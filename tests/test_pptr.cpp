@@ -295,7 +295,7 @@ static bool test_pptr_resolve_at()
 static bool test_pptr_persistence()
 {
     const std::size_t size     = 64 * 1024;
-    const char*       filename = "/tmp/pptr_test.dat";
+    const char*       filename = "pptr_test.dat";
 
     // Шаг 1: создаём менеджер, выделяем объект, записываем значение, сохраняем
     void* mem1 = std::malloc( size );
