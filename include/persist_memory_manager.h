@@ -9,6 +9,7 @@
  * Фаза 1: Базовая структура, allocate и deallocate.
  * Фаза 2: Слияние соседних свободных блоков (coalescing).
  * Фаза 3: Персистентность (save/load образа из файла).
+ * Фаза 5: Персистный типизированный указатель pptr<T>.
  *
  * Использование:
  * @code
@@ -33,7 +34,15 @@
  * }
  * @endcode
  *
- * @version 0.3.0 (Фаза 3)
+ * @code
+ * // Использование pptr<T>
+ * auto* mgr = pmm::PersistMemoryManager::create( memory, size );
+ * pmm::pptr<int> p = mgr->allocate_typed<int>();
+ * *p.resolve( mgr ) = 42;
+ * mgr->deallocate_typed( p );
+ * @endcode
+ *
+ * @version 0.4.0 (Фаза 5)
  */
 
 #pragma once
@@ -48,6 +57,9 @@
 
 namespace pmm
 {
+
+// Предварительное объявление для использования в pptr<T>
+class PersistMemoryManager;
 
 // ─── Константы ────────────────────────────────────────────────────────────────
 
@@ -314,6 +326,100 @@ inline std::size_t required_block_size( std::size_t user_size, std::size_t align
 }
 
 } // namespace detail
+
+// ─── Персистный типизированный указатель ──────────────────────────────────────
+
+/**
+ * @brief Персистный типизированный указатель.
+ *
+ * Хранит смещение (offset) от начала управляемой области менеджера памяти
+ * вместо абсолютного адреса. Это обеспечивает корректную работу после
+ * сохранения и загрузки образа памяти по другому базовому адресу.
+ *
+ * Требования:
+ *   - sizeof(pptr<T>) == sizeof(void*) — размер равен размеру обычного указателя
+ *   - Нулевое смещение (0) обозначает нулевой указатель (null)
+ *   - pptr<T> может находиться как в обычной памяти, так и в персистной области
+ *   - Для разыменования необходим указатель на менеджер памяти
+ *
+ * @tparam T Тип объекта, на который указывает персистный указатель.
+ */
+template <class T> class pptr
+{
+    /// Смещение объекта от начала управляемой области (0 = нулевой указатель).
+    /// Размер поля == sizeof(void*) — выполняется требование sizeof(pptr<T>) == sizeof(void*).
+    std::ptrdiff_t _offset;
+
+  public:
+    /// Конструктор по умолчанию — нулевой указатель.
+    inline pptr() noexcept : _offset( 0 ) {}
+
+    /// Конструктор из смещения (используется менеджером памяти).
+    inline explicit pptr( std::ptrdiff_t offset ) noexcept : _offset( offset ) {}
+
+    /// Конструктор копирования.
+    inline pptr( const pptr<T>& ) noexcept = default;
+
+    /// Оператор присваивания.
+    inline pptr<T>& operator=( const pptr<T>& ) noexcept = default;
+
+    /// Деструктор — не освобождает ресурсы.
+    inline ~pptr() noexcept = default;
+
+    // -----------------------------------------------------------------------
+    // Проверка на нулевой указатель
+    // -----------------------------------------------------------------------
+
+    /// Возвращает true, если указатель нулевой.
+    inline bool is_null() const noexcept { return _offset == 0; }
+
+    /// Явная проверка на не-нулевой указатель (для использования в if).
+    inline explicit operator bool() const noexcept { return _offset != 0; }
+
+    // -----------------------------------------------------------------------
+    // Получение смещения
+    // -----------------------------------------------------------------------
+
+    /// Возвращает хранимое смещение от базы менеджера памяти.
+    inline std::ptrdiff_t offset() const noexcept { return _offset; }
+
+    // -----------------------------------------------------------------------
+    // Разыменование (требует указатель на менеджер памяти)
+    // -----------------------------------------------------------------------
+
+    /**
+     * @brief Разыменовать — получить указатель на объект T.
+     * @param mgr Менеджер памяти, в котором был выделен объект.
+     * @return Указатель на объект или nullptr, если указатель нулевой.
+     */
+    inline T* resolve( PersistMemoryManager* mgr ) const noexcept;
+
+    /**
+     * @brief Разыменовать — получить константный указатель на объект T.
+     * @param mgr Менеджер памяти, в котором был выделен объект.
+     * @return Константный указатель на объект или nullptr, если указатель нулевой.
+     */
+    inline const T* resolve( const PersistMemoryManager* mgr ) const noexcept;
+
+    /**
+     * @brief Доступ к элементу массива по индексу.
+     * @param mgr   Менеджер памяти.
+     * @param index Индекс элемента.
+     * @return Указатель на элемент с заданным индексом.
+     */
+    inline T* resolve_at( PersistMemoryManager* mgr, std::size_t index ) const noexcept;
+
+    // -----------------------------------------------------------------------
+    // Операторы сравнения
+    // -----------------------------------------------------------------------
+
+    inline bool operator==( const pptr<T>& other ) const noexcept { return _offset == other._offset; }
+    inline bool operator!=( const pptr<T>& other ) const noexcept { return _offset != other._offset; }
+};
+
+// Проверяем требование: sizeof(pptr<T>) == sizeof(void*)
+static_assert( sizeof( pptr<int> ) == sizeof( void* ), "sizeof(pptr<T>) должен быть равен sizeof(void*)" );
+static_assert( sizeof( pptr<double> ) == sizeof( void* ), "sizeof(pptr<T>) должен быть равен sizeof(void*)" );
 
 // ─── Основной класс ───────────────────────────────────────────────────────────
 
@@ -597,6 +703,101 @@ class PersistMemoryManager
         std::memcpy( new_ptr, ptr, blk->user_size );
         deallocate( ptr );
         return new_ptr;
+    }
+
+    // ─── Персистные типизированные указатели (pptr<T>) ────────────────────────
+
+    /**
+     * @brief Выделить память для объекта типа T и вернуть персистный указатель.
+     *
+     * Выделяет sizeof(T) байт с выравниванием alignof(T) и возвращает pptr<T>,
+     * хранящий смещение от начала управляемой области.
+     *
+     * @tparam T Тип объекта.
+     * @return pptr<T> — персистный указатель; pptr<T>() (нулевой), если нет памяти.
+     *
+     * Постусловие: возвращённый pptr<T> не нулевой при успехе.
+     */
+    template <class T> pptr<T> allocate_typed()
+    {
+        std::size_t alignment = alignof( T ) < kMinAlignment ? kMinAlignment : alignof( T );
+        void*       raw       = allocate( sizeof( T ), alignment );
+        if ( raw == nullptr )
+        {
+            return pptr<T>();
+        }
+        std::ptrdiff_t off = static_cast<std::ptrdiff_t>( static_cast<std::uint8_t*>( raw ) - base_ptr() );
+        return pptr<T>( off );
+    }
+
+    /**
+     * @brief Выделить память для массива из count объектов типа T.
+     *
+     * @tparam T     Тип элементов массива.
+     * @param  count Количество элементов.
+     * @return pptr<T> — персистный указатель на первый элемент; нулевой при ошибке.
+     */
+    template <class T> pptr<T> allocate_typed( std::size_t count )
+    {
+        if ( count == 0 )
+        {
+            return pptr<T>();
+        }
+        std::size_t alignment = alignof( T ) < kMinAlignment ? kMinAlignment : alignof( T );
+        void*       raw       = allocate( sizeof( T ) * count, alignment );
+        if ( raw == nullptr )
+        {
+            return pptr<T>();
+        }
+        std::ptrdiff_t off = static_cast<std::ptrdiff_t>( static_cast<std::uint8_t*>( raw ) - base_ptr() );
+        return pptr<T>( off );
+    }
+
+    /**
+     * @brief Освободить блок памяти, на который указывает персистный указатель.
+     *
+     * @tparam T Тип объекта.
+     * @param  p Персистный указатель. Нулевой указатель игнорируется.
+     *
+     * Постусловие: память освобождена, pptr<T> следует сбросить в pptr<T>().
+     */
+    template <class T> void deallocate_typed( pptr<T> p )
+    {
+        if ( p.is_null() )
+        {
+            return;
+        }
+        void* raw = base_ptr() + p.offset();
+        deallocate( raw );
+    }
+
+    /**
+     * @brief Получить абсолютный указатель по смещению от базы менеджера.
+     *
+     * Используется методами pptr<T>::resolve() для разыменования.
+     *
+     * @param offset Смещение (должно быть > 0 для корректного блока).
+     * @return Указатель на данные или nullptr, если offset == 0.
+     */
+    void* offset_to_ptr( std::ptrdiff_t offset ) noexcept
+    {
+        if ( offset == 0 )
+        {
+            return nullptr;
+        }
+        return base_ptr() + offset;
+    }
+
+    /**
+     * @brief Получить абсолютный константный указатель по смещению.
+     */
+    const void* offset_to_ptr( std::ptrdiff_t offset ) const noexcept
+    {
+        if ( offset == 0 )
+        {
+            return nullptr;
+        }
+        return const_base_ptr() + offset;
     }
 
     // ─── Метрики ──────────────────────────────────────────────────────────────
@@ -899,6 +1100,45 @@ class PersistMemoryManager
         return detail::user_ptr( blk );
     }
 };
+
+// ─── Реализация методов pptr<T> (после полного определения PersistMemoryManager) ──
+
+/**
+ * @brief Разыменовать — получить указатель на объект T.
+ */
+template <class T> inline T* pptr<T>::resolve( PersistMemoryManager* mgr ) const noexcept
+{
+    if ( mgr == nullptr || _offset == 0 )
+    {
+        return nullptr;
+    }
+    return static_cast<T*>( mgr->offset_to_ptr( _offset ) );
+}
+
+/**
+ * @brief Разыменовать — получить константный указатель на объект T.
+ */
+template <class T> inline const T* pptr<T>::resolve( const PersistMemoryManager* mgr ) const noexcept
+{
+    if ( mgr == nullptr || _offset == 0 )
+    {
+        return nullptr;
+    }
+    return static_cast<const T*>( mgr->offset_to_ptr( _offset ) );
+}
+
+/**
+ * @brief Доступ к элементу массива по индексу.
+ */
+template <class T> inline T* pptr<T>::resolve_at( PersistMemoryManager* mgr, std::size_t index ) const noexcept
+{
+    T* base_elem = resolve( mgr );
+    if ( base_elem == nullptr )
+    {
+        return nullptr;
+    }
+    return base_elem + index;
+}
 
 // ─── Реализация свободных функций ─────────────────────────────────────────────
 
