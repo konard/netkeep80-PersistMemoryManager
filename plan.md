@@ -1,8 +1,8 @@
 # План разработки PersistMemoryManager
 
-## Текущая фаза: Фаза 2 — Слияние блоков (coalescing)
+## Текущая фаза: Фаза 4 — Тесты и документация
 
-Подробности по каждой фазе: [phase1.md](phase1.md), [phase2.md](phase2.md)
+Подробности по каждой фазе: [phase1.md](phase1.md), [phase2.md](phase2.md), [phase3.md](phase3.md), [phase4.md](phase4.md)
 
 ---
 
@@ -12,8 +12,8 @@
 |------|--------|--------|------|
 | 1 | Базовая структура и allocate/deallocate | ✅ Завершена | [phase1.md](phase1.md) |
 | 2 | Слияние блоков (coalescing) | ✅ Завершена | [phase2.md](phase2.md) |
-| 3 | Персистентность (save/load) | ⏳ Ожидает | — |
-| 4 | Тесты и документация | ⏳ Ожидает | — |
+| 3 | Персистентность (save/load) | ✅ Завершена | [phase3.md](phase3.md) |
+| 4 | Тесты и документация | ✅ Завершена | [phase4.md](phase4.md) |
 | 5 | Оптимизация производительности | ⏳ Ожидает | — |
 | 6 | Интеграция с pjson_db | ⏳ Ожидает | — |
 
@@ -63,32 +63,46 @@
 
 ## Фаза 3: Персистентность (save/load)
 
-**Статус:** ⏳ Ожидает
+**Статус:** ✅ Завершена
 
 **Задачи:**
-- [ ] Реализовать `save(const char* filename)` для сохранения образа памяти
-- [ ] Реализовать `load(const char* filename)` для загрузки образа памяти
-- [ ] Реализовать `PersistMemoryManager::load(void* memory, size_t size)` — загрузка из существующего образа
-- [ ] Хранение указателей как смещений (offsets) от base_ptr
-- [ ] Поддержка разных базовых адресов при загрузке
-- [ ] Написать тесты для персистентности
-- [ ] Демонстрационный пример: `examples/persistence_demo.cpp`
+- [x] Реализовать `save(const char* filename)` для сохранения образа памяти
+- [x] Реализовать `load_from_file(const char* filename, void* memory, size_t size)` для загрузки образа из файла
+- [x] `PersistMemoryManager::load(void* memory, size_t size)` — загрузка из существующего образа (реализован в Фазе 1)
+- [x] Хранение указателей как смещений (offsets) от base_ptr (обеспечено с Фазы 1)
+- [x] Поддержка разных базовых адресов при загрузке (смещения не зависят от адреса)
+- [x] Написать тесты для персистентности
+- [x] Демонстрационный пример: `examples/persistence_demo.cpp`
+
+**Результаты:**
+- `include/persist_memory_manager.h` — добавлен метод `save()`, свободная функция `load_from_file()`
+- `tests/test_persistence.cpp` — 12 тестов персистентности
+- `examples/persistence_demo.cpp` — демонстрация полного цикла save/load
+- `phase3.md` — документация по Фазе 3
 
 ---
 
 ## Фаза 4: Тесты и документация
 
-**Статус:** ⏳ Ожидает
+**Статус:** ✅ Завершена
 
 **Задачи:**
-- [ ] Достичь покрытия тестами ≥ 90%
-- [ ] Стресс-тест: 100,000 аллокаций подряд
-- [ ] Чередование allocate/deallocate (1M операций)
-- [ ] Написать `tests/test_coalesce.cpp`
-- [ ] Написать `tests/test_persistence.cpp`
-- [ ] Написать `examples/stress_test.cpp`
-- [ ] Написать `docs/api_reference.md`
-- [ ] Написать `docs/performance.md`
+- [x] Стресс-тест: 100 000 аллокаций подряд
+- [x] Чередование allocate/deallocate (1 000 000 операций)
+- [x] Написать `examples/stress_test.cpp`
+- [x] Написать `examples/CMakeLists.txt` (сборка примеров)
+- [x] Написать `docs/api_reference.md`
+- [x] Написать `docs/performance.md`
+- [x] Написать `phase4.md`
+- [x] Обновить `plan.md` и `README.md`
+- [ ] Достичь покрытия тестами ≥ 90% (требуется gcov/lcov — перенесено в Фазу 5)
+
+**Результаты:**
+- `examples/stress_test.cpp` — стресс-тест: 100K аллокаций + 1M чередующихся операций
+- `examples/CMakeLists.txt` — сборка примеров (basic_usage, persistence_demo, stress_test)
+- `docs/api_reference.md` — полный справочник по API
+- `docs/performance.md` — документация по производительности и результаты тестов
+- `phase4.md` — документация по Фазе 4
 
 ---
 
