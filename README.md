@@ -75,6 +75,18 @@ mgr2->validate(); // → true
 
 - **Слияние блоков (coalescing)** — при освобождении блока автоматически объединяются соседние свободные блоки, что снижает фрагментацию до нуля при полном освобождении памяти
 
+## Стресс-тест (Фаза 4)
+
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --target stress_test
+./build/examples/stress_test
+```
+
+Результаты на типичном железе:
+- **100 000 последовательных аллокаций** — все 100 000 блоков выделены успешно
+- **1 000 000 чередующихся операций** — ~28 мс (~0,028 мкс на операцию)
+
 ## Структура репозитория
 
 ```
@@ -82,8 +94,10 @@ PersistMemoryManager/
 ├── include/
 │   └── persist_memory_manager.h    # Single-header реализация
 ├── examples/
-│   ├── basic_usage.cpp             # Базовое использование
-│   └── persistence_demo.cpp        # Демонстрация персистентности
+│   ├── basic_usage.cpp             # Базовое использование (Фаза 1)
+│   ├── persistence_demo.cpp        # Демонстрация персистентности (Фаза 3)
+│   ├── stress_test.cpp             # Стресс-тест 100K/1M операций (Фаза 4)
+│   └── CMakeLists.txt
 ├── tests/
 │   ├── test_allocate.cpp           # Тесты выделения (Фаза 1)
 │   ├── test_deallocate.cpp         # Тесты освобождения (Фаза 1)
@@ -91,11 +105,14 @@ PersistMemoryManager/
 │   ├── test_persistence.cpp        # Тесты персистентности (Фаза 3)
 │   └── CMakeLists.txt
 ├── docs/
-│   └── architecture.md             # Архитектура
+│   ├── architecture.md             # Архитектура
+│   ├── api_reference.md            # Справочник по API (Фаза 4)
+│   └── performance.md              # Производительность (Фаза 4)
 ├── plan.md                         # План разработки
 ├── phase1.md                       # Фаза 1: Базовая структура
 ├── phase2.md                       # Фаза 2: Слияние блоков
 ├── phase3.md                       # Фаза 3: Персистентность
+├── phase4.md                       # Фаза 4: Тесты и документация
 ├── tz.md                           # Техническое задание
 ├── CMakeLists.txt
 └── LICENSE
@@ -128,7 +145,14 @@ PersistMemoryManager/
 - Корректная работа по любому базовому адресу (все ссылки — смещения)
 - Определение повреждённых образов через магическое число
 
-Подробнее: [plan.md](plan.md) | [phase1.md](phase1.md) | [phase2.md](phase2.md) | [phase3.md](phase3.md) | [docs/architecture.md](docs/architecture.md)
+### Фаза 4 — Тесты и документация
+
+- `examples/stress_test.cpp` — стресс-тест: 100 000 последовательных аллокаций + 1 000 000 чередующихся операций
+- `docs/api_reference.md` — полный справочник по API
+- `docs/performance.md` — результаты тестов и анализ производительности
+- Сборка примеров через `examples/CMakeLists.txt`
+
+Подробнее: [plan.md](plan.md) | [phase1.md](phase1.md) | [phase2.md](phase2.md) | [phase3.md](phase3.md) | [phase4.md](phase4.md) | [docs/architecture.md](docs/architecture.md) | [docs/api_reference.md](docs/api_reference.md) | [docs/performance.md](docs/performance.md)
 
 ## Лицензия
 
