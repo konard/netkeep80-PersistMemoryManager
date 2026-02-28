@@ -16,3 +16,6 @@ pmm_add_test(test_coalesce    test_coalesce.cpp)
 
 # ─── Тесты Фазы 3 ─────────────────────────────────────────────────────────────
 pmm_add_test(test_persistence test_persistence.cpp)
+
+# ─── Тесты Фазы 5 ─────────────────────────────────────────────────────────────
+pmm_add_test(test_pptr test_pptr.cpp)

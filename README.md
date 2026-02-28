@@ -9,6 +9,7 @@
 - **Single-header** — вся реализация в одном файле `include/persist_memory_manager.h`
 - **C++17** — без внешних зависимостей, только стандартная библиотека
 - **Персистентность** — все ссылки хранятся как смещения, а не абсолютные указатели
+- **pptr<T>** — персистный типизированный указатель, sizeof == sizeof(void*)
 - **Выравнивание** — поддержка alignment от 8 до 4096 байт
 - **Диагностика** — validate(), dump_stats(), get_stats()
 
@@ -48,6 +49,64 @@ cmake -B build
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
+
+## Персистный указатель pptr<T> (Фаза 5)
+
+`pptr<T>` — типизированный персистный указатель, который хранит смещение (offset) от базы менеджера памяти вместо абсолютного адреса. Это позволяет корректно восстанавливать указатели после загрузки образа по любому базовому адресу.
+
+```cpp
+#include "persist_memory_manager.h"
+
+int main() {
+    void* memory = std::malloc(1024 * 1024);
+    auto* mgr = pmm::PersistMemoryManager::create(memory, 1024 * 1024);
+
+    // Выделить один объект типа int
+    pmm::pptr<int> p = mgr->allocate_typed<int>();
+    *p.resolve(mgr) = 42;
+
+    // Выделить массив из 10 double
+    pmm::pptr<double> arr = mgr->allocate_typed<double>(10);
+    for (int i = 0; i < 10; i++) {
+        *arr.resolve_at(mgr, i) = i * 1.5;
+    }
+
+    // Проверка на нулевой указатель
+    if (p) { /* ненулевой */ }
+
+    // Сохранить образ
+    mgr->save("heap.dat");
+
+    // Сохраняем смещение для восстановления после load
+    std::ptrdiff_t off = p.offset();
+
+    mgr->deallocate_typed(arr);
+    mgr->deallocate_typed(p);
+    mgr->destroy();
+    std::free(memory);
+
+    // --- следующий запуск ---
+    void* buf2 = std::malloc(1024 * 1024);
+    auto* mgr2 = pmm::load_from_file("heap.dat", buf2, 1024 * 1024);
+
+    // Восстанавливаем pptr<int> по сохранённому смещению
+    pmm::pptr<int> p2(off);
+    std::cout << *p2.resolve(mgr2) << "\n"; // выведет 42
+
+    mgr2->destroy();
+    std::free(buf2);
+    return 0;
+}
+```
+
+Ключевые свойства `pptr<T>`:
+- `sizeof(pptr<T>) == sizeof(void*)` — размер как у обычного указателя
+- `pptr<T>()` — нулевой указатель по умолчанию
+- `is_null()` / `operator bool()` — проверка на нулевой указатель
+- `resolve(mgr)` — разыменование (возвращает `T*`)
+- `resolve_at(mgr, index)` — доступ к элементу массива
+- `offset()` — хранимое смещение (для сохранения/восстановления)
+- Операторы `==` и `!=`
 
 ## Персистентность (Фаза 3)
 
@@ -103,6 +162,7 @@ PersistMemoryManager/
 │   ├── test_deallocate.cpp         # Тесты освобождения (Фаза 1)
 │   ├── test_coalesce.cpp           # Тесты слияния блоков (Фаза 2)
 │   ├── test_persistence.cpp        # Тесты персистентности (Фаза 3)
+│   ├── test_pptr.cpp               # Тесты персистного указателя pptr<T> (Фаза 5)
 │   └── CMakeLists.txt
 ├── docs/
 │   ├── architecture.md             # Архитектура
@@ -151,6 +211,16 @@ PersistMemoryManager/
 - `docs/api_reference.md` — полный справочник по API
 - `docs/performance.md` — результаты тестов и анализ производительности
 - Сборка примеров через `examples/CMakeLists.txt`
+
+### Фаза 5 — Персистный указатель pptr<T>
+
+- `pptr<T>` — шаблонный класс персистного типизированного указателя
+- `sizeof(pptr<T>) == sizeof(void*)` — размер как у обычного указателя
+- Хранит смещение от базы менеджера (не абсолютный адрес)
+- Корректно восстанавливается после save/load по любому базовому адресу
+- `allocate_typed<T>()` / `allocate_typed<T>(count)` — выделение объекта/массива
+- `deallocate_typed(pptr<T>)` — освобождение памяти
+- 14 тестов в `tests/test_pptr.cpp`
 
 Подробнее: [plan.md](plan.md) | [phase1.md](phase1.md) | [phase2.md](phase2.md) | [phase3.md](phase3.md) | [phase4.md](phase4.md) | [docs/architecture.md](docs/architecture.md) | [docs/api_reference.md](docs/api_reference.md) | [docs/performance.md](docs/performance.md)
 
