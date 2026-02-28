@@ -345,13 +345,11 @@ static bool test_pptr_allocate_auto_expand()
     std::size_t initial_total = mgr->total_size();
 
     // Заполняем большую часть буфера первым блоком
-    pmm::pptr<std::uint8_t> p1 =
-        pmm::PersistMemoryManager::instance()->allocate_typed<std::uint8_t>( 4 * 1024 );
+    pmm::pptr<std::uint8_t> p1 = pmm::PersistMemoryManager::instance()->allocate_typed<std::uint8_t>( 4 * 1024 );
     PMM_TEST( !p1.is_null() );
 
     // Запрашиваем второй блок — должно вызвать расширение
-    pmm::pptr<std::uint8_t> p2 =
-        pmm::PersistMemoryManager::instance()->allocate_typed<std::uint8_t>( 4 * 1024 );
+    pmm::pptr<std::uint8_t> p2 = pmm::PersistMemoryManager::instance()->allocate_typed<std::uint8_t>( 4 * 1024 );
     PMM_TEST( !p2.is_null() );
 
     // После расширения синглтон указывает на новый буфер

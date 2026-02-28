@@ -396,10 +396,8 @@ static bool test_persistence_deallocate_after_load()
     PMM_TEST( p1 && p2 );
 
     // Запоминаем смещения
-    std::ptrdiff_t off1 =
-        static_cast<std::uint8_t*>( p1 ) - static_cast<std::uint8_t*>( static_cast<void*>( mgr1 ) );
-    std::ptrdiff_t off2 =
-        static_cast<std::uint8_t*>( p2 ) - static_cast<std::uint8_t*>( static_cast<void*>( mgr1 ) );
+    std::ptrdiff_t off1 = static_cast<std::uint8_t*>( p1 ) - static_cast<std::uint8_t*>( static_cast<void*>( mgr1 ) );
+    std::ptrdiff_t off2 = static_cast<std::uint8_t*>( p2 ) - static_cast<std::uint8_t*>( static_cast<void*>( mgr1 ) );
 
     PMM_TEST( mgr1->save( TEST_FILE ) );
     pmm::PersistMemoryManager::destroy();

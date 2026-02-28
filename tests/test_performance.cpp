@@ -238,10 +238,8 @@ static bool test_free_list_after_load()
     PMM_TEST( mgr->validate() );
 
     // Запоминаем смещения p1 и p3 до того как менеджер сменится
-    std::ptrdiff_t off1 =
-        static_cast<std::uint8_t*>( p1 ) - static_cast<std::uint8_t*>( static_cast<void*>( mgr ) );
-    std::ptrdiff_t off3 =
-        static_cast<std::uint8_t*>( p3 ) - static_cast<std::uint8_t*>( static_cast<void*>( mgr ) );
+    std::ptrdiff_t off1 = static_cast<std::uint8_t*>( p1 ) - static_cast<std::uint8_t*>( static_cast<void*>( mgr ) );
+    std::ptrdiff_t off3 = static_cast<std::uint8_t*>( p3 ) - static_cast<std::uint8_t*>( static_cast<void*>( mgr ) );
 
     // Сохраняем образ и загружаем его в новый буфер
     void* mem_copy = std::malloc( MEMORY_SIZE );
@@ -365,8 +363,7 @@ static bool test_full_coalesce_after_alloc_dealloc()
     PMM_TEST( stats.free_blocks == 1 );
 
     PMM_TEST( pmm::PersistMemoryManager::instance()->free_size() > 0 );
-    PMM_TEST( pmm::PersistMemoryManager::instance()->free_size() +
-                  pmm::PersistMemoryManager::instance()->used_size() ==
+    PMM_TEST( pmm::PersistMemoryManager::instance()->free_size() + pmm::PersistMemoryManager::instance()->used_size() ==
               pmm::PersistMemoryManager::instance()->total_size() );
     (void)initial_total;
 
