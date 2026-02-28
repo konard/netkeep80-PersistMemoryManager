@@ -11,8 +11,9 @@
  * Фаза 3: Персистентность (save/load образа из файла).
  * Фаза 5: Персистный типизированный указатель pptr<T>.
  * Фаза 6: Оптимизация производительности (отдельный список свободных блоков).
+ * Фаза 7: Синглтон и автоматическое расширение памяти.
  *
- * Использование:
+ * Использование (синглтон):
  * @code
  * #include "persist_memory_manager.h"
  *
@@ -22,28 +23,30 @@
  *     void* block  = mgr->allocate( 256 );
  *     mgr->save( "heap.dat" );   // сохранить образ в файл
  *     mgr->deallocate( block );
- *     mgr->destroy();
- *     std::free( memory );
+ *     pmm::PersistMemoryManager::destroy();
+ *     // память освобождается менеджером автоматически при expand
+ *     // либо вручную по sys_memory() + destroy
  *
  *     // --- следующий запуск ---
  *     void* buf2 = std::malloc( 1024 * 1024 );
  *     auto* mgr2 = pmm::load_from_file( "heap.dat", buf2, 1024 * 1024 );
  *     // mgr2 восстановлен с теми же блоками
- *     mgr2->destroy();
+ *     pmm::PersistMemoryManager::destroy();
  *     std::free( buf2 );
  *     return 0;
  * }
  * @endcode
  *
  * @code
- * // Использование pptr<T>
+ * // Использование pptr<T> — разыменование без явной передачи менеджера
  * auto* mgr = pmm::PersistMemoryManager::create( memory, size );
  * pmm::pptr<int> p = mgr->allocate_typed<int>();
- * *p.resolve( mgr ) = 42;
+ * *p = 42;                       // разыменование через синглтон автоматически
+ * p->some_field = ...;           // оператор ->
  * mgr->deallocate_typed( p );
  * @endcode
  *
- * @version 0.5.0 (Фаза 6)
+ * @version 0.6.0 (Фаза 7)
  */
 
 #pragma once
@@ -53,6 +56,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
 
@@ -81,6 +85,10 @@ static constexpr std::size_t kMinBlockSize = 32;
 
 /// Магическое число для валидации заголовка менеджера
 static constexpr std::uint64_t kMagic = 0x504D4D5F56303130ULL; // "PMM_V010"
+
+/// Коэффициент расширения памяти при нехватке (25%)
+static constexpr std::size_t kGrowNumerator = 5;
+static constexpr std::size_t kGrowDenominator = 4;
 
 // ─── Коды ошибок ──────────────────────────────────────────────────────────────
 
@@ -404,7 +412,8 @@ inline void free_list_remove( std::uint8_t* base, ManagerHeader* hdr, BlockHeade
  *   - sizeof(pptr<T>) == sizeof(void*) — размер равен размеру обычного указателя
  *   - Нулевое смещение (0) обозначает нулевой указатель (null)
  *   - pptr<T> может находиться как в обычной памяти, так и в персистной области
- *   - Для разыменования необходим указатель на менеджер памяти
+ *   - Разыменование использует синглтон PersistMemoryManager::instance()
+ *     (не требует явной передачи указателя на менеджер)
  *
  * @tparam T Тип объекта, на который указывает персистный указатель.
  */
@@ -448,7 +457,38 @@ template <class T> class pptr
     inline std::ptrdiff_t offset() const noexcept { return _offset; }
 
     // -----------------------------------------------------------------------
-    // Разыменование (требует указатель на менеджер памяти)
+    // Разыменование через синглтон (не требует явного указателя на менеджер)
+    // -----------------------------------------------------------------------
+
+    /**
+     * @brief Разыменовать — получить указатель на объект T.
+     *
+     * Использует синглтон PersistMemoryManager::instance() автоматически.
+     * @return Указатель на объект или nullptr, если указатель нулевой или нет экземпляра.
+     */
+    inline T* get() const noexcept;
+
+    /**
+     * @brief Оператор разыменования.
+     * @return Ссылка на объект T.
+     */
+    inline T& operator*() const noexcept { return *get(); }
+
+    /**
+     * @brief Оператор доступа к членам.
+     * @return Указатель на объект T.
+     */
+    inline T* operator->() const noexcept { return get(); }
+
+    /**
+     * @brief Доступ к элементу массива по индексу.
+     * @param index Индекс элемента.
+     * @return Указатель на элемент с заданным индексом.
+     */
+    inline T* get_at( std::size_t index ) const noexcept;
+
+    // -----------------------------------------------------------------------
+    // Разыменование с явным менеджером (для совместимости и save/load сценариев)
     // -----------------------------------------------------------------------
 
     /**
@@ -521,11 +561,17 @@ AllocationInfo get_info( const PersistMemoryManager* mgr, void* ptr );
 PersistMemoryManager* load_from_file( const char* filename, void* memory, std::size_t size );
 
 /**
- * @brief Менеджер персистентной памяти.
+ * @brief Менеджер персистентной памяти (синглтон).
  *
  * Управляет областью памяти, переданной при создании. Все метаданные
  * хранятся внутри этой области, что позволяет сохранять и загружать
  * образ памяти из файла.
+ *
+ * Одновременно может существовать только один экземпляр менеджера.
+ * Доступ к нему осуществляется через статический метод instance().
+ *
+ * При нехватке памяти менеджер автоматически расширяет управляемую
+ * область на 25%, копирует данные и освобождает старый буфер.
  *
  * Предусловие для create(): размер >= kMinMemorySize.
  * Постусловие для create(): возвращаемый указатель != nullptr.
@@ -533,13 +579,27 @@ PersistMemoryManager* load_from_file( const char* filename, void* memory, std::s
 class PersistMemoryManager
 {
   public:
+    // ─── Синглтон ─────────────────────────────────────────────────────────────
+
+    /**
+     * @brief Получить указатель на текущий экземпляр менеджера (синглтон).
+     *
+     * @return Указатель на менеджер или nullptr, если менеджер ещё не создан.
+     */
+    static PersistMemoryManager* instance() noexcept
+    {
+        return s_instance;
+    }
+
     // ─── Инициализация ────────────────────────────────────────────────────────
 
     /**
      * @brief Создать новый менеджер памяти в переданной области.
      *
      * Инициализирует метаданные в начале буфера и создаёт один большой
-     * свободный блок на всё оставшееся пространство.
+     * свободный блок на всё оставшееся пространство. Устанавливает синглтон.
+     *
+     * Если менеджер уже создан, уничтожает предыдущий экземпляр перед созданием нового.
      *
      * @param memory Указатель на начало управляемой области.
      * @param size   Размер области в байтах (>= kMinMemorySize).
@@ -598,7 +658,9 @@ class PersistMemoryManager
         hdr->free_count         = 1;
         hdr->used_size          = hdr_end + sizeof( detail::BlockHeader );
 
-        return reinterpret_cast<PersistMemoryManager*>( base );
+        PersistMemoryManager* mgr = reinterpret_cast<PersistMemoryManager*>( base );
+        s_instance                = mgr;
+        return mgr;
     }
 
     /**
@@ -606,6 +668,7 @@ class PersistMemoryManager
      *
      * Проверяет магическое число и базовую целостность заголовка.
      * Не пересчитывает абсолютные указатели (используются только смещения).
+     * Устанавливает синглтон.
      *
      * @param memory Указатель на начало области с сохранённым образом.
      * @param size   Размер области в байтах.
@@ -626,19 +689,29 @@ class PersistMemoryManager
         // Перестраиваем список свободных блоков после загрузки образа
         auto* mgr = reinterpret_cast<PersistMemoryManager*>( base );
         mgr->rebuild_free_list();
+        s_instance = mgr;
         return mgr;
     }
 
     /**
-     * @brief Уничтожить менеджер (обнулить магическое число в заголовке).
+     * @brief Уничтожить синглтон и освободить управляемую память.
      *
-     * После вызова использование менеджера через тот же указатель
-     * приведёт к неопределённому поведению.
+     * Обнуляет магическое число в заголовке, освобождает буфер (std::free),
+     * сбрасывает синглтон в nullptr.
+     *
+     * После вызова пользователь НЕ должен вызывать std::free для буфера,
+     * переданного в create() или load() — менеджер управляет им самостоятельно.
      */
-    void destroy()
+    static void destroy()
     {
-        detail::ManagerHeader* hdr = header();
-        hdr->magic                 = 0;
+        if ( s_instance != nullptr )
+        {
+            detail::ManagerHeader* hdr = s_instance->header();
+            hdr->magic                 = 0;
+            void* buf                  = s_instance->base_ptr();
+            s_instance                 = nullptr;
+            std::free( buf );
+        }
     }
 
     // ─── Выделение / освобождение ─────────────────────────────────────────────
@@ -648,6 +721,7 @@ class PersistMemoryManager
      *
      * Алгоритм: линейный поиск подходящего свободного блока (first-fit).
      * При нахождении блока большего размера — разбивает его на два.
+     * При нехватке памяти — автоматически расширяет область на 25%.
      *
      * @param user_size  Требуемый размер пользовательских данных (байт).
      * @param alignment  Требуемое выравнивание (степень двойки, [8..4096]).
@@ -683,7 +757,33 @@ class PersistMemoryManager
             offset = blk->free_next_offset;
         }
 
-        return nullptr; // Не хватает памяти
+        // Нет подходящего блока — пытаемся расширить память
+        if ( !expand( user_size, alignment ) )
+        {
+            return nullptr; // Расширение не удалось
+        }
+
+        // После расширения s_instance указывает на новый буфер (this устарел).
+        // Делегируем повторный поиск новому синглтону.
+        PersistMemoryManager* new_mgr = s_instance;
+        if ( new_mgr == nullptr )
+        {
+            return nullptr;
+        }
+        std::uint8_t*          new_base   = new_mgr->base_ptr();
+        detail::ManagerHeader* new_hdr    = new_mgr->header();
+        std::ptrdiff_t         new_offset = new_hdr->first_free_offset;
+        while ( new_offset != detail::kNoBlock )
+        {
+            detail::BlockHeader* blk = detail::block_at( new_base, new_offset );
+            if ( blk->total_size >= needed )
+            {
+                return new_mgr->allocate_from_block( blk, user_size, alignment );
+            }
+            new_offset = blk->free_next_offset;
+        }
+
+        return nullptr;
     }
 
     /**
@@ -848,7 +948,7 @@ class PersistMemoryManager
     /**
      * @brief Получить абсолютный указатель по смещению от базы менеджера.
      *
-     * Используется методами pptr<T>::resolve() для разыменования.
+     * Используется методами pptr<T>::get() и pptr<T>::resolve() для разыменования.
      *
      * @param offset Смещение (должно быть > 0 для корректного блока).
      * @return Указатель на данные или nullptr, если offset == 0.
@@ -1023,6 +1123,9 @@ class PersistMemoryManager
     friend PersistMemoryManager* load_from_file( const char* filename, void* memory, std::size_t size );
 
   private:
+    /// Единственный экземпляр менеджера (синглтон).
+    static PersistMemoryManager* s_instance;
+
     // ─── Вспомогательные методы ───────────────────────────────────────────────
 
     /**
@@ -1038,6 +1141,125 @@ class PersistMemoryManager
     detail::ManagerHeader* header() { return reinterpret_cast<detail::ManagerHeader*>( this ); }
 
     const detail::ManagerHeader* header() const { return reinterpret_cast<const detail::ManagerHeader*>( this ); }
+
+    /**
+     * @brief Расширить управляемую область памяти на 25%.
+     *
+     * Выделяет новый буфер размером old_size * 5 / 4, копирует туда
+     * старый образ, освобождает старый буфер (std::free) и обновляет
+     * синглтон s_instance.
+     *
+     * @param user_size  Требуемый дополнительный размер (для проверки достаточности).
+     * @param alignment  Требуемое выравнивание (для проверки достаточности).
+     * @return true при успешном расширении, false при ошибке выделения.
+     *
+     * Предусловие:  вызывается только когда нет подходящего свободного блока.
+     * Постусловие: s_instance указывает на новый буфер, старый освобождён.
+     */
+    bool expand( std::size_t user_size, std::size_t alignment )
+    {
+        detail::ManagerHeader* hdr      = header();
+        std::size_t            old_size = hdr->total_size;
+
+        // Вычисляем новый размер: +25% (умножаем на 5/4)
+        std::size_t new_size = old_size * kGrowNumerator / kGrowDenominator;
+
+        // Убеждаемся что новый размер достаточно велик для запрашиваемого блока
+        std::size_t needed = detail::required_block_size( user_size, alignment );
+        if ( new_size < old_size + needed )
+        {
+            new_size = old_size + needed + detail::align_up( sizeof( detail::BlockHeader ), kDefaultAlignment );
+        }
+
+        // Выделяем новый буфер
+        void* new_memory = std::malloc( new_size );
+        if ( new_memory == nullptr )
+        {
+            return false;
+        }
+
+        // Копируем старый образ в новый буфер
+        std::memcpy( new_memory, base_ptr(), old_size );
+
+        // Обновляем заголовок менеджера с новым размером
+        detail::ManagerHeader* new_hdr = reinterpret_cast<detail::ManagerHeader*>( new_memory );
+        std::uint8_t*          new_base = static_cast<std::uint8_t*>( new_memory );
+
+        // Находим последний блок в новом буфере и расширяем его (или добавляем новый свободный блок)
+        std::ptrdiff_t extra_offset = static_cast<std::ptrdiff_t>( old_size );
+        std::size_t    extra_size   = new_size - old_size;
+
+        // Находим последний блок через обход связного списка
+        detail::BlockHeader* last_blk   = nullptr;
+        std::ptrdiff_t       blk_offset = new_hdr->first_block_offset;
+        while ( blk_offset != detail::kNoBlock )
+        {
+            detail::BlockHeader* blk = detail::block_at( new_base, blk_offset );
+            if ( blk->next_offset == detail::kNoBlock )
+            {
+                last_blk = blk;
+            }
+            blk_offset = blk->next_offset;
+        }
+
+        if ( last_blk != nullptr && !last_blk->used )
+        {
+            // Последний блок свободен — просто увеличиваем его
+            detail::free_list_remove( new_base, new_hdr, last_blk );
+            last_blk->total_size += extra_size;
+            detail::free_list_insert( new_base, new_hdr, last_blk );
+        }
+        else
+        {
+            // Создаём новый свободный блок в расширенной области
+            if ( extra_size < sizeof( detail::BlockHeader ) + kMinBlockSize )
+            {
+                // Слишком мало для нового блока — не можем расшириться
+                std::free( new_memory );
+                return false;
+            }
+
+            detail::BlockHeader* new_blk = detail::block_at( new_base, extra_offset );
+            new_blk->magic               = detail::kBlockMagic;
+            new_blk->total_size          = extra_size;
+            new_blk->user_size           = 0;
+            new_blk->alignment           = kDefaultAlignment;
+            new_blk->used                = false;
+            new_blk->free_prev_offset    = detail::kNoBlock;
+            new_blk->free_next_offset    = detail::kNoBlock;
+            std::memset( new_blk->_pad, 0, sizeof( new_blk->_pad ) );
+
+            if ( last_blk != nullptr )
+            {
+                std::ptrdiff_t last_off       = detail::block_offset( new_base, last_blk );
+                new_blk->prev_offset          = last_off;
+                new_blk->next_offset          = detail::kNoBlock;
+                last_blk->next_offset         = extra_offset;
+            }
+            else
+            {
+                new_blk->prev_offset            = detail::kNoBlock;
+                new_blk->next_offset            = detail::kNoBlock;
+                new_hdr->first_block_offset     = extra_offset;
+            }
+
+            new_hdr->block_count++;
+            new_hdr->free_count++;
+            detail::free_list_insert( new_base, new_hdr, new_blk );
+        }
+
+        // Обновляем total_size в заголовке
+        new_hdr->total_size = new_size;
+
+        // Освобождаем старый буфер
+        void* old_memory = base_ptr();
+        std::free( old_memory );
+
+        // Обновляем синглтон
+        s_instance = reinterpret_cast<PersistMemoryManager*>( new_memory );
+
+        return true;
+    }
 
     /**
      * @brief Перестроить список свободных блоков, обходя все блоки.
@@ -1231,10 +1453,40 @@ class PersistMemoryManager
     }
 };
 
+// ─── Определение статического члена синглтона ──────────────────────────────────
+
+inline PersistMemoryManager* PersistMemoryManager::s_instance = nullptr;
+
 // ─── Реализация методов pptr<T> (после полного определения PersistMemoryManager) ──
 
 /**
- * @brief Разыменовать — получить указатель на объект T.
+ * @brief Разыменовать — получить указатель на объект T через синглтон.
+ */
+template <class T> inline T* pptr<T>::get() const noexcept
+{
+    PersistMemoryManager* mgr = PersistMemoryManager::instance();
+    if ( mgr == nullptr || _offset == 0 )
+    {
+        return nullptr;
+    }
+    return static_cast<T*>( mgr->offset_to_ptr( _offset ) );
+}
+
+/**
+ * @brief Доступ к элементу массива по индексу через синглтон.
+ */
+template <class T> inline T* pptr<T>::get_at( std::size_t index ) const noexcept
+{
+    T* base_elem = get();
+    if ( base_elem == nullptr )
+    {
+        return nullptr;
+    }
+    return base_elem + index;
+}
+
+/**
+ * @brief Разыменовать — получить указатель на объект T (явный менеджер).
  */
 template <class T> inline T* pptr<T>::resolve( PersistMemoryManager* mgr ) const noexcept
 {
@@ -1246,7 +1498,7 @@ template <class T> inline T* pptr<T>::resolve( PersistMemoryManager* mgr ) const
 }
 
 /**
- * @brief Разыменовать — получить константный указатель на объект T.
+ * @brief Разыменовать — получить константный указатель на объект T (явный менеджер).
  */
 template <class T> inline const T* pptr<T>::resolve( const PersistMemoryManager* mgr ) const noexcept
 {
@@ -1258,7 +1510,7 @@ template <class T> inline const T* pptr<T>::resolve( const PersistMemoryManager*
 }
 
 /**
- * @brief Доступ к элементу массива по индексу.
+ * @brief Доступ к элементу массива по индексу (явный менеджер).
  */
 template <class T> inline T* pptr<T>::resolve_at( PersistMemoryManager* mgr, std::size_t index ) const noexcept
 {
@@ -1359,7 +1611,7 @@ inline AllocationInfo get_info( const PersistMemoryManager* mgr, void* ptr )
  * загрузка по другому базовому адресу корректна без пересчёта указателей.
  *
  * @param filename Путь к файлу с образом памяти.
- * @param memory   Буфер, в который будет загружен образ (размер >= size файла).
+ * @param memory   Буфер, в который будет загружен образ (размер >= размера файла).
  * @param size     Размер буфера в байтах.
  * @return Указатель на восстановленный менеджер или nullptr при ошибке.
  */
