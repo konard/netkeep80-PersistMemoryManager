@@ -177,7 +177,7 @@ static bool test_coalesce_both_neighbors()
     mgr->deallocate( p3 );
     PMM_TEST( mgr->validate() );
 
-    auto before = pmm::get_stats( mgr );
+    auto        before      = pmm::get_stats( mgr );
     std::size_t free_before = before.free_blocks;
 
     // Теперь освобождаем p2 — должно слиться с p1 (слева) и p3 (справа)
@@ -458,7 +458,7 @@ static bool test_coalesce_stress_interleaved()
     pmm::PersistMemoryManager* mgr = pmm::PersistMemoryManager::create( mem, size );
     PMM_TEST( mgr != nullptr );
 
-    static const int ROUNDS = 200;
+    static const int ROUNDS  = 200;
     void*            ptrs[4] = { nullptr, nullptr, nullptr, nullptr };
     std::size_t      sizes[] = { 64, 128, 256, 512 };
 
