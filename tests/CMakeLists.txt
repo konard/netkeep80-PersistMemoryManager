@@ -22,3 +22,6 @@ pmm_add_test(test_pptr test_pptr.cpp)
 
 # ─── Тесты Фазы 6 ─────────────────────────────────────────────────────────────
 pmm_add_test(test_performance test_performance.cpp)
+
+# ─── Реалистичный стресс-тест (Issue #20) ────────────────────────────────────
+pmm_add_test(test_stress_realistic test_stress_realistic.cpp)
