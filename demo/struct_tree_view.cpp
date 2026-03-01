@@ -21,7 +21,7 @@ void StructTreeView::update_snapshot( pmm::PersistMemoryManager* mgr )
 
     snapshot_.blocks.clear();
 
-    const pmm::ManagerInfo info = pmm::get_manager_info( mgr );
+    const pmm::ManagerInfo info = pmm::get_manager_info();
 
     snapshot_.magic              = info.magic;
     snapshot_.total_size         = info.total_size;
@@ -32,8 +32,7 @@ void StructTreeView::update_snapshot( pmm::PersistMemoryManager* mgr )
     snapshot_.first_block_offset = info.first_block_offset;
     snapshot_.first_free_offset  = info.first_free_offset;
 
-    pmm::for_each_block( mgr,
-                         [&]( const pmm::BlockView& blk )
+    pmm::for_each_block( [&]( const pmm::BlockView& blk )
                          {
                              BlockSnapshot bs;
                              bs.index      = blk.index;

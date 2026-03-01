@@ -136,11 +136,10 @@ class LinearFill final : public Scenario
     {
         coord.register_participant();
 
-        auto*      mgr      = pmm::PersistMemoryManager::instance();
         const auto interval = std::chrono::duration<double>( 1.0 / std::max( p.alloc_freq, 1.0f ) );
         auto       next     = std::chrono::steady_clock::now();
 
-        std::vector<void*> live;
+        std::vector<pmm::pptr<uint8_t>> live;
         live.reserve( 512 );
 
         while ( !stop.load( std::memory_order_relaxed ) )
@@ -163,11 +162,10 @@ class LinearFill final : public Scenario
                     break;
                 if ( pmm::PersistMemoryManager::instance() != inner_before )
                     live.clear();
-                mgr = pmm::PersistMemoryManager::instance();
-                if ( !mgr )
+                if ( !pmm::PersistMemoryManager::instance() )
                     break;
-                void* ptr = mgr->allocate( p.min_block_size );
-                if ( !ptr )
+                auto ptr = pmm::PersistMemoryManager::allocate_typed<uint8_t>( p.min_block_size );
+                if ( ptr.is_null() )
                     break;
                 live.push_back( ptr );
                 ops.fetch_add( 1, std::memory_order_relaxed );
@@ -175,13 +173,11 @@ class LinearFill final : public Scenario
             }
 
             // Free phase
-            mgr = pmm::PersistMemoryManager::instance();
-            for ( void* ptr : live )
+            for ( auto& ptr : live )
             {
                 if ( stop.load( std::memory_order_relaxed ) )
                     break;
-                if ( mgr )
-                    mgr->deallocate( ptr );
+                pmm::PersistMemoryManager::deallocate_typed( ptr );
                 ops.fetch_add( 1, std::memory_order_relaxed );
             }
             live.clear();
@@ -207,7 +203,6 @@ class RandomStress final : public Scenario
     {
         coord.register_participant();
 
-        auto*                                      mgr = pmm::PersistMemoryManager::instance();
         std::mt19937                               rng( std::random_device{}() );
         std::uniform_int_distribution<std::size_t> size_dist( p.min_block_size, p.max_block_size );
         std::uniform_real_distribution<float>      choice( 0.0f, p.alloc_freq + p.dealloc_freq );
@@ -215,7 +210,7 @@ class RandomStress final : public Scenario
         const auto alloc_interval = std::chrono::duration<double>( 1.0 / std::max( p.alloc_freq, 1.0f ) );
         auto       next           = std::chrono::steady_clock::now();
 
-        std::vector<void*> live;
+        std::vector<pmm::pptr<uint8_t>> live;
         live.reserve( static_cast<std::size_t>( p.max_live_blocks ) );
 
         while ( !stop.load( std::memory_order_relaxed ) )
@@ -228,8 +223,7 @@ class RandomStress final : public Scenario
             if ( pmm::PersistMemoryManager::instance() != mgr_before )
                 live.clear();
 
-            mgr = pmm::PersistMemoryManager::instance();
-            if ( !mgr )
+            if ( !pmm::PersistMemoryManager::instance() )
             {
                 rate_sleep( next, alloc_interval );
                 continue;
@@ -240,8 +234,8 @@ class RandomStress final : public Scenario
 
             if ( do_alloc )
             {
-                void* ptr = mgr->allocate( size_dist( rng ) );
-                if ( ptr )
+                auto ptr = pmm::PersistMemoryManager::allocate_typed<uint8_t>( size_dist( rng ) );
+                if ( !ptr.is_null() )
                 {
                     live.push_back( ptr );
                     ops.fetch_add( 1, std::memory_order_relaxed );
@@ -251,7 +245,7 @@ class RandomStress final : public Scenario
             {
                 std::uniform_int_distribution<std::size_t> idx( 0, live.size() - 1 );
                 std::size_t                                i = idx( rng );
-                mgr->deallocate( live[i] );
+                pmm::PersistMemoryManager::deallocate_typed( live[i] );
                 live[i] = live.back();
                 live.pop_back();
                 ops.fetch_add( 1, std::memory_order_relaxed );
@@ -261,12 +255,8 @@ class RandomStress final : public Scenario
         }
 
         // Cleanup remaining live blocks
-        mgr = pmm::PersistMemoryManager::instance();
-        if ( mgr )
-        {
-            for ( void* ptr : live )
-                mgr->deallocate( ptr );
-        }
+        for ( auto& ptr : live )
+            pmm::PersistMemoryManager::deallocate_typed( ptr );
 
         coord.unregister_participant();
     }
@@ -289,14 +279,13 @@ class FragmentationDemo final : public Scenario
     {
         coord.register_participant();
 
-        auto*        mgr = pmm::PersistMemoryManager::instance();
         std::mt19937 rng( std::random_device{}() );
 
         const auto interval = std::chrono::duration<double>( 1.0 / std::max( p.alloc_freq, 1.0f ) );
         auto       next     = std::chrono::steady_clock::now();
 
-        std::vector<void*> small_live;
-        std::vector<void*> large_live;
+        std::vector<pmm::pptr<uint8_t>> small_live;
+        std::vector<pmm::pptr<uint8_t>> large_live;
         small_live.reserve( 256 );
         large_live.reserve( 64 );
 
@@ -315,8 +304,7 @@ class FragmentationDemo final : public Scenario
                 large_live.clear();
             }
 
-            mgr = pmm::PersistMemoryManager::instance();
-            if ( !mgr )
+            if ( !pmm::PersistMemoryManager::instance() )
             {
                 rate_sleep( next, interval );
                 continue;
@@ -324,14 +312,14 @@ class FragmentationDemo final : public Scenario
 
             if ( alloc_small )
             {
-                void* ptr = mgr->allocate( 16 + ( rng() % 48 ) ); // 16..63
-                if ( ptr )
+                auto ptr = pmm::PersistMemoryManager::allocate_typed<uint8_t>( 16 + ( rng() % 48 ) ); // 16..63
+                if ( !ptr.is_null() )
                     small_live.push_back( ptr );
             }
             else
             {
-                void* ptr = mgr->allocate( 4096 + ( rng() % 12288 ) ); // 4096..16383
-                if ( ptr )
+                auto ptr = pmm::PersistMemoryManager::allocate_typed<uint8_t>( 4096 + ( rng() % 12288 ) ); // 4096..16383
+                if ( !ptr.is_null() )
                     large_live.push_back( ptr );
             }
             ops.fetch_add( 1, std::memory_order_relaxed );
@@ -343,7 +331,7 @@ class FragmentationDemo final : public Scenario
                 std::size_t to_free = small_live.size() / 2;
                 for ( std::size_t i = 0; i < to_free; ++i )
                 {
-                    mgr->deallocate( small_live[i] );
+                    pmm::PersistMemoryManager::deallocate_typed( small_live[i] );
                     ops.fetch_add( 1, std::memory_order_relaxed );
                 }
                 small_live.erase( small_live.begin(), small_live.begin() + static_cast<std::ptrdiff_t>( to_free ) );
@@ -352,7 +340,7 @@ class FragmentationDemo final : public Scenario
             // Free large blocks if too many accumulate
             if ( large_live.size() > 16 )
             {
-                mgr->deallocate( large_live.front() );
+                pmm::PersistMemoryManager::deallocate_typed( large_live.front() );
                 large_live.erase( large_live.begin() );
                 ops.fetch_add( 1, std::memory_order_relaxed );
             }
@@ -360,14 +348,10 @@ class FragmentationDemo final : public Scenario
             rate_sleep( next, interval );
         }
 
-        mgr = pmm::PersistMemoryManager::instance();
-        if ( mgr )
-        {
-            for ( void* ptr : small_live )
-                mgr->deallocate( ptr );
-            for ( void* ptr : large_live )
-                mgr->deallocate( ptr );
-        }
+        for ( auto& ptr : small_live )
+            pmm::PersistMemoryManager::deallocate_typed( ptr );
+        for ( auto& ptr : large_live )
+            pmm::PersistMemoryManager::deallocate_typed( ptr );
 
         coord.unregister_participant();
     }
@@ -389,14 +373,13 @@ class LargeBlocks final : public Scenario
     {
         coord.register_participant();
 
-        auto*                                      mgr = pmm::PersistMemoryManager::instance();
         std::mt19937                               rng( std::random_device{}() );
         std::uniform_int_distribution<std::size_t> size_dist( p.min_block_size, p.max_block_size );
 
         const auto interval = std::chrono::duration<double>( 1.0 / std::max( p.alloc_freq, 1.0f ) );
         auto       next     = std::chrono::steady_clock::now();
 
-        std::deque<void*> fifo;
+        std::deque<pmm::pptr<uint8_t>> fifo;
 
         while ( !stop.load( std::memory_order_relaxed ) )
         {
@@ -408,15 +391,14 @@ class LargeBlocks final : public Scenario
             if ( pmm::PersistMemoryManager::instance() != mgr_before )
                 fifo.clear();
 
-            mgr = pmm::PersistMemoryManager::instance();
-            if ( !mgr )
+            if ( !pmm::PersistMemoryManager::instance() )
             {
                 rate_sleep( next, interval );
                 continue;
             }
 
-            void* ptr = mgr->allocate( size_dist( rng ) );
-            if ( ptr )
+            auto ptr = pmm::PersistMemoryManager::allocate_typed<uint8_t>( size_dist( rng ) );
+            if ( !ptr.is_null() )
             {
                 fifo.push_back( ptr );
                 ops.fetch_add( 1, std::memory_order_relaxed );
@@ -424,7 +406,7 @@ class LargeBlocks final : public Scenario
 
             if ( fifo.size() > static_cast<std::size_t>( p.max_live_blocks ) )
             {
-                mgr->deallocate( fifo.front() );
+                pmm::PersistMemoryManager::deallocate_typed( fifo.front() );
                 fifo.pop_front();
                 ops.fetch_add( 1, std::memory_order_relaxed );
             }
@@ -432,14 +414,10 @@ class LargeBlocks final : public Scenario
             rate_sleep( next, interval );
         }
 
-        mgr = pmm::PersistMemoryManager::instance();
-        if ( mgr )
+        while ( !fifo.empty() )
         {
-            while ( !fifo.empty() )
-            {
-                mgr->deallocate( fifo.front() );
-                fifo.pop_front();
-            }
+            pmm::PersistMemoryManager::deallocate_typed( fifo.front() );
+            fifo.pop_front();
         }
 
         coord.unregister_participant();
@@ -462,7 +440,6 @@ class TinyBlocks final : public Scenario
     {
         coord.register_participant();
 
-        auto*        mgr = pmm::PersistMemoryManager::instance();
         std::mt19937 rng( std::random_device{}() );
 
         const std::size_t                          min_sz = std::max( p.min_block_size, std::size_t( 8 ) );
@@ -472,7 +449,7 @@ class TinyBlocks final : public Scenario
         const auto interval = std::chrono::duration<double>( 1.0 / std::max( p.alloc_freq, 1.0f ) );
         auto       next     = std::chrono::steady_clock::now();
 
-        std::deque<void*> fifo;
+        std::deque<pmm::pptr<uint8_t>> fifo;
 
         while ( !stop.load( std::memory_order_relaxed ) )
         {
@@ -484,15 +461,14 @@ class TinyBlocks final : public Scenario
             if ( pmm::PersistMemoryManager::instance() != mgr_before )
                 fifo.clear();
 
-            mgr = pmm::PersistMemoryManager::instance();
-            if ( !mgr )
+            if ( !pmm::PersistMemoryManager::instance() )
             {
                 rate_sleep( next, interval );
                 continue;
             }
 
-            void* ptr = mgr->allocate( size_dist( rng ) );
-            if ( ptr )
+            auto ptr = pmm::PersistMemoryManager::allocate_typed<uint8_t>( size_dist( rng ) );
+            if ( !ptr.is_null() )
             {
                 fifo.push_back( ptr );
                 ops.fetch_add( 1, std::memory_order_relaxed );
@@ -500,7 +476,7 @@ class TinyBlocks final : public Scenario
 
             if ( fifo.size() > static_cast<std::size_t>( p.max_live_blocks ) )
             {
-                mgr->deallocate( fifo.front() );
+                pmm::PersistMemoryManager::deallocate_typed( fifo.front() );
                 fifo.pop_front();
                 ops.fetch_add( 1, std::memory_order_relaxed );
             }
@@ -508,14 +484,10 @@ class TinyBlocks final : public Scenario
             rate_sleep( next, interval );
         }
 
-        mgr = pmm::PersistMemoryManager::instance();
-        if ( mgr )
+        while ( !fifo.empty() )
         {
-            while ( !fifo.empty() )
-            {
-                mgr->deallocate( fifo.front() );
-                fifo.pop_front();
-            }
+            pmm::PersistMemoryManager::deallocate_typed( fifo.front() );
+            fifo.pop_front();
         }
 
         coord.unregister_participant();
@@ -539,14 +511,13 @@ class MixedSizes final : public Scenario
     {
         coord.register_participant();
 
-        auto*                                 mgr = pmm::PersistMemoryManager::instance();
         std::mt19937                          rng( std::random_device{}() );
         std::uniform_real_distribution<float> chance( 0.0f, 1.0f );
 
         const auto interval = std::chrono::duration<double>( 1.0 / std::max( p.alloc_freq, 1.0f ) );
         auto       next     = std::chrono::steady_clock::now();
 
-        std::vector<void*> live;
+        std::vector<pmm::pptr<uint8_t>> live;
         live.reserve( static_cast<std::size_t>( p.max_live_blocks ) );
 
         // Profile A: 80% small [32..256], 20% large [1024..32768]
@@ -564,8 +535,7 @@ class MixedSizes final : public Scenario
             if ( pmm::PersistMemoryManager::instance() != mgr_before )
                 live.clear();
 
-            mgr = pmm::PersistMemoryManager::instance();
-            if ( !mgr )
+            if ( !pmm::PersistMemoryManager::instance() )
             {
                 rate_sleep( next, interval );
                 continue;
@@ -594,8 +564,8 @@ class MixedSizes final : public Scenario
             {
                 std::uniform_int_distribution<std::size_t> idx( 0, live.size() - 1 );
                 std::size_t                                i      = idx( rng );
-                void*                                      newptr = mgr->reallocate( live[i], sz );
-                if ( newptr )
+                auto newptr = pmm::PersistMemoryManager::reallocate_typed<uint8_t>( live[i], sz );
+                if ( !newptr.is_null() )
                 {
                     live[i] = newptr;
                     ops.fetch_add( 1, std::memory_order_relaxed );
@@ -603,8 +573,8 @@ class MixedSizes final : public Scenario
             }
             else if ( static_cast<int>( live.size() ) < p.max_live_blocks )
             {
-                void* ptr = mgr->allocate( sz );
-                if ( ptr )
+                auto ptr = pmm::PersistMemoryManager::allocate_typed<uint8_t>( sz );
+                if ( !ptr.is_null() )
                 {
                     live.push_back( ptr );
                     ops.fetch_add( 1, std::memory_order_relaxed );
@@ -614,7 +584,7 @@ class MixedSizes final : public Scenario
             {
                 std::uniform_int_distribution<std::size_t> idx( 0, live.size() - 1 );
                 std::size_t                                i = idx( rng );
-                mgr->deallocate( live[i] );
+                pmm::PersistMemoryManager::deallocate_typed( live[i] );
                 live[i] = live.back();
                 live.pop_back();
                 ops.fetch_add( 1, std::memory_order_relaxed );
@@ -623,12 +593,8 @@ class MixedSizes final : public Scenario
             rate_sleep( next, interval );
         }
 
-        mgr = pmm::PersistMemoryManager::instance();
-        if ( mgr )
-        {
-            for ( void* ptr : live )
-                mgr->deallocate( ptr );
-        }
+        for ( auto& ptr : live )
+            pmm::PersistMemoryManager::deallocate_typed( ptr );
 
         coord.unregister_participant();
     }
@@ -654,7 +620,6 @@ class PersistenceCycle final : public Scenario
     void run( std::atomic<bool>& stop, std::atomic<uint64_t>& ops, const ScenarioParams& p,
               ScenarioCoordinator& coord ) override
     {
-        auto*                                      mgr = pmm::PersistMemoryManager::instance();
         std::mt19937                               rng( std::random_device{}() );
         std::uniform_int_distribution<std::size_t> size_dist( p.min_block_size, p.max_block_size );
 
@@ -662,7 +627,7 @@ class PersistenceCycle final : public Scenario
         const double cycle_period = ( p.alloc_freq > 0.0f ) ? ( 1.0 / static_cast<double>( p.alloc_freq ) ) : 5.0;
         const auto   cycle_dur    = std::chrono::duration<double>( cycle_period );
 
-        std::vector<void*> live;
+        std::vector<pmm::pptr<uint8_t>> live;
         live.reserve( 16 );
 
         while ( !stop.load( std::memory_order_relaxed ) )
@@ -670,13 +635,12 @@ class PersistenceCycle final : public Scenario
             // Allocate a few blocks and write data
             for ( int i = 0; i < 4 && !stop.load( std::memory_order_relaxed ); ++i )
             {
-                mgr = pmm::PersistMemoryManager::instance();
-                if ( !mgr )
+                if ( !pmm::PersistMemoryManager::instance() )
                     break;
-                void* ptr = mgr->allocate( size_dist( rng ) );
-                if ( ptr )
+                auto ptr = pmm::PersistMemoryManager::allocate_typed<uint8_t>( size_dist( rng ) );
+                if ( !ptr.is_null() )
                 {
-                    std::memset( ptr, static_cast<int>( i + 1 ), p.min_block_size );
+                    std::memset( ptr.get(), static_cast<int>( i + 1 ), p.min_block_size );
                     live.push_back( ptr );
                     ops.fetch_add( 1, std::memory_order_relaxed );
                 }
@@ -685,20 +649,19 @@ class PersistenceCycle final : public Scenario
             if ( stop.load( std::memory_order_relaxed ) )
                 break;
 
-            mgr = pmm::PersistMemoryManager::instance();
-            if ( !mgr )
+            if ( !pmm::PersistMemoryManager::instance() )
                 break;
 
             // Save image
-            pmm::save( mgr, "pmm_demo.bin" );
+            pmm::save( "pmm_demo.bin" );
 
             // Free live blocks before destroy
-            for ( void* ptr : live )
-                mgr->deallocate( ptr );
+            for ( auto& ptr : live )
+                pmm::PersistMemoryManager::deallocate_typed( ptr );
             live.clear();
 
             // Retrieve buffer info before destroy
-            std::size_t total = mgr->total_size();
+            std::size_t total = pmm::PersistMemoryManager::total_size();
             void*       buf   = std::malloc( total );
             if ( !buf )
                 break;
@@ -710,17 +673,16 @@ class PersistenceCycle final : public Scenario
 
             // Destroy and reload from file
             pmm::PersistMemoryManager::destroy();
-            auto* mgr2 = pmm::load_from_file( "pmm_demo.bin", buf, total );
-            if ( mgr2 )
+            bool reloaded = pmm::load_from_file( "pmm_demo.bin", buf, total );
+            if ( reloaded )
             {
-                mgr2->validate();
+                pmm::PersistMemoryManager::validate();
                 ops.fetch_add( 1, std::memory_order_relaxed );
-                mgr = mgr2; // use reloaded instance
             }
             else
             {
                 // Fallback: recreate fresh
-                mgr = pmm::PersistMemoryManager::create( buf, total );
+                pmm::PersistMemoryManager::create( buf, total );
             }
 
             // --- Phase 10: resume all other scenarios ---
@@ -735,12 +697,8 @@ class PersistenceCycle final : public Scenario
         }
 
         // Cleanup
-        mgr = pmm::PersistMemoryManager::instance();
-        if ( mgr )
-        {
-            for ( void* ptr : live )
-                mgr->deallocate( ptr );
-        }
+        for ( auto& ptr : live )
+            pmm::PersistMemoryManager::deallocate_typed( ptr );
     }
 };
 

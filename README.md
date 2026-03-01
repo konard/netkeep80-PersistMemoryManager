@@ -9,11 +9,12 @@
 - **Single-header** — вся реализация в одном файле `include/persist_memory_manager.h`
 - **C++17** — без внешних зависимостей, только стандартная библиотека
 - **Персистентность** — все ссылки хранятся как смещения, а не абсолютные указатели
-- **pptr<T>** — персистный типизированный указатель, sizeof == sizeof(void*)
-- **Выравнивание** — поддержка alignment от 8 до 4096 байт
+- **pptr<T>** — персистный типизированный указатель, sizeof == 4 байта (32-битный гранульный индекс)
+- **Статический класс** — весь API через статические методы, без экземпляров класса
+- **16-байтная гранулярность** — поддержка адресации до 64 ГБ
 - **Диагностика** — validate(), dump_stats(), get_stats(), get_manager_info(), for_each_block()
-- **Высокая производительность** — отдельный список свободных блоков, allocate 100K ≤ 7 мс
-- **Синглтон** — единственный активный менеджер доступен через `PersistMemoryManager::instance()`
+- **Высокая производительность** — AVL-дерево свободных блоков, allocate 100K ≤ 7 мс
+- **Синглтон** — единственный активный менеджер доступен через `PersistMemoryManager::instance()` (для внутреннего использования)
 - **Автоматическое расширение** — при нехватке памяти буфер автоматически растёт на 25%
 - **Потокобезопасность** — разделённые блокировки через `std::shared_mutex` (параллельное чтение, эксклюзивная запись)
 
@@ -27,23 +28,21 @@ int main() {
     void* memory = std::malloc(1024 * 1024);
 
     // Создать менеджер (устанавливает синглтон)
-    pmm::PersistMemoryManager::create(memory, 1024 * 1024);
+    bool ok = pmm::PersistMemoryManager::create(memory, 1024 * 1024);
 
-    // Получить доступ к синглтону
-    auto* mgr = pmm::PersistMemoryManager::instance();
-
-    // Выделить блоки (при нехватке памяти автоматически расширяет буфер на 25%)
-    void* block1 = mgr->allocate(256);          // 256 байт, align=16
-    void* block2 = mgr->allocate(1024, 32);     // 1 КБ, align=32
+    // Выделить блоки через типизированный API (при нехватке памяти автоматически расширяет буфер на 25%)
+    pmm::pptr<uint8_t> block1 = pmm::PersistMemoryManager::allocate_typed<uint8_t>(256);  // 256 байт
+    pmm::pptr<uint8_t> block2 = pmm::PersistMemoryManager::allocate_typed<uint8_t>(1024); // 1 КБ
 
     // Освободить
-    mgr->deallocate(block1);
+    pmm::PersistMemoryManager::deallocate_typed(block1);
 
     // Получить статистику
-    auto stats = pmm::get_stats(pmm::PersistMemoryManager::instance());
+    auto stats = pmm::get_stats();
 
-    // Уничтожить менеджер (освобождает управляемый буфер)
+    // Уничтожить менеджер
     pmm::PersistMemoryManager::destroy();
+    std::free(memory); // Внешняя память освобождается вызывающим кодом
     return 0;
 }
 ```
@@ -58,7 +57,7 @@ ctest --test-dir build --output-on-failure
 
 ## Персистный указатель pptr<T>
 
-`pptr<T>` — типизированный персистный указатель, который хранит смещение (offset) от базы менеджера памяти вместо абсолютного адреса. Начиная с Фазы 7, `pptr<T>` использует синглтон автоматически и не требует явной передачи менеджера.
+`pptr<T>` — типизированный персистный указатель, который хранит 32-битный гранульный индекс (16 байт/гранула). Использует синглтон автоматически и не требует явной передачи менеджера.
 
 ```cpp
 #include "persist_memory_manager.h"
@@ -68,49 +67,50 @@ int main() {
     pmm::PersistMemoryManager::create(memory, 1024 * 1024);
 
     // Выделить один объект типа int
-    pmm::pptr<int> p = pmm::PersistMemoryManager::instance()->allocate_typed<int>();
+    pmm::pptr<int> p = pmm::PersistMemoryManager::allocate_typed<int>();
     *p = 42;           // operator* использует синглтон автоматически
 
     // Выделить массив из 10 double
-    pmm::pptr<double> arr = pmm::PersistMemoryManager::instance()->allocate_typed<double>(10);
+    pmm::pptr<double> arr = pmm::PersistMemoryManager::allocate_typed<double>(10);
     for (int i = 0; i < 10; i++) {
-        *arr.resolve_at(pmm::PersistMemoryManager::instance(), i) = i * 1.5;
+        arr[i] = i * 1.5; // operator[] с проверкой границ
     }
 
     // Проверка на нулевой указатель
-    if (p) { /* ненулевой */ }
+    if (!p.is_null()) { /* ненулевой */ }
 
     // Сохранить образ
-    pmm::save(pmm::PersistMemoryManager::instance(), "heap.dat");
+    pmm::save("heap.dat");
 
     // Сохраняем смещение для восстановления после load
-    std::ptrdiff_t off = p.offset();
+    uint32_t off = p.offset();
 
-    pmm::PersistMemoryManager::instance()->deallocate_typed(arr);
-    pmm::PersistMemoryManager::instance()->deallocate_typed(p);
-    pmm::PersistMemoryManager::destroy(); // освобождает буфер
+    pmm::PersistMemoryManager::deallocate_typed(arr);
+    pmm::PersistMemoryManager::deallocate_typed(p);
+    pmm::PersistMemoryManager::destroy();
+    std::free(memory);
 
     // --- следующий запуск ---
     void* buf2 = std::malloc(1024 * 1024);
-    pmm::load_from_file("heap.dat", buf2, 1024 * 1024); // устанавливает синглтон
+    pmm::load_from_file("heap.dat", buf2, 1024 * 1024); // устанавливает синглтон, возвращает bool
 
     // Восстанавливаем pptr<int> по сохранённому смещению
     pmm::pptr<int> p2(off);
     std::cout << *p2 << "\n"; // выведет 42 (operator* через синглтон)
 
-    pmm::PersistMemoryManager::destroy(); // освобождает buf2
+    pmm::PersistMemoryManager::destroy();
+    std::free(buf2);
     return 0;
 }
 ```
 
 Ключевые свойства `pptr<T>`:
-- `sizeof(pptr<T>) == sizeof(void*)` — размер как у обычного указателя
+- `sizeof(pptr<T>) == 4` — 32-битный гранульный индекс (16 байт/гранула)
 - `pptr<T>()` — нулевой указатель по умолчанию
 - `is_null()` / `operator bool()` — проверка на нулевой указатель
-- `get()` / `operator*` / `operator->` — разыменование через синглтон (Фаза 7)
-- `resolve(mgr)` — разыменование через явный менеджер (обратная совместимость)
-- `resolve_at(mgr, index)` — доступ к элементу массива
-- `offset()` — хранимое смещение (для сохранения/восстановления)
+- `get()` / `operator*` / `operator->` — разыменование через синглтон
+- `operator[]` — доступ к элементу массива (с проверкой границ)
+- `offset()` — хранимый гранульный индекс (для сохранения/восстановления)
 - Операторы `==` и `!=`
 
 ## Персистентность
@@ -120,16 +120,16 @@ int main() {
 ```cpp
 // Программа A — создаём и сохраняем
 pmm::PersistMemoryManager::create(memory, size);
-auto* mgr = pmm::PersistMemoryManager::instance();
-void* ptr = mgr->allocate(256);
-std::strcpy((char*)ptr, "Hello, World!");
-pmm::save(mgr, "heap.dat");                  // сохранить образ в файл
-pmm::PersistMemoryManager::destroy();        // освобождает буфер
+pmm::pptr<char> ptr = pmm::PersistMemoryManager::allocate_typed<char>(256);
+std::strcpy(ptr.get(), "Hello, World!");
+pmm::save("heap.dat");                           // сохранить образ в файл
+pmm::PersistMemoryManager::destroy();
+std::free(memory);
 
 // Программа B — восстанавливаем
 void* buf = std::malloc(size);
-pmm::load_from_file("heap.dat", buf, size);  // устанавливает синглтон
-pmm::PersistMemoryManager::instance()->validate(); // → true
+pmm::load_from_file("heap.dat", buf, size);      // устанавливает синглтон
+pmm::PersistMemoryManager::validate();           // → true
 ```
 
 Поскольку все метаданные хранятся как **смещения** (а не абсолютные указатели), образ корректно загружается по любому базовому адресу без пересчёта.
@@ -145,7 +145,7 @@ pmm::PersistMemoryManager::instance()->validate(); // → true
 
 ```cpp
 template <typename Callback>
-void pmm::for_each_block( const pmm::PersistMemoryManager* mgr, Callback&& callback );
+void pmm::for_each_block( Callback&& callback );
 // Callback: void(const pmm::BlockView&)
 ```
 
@@ -154,7 +154,7 @@ void pmm::for_each_block( const pmm::PersistMemoryManager* mgr, Callback&& callb
 `total_size`, `header_size`, `user_size`, `alignment`, `used`.
 
 ```cpp
-pmm::for_each_block( mgr, []( const pmm::BlockView& blk ) {
+pmm::for_each_block( []( const pmm::BlockView& blk ) {
     std::cout << "Block #" << blk.index
               << " offset=" << blk.offset
               << " size="   << blk.total_size
@@ -165,7 +165,7 @@ pmm::for_each_block( mgr, []( const pmm::BlockView& blk ) {
 ### `get_manager_info()`
 
 ```cpp
-pmm::ManagerInfo pmm::get_manager_info( const pmm::PersistMemoryManager* mgr );
+pmm::ManagerInfo pmm::get_manager_info();
 ```
 
 Возвращает снимок полей заголовка менеджера: `magic`, `total_size`, `used_size`,

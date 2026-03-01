@@ -61,7 +61,7 @@ void MemMapView::update_snapshot( pmm::PersistMemoryManager* mgr )
     if ( !mgr )
         return;
 
-    total_bytes_ = mgr->total_size();
+    total_bytes_ = pmm::PersistMemoryManager::total_size();
 
     // ── Detail-mode snapshot (first 512 KB, 1 byte = 1 entry) ────────────────
     const std::size_t display_bytes = ( total_bytes_ > kDetailLimit ) ? kDetailLimit : total_bytes_;
@@ -81,8 +81,7 @@ void MemMapView::update_snapshot( pmm::PersistMemoryManager* mgr )
         snapshot_[i].type = ByteInfo::Type::ManagerHeader;
 
     // Walk block linked list via the public for_each_block() iterator
-    pmm::for_each_block( mgr,
-                         [&]( const pmm::BlockView& blk )
+    pmm::for_each_block( [&]( const pmm::BlockView& blk )
                          {
                              const ByteInfo::Type hdr_type =
                                  blk.used ? ByteInfo::Type::BlockHeaderUsed : ByteInfo::Type::BlockHeaderFree;
@@ -143,8 +142,7 @@ void MemMapView::update_snapshot( pmm::PersistMemoryManager* mgr )
     // Fill remaining tiles (beyond detail limit) using for_each_block
     if ( total_bytes_ > kDetailLimit )
     {
-        pmm::for_each_block( mgr,
-                             [&]( const pmm::BlockView& blk )
+        pmm::for_each_block( [&]( const pmm::BlockView& blk )
                              {
                                  const ByteInfo::Type hdr_type =
                                      blk.used ? ByteInfo::Type::BlockHeaderUsed : ByteInfo::Type::BlockHeaderFree;
