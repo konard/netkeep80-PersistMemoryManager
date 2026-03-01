@@ -971,10 +971,12 @@ class PersistMemoryManager
         detail::ManagerHeader* hdr      = header();
         std::size_t            old_size = hdr->total_size;
 
-        std::size_t new_size = old_size * kGrowNumerator / kGrowDenominator;
+        std::size_t new_size = detail::align_up( old_size * kGrowNumerator / kGrowDenominator, kMinAlignment );
         std::size_t needed   = detail::required_block_size( user_size, alignment );
         if ( new_size < old_size + needed )
-            new_size = old_size + needed + detail::align_up( sizeof( detail::BlockHeader ), kDefaultAlignment );
+            new_size = detail::align_up( old_size + needed +
+                                             detail::align_up( sizeof( detail::BlockHeader ), kDefaultAlignment ),
+                                         kMinAlignment );
 
         void* new_memory = std::malloc( new_size );
         if ( new_memory == nullptr )
