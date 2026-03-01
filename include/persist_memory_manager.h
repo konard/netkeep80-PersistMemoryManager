@@ -103,12 +103,7 @@ struct AllocationInfo
     bool        is_valid;  ///< Признак корректного блока
 };
 
-/**
- * @brief Снимок полей заголовка менеджера памяти, возвращаемый get_manager_info().
- *
- * Предназначен для диагностических инструментов, визуализаторов и тестов,
- * которым нужен доступ к внутренним полям без прямого обращения к detail::.
- */
+/// @brief Snapshot of manager header fields returned by get_manager_info().
 struct ManagerInfo
 {
     std::uint64_t  magic; ///< Магическое число (kMagic при корректном заголовке)
@@ -119,14 +114,11 @@ struct ManagerInfo
     std::size_t    alloc_count;        ///< Количество занятых блоков
     std::ptrdiff_t first_block_offset; ///< Смещение первого блока (-1 = нет блоков)
     std::ptrdiff_t first_free_offset; ///< Смещение первого свободного блока (-1 = нет)
+    std::ptrdiff_t last_free_offset; ///< Смещение последнего свободного блока (-1 = нет)
     std::size_t manager_header_size; ///< Размер служебного заголовка менеджера (байт)
 };
 
-/**
- * @brief Информация об одном блоке памяти, возвращаемая итератором for_each_block().
- *
- * Безопасный снимок заголовка блока без прямого доступа к detail::.
- */
+/// @brief Block snapshot returned by for_each_block(). Safe view without detail:: access.
 struct BlockView
 {
     std::size_t index; ///< Порядковый индекс блока (0-based, по связному списку)
@@ -159,17 +151,12 @@ struct BlockHeader
     std::ptrdiff_t prev_offset; ///< Смещение предыдущего блока в общем списке (-1 = нет)
     std::ptrdiff_t next_offset; ///< Смещение следующего блока в общем списке (-1 = нет)
     std::size_t total_size; ///< Полный размер блока, включая заголовок и выравнивание
-    std::size_t  user_size; ///< Размер пользовательских данных (байт)
-    std::size_t  alignment; ///< Выравнивание пользовательских данных
-    bool         used;      ///< true — блок занят, false — свободен
-    std::uint8_t _pad[7];   ///< Выравнивание до 8 байт (совместимость ABI)
-    /// Смещение предыдущего свободного блока в списке свободных (-1 = нет).
-    /// Используется только при used == false.
-    std::ptrdiff_t free_prev_offset;
-    /// Смещение следующего свободного блока в списке свободных (-1 = нет).
-    /// Используется только при used == false.
-    std::ptrdiff_t free_next_offset;
-    // После заголовка следуют пользовательские данные, выровненные на alignment
+    std::size_t    user_size;        ///< Размер пользовательских данных (байт)
+    std::size_t    alignment;        ///< Выравнивание пользовательских данных
+    bool           used;             ///< true — блок занят, false — свободен
+    std::uint8_t   _pad[7];          ///< Выравнивание до 8 байт (совместимость ABI)
+    std::ptrdiff_t free_prev_offset; ///< Previous free block (-1 = none; valid only if !used)
+    std::ptrdiff_t free_next_offset; ///< Next free block (-1 = none; valid only if !used)
 };
 
 static_assert( sizeof( BlockHeader ) % 8 == 0, "BlockHeader must be 8-byte aligned" );
@@ -187,17 +174,16 @@ static constexpr std::ptrdiff_t kNoBlock = -1;
  */
 struct ManagerHeader
 {
-    std::uint64_t magic;       ///< Магическое число (kMagic)
-    std::size_t   total_size;  ///< Полный размер управляемой области (байт)
-    std::size_t   used_size;   ///< Занятый объём (метаданные + данные, байт)
-    std::size_t   block_count; ///< Общее количество блоков
-    std::size_t   free_count;  ///< Количество свободных блоков
-    std::size_t   alloc_count; ///< Количество занятых блоков
-    /// Смещение до первого блока в связном списке всех блоков
-    std::ptrdiff_t first_block_offset;
-    /// Смещение до первого свободного блока в отдельном списке свободных блоков.
-    /// Позволяет выделению памяти сразу находить свободный блок, не обходя занятые.
-    std::ptrdiff_t first_free_offset;
+    std::uint64_t  magic;              ///< Магическое число (kMagic)
+    std::size_t    total_size;         ///< Полный размер управляемой области (байт)
+    std::size_t    used_size;          ///< Занятый объём (метаданные + данные, байт)
+    std::size_t    block_count;        ///< Общее количество блоков
+    std::size_t    free_count;         ///< Количество свободных блоков
+    std::size_t    alloc_count;        ///< Количество занятых блоков
+    std::ptrdiff_t first_block_offset; ///< Head of all-blocks linked list (-1 = empty)
+    std::ptrdiff_t first_free_offset;  ///< Head of free-blocks list (-1 = empty)
+    /// Tail of the free list (O(1) tail insert for expand(); kNoBlock if empty).
+    std::ptrdiff_t last_free_offset;
     bool owns_memory; ///< true — буфер принадлежит нам (malloc), destroy() освободит его
     std::uint8_t _hdr_pad[7]; ///< padding до 8 байт
     std::size_t prev_total_size; ///< размер предыдущего буфера (0 если expand() не вызывался)
@@ -247,11 +233,7 @@ inline std::ptrdiff_t block_offset( const std::uint8_t* base, const BlockHeader*
     return reinterpret_cast<const std::uint8_t*>( block ) - base;
 }
 
-/**
- * @brief Вычислить указатель на пользовательские данные внутри блока.
- *
- * Данные начинаются сразу после BlockHeader, выровненные на block->alignment.
- */
+/// @brief Pointer to user data inside a block (aligned to block->alignment).
 inline void* user_ptr( BlockHeader* block )
 {
     std::uint8_t* raw          = reinterpret_cast<std::uint8_t*>( block ) + sizeof( BlockHeader );
@@ -260,13 +242,7 @@ inline void* user_ptr( BlockHeader* block )
     return reinterpret_cast<void*>( aligned_addr );
 }
 
-/**
- * @brief Получить заголовок блока из указателя на пользовательские данные.
- *
- * user_ptr = align_up(block + sizeof(BlockHeader), alignment), поэтому заголовок
- * в диапазоне [ptr - sizeof(BlockHeader) - (kMaxAlignment-1), ptr - sizeof(BlockHeader)].
- * Шаг kMinAlignment: O(1) — не более kMaxAlignment/kMinAlignment = 512 итераций.
- */
+/// @brief Find BlockHeader from a user pointer (reverse-scan up to kMaxAlignment).
 inline BlockHeader* header_from_ptr( std::uint8_t* base, void* ptr )
 {
     if ( ptr == nullptr )
@@ -287,15 +263,7 @@ inline BlockHeader* header_from_ptr( std::uint8_t* base, void* ptr )
     return nullptr;
 }
 
-/**
- * @brief Найти заголовок блока по указателю пользователя через линейный обход.
- *
- * Надёжный способ: обходит весь связный список блоков.
- * @param base         Начало управляемой области.
- * @param mgr_header   Заголовок менеджера.
- * @param ptr          Указатель пользователя.
- * @return Заголовок блока или nullptr.
- */
+/// @brief Find BlockHeader by user pointer via linear walk of all-blocks list.
 inline BlockHeader* find_block_by_ptr( std::uint8_t* base, const ManagerHeader* mgr_header, void* ptr )
 {
     if ( mgr_header->first_block_offset == kNoBlock )
@@ -315,27 +283,15 @@ inline BlockHeader* find_block_by_ptr( std::uint8_t* base, const ManagerHeader* 
     return nullptr;
 }
 
-/**
- * @brief Вычислить минимальный размер блока для запроса user_size с заданным выравниванием.
- *
- * Результат выровнен до kMinAlignment, гарантируя, что все заголовки блоков
- * располагаются на kMinAlignment-выровненных адресах — требование header_from_ptr.
- */
+/// @brief Minimum block size for user_size + alignment (aligned to kMinAlignment).
 inline std::size_t required_block_size( std::size_t user_size, std::size_t alignment )
 {
     std::size_t min_total = sizeof( BlockHeader ) + ( alignment - 1 ) + user_size;
     return align_up( std::max( min_total, kMinBlockSize ), kMinAlignment );
 }
 
-/**
- * @brief Вставить свободный блок в начало списка свободных блоков.
- *
- * @param base  Начало управляемой области.
- * @param hdr   Заголовок менеджера.
- * @param blk   Свободный блок для вставки.
- *
- * Предусловие: blk->used == false.
- */
+/// @brief Insert a free block at the HEAD of the free list (O(1)).
+/// Regular freed/split blocks go here; expand() blocks use free_list_insert_tail().
 inline void free_list_insert( std::uint8_t* base, ManagerHeader* hdr, BlockHeader* blk )
 {
     std::ptrdiff_t blk_off = block_offset( base, blk );
@@ -348,8 +304,36 @@ inline void free_list_insert( std::uint8_t* base, ManagerHeader* hdr, BlockHeade
         BlockHeader* old_head      = block_at( base, hdr->first_free_offset );
         old_head->free_prev_offset = blk_off;
     }
+    else
+    {
+        // List was empty; this block is also the tail.
+        hdr->last_free_offset = blk_off;
+    }
 
     hdr->first_free_offset = blk_off;
+}
+
+/// @brief Insert a free block at the TAIL of the free list (O(1)).
+/// Used by expand() so fragmented interior gaps are searched before the new tail region.
+inline void free_list_insert_tail( std::uint8_t* base, ManagerHeader* hdr, BlockHeader* blk )
+{
+    std::ptrdiff_t blk_off = block_offset( base, blk );
+
+    blk->free_next_offset = kNoBlock;
+    blk->free_prev_offset = hdr->last_free_offset;
+
+    if ( hdr->last_free_offset != kNoBlock )
+    {
+        BlockHeader* old_tail      = block_at( base, hdr->last_free_offset );
+        old_tail->free_next_offset = blk_off;
+    }
+    else
+    {
+        // List was empty; this block is also the head.
+        hdr->first_free_offset = blk_off;
+    }
+
+    hdr->last_free_offset = blk_off;
 }
 
 /**
@@ -368,7 +352,7 @@ inline void free_list_remove( std::uint8_t* base, ManagerHeader* hdr, BlockHeade
     }
     else
     {
-        // blk был головой списка
+        // blk was the head of the list
         hdr->first_free_offset = blk->free_next_offset;
     }
 
@@ -376,6 +360,11 @@ inline void free_list_remove( std::uint8_t* base, ManagerHeader* hdr, BlockHeade
     {
         BlockHeader* next_free      = block_at( base, blk->free_next_offset );
         next_free->free_prev_offset = blk->free_prev_offset;
+    }
+    else
+    {
+        // blk was the tail of the list
+        hdr->last_free_offset = blk->free_prev_offset;
     }
 
     blk->free_prev_offset = kNoBlock;
@@ -602,6 +591,7 @@ class PersistMemoryManager
 
         hdr->first_block_offset = blk_off;
         hdr->first_free_offset  = blk_off;
+        hdr->last_free_offset   = blk_off;
         hdr->block_count        = 1;
         hdr->free_count         = 1;
         hdr->used_size          = hdr_end + sizeof( detail::BlockHeader );
@@ -1051,9 +1041,12 @@ class PersistMemoryManager
 
         if ( last_blk != nullptr && !last_blk->used )
         {
+            // Extend the last free block (which is already at the tail of the
+            // free list since it was the last block in address order).
             detail::free_list_remove( new_base, new_hdr, last_blk );
             last_blk->total_size += extra_size;
-            detail::free_list_insert( new_base, new_hdr, last_blk );
+            // Re-insert at the tail so expansion space remains last in search order.
+            detail::free_list_insert_tail( new_base, new_hdr, last_blk );
         }
         else
         {
@@ -1089,7 +1082,8 @@ class PersistMemoryManager
 
             new_hdr->block_count++;
             new_hdr->free_count++;
-            detail::free_list_insert( new_base, new_hdr, new_blk );
+            // Insert at the tail so existing fragmented blocks are searched first.
+            detail::free_list_insert_tail( new_base, new_hdr, new_blk );
         }
 
         new_hdr->total_size = new_size;
@@ -1113,6 +1107,7 @@ class PersistMemoryManager
         detail::ManagerHeader* hdr  = header();
 
         hdr->first_free_offset = detail::kNoBlock;
+        hdr->last_free_offset  = detail::kNoBlock;
 
         std::ptrdiff_t offset = hdr->first_block_offset;
         while ( offset != detail::kNoBlock )
@@ -1121,7 +1116,8 @@ class PersistMemoryManager
             blk->free_prev_offset    = detail::kNoBlock;
             blk->free_next_offset    = detail::kNoBlock;
             if ( !blk->used )
-                detail::free_list_insert( base, hdr, blk );
+                // Insert at tail to preserve address order for the rebuilt list.
+                detail::free_list_insert_tail( base, hdr, blk );
             offset = blk->next_offset;
         }
     }
@@ -1434,6 +1430,7 @@ inline ManagerInfo get_manager_info( const PersistMemoryManager* mgr )
     info.alloc_count         = hdr->alloc_count;
     info.first_block_offset  = hdr->first_block_offset;
     info.first_free_offset   = hdr->first_free_offset;
+    info.last_free_offset    = hdr->last_free_offset;
     info.manager_header_size = sizeof( detail::ManagerHeader );
 
     return info;

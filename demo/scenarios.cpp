@@ -40,20 +40,44 @@ namespace demo
 
 // ─── ScenarioCoordinator implementation ──────────────────────────────────────
 
-void ScenarioCoordinator::pause_others()
+void ScenarioCoordinator::register_participant()
+{
+    std::lock_guard<std::mutex> lk( mutex_ );
+    ++participants_;
+}
+
+void ScenarioCoordinator::unregister_participant()
+{
+    std::lock_guard<std::mutex> lk( mutex_ );
+    --participants_;
+    // If a pause is in progress and this thread hasn't acked yet, ack on its
+    // behalf so pause_others() is not left waiting forever.
+    if ( paused_.load( std::memory_order_relaxed ) )
+    {
+        ++ack_count_;
+        cv_ack_.notify_all();
+    }
+}
+
+void ScenarioCoordinator::pause_others( const std::atomic<bool>& stop_flag )
 {
     {
         std::lock_guard<std::mutex> lk( mutex_ );
+        ack_count_ = 0;
         paused_.store( true, std::memory_order_release );
     }
-    // No need to notify here; threads already running will hit yield_if_paused
-    // on their next iteration and block themselves.
+    // Wait until every registered participant has acknowledged the pause, or
+    // until the caller's stop_flag is set.
+    std::unique_lock<std::mutex> lk( mutex_ );
+    cv_ack_.wait( lk, [this, &stop_flag]
+                  { return ack_count_ >= participants_ || stop_flag.load( std::memory_order_relaxed ); } );
 }
 
 void ScenarioCoordinator::resume_others()
 {
     {
         std::lock_guard<std::mutex> lk( mutex_ );
+        ack_count_ = 0;
         paused_.store( false, std::memory_order_release );
     }
     cv_.notify_all();
@@ -64,6 +88,14 @@ void ScenarioCoordinator::yield_if_paused( const std::atomic<bool>& stop_flag )
     if ( !paused_.load( std::memory_order_acquire ) )
         return;
 
+    {
+        // Acknowledge the pause: increment ack_count and notify pause_others().
+        std::lock_guard<std::mutex> lk( mutex_ );
+        ++ack_count_;
+        cv_ack_.notify_all();
+    }
+
+    // Now block until resume_others() is called (or stop_flag is set).
     std::unique_lock<std::mutex> lk( mutex_ );
     cv_.wait( lk, [this, &stop_flag]
               { return !paused_.load( std::memory_order_relaxed ) || stop_flag.load( std::memory_order_relaxed ); } );
@@ -102,6 +134,8 @@ class LinearFill final : public Scenario
     void run( std::atomic<bool>& stop, std::atomic<uint64_t>& ops, const ScenarioParams& p,
               ScenarioCoordinator& coord ) override
     {
+        coord.register_participant();
+
         auto*      mgr      = pmm::PersistMemoryManager::instance();
         const auto interval = std::chrono::duration<double>( 1.0 / std::max( p.alloc_freq, 1.0f ) );
         auto       next     = std::chrono::steady_clock::now();
@@ -152,6 +186,8 @@ class LinearFill final : public Scenario
             }
             live.clear();
         }
+
+        coord.unregister_participant();
     }
 };
 
@@ -169,6 +205,8 @@ class RandomStress final : public Scenario
     void run( std::atomic<bool>& stop, std::atomic<uint64_t>& ops, const ScenarioParams& p,
               ScenarioCoordinator& coord ) override
     {
+        coord.register_participant();
+
         auto*                                      mgr = pmm::PersistMemoryManager::instance();
         std::mt19937                               rng( std::random_device{}() );
         std::uniform_int_distribution<std::size_t> size_dist( p.min_block_size, p.max_block_size );
@@ -229,6 +267,8 @@ class RandomStress final : public Scenario
             for ( void* ptr : live )
                 mgr->deallocate( ptr );
         }
+
+        coord.unregister_participant();
     }
 };
 
@@ -247,6 +287,8 @@ class FragmentationDemo final : public Scenario
     void run( std::atomic<bool>& stop, std::atomic<uint64_t>& ops, const ScenarioParams& p,
               ScenarioCoordinator& coord ) override
     {
+        coord.register_participant();
+
         auto*        mgr = pmm::PersistMemoryManager::instance();
         std::mt19937 rng( std::random_device{}() );
 
@@ -326,6 +368,8 @@ class FragmentationDemo final : public Scenario
             for ( void* ptr : large_live )
                 mgr->deallocate( ptr );
         }
+
+        coord.unregister_participant();
     }
 };
 
@@ -343,6 +387,8 @@ class LargeBlocks final : public Scenario
     void run( std::atomic<bool>& stop, std::atomic<uint64_t>& ops, const ScenarioParams& p,
               ScenarioCoordinator& coord ) override
     {
+        coord.register_participant();
+
         auto*                                      mgr = pmm::PersistMemoryManager::instance();
         std::mt19937                               rng( std::random_device{}() );
         std::uniform_int_distribution<std::size_t> size_dist( p.min_block_size, p.max_block_size );
@@ -395,6 +441,8 @@ class LargeBlocks final : public Scenario
                 fifo.pop_front();
             }
         }
+
+        coord.unregister_participant();
     }
 };
 
@@ -412,6 +460,8 @@ class TinyBlocks final : public Scenario
     void run( std::atomic<bool>& stop, std::atomic<uint64_t>& ops, const ScenarioParams& p,
               ScenarioCoordinator& coord ) override
     {
+        coord.register_participant();
+
         auto*        mgr = pmm::PersistMemoryManager::instance();
         std::mt19937 rng( std::random_device{}() );
 
@@ -467,6 +517,8 @@ class TinyBlocks final : public Scenario
                 fifo.pop_front();
             }
         }
+
+        coord.unregister_participant();
     }
 };
 
@@ -485,6 +537,8 @@ class MixedSizes final : public Scenario
     void run( std::atomic<bool>& stop, std::atomic<uint64_t>& ops, const ScenarioParams& p,
               ScenarioCoordinator& coord ) override
     {
+        coord.register_participant();
+
         auto*                                 mgr = pmm::PersistMemoryManager::instance();
         std::mt19937                          rng( std::random_device{}() );
         std::uniform_real_distribution<float> chance( 0.0f, 1.0f );
@@ -575,6 +629,8 @@ class MixedSizes final : public Scenario
             for ( void* ptr : live )
                 mgr->deallocate( ptr );
         }
+
+        coord.unregister_participant();
     }
 };
 
@@ -648,12 +704,9 @@ class PersistenceCycle final : public Scenario
                 break;
 
             // --- Phase 10: pause all other scenarios before destroy() ---
-            coord.pause_others();
-
-            // Give other scenario threads a moment to reach yield_if_paused()
-            // and block.  50 ms is conservative; typical loop iterations are
-            // << 1 ms except for TinyBlocks which has a 0.1 ms interval.
-            std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+            // pause_others() now waits until every registered participant has
+            // acknowledged the pause, so no arbitrary sleep is needed.
+            coord.pause_others( stop );
 
             // Destroy and reload from file
             pmm::PersistMemoryManager::destroy();

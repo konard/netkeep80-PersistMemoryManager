@@ -39,14 +39,16 @@ struct ScenarioParams
  *
  * When the PersistenceCycle scenario needs to call PersistMemoryManager::destroy()
  * and reload, it must ensure no other scenario thread is using the PMM singleton.
- * ScenarioCoordinator implements a two-phase pause/resume protocol:
+ * ScenarioCoordinator implements a two-phase pause/resume protocol with
+ * acknowledgment counting:
  *
- *  1. pause_others() — sets a pause flag; any scenario calling yield_if_paused()
- *     will block until resume_others() is called.
- *  2. resume_others() — clears the pause flag and wakes all waiting threads.
- *
- * Non-PersistenceCycle scenarios call yield_if_paused() at safe points in their
- * loops (after completing an allocation/deallocation, before the next one).
+ *  1. register_participant() — each non-PersistenceCycle thread registers itself.
+ *  2. unregister_participant() — called when a thread exits.
+ *  3. pause_others() — sets a pause flag and waits until all registered threads
+ *     have acknowledged the pause by calling yield_if_paused() or have exited.
+ *  4. resume_others() — clears the pause flag and wakes all waiting threads.
+ *  5. yield_if_paused() — called at safe points; increments ack counter, then
+ *     blocks until resume_others() is called.
  *
  * Thread-safety: all methods are safe to call from any thread.
  */
@@ -63,12 +65,33 @@ class ScenarioCoordinator
     ScenarioCoordinator& operator=( ScenarioCoordinator&& )      = delete;
 
     /**
-     * @brief Request all other scenarios to pause.
+     * @brief Register a participant thread (non-PersistenceCycle scenario).
      *
-     * Sets the pause flag. Scenarios that call yield_if_paused() will block.
-     * The caller (PersistenceCycle) must call resume_others() to unblock them.
+     * Must be called once per thread before entering its main loop.
+     * Increments the total participant count used by pause_others() to
+     * determine when all threads have acknowledged the pause.
      */
-    void pause_others();
+    void register_participant();
+
+    /**
+     * @brief Unregister a participant thread (called when thread is exiting).
+     *
+     * Decrements the total participant count. If a pause is in progress this
+     * also increments the acknowledgment counter so pause_others() is not
+     * left waiting forever for an exited thread.
+     */
+    void unregister_participant();
+
+    /**
+     * @brief Request all other scenarios to pause and wait until they have.
+     *
+     * Sets the pause flag, then blocks until every registered participant has
+     * acknowledged the pause via yield_if_paused() (or has unregistered).
+     * The caller (PersistenceCycle) must call resume_others() when done.
+     *
+     * @param stop_flag  Caller's cancellation flag; returns early if set.
+     */
+    void pause_others( const std::atomic<bool>& stop_flag );
 
     /**
      * @brief Resume all paused scenarios.
@@ -80,9 +103,10 @@ class ScenarioCoordinator
     /**
      * @brief Block the calling thread if a pause has been requested.
      *
-     * Called by non-coordinator scenarios at safe points. Returns immediately
-     * when no pause is active. If stop_flag is true the function returns
-     * without waiting (to allow fast shutdown).
+     * Called by non-coordinator scenarios at safe points (after completing
+     * an allocation/deallocation, before starting the next one).  Returns
+     * immediately when no pause is active. If stop_flag is true the function
+     * returns without blocking (to allow fast shutdown).
      *
      * @param stop_flag  The scenario's cooperative-cancellation flag.
      */
@@ -94,7 +118,10 @@ class ScenarioCoordinator
   private:
     std::atomic<bool>       paused_{ false };
     std::mutex              mutex_;
-    std::condition_variable cv_;
+    std::condition_variable cv_;                ///< notified on resume
+    std::condition_variable cv_ack_;            ///< notified when ack_count_ changes
+    int                     participants_{ 0 }; ///< registered participant count
+    int                     ack_count_{ 0 };    ///< threads that acknowledged pause
 };
 
 /**

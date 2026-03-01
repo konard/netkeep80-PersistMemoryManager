@@ -284,6 +284,68 @@ static bool test_allocate_metrics()
     return true;
 }
 
+/**
+ * @brief Fragmented free blocks must be reused before the tail expansion space
+ *        (Issue #53 fix verification).
+ *
+ * Strategy:
+ *   1. Create a PMM and allocate N blocks, staying within the initial buffer.
+ *   2. Free every other block to create N/2 non-adjacent fragmented holes.
+ *   3. Re-allocate N/2 blocks of the same size.
+ *   4. Verify total_size did NOT grow — all allocations fit in the freed holes.
+ */
+static bool test_fragmented_gaps_reused_before_expand_space()
+{
+    const std::size_t block_size   = 256;
+    const std::size_t initial_size = 8 * 1024;
+
+    void* mem = std::malloc( initial_size );
+    PMM_TEST( mem != nullptr );
+
+    pmm::PersistMemoryManager* mgr = pmm::PersistMemoryManager::create( mem, initial_size );
+    PMM_TEST( mgr != nullptr );
+
+    // Allocate blocks until most of the space is used, but stop before auto-grow.
+    void* ptrs[20];
+    int   n = 0;
+    for ( ; n < 20; ++n )
+    {
+        ptrs[n] = pmm::PersistMemoryManager::instance()->allocate( block_size );
+        if ( ptrs[n] == nullptr )
+            break;
+        // Stop before we accidentally trigger auto-grow
+        if ( pmm::PersistMemoryManager::instance()->total_size() != initial_size )
+            break;
+    }
+    PMM_TEST( n >= 4 );
+
+    // Free every other block — creates n/2 non-adjacent holes
+    int holes = 0;
+    for ( int i = 0; i < n; i += 2 )
+    {
+        pmm::PersistMemoryManager::instance()->deallocate( ptrs[i] );
+        ++holes;
+    }
+    PMM_TEST( holes >= 2 );
+
+    // Record state before re-allocation
+    std::size_t size_before = pmm::PersistMemoryManager::instance()->total_size();
+
+    // Re-allocate the freed blocks; they must fit in the fragmented holes.
+    for ( int i = 0; i < holes; ++i )
+    {
+        void* p = pmm::PersistMemoryManager::instance()->allocate( block_size );
+        PMM_TEST( p != nullptr );
+    }
+
+    // No expansion must have occurred — all allocations fit inside the freed holes.
+    PMM_TEST( pmm::PersistMemoryManager::instance()->total_size() == size_before );
+    PMM_TEST( pmm::PersistMemoryManager::instance()->validate() );
+
+    pmm::PersistMemoryManager::destroy();
+    return true;
+}
+
 int main()
 {
     std::cout << "=== test_allocate ===\n";
@@ -301,6 +363,7 @@ int main()
     PMM_RUN( "allocate_invalid_alignment", test_allocate_invalid_alignment );
     PMM_RUN( "allocate_write_read", test_allocate_write_read );
     PMM_RUN( "allocate_metrics", test_allocate_metrics );
+    PMM_RUN( "fragmented_gaps_reused_before_expand_space", test_fragmented_gaps_reused_before_expand_space );
 
     std::cout << ( all_passed ? "\nAll tests PASSED\n" : "\nSome tests FAILED\n" );
     return all_passed ? 0 : 1;
