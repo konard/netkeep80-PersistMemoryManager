@@ -41,3 +41,6 @@ add_test(NAME test_shared_mutex COMMAND test_shared_mutex)
 
 # ─── Нагрузочные и стресс-тесты (Issue #34) ──────────────────────────────────
 pmm_add_test(test_scenarios_issue34 test_scenarios_issue34.cpp)
+
+# ─── Тесты нового алгоритма (Issue #55): AVL-дерево свободных блоков ──────────
+pmm_add_test(test_avl_allocator test_avl_allocator.cpp)
