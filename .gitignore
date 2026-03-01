@@ -17,6 +17,7 @@ Debug
 packages
 .vs
 *.vcxproj.user
+pmm_demo.bin
 
 # Windows image file caches
 Thumbs.db
