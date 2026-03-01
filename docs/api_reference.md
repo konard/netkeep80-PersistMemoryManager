@@ -7,6 +7,8 @@
 памяти из файла или shared memory. Взаимодействие с данными в управляемой памяти осуществляется
 через персистные типизированные указатели `pptr<T>`.
 
+**Issue #61:** Менеджер реализован как полностью статический класс — нет экземпляров, нет `PersistMemoryManager*` в пользовательском коде. Весь API доступен через статические методы.
+
 Реализация находится в двух файлах:
 - `include/persist_memory_manager.h` — менеджер памяти и `pptr<T>`
 - `include/persist_memory_io.h` — утилиты файлового ввода/вывода (`save` / `load_from_file`)
@@ -34,44 +36,31 @@ namespace pmm {
 }
 ```
 
-Все объекты создаются и уничтожаются через статические методы — прямой вызов конструктора/деструктора не предусмотрен.
+Полностью статический класс. Одновременно может существовать только один активный менеджер (синглтон). Прямой вызов конструктора/деструктора не предусмотрен.
 
-Одновременно может существовать только один экземпляр менеджера (синглтон). Доступ к нему осуществляется
-через `PersistMemoryManager::instance()`.
-
-### Статические методы
-
-#### `instance()`
-
-```cpp
-static PersistMemoryManager* instance() noexcept;
-```
-
-Возвращает указатель на текущий экземпляр менеджера. `nullptr`, если менеджер не создан.
-
----
+### Создание и уничтожение
 
 #### `create()`
 
 ```cpp
-static PersistMemoryManager* create(void* memory, std::size_t size);
+static bool create(void* memory, std::size_t size);
 ```
 
 Создаёт новый менеджер памяти в переданном буфере и устанавливает синглтон.
 
 **Параметры:**
-- `memory` — указатель на буфер. Не должен быть `nullptr`.
-- `size` — размер буфера в байтах. Должен быть ≥ `kMinMemorySize` (4096).
+- `memory` — указатель на буфер. Не должен быть `nullptr`. Должен быть выровнен по `kGranuleSize` (16 байт).
+- `size` — размер буфера в байтах. Должен быть ≥ `kMinMemorySize` (4096) и кратен `kGranuleSize`.
 
-**Возвращает:** указатель на менеджер или `nullptr` при ошибке.
+**Возвращает:** `true` при успехе, `false` при ошибке.
 
-**Постусловие:** `PersistMemoryManager::instance()` указывает на созданный менеджер. Буфер принадлежит менеджеру и будет освобождён при `destroy()`.
+**Важно:** Переданный буфер (`memory`) НЕ освобождается при `destroy()`. Вызывающий код ответственен за его освобождение.
 
 **Пример:**
 ```cpp
 void* mem = std::malloc(1024 * 1024);
-auto* mgr = pmm::PersistMemoryManager::create(mem, 1024 * 1024);
-// mgr != nullptr при успехе
+bool ok = pmm::PersistMemoryManager::create(mem, 1024 * 1024);
+// ok == true при успехе
 ```
 
 ---
@@ -79,7 +68,7 @@ auto* mgr = pmm::PersistMemoryManager::create(mem, 1024 * 1024);
 #### `load()`
 
 ```cpp
-static PersistMemoryManager* load(void* memory, std::size_t size);
+static bool load(void* memory, std::size_t size);
 ```
 
 Загружает менеджер из существующего образа в памяти. Проверяет магическое число и размер. Устанавливает синглтон.
@@ -88,12 +77,12 @@ static PersistMemoryManager* load(void* memory, std::size_t size);
 - `memory` — буфер с ранее сохранённым образом.
 - `size` — размер образа (должен совпадать с `total_size` из заголовка).
 
-**Возвращает:** указатель на менеджер или `nullptr`, если образ некорректен.
+**Возвращает:** `true` при успехе, `false` если образ некорректен.
 
 **Пример:**
 ```cpp
 // После fread(memory, 1, file_size, f):
-auto* mgr = pmm::PersistMemoryManager::load(memory, file_size);
+bool ok = pmm::PersistMemoryManager::load(memory, file_size);
 ```
 
 ---
@@ -104,44 +93,42 @@ auto* mgr = pmm::PersistMemoryManager::load(memory, file_size);
 static void destroy();
 ```
 
-Уничтожает синглтон: обнуляет метаданные, освобождает все управляемые буферы (включая цепочку расширений), сбрасывает `instance()` в `nullptr`.
+Уничтожает синглтон: обнуляет метаданные, освобождает все буферы, выделенные через авто-расширение (`expand()`), сбрасывает `instance()` в `nullptr`.
 
-**Постусловие:** `PersistMemoryManager::instance() == nullptr`.
+**Важно:** Буфер, переданный в `create()` или `load()` (внешняя память), НЕ освобождается. Вызывающий код должен освободить его самостоятельно.
 
 **Пример:**
 ```cpp
 pmm::PersistMemoryManager::destroy();
-// Буфер, переданный в create(), уже освобождён
+std::free(mem); // Освобождаем внешний буфер самостоятельно
 ```
 
 ---
 
-### Персистные типизированные указатели (pptr<T>)
-
-Основной способ работы с данными в управляемой памяти — через `pptr<T>`.
+### Типизированное выделение памяти (основной API)
 
 #### `allocate_typed<T>()`
 
 ```cpp
 template <class T>
-pptr<T> allocate_typed();
+static pptr<T> allocate_typed();
 
 template <class T>
-pptr<T> allocate_typed(std::size_t count);
+static pptr<T> allocate_typed(std::size_t count);
 ```
 
 Выделяет `sizeof(T)` байт (или `sizeof(T) * count` для массива) с выравниванием `alignof(T)`.
 
-**Возвращает:** `pptr<T>` на выделенный объект/массив. Нулевой `pptr` при ошибке.
+**Возвращает:** `pptr<T>` на выделенный объект/массив. Нулевой `pptr` при ошибке (не null означает 0 гранульный индекс).
 
-**Особенность:** при нехватке памяти менеджер автоматически расширяет управляемую область на 25%. После расширения `PersistMemoryManager::instance()` указывает на новый буфер.
+**Особенность:** при нехватке памяти менеджер автоматически расширяет управляемую область на 25%.
 
 **Пример:**
 ```cpp
-pmm::pptr<int>    p1 = mgr->allocate_typed<int>();
-pmm::pptr<double> p2 = mgr->allocate_typed<double>(10);  // массив из 10 double
+pmm::pptr<int>    p1 = pmm::PersistMemoryManager::allocate_typed<int>();
+pmm::pptr<double> p2 = pmm::PersistMemoryManager::allocate_typed<double>(10);  // массив из 10 double
 *p1 = 42;
-*p2.get_at(0) = 3.14;
+p2[0] = 3.14;
 ```
 
 ---
@@ -150,60 +137,68 @@ pmm::pptr<double> p2 = mgr->allocate_typed<double>(10);  // массив из 10
 
 ```cpp
 template <class T>
-void deallocate_typed(pptr<T> p);
+static void deallocate_typed(pptr<T> p);
 ```
 
 Освобождает блок памяти, на который указывает `p`. Нулевой `pptr` игнорируется.
 
 **Пример:**
 ```cpp
-mgr->deallocate_typed(p1);
+pmm::PersistMemoryManager::deallocate_typed(p1);
 ```
 
 ---
 
-### Вспомогательный метод
-
-#### `offset_to_ptr()`
+#### `reallocate_typed<T>()`
 
 ```cpp
-void*       offset_to_ptr(std::ptrdiff_t offset) noexcept;
-const void* offset_to_ptr(std::ptrdiff_t offset) const noexcept;
+template <class T>
+static pptr<T> reallocate_typed(pptr<T> p, std::size_t new_count);
 ```
 
-Преобразует смещение от базы управляемой области в абсолютный указатель. `offset == 0` → `nullptr`.
+Изменяет размер блока до `sizeof(T) * new_count` байт. Данные из старого блока копируются в новый (до минимума из старого и нового размера). Если `p` нулевой — работает как `allocate_typed<T>(new_count)`.
+
+**Возвращает:** `pptr<T>` на новый блок, нулевой `pptr` при ошибке.
+
+**Пример:**
+```cpp
+pmm::pptr<uint8_t> p = pmm::PersistMemoryManager::allocate_typed<uint8_t>(128);
+p = pmm::PersistMemoryManager::reallocate_typed(p, 512); // увеличить до 512 байт
+```
 
 ---
 
 ### Метрики
 
+Все методы метрик — статические, потокобезопасные (shared_lock).
+
 #### `total_size()`
 
 ```cpp
-std::size_t total_size() const;
+static std::size_t total_size() noexcept;
 ```
 
-Возвращает полный размер управляемой области (равен `size`, переданному в `create()`).
+Полный размер управляемой области в байтах.
 
 ---
 
 #### `used_size()`
 
 ```cpp
-std::size_t used_size() const;
+static std::size_t used_size() noexcept;
 ```
 
-Возвращает объём занятой памяти: метаданные (заголовки) плюс пользовательские данные.
+Объём занятой памяти: метаданные (заголовки) плюс пользовательские данные.
 
 ---
 
 #### `free_size()`
 
 ```cpp
-std::size_t free_size() const;
+static std::size_t free_size() noexcept;
 ```
 
-Возвращает объём доступной свободной памяти внутри управляемой области.
+Объём доступной свободной памяти внутри управляемой области.
 
 **Инвариант:** `used_size() + free_size() <= total_size()`.
 
@@ -212,10 +207,10 @@ std::size_t free_size() const;
 #### `fragmentation()`
 
 ```cpp
-std::size_t fragmentation() const;
+static std::size_t fragmentation() noexcept;
 ```
 
-Возвращает количество лишних свободных фрагментов (число свободных блоков минус один).
+Количество лишних свободных фрагментов (число свободных блоков минус один).
 
 `0` — нет фрагментации, `> 0` — есть несмежные свободные регионы.
 
@@ -226,7 +221,7 @@ std::size_t fragmentation() const;
 #### `validate()`
 
 ```cpp
-bool validate() const;
+static bool validate();
 ```
 
 Выполняет полную проверку целостности структур данных:
@@ -243,10 +238,50 @@ bool validate() const;
 #### `dump_stats()`
 
 ```cpp
-void dump_stats() const;
+static void dump_stats();
 ```
 
 Выводит в `std::cout` диагностическую информацию: размеры, счётчики блоков, фрагментацию.
+
+---
+
+#### `is_initialized()`
+
+```cpp
+static bool is_initialized() noexcept;
+```
+
+Возвращает `true`, если менеджер создан (синглтон не `nullptr`).
+
+---
+
+#### `block_data_size_bytes()`
+
+```cpp
+static std::size_t block_data_size_bytes(uint32_t granule_idx) noexcept;
+```
+
+Возвращает размер пользовательских данных блока по гранульному индексу (в байтах, округлено до кратного `kGranuleSize`).
+
+---
+
+#### `offset_to_ptr()`
+
+```cpp
+static void* offset_to_ptr(uint32_t granule_idx) noexcept;
+```
+
+Преобразует гранульный индекс в абсолютный указатель. `0` → `nullptr`.
+
+---
+
+#### `instance()`
+
+```cpp
+static PersistMemoryManager* instance() noexcept;
+```
+
+Возвращает указатель на текущий экземпляр менеджера (для внутреннего использования в IO-утилитах и демо). `nullptr`, если менеджер не создан.
 
 ---
 
@@ -259,15 +294,15 @@ namespace pmm {
 }
 ```
 
-Персистный типизированный указатель. Хранит смещение от начала управляемой области вместо абсолютного адреса, что обеспечивает корректную работу после загрузки образа по другому базовому адресу.
+Персистный типизированный указатель. Хранит 32-битный гранульный индекс (16 байт/гранула) вместо абсолютного адреса, что обеспечивает корректную работу после загрузки образа по другому базовому адресу.
 
-**Требование:** `sizeof(pptr<T>) == sizeof(void*)`.
+**Требование:** `sizeof(pptr<T>) == 4`.
 
 ### Конструкторы
 
 ```cpp
-pptr();                               // нулевой указатель
-explicit pptr(std::ptrdiff_t offset); // из смещения (используется менеджером)
+pptr();                               // нулевой указатель (индекс 0)
+explicit pptr(std::uint32_t offset);  // из гранульного индекса
 pptr(const pptr<T>&) = default;
 ```
 
@@ -278,10 +313,10 @@ bool is_null() const noexcept;
 explicit operator bool() const noexcept;
 ```
 
-### Получение смещения
+### Получение гранульного индекса
 
 ```cpp
-std::ptrdiff_t offset() const noexcept;
+std::uint32_t offset() const noexcept;
 ```
 
 ### Разыменование через синглтон
@@ -290,18 +325,10 @@ std::ptrdiff_t offset() const noexcept;
 T*  get() const noexcept;          // указатель на объект
 T&  operator*() const noexcept;    // разыменование
 T*  operator->() const noexcept;   // доступ к членам
-T*  get_at(std::size_t index) const noexcept;  // элемент массива
+T&  operator[](std::size_t i) const noexcept; // элемент массива (с проверкой границ)
 ```
 
 Используют `PersistMemoryManager::instance()` автоматически.
-
-### Разыменование с явным менеджером
-
-```cpp
-T*       resolve(PersistMemoryManager* mgr) const noexcept;
-const T* resolve(const PersistMemoryManager* mgr) const noexcept;
-T*       resolve_at(PersistMemoryManager* mgr, std::size_t index) const noexcept;
-```
 
 ### Операторы сравнения
 
@@ -314,24 +341,28 @@ bool operator!=(const pptr<T>& other) const noexcept;
 
 ```cpp
 // Создать менеджер
-auto* mgr = pmm::PersistMemoryManager::create(std::malloc(1 << 20), 1 << 20);
+void* mem = std::malloc(1 << 20);
+pmm::PersistMemoryManager::create(mem, 1 << 20);
 
 // Выделить и использовать типизированный указатель
-pmm::pptr<int> p = mgr->allocate_typed<int>();
+pmm::pptr<int> p = pmm::PersistMemoryManager::allocate_typed<int>();
 *p = 123;
 
-// Сохранить смещение для восстановления после перезагрузки
-std::ptrdiff_t saved = p.offset();
+// Сохранить гранульный индекс для восстановления после перезагрузки
+uint32_t saved = p.offset();
 
 // Сохранить образ в файл
-pmm::save(mgr, "heap.dat");
+pmm::save("heap.dat");
 pmm::PersistMemoryManager::destroy();
+std::free(mem);
 
 // Загрузить образ
-auto* mgr2 = pmm::load_from_file("heap.dat", std::malloc(1 << 20), 1 << 20);
+void* mem2 = std::malloc(1 << 20);
+pmm::load_from_file("heap.dat", mem2, 1 << 20);
 pmm::pptr<int> p2(saved);
 assert(*p2 == 123);
 pmm::PersistMemoryManager::destroy();
+std::free(mem2);
 ```
 
 ---
@@ -342,14 +373,13 @@ pmm::PersistMemoryManager::destroy();
 
 ```cpp
 namespace pmm {
-    bool save(const PersistMemoryManager* mgr, const char* filename);
+    bool save(const char* filename);
 }
 ```
 
-Сохраняет образ управляемой области памяти в двоичный файл.
+Сохраняет образ управляемой области памяти в двоичный файл. Использует синглтон внутри.
 
 **Параметры:**
-- `mgr` — указатель на менеджер. Не должен быть `nullptr`.
 - `filename` — путь к выходному файлу. Не должен быть `nullptr`.
 
 **Возвращает:** `true` при успешной записи, `false` при ошибке.
@@ -358,7 +388,7 @@ namespace pmm {
 ```cpp
 #include "persist_memory_io.h"
 
-if (!pmm::save(mgr, "heap.dat")) {
+if (!pmm::save("heap.dat")) {
     // ошибка записи
 }
 ```
@@ -369,7 +399,7 @@ if (!pmm::save(mgr, "heap.dat")) {
 
 ```cpp
 namespace pmm {
-    PersistMemoryManager* load_from_file(
+    bool load_from_file(
         const char* filename,
         void*       memory,
         std::size_t size
@@ -377,22 +407,22 @@ namespace pmm {
 }
 ```
 
-Загружает образ менеджера из файла в существующий буфер.
+Загружает образ менеджера из файла в существующий буфер и устанавливает синглтон.
 
 **Параметры:**
 - `filename` — путь к файлу с образом.
 - `memory` — буфер для загрузки. Размер должен быть ≥ размера файла.
 - `size` — размер буфера в байтах.
 
-**Возвращает:** указатель на восстановленный менеджер или `nullptr` при ошибке.
+**Возвращает:** `true` при успехе, `false` при ошибке.
 
 **Пример:**
 ```cpp
 #include "persist_memory_io.h"
 
 void* buf = std::malloc(1024 * 1024);
-auto* mgr = pmm::load_from_file("heap.dat", buf, 1024 * 1024);
-if (mgr != nullptr && mgr->validate()) {
+bool ok = pmm::load_from_file("heap.dat", buf, 1024 * 1024);
+if (ok && pmm::PersistMemoryManager::validate()) {
     // образ корректно загружен
 }
 ```
@@ -403,23 +433,37 @@ if (mgr != nullptr && mgr->validate()) {
 
 ```cpp
 namespace pmm {
-    MemoryStats get_stats(const PersistMemoryManager* mgr);
+    MemoryStats get_stats();
 }
 ```
 
-Возвращает структуру со статистикой состояния менеджера.
+Возвращает структуру со статистикой состояния менеджера. Использует синглтон внутри.
 
 ---
 
-### `get_info()`
+### `get_manager_info()`
 
 ```cpp
 namespace pmm {
-    AllocationInfo get_info(const PersistMemoryManager* mgr, void* ptr);
+    ManagerInfo get_manager_info();
 }
 ```
 
-Возвращает информацию о конкретном выделенном блоке по абсолютному указателю на данные пользователя.
+Возвращает снимок полей заголовка менеджера. Использует синглтон внутри.
+
+---
+
+### `for_each_block()`
+
+```cpp
+namespace pmm {
+    template <typename Callback>
+    void for_each_block(Callback&& callback);
+    // Callback: void(const pmm::BlockView&)
+}
+```
+
+Вызывает `callback` для каждого блока памяти. Использует синглтон внутри. Потокобезопасно (shared_lock).
 
 ---
 
@@ -440,28 +484,14 @@ struct MemoryStats {
 
 ---
 
-### `AllocationInfo`
-
-```cpp
-struct AllocationInfo {
-    void*       ptr;       // Указатель на данные пользователя
-    std::size_t size;      // Размер пользовательских данных (байт)
-    std::size_t alignment; // Выравнивание
-    bool        is_valid;  // true — блок найден и корректен
-};
-```
-
----
-
 ## Константы
 
 | Константа | Значение | Описание |
 |-----------|----------|----------|
-| `kDefaultAlignment` | 16 | Выравнивание по умолчанию (байт) |
-| `kMinAlignment` | 8 | Минимальное выравнивание (байт) |
-| `kMaxAlignment` | 4096 | Максимальное выравнивание (байт) |
+| `kGranuleSize` | 16 | Размер гранулы в байтах (единица адресации) |
+| `kMinAlignment` | 16 | Минимальное выравнивание (байт) |
 | `kMinMemorySize` | 4096 | Минимальный размер буфера (байт) |
-| `kMinBlockSize` | 32 | Минимальный размер блока данных (байт) |
+| `kMinBlockSize` | 16 | Минимальный размер блока данных (байт) |
 | `kGrowNumerator` | 5 | Числитель коэффициента расширения (5/4 = 25%) |
 | `kGrowDenominator` | 4 | Знаменатель коэффициента расширения |
 
@@ -471,35 +501,35 @@ struct AllocationInfo {
 
 | Условие | Возвращаемое значение |
 |---------|----------------------|
-| `create(nullptr, size)` | `nullptr` |
-| `create(mem, < 4096)` | `nullptr` |
+| `create(nullptr, size)` | `false` |
+| `create(mem, < 4096)` | `false` |
 | `allocate_typed<T>()` при нехватке памяти | автоматическое расширение на 25% |
 | `deallocate_typed(null pptr)` | нет операции |
-| `save(nullptr, ...)` | `false` |
-| `save(mgr, nullptr)` | `false` |
-| `load_from_file(nullptr, ...)` | `nullptr` |
-| `load_from_file(file, nullptr, ...)` | `nullptr` |
-| `load_from_file(несуществующий файл, ...)` | `nullptr` |
-| `load_from_file(файл > size, ...)` | `nullptr` |
-| `load(повреждённый образ, ...)` | `nullptr` |
+| `save(nullptr)` | `false` |
+| `load_from_file(nullptr, ...)` | `false` |
+| `load_from_file(file, nullptr, ...)` | `false` |
+| `load_from_file(несуществующий файл, ...)` | `false` |
+| `load_from_file(файл > size, ...)` | `false` |
+| `load(повреждённый образ, ...)` | `false` |
 
 ---
 
 ## Потокобезопасность
 
 Все публичные методы потокобезопасны. Используется `std::shared_mutex`:
-- методы чтения (`total_size`, `used_size`, `free_size`, `fragmentation`, `validate`, `dump_stats`, `get_stats`, `get_info`) захватывают разделённую блокировку (`shared_lock`) и могут выполняться параллельно;
-- методы записи (`create`, `load`, `destroy`, `allocate_typed`, `deallocate_typed`) захватывают эксклюзивную блокировку (`unique_lock`).
+- методы чтения (`total_size`, `used_size`, `free_size`, `fragmentation`, `validate`, `dump_stats`, `get_stats`, `get_manager_info`, `for_each_block`) захватывают разделённую блокировку (`shared_lock`) и могут выполняться параллельно;
+- методы записи (`create`, `load`, `destroy`, `allocate_typed`, `deallocate_typed`, `reallocate_typed`) захватывают эксклюзивную блокировку (`unique_lock`).
 
 ---
 
 ## Ограничения
 
 - Файловый ввод/вывод: только `stdio` (`fopen`/`fread`/`fwrite`/`fclose`). Нет поддержки `mmap`.
-- Алгоритм поиска свободного блока: first-fit по отдельному списку свободных блоков.
+- Алгоритм поиска свободного блока: best-fit через AVL-дерево свободных блоков (O(log n)).
 - Нет сжатия или шифрования образа.
 - Одновременно может существовать только один экземпляр менеджера (синглтон).
+- Максимальный адресуемый объём: 64 ГБ (2^32 × 16 байт/гранула).
 
 ---
 
-*Версия документа 2.0. Соответствует версии библиотеки 1.0.0.*
+*Версия документа 3.0. Соответствует версии библиотеки 3.0.0 (Issue #61: статический API).*

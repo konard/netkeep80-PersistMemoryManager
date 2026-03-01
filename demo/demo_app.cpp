@@ -66,11 +66,11 @@ void DemoApp::render()
         struct_tree_view_->update_snapshot( mgr );
 
         // Build MetricsSnapshot
-        auto            stats = pmm::get_stats( mgr );
+        auto            stats = pmm::get_stats();
         MetricsSnapshot snap;
-        snap.total_size       = mgr->total_size();
-        snap.used_size        = mgr->used_size();
-        snap.free_size        = ( mgr->total_size() > mgr->used_size() ) ? ( mgr->total_size() - mgr->used_size() ) : 0;
+        snap.total_size       = pmm::PersistMemoryManager::total_size();
+        snap.used_size        = pmm::PersistMemoryManager::used_size();
+        snap.free_size        = pmm::PersistMemoryManager::free_size();
         snap.total_blocks     = stats.total_blocks;
         snap.allocated_blocks = stats.allocated_blocks;
         snap.free_blocks      = stats.free_blocks;
@@ -88,7 +88,7 @@ void DemoApp::render()
         auto elapsed = std::chrono::duration_cast<std::chrono::seconds>( now - last_validate_time_ ).count();
         if ( first_validate_ || elapsed >= kValidateIntervalSec )
         {
-            run_validate( mgr );
+            run_validate();
             first_validate_ = false;
         }
         metrics_view_->update_validation( last_validation_ );
@@ -104,7 +104,7 @@ void DemoApp::render()
 
     // ── Phase 12: handle "Validate now" button press ──────────────────────────
     if ( metrics_view_->validate_requested() && mgr )
-        run_validate( mgr );
+        run_validate();
 
     if ( show_help_ )
         render_help_window();
@@ -255,10 +255,10 @@ void DemoApp::apply_pmm_size()
 
 // ─── Phase 12: Integrity validation ──────────────────────────────────────────
 
-void DemoApp::run_validate( pmm::PersistMemoryManager* mgr )
+void DemoApp::run_validate()
 {
     last_validate_time_        = std::chrono::steady_clock::now();
-    bool ok                    = mgr->validate();
+    bool ok                    = pmm::PersistMemoryManager::validate();
     last_validation_.state     = ok ? ValidationResult::State::Ok : ValidationResult::State::Failed;
     last_validation_.timestamp = last_validate_time_;
     metrics_view_->update_validation( last_validation_ );

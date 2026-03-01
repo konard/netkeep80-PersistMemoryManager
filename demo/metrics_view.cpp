@@ -163,9 +163,7 @@ void MetricsView::render()
 
     if ( ImGui::Button( "Dump to stdout" ) )
     {
-        auto* mgr = pmm::PersistMemoryManager::instance();
-        if ( mgr )
-            mgr->dump_stats();
+        pmm::PersistMemoryManager::dump_stats();
     }
 
     ImGui::End();

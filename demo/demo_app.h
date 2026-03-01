@@ -88,8 +88,8 @@ class DemoApp
     std::chrono::steady_clock::time_point last_validate_time_{};
     bool                                  first_validate_ = true; ///< run validate() on first frame
 
-    /// Run validate() on mgr and update last_validation_.
-    void run_validate( pmm::PersistMemoryManager* mgr );
+    /// Run validate() and update last_validation_.
+    void run_validate();
 };
 
 } // namespace demo

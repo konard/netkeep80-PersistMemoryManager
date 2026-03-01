@@ -1,8 +1,10 @@
 /**
  * @file test_coalesce.cpp
- * @brief Тесты слияния соседних свободных блоков — Фаза 2 (обновлено в Фазе 7)
+ * @brief Тесты слияния соседних свободных блоков — Фаза 2 (обновлено в Issue #61)
  *
- * Фаза 7: синглтон, destroy() освобождает буфер.
+ * Issue #61: менеджер — полностью статический класс.
+ *   - Все операции через статические методы PersistMemoryManager::xxx().
+ *   - Выделение через allocate_typed<T>(), освобождение через deallocate_typed().
  */
 
 #include "persist_memory_manager.h"
@@ -43,37 +45,37 @@ static bool test_coalesce_with_next()
     void*             mem  = std::malloc( size );
     PMM_TEST( mem != nullptr );
 
-    pmm::PersistMemoryManager* mgr = pmm::PersistMemoryManager::create( mem, size );
-    PMM_TEST( mgr != nullptr );
+    PMM_TEST( pmm::PersistMemoryManager::create( mem, size ) );
 
-    void* p1 = mgr->allocate( 256 );
-    void* p2 = mgr->allocate( 256 );
-    void* p3 = mgr->allocate( 256 );
-    PMM_TEST( p1 && p2 && p3 );
+    pmm::pptr<std::uint8_t> p1 = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 256 );
+    pmm::pptr<std::uint8_t> p2 = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 256 );
+    pmm::pptr<std::uint8_t> p3 = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 256 );
+    PMM_TEST( !p1.is_null() && !p2.is_null() && !p3.is_null() );
 
-    auto before = pmm::get_stats( mgr );
+    auto before = pmm::get_stats();
 
-    mgr->deallocate( p2 );
-    PMM_TEST( mgr->validate() );
+    pmm::PersistMemoryManager::deallocate_typed( p2 );
+    PMM_TEST( pmm::PersistMemoryManager::validate() );
 
-    auto mid = pmm::get_stats( mgr );
+    auto mid = pmm::get_stats();
     PMM_TEST( mid.total_blocks == before.total_blocks );
 
-    mgr->deallocate( p1 );
-    PMM_TEST( mgr->validate() );
+    pmm::PersistMemoryManager::deallocate_typed( p1 );
+    PMM_TEST( pmm::PersistMemoryManager::validate() );
 
-    auto after = pmm::get_stats( mgr );
+    auto after = pmm::get_stats();
     PMM_TEST( after.total_blocks < mid.total_blocks );
 
-    void* big = mgr->allocate( 400 );
-    PMM_TEST( big != nullptr );
-    PMM_TEST( mgr->validate() );
+    pmm::pptr<std::uint8_t> big = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 400 );
+    PMM_TEST( !big.is_null() );
+    PMM_TEST( pmm::PersistMemoryManager::validate() );
 
-    mgr->deallocate( big );
-    mgr->deallocate( p3 );
-    PMM_TEST( mgr->validate() );
+    pmm::PersistMemoryManager::deallocate_typed( big );
+    pmm::PersistMemoryManager::deallocate_typed( p3 );
+    PMM_TEST( pmm::PersistMemoryManager::validate() );
 
     pmm::PersistMemoryManager::destroy();
+    std::free( mem );
     return true;
 }
 
@@ -83,37 +85,37 @@ static bool test_coalesce_with_prev()
     void*             mem  = std::malloc( size );
     PMM_TEST( mem != nullptr );
 
-    pmm::PersistMemoryManager* mgr = pmm::PersistMemoryManager::create( mem, size );
-    PMM_TEST( mgr != nullptr );
+    PMM_TEST( pmm::PersistMemoryManager::create( mem, size ) );
 
-    void* p1 = mgr->allocate( 256 );
-    void* p2 = mgr->allocate( 256 );
-    void* p3 = mgr->allocate( 256 );
-    PMM_TEST( p1 && p2 && p3 );
+    pmm::pptr<std::uint8_t> p1 = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 256 );
+    pmm::pptr<std::uint8_t> p2 = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 256 );
+    pmm::pptr<std::uint8_t> p3 = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 256 );
+    PMM_TEST( !p1.is_null() && !p2.is_null() && !p3.is_null() );
 
-    auto before = pmm::get_stats( mgr );
+    auto before = pmm::get_stats();
 
-    mgr->deallocate( p2 );
-    PMM_TEST( mgr->validate() );
+    pmm::PersistMemoryManager::deallocate_typed( p2 );
+    PMM_TEST( pmm::PersistMemoryManager::validate() );
 
-    auto mid = pmm::get_stats( mgr );
+    auto mid = pmm::get_stats();
     PMM_TEST( mid.total_blocks == before.total_blocks );
 
-    mgr->deallocate( p3 );
-    PMM_TEST( mgr->validate() );
+    pmm::PersistMemoryManager::deallocate_typed( p3 );
+    PMM_TEST( pmm::PersistMemoryManager::validate() );
 
-    auto after = pmm::get_stats( mgr );
+    auto after = pmm::get_stats();
     PMM_TEST( after.total_blocks < mid.total_blocks );
 
-    void* big = mgr->allocate( 400 );
-    PMM_TEST( big != nullptr );
-    PMM_TEST( mgr->validate() );
+    pmm::pptr<std::uint8_t> big = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 400 );
+    PMM_TEST( !big.is_null() );
+    PMM_TEST( pmm::PersistMemoryManager::validate() );
 
-    mgr->deallocate( big );
-    mgr->deallocate( p1 );
-    PMM_TEST( mgr->validate() );
+    pmm::PersistMemoryManager::deallocate_typed( big );
+    pmm::PersistMemoryManager::deallocate_typed( p1 );
+    PMM_TEST( pmm::PersistMemoryManager::validate() );
 
     pmm::PersistMemoryManager::destroy();
+    std::free( mem );
     return true;
 }
 
@@ -123,38 +125,38 @@ static bool test_coalesce_both_neighbors()
     void*             mem  = std::malloc( size );
     PMM_TEST( mem != nullptr );
 
-    pmm::PersistMemoryManager* mgr = pmm::PersistMemoryManager::create( mem, size );
-    PMM_TEST( mgr != nullptr );
+    PMM_TEST( pmm::PersistMemoryManager::create( mem, size ) );
 
-    void* p1 = mgr->allocate( 256 );
-    void* p2 = mgr->allocate( 256 );
-    void* p3 = mgr->allocate( 256 );
-    void* p4 = mgr->allocate( 256 );
-    PMM_TEST( p1 && p2 && p3 && p4 );
+    pmm::pptr<std::uint8_t> p1 = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 256 );
+    pmm::pptr<std::uint8_t> p2 = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 256 );
+    pmm::pptr<std::uint8_t> p3 = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 256 );
+    pmm::pptr<std::uint8_t> p4 = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 256 );
+    PMM_TEST( !p1.is_null() && !p2.is_null() && !p3.is_null() && !p4.is_null() );
 
-    mgr->deallocate( p1 );
-    mgr->deallocate( p3 );
-    PMM_TEST( mgr->validate() );
+    pmm::PersistMemoryManager::deallocate_typed( p1 );
+    pmm::PersistMemoryManager::deallocate_typed( p3 );
+    PMM_TEST( pmm::PersistMemoryManager::validate() );
 
-    auto        before      = pmm::get_stats( mgr );
+    auto        before      = pmm::get_stats();
     std::size_t free_before = before.free_blocks;
 
-    mgr->deallocate( p2 );
-    PMM_TEST( mgr->validate() );
+    pmm::PersistMemoryManager::deallocate_typed( p2 );
+    PMM_TEST( pmm::PersistMemoryManager::validate() );
 
-    auto after = pmm::get_stats( mgr );
+    auto after = pmm::get_stats();
     PMM_TEST( after.total_blocks == before.total_blocks - 2 );
     PMM_TEST( after.free_blocks == free_before - 1 );
 
-    void* big = mgr->allocate( 600 );
-    PMM_TEST( big != nullptr );
-    PMM_TEST( mgr->validate() );
+    pmm::pptr<std::uint8_t> big = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 600 );
+    PMM_TEST( !big.is_null() );
+    PMM_TEST( pmm::PersistMemoryManager::validate() );
 
-    mgr->deallocate( big );
-    mgr->deallocate( p4 );
-    PMM_TEST( mgr->validate() );
+    pmm::PersistMemoryManager::deallocate_typed( big );
+    pmm::PersistMemoryManager::deallocate_typed( p4 );
+    PMM_TEST( pmm::PersistMemoryManager::validate() );
 
     pmm::PersistMemoryManager::destroy();
+    std::free( mem );
     return true;
 }
 
@@ -164,28 +166,28 @@ static bool test_coalesce_no_merge_when_neighbors_used()
     void*             mem  = std::malloc( size );
     PMM_TEST( mem != nullptr );
 
-    pmm::PersistMemoryManager* mgr = pmm::PersistMemoryManager::create( mem, size );
-    PMM_TEST( mgr != nullptr );
+    PMM_TEST( pmm::PersistMemoryManager::create( mem, size ) );
 
-    void* p1 = mgr->allocate( 128 );
-    void* p2 = mgr->allocate( 128 );
-    void* p3 = mgr->allocate( 128 );
-    PMM_TEST( p1 && p2 && p3 );
+    pmm::pptr<std::uint8_t> p1 = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 128 );
+    pmm::pptr<std::uint8_t> p2 = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 128 );
+    pmm::pptr<std::uint8_t> p3 = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 128 );
+    PMM_TEST( !p1.is_null() && !p2.is_null() && !p3.is_null() );
 
-    auto before = pmm::get_stats( mgr );
+    auto before = pmm::get_stats();
 
-    mgr->deallocate( p2 );
-    PMM_TEST( mgr->validate() );
+    pmm::PersistMemoryManager::deallocate_typed( p2 );
+    PMM_TEST( pmm::PersistMemoryManager::validate() );
 
-    auto after = pmm::get_stats( mgr );
+    auto after = pmm::get_stats();
     PMM_TEST( after.total_blocks == before.total_blocks );
     PMM_TEST( after.free_blocks == before.free_blocks + 1 );
 
-    mgr->deallocate( p1 );
-    mgr->deallocate( p3 );
-    PMM_TEST( mgr->validate() );
+    pmm::PersistMemoryManager::deallocate_typed( p1 );
+    pmm::PersistMemoryManager::deallocate_typed( p3 );
+    PMM_TEST( pmm::PersistMemoryManager::validate() );
 
     pmm::PersistMemoryManager::destroy();
+    std::free( mem );
     return true;
 }
 
@@ -195,26 +197,26 @@ static bool test_coalesce_first_block_no_next_free()
     void*             mem  = std::malloc( size );
     PMM_TEST( mem != nullptr );
 
-    pmm::PersistMemoryManager* mgr = pmm::PersistMemoryManager::create( mem, size );
-    PMM_TEST( mgr != nullptr );
+    PMM_TEST( pmm::PersistMemoryManager::create( mem, size ) );
 
-    void* p1 = mgr->allocate( 256 );
-    void* p2 = mgr->allocate( 256 );
-    PMM_TEST( p1 && p2 );
+    pmm::pptr<std::uint8_t> p1 = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 256 );
+    pmm::pptr<std::uint8_t> p2 = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 256 );
+    PMM_TEST( !p1.is_null() && !p2.is_null() );
 
-    auto before = pmm::get_stats( mgr );
+    auto before = pmm::get_stats();
 
-    mgr->deallocate( p1 );
-    PMM_TEST( mgr->validate() );
+    pmm::PersistMemoryManager::deallocate_typed( p1 );
+    PMM_TEST( pmm::PersistMemoryManager::validate() );
 
-    auto after = pmm::get_stats( mgr );
+    auto after = pmm::get_stats();
     PMM_TEST( after.total_blocks == before.total_blocks );
     PMM_TEST( after.free_blocks == before.free_blocks + 1 );
 
-    mgr->deallocate( p2 );
-    PMM_TEST( mgr->validate() );
+    pmm::PersistMemoryManager::deallocate_typed( p2 );
+    PMM_TEST( pmm::PersistMemoryManager::validate() );
 
     pmm::PersistMemoryManager::destroy();
+    std::free( mem );
     return true;
 }
 
@@ -224,37 +226,37 @@ static bool test_coalesce_zero_fragmentation_after_all_free()
     void*             mem  = std::malloc( size );
     PMM_TEST( mem != nullptr );
 
-    pmm::PersistMemoryManager* mgr = pmm::PersistMemoryManager::create( mem, size );
-    PMM_TEST( mgr != nullptr );
+    PMM_TEST( pmm::PersistMemoryManager::create( mem, size ) );
 
-    const int N = 8;
-    void*     ptrs[N];
+    const int               N = 8;
+    pmm::pptr<std::uint8_t> ptrs[N];
     for ( int i = 0; i < N; i++ )
     {
-        ptrs[i] = mgr->allocate( 256 );
-        PMM_TEST( ptrs[i] != nullptr );
+        ptrs[i] = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 256 );
+        PMM_TEST( !ptrs[i].is_null() );
     }
 
     for ( int i = 0; i < N; i += 2 )
     {
-        mgr->deallocate( ptrs[i] );
+        pmm::PersistMemoryManager::deallocate_typed( ptrs[i] );
     }
-    PMM_TEST( mgr->validate() );
-    PMM_TEST( mgr->fragmentation() > 0 );
+    PMM_TEST( pmm::PersistMemoryManager::validate() );
+    PMM_TEST( pmm::PersistMemoryManager::fragmentation() > 0 );
 
     for ( int i = 1; i < N; i += 2 )
     {
-        mgr->deallocate( ptrs[i] );
-        PMM_TEST( mgr->validate() );
+        pmm::PersistMemoryManager::deallocate_typed( ptrs[i] );
+        PMM_TEST( pmm::PersistMemoryManager::validate() );
     }
 
-    PMM_TEST( mgr->fragmentation() == 0 );
-    auto stats = pmm::get_stats( mgr );
+    PMM_TEST( pmm::PersistMemoryManager::fragmentation() == 0 );
+    auto stats = pmm::get_stats();
     PMM_TEST( stats.total_blocks == 1 );
     PMM_TEST( stats.free_blocks == 1 );
     PMM_TEST( stats.allocated_blocks == 0 );
 
     pmm::PersistMemoryManager::destroy();
+    std::free( mem );
     return true;
 }
 
@@ -264,28 +266,28 @@ static bool test_coalesce_lifo_results_in_one_block()
     void*             mem  = std::malloc( size );
     PMM_TEST( mem != nullptr );
 
-    pmm::PersistMemoryManager* mgr = pmm::PersistMemoryManager::create( mem, size );
-    PMM_TEST( mgr != nullptr );
+    PMM_TEST( pmm::PersistMemoryManager::create( mem, size ) );
 
-    const int N = 5;
-    void*     ptrs[N];
+    const int               N = 5;
+    pmm::pptr<std::uint8_t> ptrs[N];
     for ( int i = 0; i < N; i++ )
     {
-        ptrs[i] = mgr->allocate( 512 );
-        PMM_TEST( ptrs[i] != nullptr );
+        ptrs[i] = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 512 );
+        PMM_TEST( !ptrs[i].is_null() );
     }
 
     for ( int i = N - 1; i >= 0; i-- )
     {
-        mgr->deallocate( ptrs[i] );
-        PMM_TEST( mgr->validate() );
+        pmm::PersistMemoryManager::deallocate_typed( ptrs[i] );
+        PMM_TEST( pmm::PersistMemoryManager::validate() );
     }
 
-    auto stats = pmm::get_stats( mgr );
+    auto stats = pmm::get_stats();
     PMM_TEST( stats.total_blocks == 1 );
     PMM_TEST( stats.free_blocks == 1 );
 
     pmm::PersistMemoryManager::destroy();
+    std::free( mem );
     return true;
 }
 
@@ -295,28 +297,28 @@ static bool test_coalesce_fifo_results_in_one_block()
     void*             mem  = std::malloc( size );
     PMM_TEST( mem != nullptr );
 
-    pmm::PersistMemoryManager* mgr = pmm::PersistMemoryManager::create( mem, size );
-    PMM_TEST( mgr != nullptr );
+    PMM_TEST( pmm::PersistMemoryManager::create( mem, size ) );
 
-    const int N = 5;
-    void*     ptrs[N];
+    const int               N = 5;
+    pmm::pptr<std::uint8_t> ptrs[N];
     for ( int i = 0; i < N; i++ )
     {
-        ptrs[i] = mgr->allocate( 512 );
-        PMM_TEST( ptrs[i] != nullptr );
+        ptrs[i] = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 512 );
+        PMM_TEST( !ptrs[i].is_null() );
     }
 
     for ( int i = 0; i < N; i++ )
     {
-        mgr->deallocate( ptrs[i] );
-        PMM_TEST( mgr->validate() );
+        pmm::PersistMemoryManager::deallocate_typed( ptrs[i] );
+        PMM_TEST( pmm::PersistMemoryManager::validate() );
     }
 
-    auto stats = pmm::get_stats( mgr );
+    auto stats = pmm::get_stats();
     PMM_TEST( stats.total_blocks == 1 );
     PMM_TEST( stats.free_blocks == 1 );
 
     pmm::PersistMemoryManager::destroy();
+    std::free( mem );
     return true;
 }
 
@@ -326,40 +328,36 @@ static bool test_coalesce_large_allocation_after_merge()
     void*             mem  = std::malloc( size );
     PMM_TEST( mem != nullptr );
 
-    pmm::PersistMemoryManager* mgr = pmm::PersistMemoryManager::create( mem, size );
-    PMM_TEST( mgr != nullptr );
+    PMM_TEST( pmm::PersistMemoryManager::create( mem, size ) );
 
-    void* p1 = mgr->allocate( 256 );
-    void* p2 = mgr->allocate( 256 );
-    void* p3 = mgr->allocate( 256 );
-    PMM_TEST( p1 && p2 && p3 );
+    pmm::pptr<std::uint8_t> p1 = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 256 );
+    pmm::pptr<std::uint8_t> p2 = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 256 );
+    pmm::pptr<std::uint8_t> p3 = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 256 );
+    PMM_TEST( !p1.is_null() && !p2.is_null() && !p3.is_null() );
 
-    void* probe = mgr->allocate( 700 );
-    if ( probe )
-    {
-        mgr->deallocate( probe );
-    }
+    pmm::pptr<std::uint8_t> probe = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 700 );
+    if ( !probe.is_null() )
+        pmm::PersistMemoryManager::deallocate_typed( probe );
 
-    mgr->deallocate( p1 );
-    mgr->deallocate( p2 );
-    mgr->deallocate( p3 );
-    PMM_TEST( mgr->validate() );
+    pmm::PersistMemoryManager::deallocate_typed( p1 );
+    pmm::PersistMemoryManager::deallocate_typed( p2 );
+    pmm::PersistMemoryManager::deallocate_typed( p3 );
+    PMM_TEST( pmm::PersistMemoryManager::validate() );
 
-    void* big = mgr->allocate( 512 );
-    PMM_TEST( big != nullptr );
-    PMM_TEST( mgr->validate() );
+    pmm::pptr<std::uint8_t> big = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 512 );
+    PMM_TEST( !big.is_null() );
+    PMM_TEST( pmm::PersistMemoryManager::validate() );
 
-    std::memset( big, 0xAB, 512 );
-    const std::uint8_t* p = static_cast<const std::uint8_t*>( big );
+    std::memset( big.get(), 0xAB, 512 );
+    const std::uint8_t* p = big.get();
     for ( std::size_t i = 0; i < 512; i++ )
-    {
         PMM_TEST( p[i] == 0xAB );
-    }
 
-    mgr->deallocate( big );
-    PMM_TEST( mgr->validate() );
+    pmm::PersistMemoryManager::deallocate_typed( big );
+    PMM_TEST( pmm::PersistMemoryManager::validate() );
 
     pmm::PersistMemoryManager::destroy();
+    std::free( mem );
     return true;
 }
 
@@ -369,41 +367,38 @@ static bool test_coalesce_stress_interleaved()
     void*             mem  = std::malloc( size );
     PMM_TEST( mem != nullptr );
 
-    pmm::PersistMemoryManager* mgr = pmm::PersistMemoryManager::create( mem, size );
-    PMM_TEST( mgr != nullptr );
+    PMM_TEST( pmm::PersistMemoryManager::create( mem, size ) );
 
-    static const int ROUNDS  = 200;
-    void*            ptrs[4] = { nullptr, nullptr, nullptr, nullptr };
-    std::size_t      sizes[] = { 64, 128, 256, 512 };
+    static const int        ROUNDS = 200;
+    pmm::pptr<std::uint8_t> ptrs[4];
+    std::size_t             sizes[] = { 64, 128, 256, 512 };
 
     for ( int r = 0; r < ROUNDS; r++ )
     {
         int slot = r % 4;
-        if ( ptrs[slot] )
+        if ( !ptrs[slot].is_null() )
         {
-            mgr->deallocate( ptrs[slot] );
-            ptrs[slot] = nullptr;
-            PMM_TEST( pmm::PersistMemoryManager::instance()->validate() );
+            pmm::PersistMemoryManager::deallocate_typed( ptrs[slot] );
+            ptrs[slot] = pmm::pptr<std::uint8_t>();
+            PMM_TEST( pmm::PersistMemoryManager::validate() );
         }
-        // After auto-expand mgr pointer may have changed — always use instance()
-        ptrs[slot] = pmm::PersistMemoryManager::instance()->allocate( sizes[slot] );
-        PMM_TEST( ptrs[slot] != nullptr );
-        PMM_TEST( pmm::PersistMemoryManager::instance()->validate() );
+        ptrs[slot] = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( sizes[slot] );
+        PMM_TEST( !ptrs[slot].is_null() );
+        PMM_TEST( pmm::PersistMemoryManager::validate() );
     }
 
     for ( int k = 0; k < 4; k++ )
     {
-        if ( ptrs[k] )
-        {
-            pmm::PersistMemoryManager::instance()->deallocate( ptrs[k] );
-        }
+        if ( !ptrs[k].is_null() )
+            pmm::PersistMemoryManager::deallocate_typed( ptrs[k] );
     }
-    PMM_TEST( pmm::PersistMemoryManager::instance()->validate() );
+    PMM_TEST( pmm::PersistMemoryManager::validate() );
 
-    auto stats = pmm::get_stats( pmm::PersistMemoryManager::instance() );
+    auto stats = pmm::get_stats();
     PMM_TEST( stats.free_blocks == 1 );
 
     pmm::PersistMemoryManager::destroy();
+    std::free( mem );
     return true;
 }
 
