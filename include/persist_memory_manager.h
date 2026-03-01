@@ -412,20 +412,20 @@ inline void avl_insert( std::uint8_t* base, ManagerHeader* hdr, std::uint32_t bl
         hdr->free_tree_root = blk_idx;
         return;
     }
+    // Issue #59: cache total_gran once; compute blk size in granules before the traversal loop
+    std::uint32_t total_gran = byte_off_to_idx( hdr->total_size );
+    std::uint32_t blk_gran =
+        ( blk->next_offset != kNoBlock ) ? ( blk->next_offset - blk_idx ) : ( total_gran - blk_idx );
     std::uint32_t cur = hdr->free_tree_root, parent = kNoBlock;
     bool          go_left = false;
     while ( cur != kNoBlock )
     {
-        parent         = cur;
-        BlockHeader* n = block_at( base, cur );
-        // Issue #59: sizes in granules
-        std::uint32_t blk_gran = ( blk->next_offset != kNoBlock ) ? ( blk->next_offset - blk_idx )
-                                                                  : ( byte_off_to_idx( hdr->total_size ) - blk_idx );
-        std::uint32_t n_gran =
-            ( n->next_offset != kNoBlock ) ? ( n->next_offset - cur ) : ( byte_off_to_idx( hdr->total_size ) - cur );
-        bool smaller = ( blk_gran < n_gran ) || ( blk_gran == n_gran && blk_idx <= cur );
-        go_left      = smaller;
-        cur          = smaller ? n->left_offset : n->right_offset;
+        parent                = cur;
+        BlockHeader*  n       = block_at( base, cur );
+        std::uint32_t n_gran  = ( n->next_offset != kNoBlock ) ? ( n->next_offset - cur ) : ( total_gran - cur );
+        bool          smaller = ( blk_gran < n_gran ) || ( blk_gran == n_gran && blk_idx <= cur );
+        go_left               = smaller;
+        cur                   = smaller ? n->left_offset : n->right_offset;
     }
     blk->parent_offset = parent;
     if ( go_left )
@@ -504,12 +504,13 @@ inline void avl_remove( std::uint8_t* base, ManagerHeader* hdr, std::uint32_t bl
 /// Issue #59: размеры в гранулах.
 inline std::uint32_t avl_find_best_fit( std::uint8_t* base, ManagerHeader* hdr, std::uint32_t needed_granules )
 {
+    // Issue #59: cache total_gran once to avoid repeated hdr->total_size reads in the hot path
+    std::uint32_t total_gran = byte_off_to_idx( hdr->total_size );
     std::uint32_t cur = hdr->free_tree_root, result = kNoBlock;
     while ( cur != kNoBlock )
     {
         BlockHeader*  node     = block_at( base, cur );
-        std::uint32_t cur_gran = ( node->next_offset != kNoBlock ) ? ( node->next_offset - cur )
-                                                                   : ( byte_off_to_idx( hdr->total_size ) - cur );
+        std::uint32_t cur_gran = ( node->next_offset != kNoBlock ) ? ( node->next_offset - cur ) : ( total_gran - cur );
         if ( cur_gran >= needed_granules )
         {
             result = cur;
