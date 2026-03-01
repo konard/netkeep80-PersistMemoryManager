@@ -15,6 +15,7 @@
 - **Высокая производительность** — отдельный список свободных блоков, allocate 100K ≤ 7 мс
 - **Синглтон** — единственный активный менеджер доступен через `PersistMemoryManager::instance()`
 - **Автоматическое расширение** — при нехватке памяти буфер автоматически растёт на 25%
+- **Потокобезопасность** — базовая синхронизация через `std::recursive_mutex`
 
 ## Быстрый старт
 
@@ -172,6 +173,8 @@ PersistMemoryManager/
 │   ├── test_persistence.cpp        # Тесты персистентности (Фаза 3)
 │   ├── test_pptr.cpp               # Тесты персистного указателя pptr<T> (Фаза 5)
 │   ├── test_performance.cpp        # Тесты производительности (Фаза 6)
+│   ├── test_stress_realistic.cpp   # Реалистичный стресс-тест (Фаза 8)
+│   ├── test_thread_safety.cpp      # Тесты потокобезопасности (Фаза 9)
 │   └── CMakeLists.txt
 ├── docs/
 │   ├── architecture.md             # Архитектура
@@ -183,6 +186,7 @@ PersistMemoryManager/
 ├── phase3.md                       # Фаза 3: Персистентность
 ├── phase4.md                       # Фаза 4: Тесты и документация
 ├── phase6.md                       # Фаза 6: Оптимизация производительности
+├── phase9.md                       # Фаза 9: Потокобезопасность
 ├── tz.md                           # Техническое задание
 ├── CMakeLists.txt
 └── LICENSE
@@ -242,6 +246,17 @@ PersistMemoryManager/
 - Бенчмарк в `examples/benchmark.cpp`
 - Результат: allocate 100K блоков ~7 мс (цель ≤ 100 мс ✅, ускорение ~2200×)
 
+### Фаза 8 — Реалистичный стресс-тест
+
+- Четырёхфазный тест жизненного цикла: прогрев (10K блоков), рост (66/33), равновесие (50/50), дренаж (33/66)
+- `tests/test_stress_realistic.cpp` — 339 строк, время выполнения ~3.5 с (Release)
+
+### Фаза 9 — Потокобезопасность
+
+- `std::recursive_mutex s_mutex` — единый статический мьютекс для синглтона
+- `create()`, `load()`, `destroy()`, `allocate()`, `deallocate()`, `reallocate()` защищены `lock_guard`
+- 4 теста в `tests/test_thread_safety.cpp`: конкурентный allocate, чередование alloc/dealloc, reallocate, проверка отсутствия гонок данных
+
 ### Фаза 7 — Синглтон + автоматическое расширение памяти
 
 - `PersistMemoryManager::instance()` — глобальный доступ к единственному активному менеджеру
@@ -251,7 +266,7 @@ PersistMemoryManager/
 - `pptr<T>::get()`, `operator*`, `operator->` — разыменование через синглтон без передачи менеджера
 - Все тесты и примеры обновлены для нового API
 
-Подробнее: [plan.md](plan.md) | [phase1.md](phase1.md) | [phase2.md](phase2.md) | [phase3.md](phase3.md) | [phase4.md](phase4.md) | [phase6.md](phase6.md) | [docs/architecture.md](docs/architecture.md) | [docs/api_reference.md](docs/api_reference.md) | [docs/performance.md](docs/performance.md)
+Подробнее: [plan.md](plan.md) | [phase1.md](phase1.md) | [phase2.md](phase2.md) | [phase3.md](phase3.md) | [phase4.md](phase4.md) | [phase6.md](phase6.md) | [phase9.md](phase9.md) | [docs/architecture.md](docs/architecture.md) | [docs/api_reference.md](docs/api_reference.md) | [docs/performance.md](docs/performance.md)
 
 ## Лицензия
 

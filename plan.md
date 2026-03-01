@@ -1,8 +1,8 @@
 # План разработки PersistMemoryManager
 
-## Текущая фаза: Фаза 7 завершена
+## Текущая фаза: Фаза 9 завершена
 
-Подробности по каждой фазе: [phase1.md](phase1.md), [phase2.md](phase2.md), [phase3.md](phase3.md), [phase4.md](phase4.md), [phase6.md](phase6.md)
+Подробности по каждой фазе: [phase1.md](phase1.md), [phase2.md](phase2.md), [phase3.md](phase3.md), [phase4.md](phase4.md), [phase6.md](phase6.md), [phase9.md](phase9.md)
 
 ---
 
@@ -17,6 +17,8 @@
 | 5 | Персистный указатель pptr<T> | ✅ Завершена | — |
 | 6 | Оптимизация производительности | ✅ Завершена | [phase6.md](phase6.md) |
 | 7 | Синглтон + автоматическое расширение памяти | ✅ Завершена | — |
+| 8 | Реалистичный стресс-тест | ✅ Завершена | — |
+| 9 | Потокобезопасность (std::recursive_mutex) | ✅ Завершена | [phase9.md](phase9.md) |
 
 ---
 
@@ -176,6 +178,48 @@
 - `tests/test_pptr.cpp` — заменён `pptr_allocate_oom` на `pptr_allocate_auto_expand`; использование `operator*`, `operator->`
 - `tests/test_performance.cpp` — обновлён под новый API синглтона
 - `examples/` — все примеры обновлены: `mgr->destroy()` → `pmm::PersistMemoryManager::destroy()`, убраны лишние `std::free()`
+
+---
+
+## Фаза 8: Реалистичный стресс-тест
+
+**Статус:** ✅ Завершена
+
+**Задачи:**
+- [x] Реализовать четырёхфазный тест жизненного цикла менеджера памяти
+- [x] Фаза 0: 10 000 начальных аллокаций (прогрев)
+- [x] Фаза 1: 10 000 итераций (66% аллокации / 33% освобождения)
+- [x] Фаза 2: 10 000 итераций равновесия (50% / 50%)
+- [x] Фаза 3: полный дренаж (66% освобождения / 33% аллокаций)
+- [x] Написать `tests/test_stress_realistic.cpp`
+- [x] Обновить `tests/CMakeLists.txt`
+- [x] Обновить `plan.md` и `README.md`
+
+**Результаты:**
+- `tests/test_stress_realistic.cpp` — 339 строк, четырёхфазный стресс-тест
+- Время выполнения: ~3.5 с (Release), ~15–20 с (Debug)
+- Проверяются: validate(), get_stats(), корректность счётчиков выделенных блоков
+
+---
+
+## Фаза 9: Потокобезопасность
+
+**Статус:** ✅ Завершена
+
+**Задачи:**
+- [x] Добавить `#include <mutex>` в заголовочный файл
+- [x] Добавить статический `std::recursive_mutex s_mutex` в класс
+- [x] Защитить мьютексом `create()`, `load()`, `destroy()`
+- [x] Защитить мьютексом `allocate()`, `deallocate()`, `reallocate()`
+- [x] Написать `tests/test_thread_safety.cpp`
+- [x] Обновить `tests/CMakeLists.txt`
+- [x] Написать `phase9.md`
+- [x] Обновить `plan.md` и `README.md`
+
+**Результаты:**
+- `include/persist_memory_manager.h` — добавлен `s_mutex`, блокировка в публичных методах
+- `tests/test_thread_safety.cpp` — тесты многопоточного выделения/освобождения памяти
+- `phase9.md` — документация по Фазе 9
 
 ---
 
