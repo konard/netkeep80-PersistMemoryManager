@@ -85,7 +85,11 @@ static bool test_alloc_100k_within_100ms()
     std::free( mem );
 
     PMM_TEST( allocated == N );
+#ifdef NDEBUG
     PMM_TEST( ms_alloc <= 100.0 );
+#else
+    (void)ms_alloc; // Skip timing assertion in Debug/coverage builds
+#endif
 
     return true;
 }
@@ -126,7 +130,11 @@ static bool test_dealloc_100k_within_100ms()
     pmm::PersistMemoryManager::destroy();
     std::free( mem );
 
+#ifdef NDEBUG
     PMM_TEST( ms_dealloc <= 100.0 );
+#else
+    (void)ms_dealloc; // Skip timing assertion in Debug/coverage builds
+#endif
 
     return true;
 }
