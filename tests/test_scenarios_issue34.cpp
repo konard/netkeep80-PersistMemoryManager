@@ -510,10 +510,6 @@ static bool test_marathon()
     int  validate_cnt = 0;
     bool validate_ok  = true;
 
-    // Метрики для проверки отсутствия деградации
-    std::size_t used_size_prev        = 0;
-    int         used_size_grow_streak = 0; // количество раз подряд, когда used_size росло
-
     auto t0 = now();
     std::cout << "  Запуск " << total_iterations << " итераций (60% alloc / 40% free)...\n";
 
@@ -554,21 +550,10 @@ static bool test_marathon()
                 break;
             }
 
-            // Мониторинг используемой памяти: не должна постоянно расти (признак утечки)
-            std::size_t used_now = pmm::PersistMemoryManager::instance()->used_size();
-            if ( used_now > used_size_prev && used_size_prev > 0 )
-            {
-                used_size_grow_streak++;
-            }
-            else
-            {
-                used_size_grow_streak = 0;
-            }
-            used_size_prev = used_now;
-
             if ( ( iter + 1 ) % 100000 == 0 )
             {
-                auto stats = pmm::get_stats( pmm::PersistMemoryManager::instance() );
+                auto        stats    = pmm::get_stats( pmm::PersistMemoryManager::instance() );
+                std::size_t used_now = pmm::PersistMemoryManager::instance()->used_size();
                 std::cout << "    iter=" << ( iter + 1 ) << "  живых=" << live.size() << "  alloc=" << alloc_ok
                           << "  fail=" << alloc_fail << "  free=" << dealloc_cnt << "\n"
                           << "    used=" << used_now / 1024 << " КБ" << "  frag=" << stats.total_fragmentation / 1024
