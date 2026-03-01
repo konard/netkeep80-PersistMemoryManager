@@ -93,21 +93,31 @@ static bool test_pause_blocks_thread()
     std::atomic<bool>         stop_flag{ false };
     std::atomic<bool>         thread_unblocked{ false };
 
-    coord.pause_others();
+    // Register one participant so pause_others() must wait for its ack.
+    coord.register_participant();
 
+    // Start the participant thread first so it can ack the pause.
     std::thread t(
         [&]
         {
+            // Small delay so the main thread can call pause_others() first.
+            std::this_thread::sleep_for( std::chrono::milliseconds( 20 ) );
             coord.yield_if_paused( stop_flag );
             thread_unblocked.store( true, std::memory_order_release );
         } );
 
-    // Thread should still be blocked after 100 ms
-    std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
+    // pause_others() will block until the participant acks; after that the
+    // participant is blocked inside yield_if_paused() waiting for resume.
+    coord.pause_others( stop_flag );
+
+    // Thread should still be blocked (waiting for resume_others())
     PMM_TEST( !thread_unblocked.load( std::memory_order_acquire ) );
 
     coord.resume_others();
     t.join();
+
+    // Unregister so the coordinator's participant count returns to 0.
+    coord.unregister_participant();
 
     PMM_TEST( thread_unblocked.load( std::memory_order_acquire ) );
     return true;
@@ -124,25 +134,35 @@ static bool test_resume_unblocks_all()
     std::atomic<int>          unblocked_count{ 0 };
     std::vector<std::thread>  threads;
 
-    coord.pause_others();
+    // Register all participants before pausing so pause_others() waits for them.
+    for ( int i = 0; i < kThreads; ++i )
+        coord.register_participant();
 
+    // Start participant threads with a small delay so pause_others() is called first.
     for ( int i = 0; i < kThreads; ++i )
     {
         threads.emplace_back(
             [&]
             {
+                std::this_thread::sleep_for( std::chrono::milliseconds( 20 ) );
                 coord.yield_if_paused( stop_flag );
                 unblocked_count.fetch_add( 1, std::memory_order_relaxed );
             } );
     }
 
-    std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+    // pause_others() blocks until all kThreads participants have acked.
+    coord.pause_others( stop_flag );
+
+    // All threads have acked (are inside yield_if_paused) but not yet unblocked.
     PMM_TEST( unblocked_count.load() == 0 );
 
     coord.resume_others();
 
     for ( auto& t : threads )
         t.join();
+
+    for ( int i = 0; i < kThreads; ++i )
+        coord.unregister_participant();
 
     PMM_TEST( unblocked_count.load() == kThreads );
     return true;
@@ -178,17 +198,23 @@ static bool test_stop_flag_breaks_pause()
     std::atomic<bool>         stop_flag{ false };
     std::atomic<bool>         thread_returned{ false };
 
-    coord.pause_others();
+    // Register one participant so pause_others() must wait for its ack.
+    coord.register_participant();
 
     std::thread t(
         [&]
         {
+            // Small delay so the main thread can call pause_others() first.
+            std::this_thread::sleep_for( std::chrono::milliseconds( 20 ) );
             coord.yield_if_paused( stop_flag );
             thread_returned.store( true, std::memory_order_release );
         } );
 
-    // Let the thread enter the wait
-    std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+    // pause_others() blocks until the participant acks, then participant is
+    // blocked inside yield_if_paused() waiting for resume or stop_flag.
+    coord.pause_others( stop_flag );
+
+    // Thread must still be blocked (waiting for resume or stop_flag).
     PMM_TEST( !thread_returned.load( std::memory_order_acquire ) );
 
     // Set stop flag — thread must unblock even though pause is still active
@@ -203,6 +229,8 @@ static bool test_stop_flag_breaks_pause()
         std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
     }
     t.join();
+
+    coord.unregister_participant();
 
     PMM_TEST( thread_returned.load( std::memory_order_acquire ) );
     return true;
