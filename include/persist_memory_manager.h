@@ -12,6 +12,7 @@
  * Фаза 5: Персистный типизированный указатель pptr<T>.
  * Фаза 6: Оптимизация производительности (отдельный список свободных блоков).
  * Фаза 7: Синглтон и автоматическое расширение памяти.
+ * Фаза 9: Потокобезопасность (std::recursive_mutex).
  *
  * Использование (синглтон):
  * @code
@@ -37,7 +38,7 @@
  * }
  * @endcode
  *
- * @version 0.6.0 (Фаза 7)
+ * @version 0.7.0 (Фаза 9)
  */
 
 #pragma once
@@ -50,6 +51,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <mutex>
 
 namespace pmm
 {
@@ -585,6 +587,7 @@ class PersistMemoryManager
      */
     static PersistMemoryManager* create( void* memory, std::size_t size )
     {
+        std::lock_guard<std::recursive_mutex> lock( s_mutex );
         if ( memory == nullptr || size < kMinMemorySize )
         {
             return nullptr;
@@ -641,6 +644,7 @@ class PersistMemoryManager
      */
     static PersistMemoryManager* load( void* memory, std::size_t size )
     {
+        std::lock_guard<std::recursive_mutex> lock( s_mutex );
         if ( memory == nullptr || size < kMinMemorySize )
         {
             return nullptr;
@@ -661,6 +665,7 @@ class PersistMemoryManager
     /// @brief Уничтожить синглтон: обнулить магическое число, освободить буфер (std::free), сбросить s_instance.
     static void destroy()
     {
+        std::lock_guard<std::recursive_mutex> lock( s_mutex );
         if ( s_instance != nullptr )
         {
             detail::ManagerHeader* hdr = s_instance->header();
@@ -680,6 +685,7 @@ class PersistMemoryManager
      */
     void* allocate( std::size_t user_size, std::size_t alignment = kDefaultAlignment )
     {
+        std::lock_guard<std::recursive_mutex> lock( s_mutex );
         if ( user_size == 0 )
         {
             return nullptr;
@@ -741,6 +747,7 @@ class PersistMemoryManager
      */
     void deallocate( void* ptr )
     {
+        std::lock_guard<std::recursive_mutex> lock( s_mutex );
         if ( ptr == nullptr )
         {
             return;
@@ -777,6 +784,7 @@ class PersistMemoryManager
     /// @brief Изменить размер блока. Если new_size <= текущему — возвращает тот же ptr. nullptr — выделяет новый.
     void* reallocate( void* ptr, std::size_t new_size )
     {
+        std::lock_guard<std::recursive_mutex> lock( s_mutex );
         if ( ptr == nullptr )
         {
             return allocate( new_size );
@@ -1025,6 +1033,8 @@ class PersistMemoryManager
   private:
     /// Единственный экземпляр менеджера (синглтон).
     static PersistMemoryManager* s_instance;
+    /// Мьютекс для потокобезопасного доступа к синглтону.
+    static std::recursive_mutex s_mutex;
 
     // ─── Вспомогательные методы ───────────────────────────────────────────────
 
@@ -1281,6 +1291,7 @@ class PersistMemoryManager
 // ─── Определение статического члена синглтона ──────────────────────────────────
 
 inline PersistMemoryManager* PersistMemoryManager::s_instance = nullptr;
+inline std::recursive_mutex  PersistMemoryManager::s_mutex;
 
 // ─── Реализация методов pptr<T> (после полного определения PersistMemoryManager) ──
 

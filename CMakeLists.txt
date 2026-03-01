@@ -18,6 +18,9 @@ else()
     target_compile_options(pmm INTERFACE -Wall -Wextra -Wpedantic)
 endif()
 
+# ─── Потоки (для тестов потокобезопасности) ───────────────────────────────────
+find_package(Threads REQUIRED)
+
 # ─── Тесты ────────────────────────────────────────────────────────────────────
 enable_testing()
 add_subdirectory(tests)
