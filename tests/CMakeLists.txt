@@ -38,3 +38,6 @@ add_test(NAME test_thread_safety COMMAND test_thread_safety)
 add_executable(test_shared_mutex test_shared_mutex.cpp)
 target_link_libraries(test_shared_mutex PRIVATE pmm Threads::Threads)
 add_test(NAME test_shared_mutex COMMAND test_shared_mutex)
+
+# ─── Нагрузочные и стресс-тесты (Issue #34) ──────────────────────────────────
+pmm_add_test(test_scenarios_issue34 test_scenarios_issue34.cpp)
