@@ -66,9 +66,9 @@ static bool test_100k_allocations()
         return false;
     }
 
-    const int                             N    = 100'000;
-    const std::size_t                     BSIZ = 64; // размер каждого блока в байтах
-    std::vector<pmm::pptr<uint8_t>>       ptrs( N );
+    const int                       N    = 100'000;
+    const std::size_t               BSIZ = 64; // размер каждого блока в байтах
+    std::vector<pmm::pptr<uint8_t>> ptrs( N );
 
     // ── Фаза аллокации ────────────────────────────────────────────────────────
     auto t0        = now();
@@ -187,10 +187,10 @@ static bool test_1m_alternating()
     }
 
     // Небольшой пул из 64 слотов, в каждом блоки от 32 до 512 байт
-    const int                             POOL     = 64;
-    const std::size_t                     SIZES[8] = { 32, 64, 128, 256, 512, 64, 128, 256 };
-    std::vector<pmm::pptr<uint8_t>>       pool( POOL );
-    std::vector<std::size_t>              pool_sizes( POOL, 0 );
+    const int                       POOL     = 64;
+    const std::size_t               SIZES[8] = { 32, 64, 128, 256, 512, 64, 128, 256 };
+    std::vector<pmm::pptr<uint8_t>> pool( POOL );
+    std::vector<std::size_t>        pool_sizes( POOL, 0 );
 
     const int TOTAL_OPS     = 1'000'000;
     int       alloc_ops     = 0;

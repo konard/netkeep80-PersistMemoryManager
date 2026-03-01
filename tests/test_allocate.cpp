@@ -103,8 +103,8 @@ static bool test_allocate_multiple()
 
     PMM_TEST( pmm::PersistMemoryManager::create( mem, size ) );
 
-    const int                     num = 10;
-    pmm::pptr<std::uint8_t>       ptrs[num];
+    const int               num = 10;
+    pmm::pptr<std::uint8_t> ptrs[num];
     for ( int i = 0; i < num; i++ )
     {
         ptrs[i] = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 1024 );

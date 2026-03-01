@@ -156,7 +156,8 @@ static void test_concurrent_alloc_dealloc()
         th.join();
     }
 
-    PMM_TEST( pmm::PersistMemoryManager::validate(), "concurrent_alloc_dealloc: validate() после чередующихся операций" );
+    PMM_TEST( pmm::PersistMemoryManager::validate(),
+              "concurrent_alloc_dealloc: validate() после чередующихся операций" );
     PMM_TEST( errors.load() == 0, "concurrent_alloc_dealloc: нет ошибок в потоках" );
 
     auto stats = pmm::get_stats();
@@ -211,7 +212,8 @@ static void test_concurrent_reallocate()
             pmm::PersistMemoryManager::deallocate_typed( blocks[t] );
     }
 
-    PMM_TEST( pmm::PersistMemoryManager::validate(), "concurrent_reallocate: validate() после параллельного reallocate" );
+    PMM_TEST( pmm::PersistMemoryManager::validate(),
+              "concurrent_reallocate: validate() после параллельного reallocate" );
 
     pmm::PersistMemoryManager::destroy();
 }
@@ -239,7 +241,8 @@ static void test_no_data_races()
 
                 for ( int i = 0; i < kPerThread; ++i )
                 {
-                    pmm::pptr<std::uint8_t> p = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( sizeof( int ) );
+                    pmm::pptr<std::uint8_t> p =
+                        pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( sizeof( int ) );
                     if ( !p.is_null() )
                     {
                         int val = t * 1000 + i;

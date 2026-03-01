@@ -81,31 +81,31 @@ void MemMapView::update_snapshot( pmm::PersistMemoryManager* mgr )
         snapshot_[i].type = ByteInfo::Type::ManagerHeader;
 
     // Walk block linked list via the public for_each_block() iterator
-    pmm::for_each_block( [&]( const pmm::BlockView& blk )
-                         {
-                             const ByteInfo::Type hdr_type =
-                                 blk.used ? ByteInfo::Type::BlockHeaderUsed : ByteInfo::Type::BlockHeaderFree;
-                             const ByteInfo::Type data_type =
-                                 blk.used ? ByteInfo::Type::UserDataUsed : ByteInfo::Type::UserDataFree;
+    pmm::for_each_block(
+        [&]( const pmm::BlockView& blk )
+        {
+            const ByteInfo::Type hdr_type =
+                blk.used ? ByteInfo::Type::BlockHeaderUsed : ByteInfo::Type::BlockHeaderFree;
+            const ByteInfo::Type data_type = blk.used ? ByteInfo::Type::UserDataUsed : ByteInfo::Type::UserDataFree;
 
-                             const std::size_t blk_start = static_cast<std::size_t>( blk.offset );
-                             const std::size_t hdr_end   = blk_start + blk.header_size;
-                             const std::size_t blk_end   = blk_start + blk.total_size;
+            const std::size_t blk_start = static_cast<std::size_t>( blk.offset );
+            const std::size_t hdr_end   = blk_start + blk.header_size;
+            const std::size_t blk_end   = blk_start + blk.total_size;
 
-                             // Mark BlockHeader bytes
-                             for ( std::size_t b = blk_start; b < hdr_end && b < display_bytes; ++b )
-                             {
-                                 snapshot_[b].type        = hdr_type;
-                                 snapshot_[b].block_index = blk.index;
-                             }
+            // Mark BlockHeader bytes
+            for ( std::size_t b = blk_start; b < hdr_end && b < display_bytes; ++b )
+            {
+                snapshot_[b].type        = hdr_type;
+                snapshot_[b].block_index = blk.index;
+            }
 
-                             // Mark user data bytes
-                             for ( std::size_t b = hdr_end; b < blk_end && b < display_bytes; ++b )
-                             {
-                                 snapshot_[b].type        = data_type;
-                                 snapshot_[b].block_index = blk.index;
-                             }
-                         } );
+            // Mark user data bytes
+            for ( std::size_t b = hdr_end; b < blk_end && b < display_bytes; ++b )
+            {
+                snapshot_[b].type        = data_type;
+                snapshot_[b].block_index = blk.index;
+            }
+        } );
 
     // ── Phase 11: Overview-mode tile snapshot (full PMM, N bytes per tile) ───
     // For small PMM (<= kDetailLimit) tiles map 1:1 to bytes (bytes_per_tile == 1).
@@ -142,34 +142,34 @@ void MemMapView::update_snapshot( pmm::PersistMemoryManager* mgr )
     // Fill remaining tiles (beyond detail limit) using for_each_block
     if ( total_bytes_ > kDetailLimit )
     {
-        pmm::for_each_block( [&]( const pmm::BlockView& blk )
-                             {
-                                 const ByteInfo::Type hdr_type =
-                                     blk.used ? ByteInfo::Type::BlockHeaderUsed : ByteInfo::Type::BlockHeaderFree;
-                                 const ByteInfo::Type data_type =
-                                     blk.used ? ByteInfo::Type::UserDataUsed : ByteInfo::Type::UserDataFree;
+        pmm::for_each_block(
+            [&]( const pmm::BlockView& blk )
+            {
+                const ByteInfo::Type hdr_type =
+                    blk.used ? ByteInfo::Type::BlockHeaderUsed : ByteInfo::Type::BlockHeaderFree;
+                const ByteInfo::Type data_type = blk.used ? ByteInfo::Type::UserDataUsed : ByteInfo::Type::UserDataFree;
 
-                                 const std::size_t blk_start = static_cast<std::size_t>( blk.offset );
-                                 const std::size_t hdr_end   = blk_start + blk.header_size;
-                                 const std::size_t blk_end   = blk_start + blk.total_size;
+                const std::size_t blk_start = static_cast<std::size_t>( blk.offset );
+                const std::size_t hdr_end   = blk_start + blk.header_size;
+                const std::size_t blk_end   = blk_start + blk.total_size;
 
-                                 // Only process bytes beyond the detail limit
-                                 const std::size_t hdr_from = ( blk_start > kDetailLimit ) ? blk_start : kDetailLimit;
-                                 for ( std::size_t b = hdr_from; b < hdr_end && b < total_bytes_; ++b )
-                                 {
-                                     const std::size_t tile_idx = b / bytes_per_tile_;
-                                     if ( tile_idx < num_tiles )
-                                         tile_snapshot_[tile_idx].type_counts[static_cast<int>( hdr_type )]++;
-                                 }
+                // Only process bytes beyond the detail limit
+                const std::size_t hdr_from = ( blk_start > kDetailLimit ) ? blk_start : kDetailLimit;
+                for ( std::size_t b = hdr_from; b < hdr_end && b < total_bytes_; ++b )
+                {
+                    const std::size_t tile_idx = b / bytes_per_tile_;
+                    if ( tile_idx < num_tiles )
+                        tile_snapshot_[tile_idx].type_counts[static_cast<int>( hdr_type )]++;
+                }
 
-                                 const std::size_t data_from = ( hdr_end > kDetailLimit ) ? hdr_end : kDetailLimit;
-                                 for ( std::size_t b = data_from; b < blk_end && b < total_bytes_; ++b )
-                                 {
-                                     const std::size_t tile_idx = b / bytes_per_tile_;
-                                     if ( tile_idx < num_tiles )
-                                         tile_snapshot_[tile_idx].type_counts[static_cast<int>( data_type )]++;
-                                 }
-                             } );
+                const std::size_t data_from = ( hdr_end > kDetailLimit ) ? hdr_end : kDetailLimit;
+                for ( std::size_t b = data_from; b < blk_end && b < total_bytes_; ++b )
+                {
+                    const std::size_t tile_idx = b / bytes_per_tile_;
+                    if ( tile_idx < num_tiles )
+                        tile_snapshot_[tile_idx].type_counts[static_cast<int>( data_type )]++;
+                }
+            } );
     }
 
     // Determine dominant type per tile

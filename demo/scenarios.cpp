@@ -318,7 +318,8 @@ class FragmentationDemo final : public Scenario
             }
             else
             {
-                auto ptr = pmm::PersistMemoryManager::allocate_typed<uint8_t>( 4096 + ( rng() % 12288 ) ); // 4096..16383
+                auto ptr =
+                    pmm::PersistMemoryManager::allocate_typed<uint8_t>( 4096 + ( rng() % 12288 ) ); // 4096..16383
                 if ( !ptr.is_null() )
                     large_live.push_back( ptr );
             }
@@ -563,7 +564,7 @@ class MixedSizes final : public Scenario
             if ( chance( rng ) < 0.05f && !live.empty() )
             {
                 std::uniform_int_distribution<std::size_t> idx( 0, live.size() - 1 );
-                std::size_t                                i      = idx( rng );
+                std::size_t                                i = idx( rng );
                 auto newptr = pmm::PersistMemoryManager::reallocate_typed<uint8_t>( live[i], sz );
                 if ( !newptr.is_null() )
                 {

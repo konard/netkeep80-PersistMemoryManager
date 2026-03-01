@@ -170,7 +170,8 @@ static bool test_deallocate_random_order()
     pmm::pptr<std::uint8_t> ptrs[6];
     for ( int i = 0; i < 6; i++ )
     {
-        ptrs[i] = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( static_cast<std::size_t>( ( i + 1 ) * 128 ) );
+        ptrs[i] =
+            pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( static_cast<std::size_t>( ( i + 1 ) * 128 ) );
         PMM_TEST( !ptrs[i].is_null() );
     }
 
@@ -220,7 +221,8 @@ static bool test_deallocate_interleaved()
     pmm::pptr<std::uint8_t> prev;
     for ( int i = 0; i < 50; i++ )
     {
-        pmm::pptr<std::uint8_t> ptr = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( static_cast<std::size_t>( 64 + i * 32 ) );
+        pmm::pptr<std::uint8_t> ptr =
+            pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( static_cast<std::size_t>( 64 + i * 32 ) );
         PMM_TEST( !ptr.is_null() );
         if ( !prev.is_null() )
             pmm::PersistMemoryManager::deallocate_typed( prev );

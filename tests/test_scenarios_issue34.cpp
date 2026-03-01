@@ -78,15 +78,9 @@ struct Rng
 
     uint32_t next_n( uint32_t n ) { return ( next() >> 16 ) % n; }
 
-    std::size_t next_block_size_shredder()
-    {
-        return static_cast<std::size_t>( ( next_n( 128 ) + 1 ) * 32 );
-    }
+    std::size_t next_block_size_shredder() { return static_cast<std::size_t>( ( next_n( 128 ) + 1 ) * 32 ); }
 
-    std::size_t next_block_size_marathon()
-    {
-        return static_cast<std::size_t>( ( next_n( 512 ) + 1 ) * 8 );
-    }
+    std::size_t next_block_size_marathon() { return static_cast<std::size_t>( ( next_n( 512 ) + 1 ) * 8 ); }
 };
 
 } // namespace
@@ -155,8 +149,10 @@ static bool test_shredder()
     }
 
     std::size_t                          half = all_ptrs.size() / 2;
-    std::vector<pmm::pptr<std::uint8_t>> random_half( all_ptrs.begin(), all_ptrs.begin() + static_cast<std::ptrdiff_t>( half ) );
-    std::vector<pmm::pptr<std::uint8_t>> sorted_half( all_ptrs.begin() + static_cast<std::ptrdiff_t>( half ), all_ptrs.end() );
+    std::vector<pmm::pptr<std::uint8_t>> random_half( all_ptrs.begin(),
+                                                      all_ptrs.begin() + static_cast<std::ptrdiff_t>( half ) );
+    std::vector<pmm::pptr<std::uint8_t>> sorted_half( all_ptrs.begin() + static_cast<std::ptrdiff_t>( half ),
+                                                      all_ptrs.end() );
 
     auto t1 = now();
     for ( auto& p : random_half )
@@ -188,9 +184,8 @@ static bool test_shredder()
 
     // Сортируем по смещению для провоцирования слияния соседей
     std::sort( sorted_half.begin(), sorted_half.end(),
-               []( const pmm::pptr<std::uint8_t>& a, const pmm::pptr<std::uint8_t>& b ) {
-                   return a.offset() < b.offset();
-               } );
+               []( const pmm::pptr<std::uint8_t>& a, const pmm::pptr<std::uint8_t>& b )
+               { return a.offset() < b.offset(); } );
 
     auto t2 = now();
     for ( auto& p : sorted_half )
@@ -324,8 +319,8 @@ static bool test_persistent_cycle()
         return false;
     }
 
-    auto t1      = now();
-    bool loaded  = pmm::load_from_file( filename, mem2, memory_size );
+    auto t1     = now();
+    bool loaded = pmm::load_from_file( filename, mem2, memory_size );
     if ( !loaded )
     {
         std::cerr << "  ОШИБКА: load_from_file вернул false\n";

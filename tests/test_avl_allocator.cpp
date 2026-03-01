@@ -59,15 +59,16 @@ static bool test_free_block_has_zero_used_size()
     // Обойдём все блоки и убедимся, что свободный имеет used_size==0
     int  free_blocks        = 0;
     bool all_free_zero_used = true;
-    pmm::for_each_block( [&]( const pmm::BlockView& blk )
-                         {
-                             if ( !blk.used )
-                             {
-                                 free_blocks++;
-                                 if ( blk.user_size != 0 )
-                                     all_free_zero_used = false;
-                             }
-                         } );
+    pmm::for_each_block(
+        [&]( const pmm::BlockView& blk )
+        {
+            if ( !blk.used )
+            {
+                free_blocks++;
+                if ( blk.user_size != 0 )
+                    all_free_zero_used = false;
+            }
+        } );
     PMM_TEST( free_blocks == 1 );
     PMM_TEST( all_free_zero_used );
 
@@ -124,9 +125,9 @@ static bool test_avl_integrity_stress()
 
     PMM_TEST( pmm::PersistMemoryManager::create( mem, size ) );
 
-    static const int N = 50;
+    static const int        N = 50;
     pmm::pptr<std::uint8_t> ptrs[N];
-    std::size_t      sizes[] = { 64, 128, 256, 512, 1024, 2048 };
+    std::size_t             sizes[] = { 64, 128, 256, 512, 1024, 2048 };
     for ( int i = 0; i < N; i++ )
     {
         ptrs[i] = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( sizes[i % 6] );
@@ -212,22 +213,23 @@ static bool test_block_view_fields()
 
     int  used_blocks       = 0;
     bool fields_consistent = true;
-    pmm::for_each_block( [&]( const pmm::BlockView& blk )
-                         {
-                             if ( blk.used )
-                             {
-                                 if ( blk.user_size == 0 )
-                                     fields_consistent = false;
-                                 if ( blk.total_size < blk.user_size + blk.header_size )
-                                     fields_consistent = false;
-                                 used_blocks++;
-                             }
-                             else
-                             {
-                                 if ( blk.user_size != 0 )
-                                     fields_consistent = false;
-                             }
-                         } );
+    pmm::for_each_block(
+        [&]( const pmm::BlockView& blk )
+        {
+            if ( blk.used )
+            {
+                if ( blk.user_size == 0 )
+                    fields_consistent = false;
+                if ( blk.total_size < blk.user_size + blk.header_size )
+                    fields_consistent = false;
+                used_blocks++;
+            }
+            else
+            {
+                if ( blk.user_size != 0 )
+                    fields_consistent = false;
+            }
+        } );
     PMM_TEST( fields_consistent );
     PMM_TEST( used_blocks == 2 );
     PMM_TEST( pmm::PersistMemoryManager::validate() );
@@ -299,7 +301,8 @@ static bool test_best_fit_chooses_smallest_fitting()
     gap[3]     = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 1024 );
     barrier[3] = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 64 );
     barrier[4] = pmm::PersistMemoryManager::allocate_typed<std::uint8_t>( 128 ); // keep allocated at end
-    PMM_TEST( !gap[0].is_null() && !barrier[0].is_null() && !gap[1].is_null() && !barrier[1].is_null() && !gap[2].is_null() && !barrier[2].is_null() );
+    PMM_TEST( !gap[0].is_null() && !barrier[0].is_null() && !gap[1].is_null() && !barrier[1].is_null() &&
+              !gap[2].is_null() && !barrier[2].is_null() );
     PMM_TEST( !gap[3].is_null() && !barrier[3].is_null() && !barrier[4].is_null() );
 
     // Создаём дыры: освобождаем gap[0..3]

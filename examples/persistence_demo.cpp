@@ -166,8 +166,8 @@ int main()
     }
 
     // Проверяем массив чисел в p2
-    bool  arr_ok = true;
-    int*  q2_int = reinterpret_cast<int*>( q2.get() );
+    bool arr_ok = true;
+    int* q2_int = reinterpret_cast<int*>( q2.get() );
     for ( std::size_t i = 0; i < size2 / sizeof( int ); i++ )
     {
         if ( q2_int[i] != static_cast<int>( i * i ) )

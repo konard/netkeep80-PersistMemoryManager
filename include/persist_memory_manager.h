@@ -179,9 +179,9 @@ struct ManagerHeader
     std::uint32_t first_block_offset; ///< Первый блок (гранульный индекс)
     std::uint32_t last_block_offset; ///< [Issue #57 opt 4] Последний блок (гранульный индекс)
     std::uint32_t free_tree_root; ///< Корень AVL-дерева свободных блоков (гранульный индекс)
-    bool         owns_memory; ///< Менеджер владеет буфером
+    bool         owns_memory;      ///< Менеджер владеет буфером
     bool         prev_owns_memory; ///< prev_base был выделен менеджером (через expand)
-    std::uint8_t _pad[2];     ///< Выравнивание
+    std::uint8_t _pad[2];          ///< Выравнивание
     std::uint64_t prev_total_size; ///< Размер предыдущего буфера в байтах (при расширении)
     void* prev_base;               ///< Указатель на предыдущий буфер
 };
@@ -671,11 +671,11 @@ class PersistMemoryManager
         detail::ManagerHeader* hdr  = reinterpret_cast<detail::ManagerHeader*>( base );
         if ( hdr->magic != kMagic || hdr->total_size != size )
             return false;
-        hdr->owns_memory     = false; // external memory — caller is responsible
+        hdr->owns_memory      = false; // external memory — caller is responsible
         hdr->prev_owns_memory = false;
-        hdr->prev_total_size = 0;
-        hdr->prev_base       = nullptr;
-        auto* mgr            = reinterpret_cast<PersistMemoryManager*>( base );
+        hdr->prev_total_size  = 0;
+        hdr->prev_base        = nullptr;
+        auto* mgr             = reinterpret_cast<PersistMemoryManager*>( base );
         mgr->rebuild_free_tree();
         s_instance = mgr;
         return true;
@@ -693,13 +693,13 @@ class PersistMemoryManager
         std::unique_lock<std::shared_mutex> lock( s_mutex );
         if ( s_instance == nullptr )
             return;
-        detail::ManagerHeader* hdr  = s_instance->header();
-        hdr->magic                  = 0;
-        bool  owns                  = hdr->owns_memory;
-        void* buf                   = s_instance->base_ptr();
-        void* prev                  = hdr->prev_base;
-        bool  prev_owns             = hdr->prev_owns_memory;
-        s_instance                  = nullptr;
+        detail::ManagerHeader* hdr = s_instance->header();
+        hdr->magic                 = 0;
+        bool  owns                 = hdr->owns_memory;
+        void* buf                  = s_instance->base_ptr();
+        void* prev                 = hdr->prev_base;
+        bool  prev_owns            = hdr->prev_owns_memory;
+        s_instance                 = nullptr;
         while ( prev != nullptr )
         {
             detail::ManagerHeader* ph        = reinterpret_cast<detail::ManagerHeader*>( prev );
@@ -725,7 +725,7 @@ class PersistMemoryManager
         void* raw = s_instance ? s_instance->allocate_raw( sizeof( T ) ) : nullptr;
         if ( raw == nullptr )
             return pptr<T>();
-        std::uint8_t* base    = s_instance->base_ptr();
+        std::uint8_t* base     = s_instance->base_ptr();
         std::size_t   byte_off = static_cast<std::uint8_t*>( raw ) - base;
         assert( byte_off % kGranuleSize == 0 );
         return pptr<T>( static_cast<std::uint32_t>( byte_off / kGranuleSize ) );
@@ -743,7 +743,7 @@ class PersistMemoryManager
         void* raw = s_instance ? s_instance->allocate_raw( sizeof( T ) * count ) : nullptr;
         if ( raw == nullptr )
             return pptr<T>();
-        std::uint8_t* base    = s_instance->base_ptr();
+        std::uint8_t* base     = s_instance->base_ptr();
         std::size_t   byte_off = static_cast<std::uint8_t*>( raw ) - base;
         assert( byte_off % kGranuleSize == 0 );
         return pptr<T>( static_cast<std::uint32_t>( byte_off / kGranuleSize ) );
@@ -800,8 +800,8 @@ class PersistMemoryManager
             return pptr<T>();
 
         // After allocate_typed, s_instance may have changed (auto-expand)
-        std::uint8_t* new_base    = s_instance->base_ptr();
-        void*         new_raw     = new_base + detail::idx_to_byte_off( new_p.offset() );
+        std::uint8_t* new_base = s_instance->base_ptr();
+        void*         new_raw  = new_base + detail::idx_to_byte_off( new_p.offset() );
         std::memcpy( new_raw, old_raw, old_bytes );
         deallocate_typed( p );
         return new_p;
@@ -867,9 +867,9 @@ class PersistMemoryManager
     {
         if ( s_instance == nullptr )
             return false;
-        std::shared_lock<std::shared_mutex>  lock( s_mutex );
-        const std::uint8_t*                  base = s_instance->const_base_ptr();
-        const detail::ManagerHeader*         hdr  = s_instance->header();
+        std::shared_lock<std::shared_mutex> lock( s_mutex );
+        const std::uint8_t*                 base = s_instance->const_base_ptr();
+        const detail::ManagerHeader*        hdr  = s_instance->header();
 
         if ( hdr->magic != kMagic )
             return false;
@@ -1075,10 +1075,10 @@ class PersistMemoryManager
             nh->total_size = new_size; // Update before AVL insert (affects size computation)
             detail::avl_insert( nb, nh, extra_idx );
         }
-        nh->prev_base         = base_ptr();
-        nh->prev_total_size   = old_size;
-        nh->prev_owns_memory  = hdr->owns_memory; // whether the previous buffer is owned
-        s_instance            = reinterpret_cast<PersistMemoryManager*>( new_memory );
+        nh->prev_base        = base_ptr();
+        nh->prev_total_size  = old_size;
+        nh->prev_owns_memory = hdr->owns_memory; // whether the previous buffer is owned
+        s_instance           = reinterpret_cast<PersistMemoryManager*>( new_memory );
         return true;
     }
 
@@ -1295,7 +1295,7 @@ template <class T> inline T* pptr<T>::operator[]( std::size_t i ) const noexcept
 /// @brief Получить статистику менеджера (Issue #61: без параметра PersistMemoryManager*).
 inline MemoryStats get_stats()
 {
-    MemoryStats stats{};
+    MemoryStats           stats{};
     PersistMemoryManager* mgr = PersistMemoryManager::instance();
     if ( mgr == nullptr )
         return stats;
@@ -1337,7 +1337,7 @@ inline MemoryStats get_stats()
 /// @brief Получить детальную информацию о менеджере (Issue #61: без параметра PersistMemoryManager*).
 inline ManagerInfo get_manager_info()
 {
-    ManagerInfo info{};
+    ManagerInfo           info{};
     PersistMemoryManager* mgr = PersistMemoryManager::instance();
     if ( mgr == nullptr )
         return info;

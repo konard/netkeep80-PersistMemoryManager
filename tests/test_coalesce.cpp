@@ -369,7 +369,7 @@ static bool test_coalesce_stress_interleaved()
 
     PMM_TEST( pmm::PersistMemoryManager::create( mem, size ) );
 
-    static const int        ROUNDS  = 200;
+    static const int        ROUNDS = 200;
     pmm::pptr<std::uint8_t> ptrs[4];
     std::size_t             sizes[] = { 64, 128, 256, 512 };
 

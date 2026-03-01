@@ -76,10 +76,7 @@ struct Rng
 
     uint32_t next_n( uint32_t n ) { return ( next() >> 16 ) % n; }
 
-    std::size_t next_block_size()
-    {
-        return static_cast<std::size_t>( ( next_n( 512 ) + 1 ) * 8 );
-    }
+    std::size_t next_block_size() { return static_cast<std::size_t>( ( next_n( 512 ) + 1 ) * 8 ); }
 };
 
 } // namespace

@@ -118,8 +118,8 @@ static bool test_single_expand()
         return false;
     }
 
-    const std::size_t                        block_size = 512;
-    std::vector<pmm::pptr<std::uint8_t>>     ptrs;
+    const std::size_t                    block_size = 512;
+    std::vector<pmm::pptr<std::uint8_t>> ptrs;
     ptrs.reserve( 300 );
 
     const uint8_t pattern = 0xAB;
@@ -244,9 +244,8 @@ static bool test_multi_expand()
         {
             expand_count++;
             prev_total = cur;
-            std::cout << "    expand #" << expand_count << ": буфер "
-                      << pmm::PersistMemoryManager::total_size() / 1024 << " КБ, "
-                      << "живых блоков: " << ptrs.size() << "\n";
+            std::cout << "    expand #" << expand_count << ": буфер " << pmm::PersistMemoryManager::total_size() / 1024
+                      << " КБ, " << "живых блоков: " << ptrs.size() << "\n";
         }
     }
 
@@ -428,8 +427,8 @@ static bool test_reallocate_triggers_expand()
     std::cout << "    Выделено " << n_blocks << " блоков перед reallocate\n";
     std::size_t size_before = pmm::PersistMemoryManager::total_size();
 
-    const std::size_t       big_sz  = initial_size * 2;
-    const uint8_t           pattern = static_cast<uint8_t>( 1 );
+    const std::size_t big_sz  = initial_size * 2;
+    const uint8_t     pattern = static_cast<uint8_t>( 1 );
 
     pmm::pptr<std::uint8_t> p2 = pmm::PersistMemoryManager::reallocate_typed( ptrs[0], big_sz );
     PMM_TEST( !p2.is_null() );

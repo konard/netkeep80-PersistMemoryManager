@@ -32,17 +32,18 @@ void StructTreeView::update_snapshot( pmm::PersistMemoryManager* mgr )
     snapshot_.first_block_offset = info.first_block_offset;
     snapshot_.first_free_offset  = info.first_free_offset;
 
-    pmm::for_each_block( [&]( const pmm::BlockView& blk )
-                         {
-                             BlockSnapshot bs;
-                             bs.index      = blk.index;
-                             bs.offset     = static_cast<std::size_t>( blk.offset );
-                             bs.total_size = blk.total_size;
-                             bs.user_size  = blk.user_size;
-                             bs.alignment  = blk.alignment;
-                             bs.used       = blk.used;
-                             snapshot_.blocks.push_back( bs );
-                         } );
+    pmm::for_each_block(
+        [&]( const pmm::BlockView& blk )
+        {
+            BlockSnapshot bs;
+            bs.index      = blk.index;
+            bs.offset     = static_cast<std::size_t>( blk.offset );
+            bs.total_size = blk.total_size;
+            bs.user_size  = blk.user_size;
+            bs.alignment  = blk.alignment;
+            bs.used       = blk.used;
+            snapshot_.blocks.push_back( bs );
+        } );
 }
 
 // ─── Renderer ─────────────────────────────────────────────────────────────────
