@@ -80,6 +80,7 @@
 #include <mutex>
 #include <ostream>
 #include <shared_mutex>
+#include <vector>
 
 namespace pmm
 {
@@ -130,6 +131,27 @@ struct BlockView
     std::size_t    user_size;   ///< User data size in bytes
     std::size_t    alignment;   ///< Always kDefaultAlignment (Issue #59)
     bool           used;
+};
+
+/**
+ * @brief View of a single free block in the AVL free-block tree.
+ *
+ * Exposes the byte offset of the block and its AVL structural links so that
+ * callers can reconstruct the tree topology for visualisation purposes.
+ *
+ * All _offset fields store byte offsets in the managed region, or -1 when
+ * the corresponding AVL pointer is kNoBlock (i.e. the link is absent).
+ */
+struct FreeBlockView
+{
+    std::ptrdiff_t offset;        ///< Byte offset of this free block in the managed region
+    std::size_t    total_size;    ///< Total block size in bytes
+    std::size_t    free_size;     ///< Usable (data) area in bytes
+    std::ptrdiff_t left_offset;   ///< Byte offset of left AVL child, or -1
+    std::ptrdiff_t right_offset;  ///< Byte offset of right AVL child, or -1
+    std::ptrdiff_t parent_offset; ///< Byte offset of AVL parent, or -1
+    int            avl_height;    ///< Stored AVL subtree height
+    int            avl_depth;     ///< Depth of this node from root (root = 0)
 };
 
 namespace detail
@@ -992,6 +1014,7 @@ class PersistMemoryManager
     friend MemoryStats                       get_stats();
     friend ManagerInfo                       get_manager_info();
     template <typename Callback> friend void for_each_block( Callback&& cb );
+    template <typename Callback> friend void for_each_free_block_avl( Callback&& cb );
 
     // ─── Внутренний доступ для demo и других модулей ─────────────────────────
 
@@ -1475,6 +1498,82 @@ template <typename Callback> inline void for_each_block( Callback&& cb )
         cb( view );
         ++index;
         idx = blk->next_offset;
+    }
+}
+
+/// @brief Iterate over all free blocks in the AVL free-block tree (pre-order: root first,
+/// then left subtree, then right subtree).
+///
+/// The callback receives a @ref FreeBlockView for each free block node, including the AVL
+/// structural links so that visualisation code can reconstruct the tree topology.
+///
+/// @warning The callback MUST NOT call any mutating PersistMemoryManager methods.
+/// Doing so while a shared_lock is held by the calling thread will deadlock.
+template <typename Callback> inline void for_each_free_block_avl( Callback&& cb )
+{
+    PersistMemoryManager* mgr = PersistMemoryManager::instance();
+    if ( mgr == nullptr )
+        return;
+    std::shared_lock<std::shared_mutex> lock( PersistMemoryManager::s_mutex );
+    const std::uint8_t*                 base = mgr->const_base_ptr();
+    const detail::ManagerHeader*        hdr  = mgr->header();
+
+    if ( hdr->free_tree_root == detail::kNoBlock )
+        return;
+
+    // Iterative pre-order traversal using an explicit stack to avoid recursion depth issues.
+    // Each stack entry holds (granule_index, avl_depth).
+    struct StackEntry
+    {
+        std::uint32_t idx;
+        int           depth;
+    };
+    std::vector<StackEntry> stack;
+    stack.reserve( 32 );
+    stack.push_back( { hdr->free_tree_root, 0 } );
+
+    while ( !stack.empty() )
+    {
+        auto [cur_idx, cur_depth] = stack.back();
+        stack.pop_back();
+
+        if ( cur_idx == detail::kNoBlock )
+            continue;
+        if ( detail::idx_to_byte_off( cur_idx ) >= hdr->total_size )
+            continue;
+
+        const detail::BlockHeader* blk = detail::block_at( const_cast<std::uint8_t*>( base ), cur_idx );
+
+        // Compute total granules from neighbouring block indices (Issue #59 layout)
+        std::uint32_t gran = ( blk->next_offset != detail::kNoBlock )
+                                 ? ( blk->next_offset - cur_idx )
+                                 : ( detail::byte_off_to_idx( hdr->total_size ) - cur_idx );
+
+        FreeBlockView view;
+        view.offset      = static_cast<std::ptrdiff_t>( detail::idx_to_byte_off( cur_idx ) );
+        view.total_size  = detail::granules_to_bytes( gran );
+        view.free_size   = ( gran > detail::kBlockHeaderGranules )
+                               ? detail::granules_to_bytes( gran - detail::kBlockHeaderGranules )
+                               : 0;
+        view.left_offset = ( blk->left_offset != detail::kNoBlock )
+                               ? static_cast<std::ptrdiff_t>( detail::idx_to_byte_off( blk->left_offset ) )
+                               : -1;
+        view.right_offset = ( blk->right_offset != detail::kNoBlock )
+                                ? static_cast<std::ptrdiff_t>( detail::idx_to_byte_off( blk->right_offset ) )
+                                : -1;
+        view.parent_offset = ( blk->parent_offset != detail::kNoBlock )
+                                 ? static_cast<std::ptrdiff_t>( detail::idx_to_byte_off( blk->parent_offset ) )
+                                 : -1;
+        view.avl_height = static_cast<int>( blk->avl_height );
+        view.avl_depth  = cur_depth;
+
+        cb( view );
+
+        // Push right child first so left child is processed first (pre-order)
+        if ( blk->right_offset != detail::kNoBlock )
+            stack.push_back( { blk->right_offset, cur_depth + 1 } );
+        if ( blk->left_offset != detail::kNoBlock )
+            stack.push_back( { blk->left_offset, cur_depth + 1 } );
     }
 }
 
