@@ -20,6 +20,7 @@ packages
 .vs
 *.vcxproj.user
 pmm_demo.bin
+*.dat
 
 # Windows image file caches
 Thumbs.db
