@@ -1,6 +1,6 @@
 /**
  * @file scenarios.cpp
- * @brief Implementations of all 7 load scenarios for the PMM visual demo.
+ * @brief Implementations of all 8 load scenarios for the PMM visual demo.
  *
  * Each scenario runs its logic loop in a dedicated thread managed by
  * ScenarioManager.  All scenarios must honour the stop_flag by checking it

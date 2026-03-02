@@ -6,7 +6,7 @@
  *  - Start 3 scenarios, call stop_all() + join_all(), verify all threads
  *    terminate within 5 seconds.
  *  - start() / stop() individual scenario lifecycle.
- *  - count() returns the expected number of scenarios (7).
+ *  - count() returns the expected number of scenarios (8).
  *
  * Built only when PMM_BUILD_DEMO=ON (requires demo sources + ImGui stubs).
  *
@@ -77,14 +77,14 @@ static void pmm_teardown()
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 /**
- * @brief ScenarioManager must expose exactly 7 scenarios.
+ * @brief ScenarioManager must expose exactly 8 scenarios.
  */
 static bool test_scenario_count()
 {
     pmm_setup();
 
     demo::ScenarioManager mgr;
-    PMM_TEST( mgr.count() == 7 );
+    PMM_TEST( mgr.count() == 8 );
 
     pmm_teardown();
     return true;
