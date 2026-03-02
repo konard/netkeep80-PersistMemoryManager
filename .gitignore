@@ -1,5 +1,6 @@
 ci-logs/
 dir-listing.txt
+doxygen-output/
 issue.txt
 issue-comments.txt
 .vscode/

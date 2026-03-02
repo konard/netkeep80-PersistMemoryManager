@@ -2,6 +2,8 @@
 
 **Single-header C++17 библиотека управления персистентной кучей памяти.**
 
+📚 **[Документация API (Doxygen)](https://netkeep80.github.io/PersistMemoryManager/)**
+
 Библиотека предоставляет низкоуровневый менеджер памяти, который хранит все метаданные внутри управляемой области. Это позволяет сохранять образ кучи в файл или shared memory и восстанавливать его между запусками программы.
 
 ## Возможности
@@ -299,7 +301,7 @@ PersistMemoryManager/
 └── LICENSE
 ```
 
-Подробнее: [docs/architecture.md](docs/architecture.md) | [docs/api_reference.md](docs/api_reference.md) | [docs/performance.md](docs/performance.md) | [demo.md](demo.md) | [plan.md](plan.md)
+Подробнее: [docs/architecture.md](docs/architecture.md) | [docs/api_reference.md](docs/api_reference.md) | [docs/performance.md](docs/performance.md) | [demo.md](demo.md) | [plan.md](plan.md) | [Doxygen API](https://netkeep80.github.io/PersistMemoryManager/)
 
 ## Лицензия
 
