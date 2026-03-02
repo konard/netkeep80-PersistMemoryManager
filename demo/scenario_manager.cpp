@@ -33,6 +33,7 @@ ScenarioManager::ScenarioManager() : scenarios_( create_all_scenarios() )
         // 4: TinyBlocks
         // 5: MixedSizes
         // 6: PersistenceCycle
+        // 7: ReallocateTyped
 
         states_.push_back( std::move( state ) );
     }
