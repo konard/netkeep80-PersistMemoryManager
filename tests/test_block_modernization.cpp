@@ -96,8 +96,8 @@ static bool test_basic_alloc_validate()
 static bool test_save_load_new_format()
 {
     const char*       TEST_FILE = "test_block_mod.dat";
-    const std::size_t size = 64 * 1024;
-    void*             mem1 = std::malloc( size );
+    const std::size_t size      = 64 * 1024;
+    void*             mem1      = std::malloc( size );
     PMM_TEST( mem1 != nullptr );
 
     PMM_TEST( pmm::PersistMemoryManager::create( mem1, size ) );
@@ -199,8 +199,8 @@ static bool test_coalesced_header_invalid()
 static bool test_repair_on_load()
 {
     const char*       TEST_FILE = "test_repair.dat";
-    const std::size_t size = 64 * 1024;
-    void*             mem1 = std::malloc( size );
+    const std::size_t size      = 64 * 1024;
+    void*             mem1      = std::malloc( size );
     PMM_TEST( mem1 != nullptr );
 
     PMM_TEST( pmm::PersistMemoryManager::create( mem1, size ) );
@@ -218,7 +218,7 @@ static bool test_repair_on_load()
         // Вычисляем байтовое смещение заголовка p2
         // p2 is a user ptr, block header is sizeof(BlockHeader) bytes before it
         std::uint32_t p2_data_idx = p2.offset();
-        std::uint32_t p2_blk_idx = p2_data_idx - pmm::detail::kBlockHeaderGranules;
+        std::uint32_t p2_blk_idx  = p2_data_idx - pmm::detail::kBlockHeaderGranules;
         std::size_t   p2_byte_off = static_cast<std::size_t>( p2_blk_idx ) * pmm::kGranuleSize;
 
         // Открываем файл и портим prev_offset (смещение 4 байта в BlockHeader)
@@ -227,7 +227,7 @@ static bool test_repair_on_load()
         // prev_offset is the 2nd field in BlockHeader (bytes 4-7 from block start)
         // sizeof(ManagerHeader) is accounted for in p2_byte_off already
         std::fseek( f, static_cast<long>( p2_byte_off + 4 ), SEEK_SET ); // +4: offset of prev_offset
-        std::uint32_t bad_prev = 0xDEADBEEF; // Повреждённое значение
+        std::uint32_t bad_prev = 0xDEADBEEF;                             // Повреждённое значение
         std::fwrite( &bad_prev, sizeof( bad_prev ), 1, f );
         std::fclose( f );
     }
@@ -256,14 +256,14 @@ static bool test_repair_on_load()
 static bool test_stress_save_load()
 {
     const char*       TEST_FILE = "test_stress_mod.dat";
-    const std::size_t size = 128 * 1024;
-    void*             mem1 = std::malloc( size );
+    const std::size_t size      = 128 * 1024;
+    void*             mem1      = std::malloc( size );
     PMM_TEST( mem1 != nullptr );
 
     PMM_TEST( pmm::PersistMemoryManager::create( mem1, size ) );
 
     // Выделяем много разных блоков
-    const std::size_t N = 50;
+    const std::size_t       N = 50;
     pmm::pptr<std::uint8_t> ptrs[N];
     for ( std::size_t i = 0; i < N; i++ )
     {
@@ -314,12 +314,12 @@ int main()
     std::cout << "=== test_block_modernization (Issue #69) ===\n";
     bool all_passed = true;
 
-    PMM_RUN( "block_header_no_magic",        test_block_header_no_magic );
-    PMM_RUN( "basic_alloc_validate",         test_basic_alloc_validate );
-    PMM_RUN( "save_load_new_format",         test_save_load_new_format );
-    PMM_RUN( "coalesced_header_invalid",     test_coalesced_header_invalid );
-    PMM_RUN( "repair_on_load",               test_repair_on_load );
-    PMM_RUN( "stress_save_load",             test_stress_save_load );
+    PMM_RUN( "block_header_no_magic", test_block_header_no_magic );
+    PMM_RUN( "basic_alloc_validate", test_basic_alloc_validate );
+    PMM_RUN( "save_load_new_format", test_save_load_new_format );
+    PMM_RUN( "coalesced_header_invalid", test_coalesced_header_invalid );
+    PMM_RUN( "repair_on_load", test_repair_on_load );
+    PMM_RUN( "stress_save_load", test_stress_save_load );
 
     std::cout << ( all_passed ? "\nAll tests PASSED\n" : "\nSome tests FAILED\n" );
     return all_passed ? 0 : 1;
