@@ -11,6 +11,7 @@ build-test/
 build_clean/
 build_test2/
 build_asan/
+build_demo/
 experiments/
 Testing
 build
@@ -20,6 +21,7 @@ packages
 .vs
 *.vcxproj.user
 pmm_demo.bin
+*.dat
 
 # Windows image file caches
 Thumbs.db
