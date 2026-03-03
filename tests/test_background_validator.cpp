@@ -40,7 +40,7 @@ static void fail( const char* name, const char* reason )
 
 // Create a fresh PMM singleton with the given size (in bytes).
 // Uses malloc so that PersistMemoryManager::destroy() can free the buffer.
-static pmm::PersistMemoryManager* make_pmm( std::size_t sz )
+static pmm::PersistMemoryManager<>* make_pmm( std::size_t sz )
 {
     if ( pmm::PersistMemoryManager<>::instance() )
         pmm::PersistMemoryManager<>::destroy();
