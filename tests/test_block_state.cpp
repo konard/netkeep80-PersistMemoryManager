@@ -63,8 +63,7 @@ static bool test_p9_block_state_base_size()
 {
     using A = pmm::DefaultAddressTraits;
 
-    static_assert( sizeof( pmm::BlockStateBase<A> ) == 32,
-                   "BlockStateBase<DefaultAddressTraits> must be 32 bytes" );
+    static_assert( sizeof( pmm::BlockStateBase<A> ) == 32, "BlockStateBase<DefaultAddressTraits> must be 32 bytes" );
     static_assert( sizeof( pmm::BlockStateBase<A> ) == sizeof( pmm::detail::BlockHeader ),
                    "BlockStateBase must match BlockHeader size" );
     static_assert( sizeof( pmm::BlockStateBase<A> ) == sizeof( pmm::Block<A> ),
@@ -102,8 +101,8 @@ static bool test_p9_accessors()
     auto* blk_hdr        = reinterpret_cast<pmm::detail::BlockHeader*>( buffer );
     blk_hdr->prev_offset = 10;
     blk_hdr->next_offset = 20;
-    blk_hdr->size        = 5;       // weight
-    blk_hdr->root_offset = 6;       // root_offset (=idx означает allocated)
+    blk_hdr->size        = 5; // weight
+    blk_hdr->root_offset = 6; // root_offset (=idx означает allocated)
 
     // Интерпретируем как BlockStateBase
     auto* state = reinterpret_cast<pmm::BlockStateBase<A>*>( buffer );
@@ -157,7 +156,7 @@ static bool test_p9_free_block_cast_and_verify()
     PMM_TEST( fb->verify_invariants() == true );
 
     // Портим инварианты
-    auto* blk_hdr  = reinterpret_cast<pmm::detail::BlockHeader*>( buffer );
+    auto* blk_hdr = reinterpret_cast<pmm::detail::BlockHeader*>( buffer );
     blk_hdr->size = 5; // Не 0
     PMM_TEST( fb->verify_invariants() == false );
 
@@ -172,8 +171,8 @@ static bool test_p9_free_block_remove_from_avl()
     alignas( 16 ) std::uint8_t buffer[32];
     std::memset( buffer, 0, sizeof( buffer ) );
 
-    auto* fb       = pmm::FreeBlock<A>::cast_from_raw( buffer );
-    auto* removed  = fb->remove_from_avl();
+    auto* fb      = pmm::FreeBlock<A>::cast_from_raw( buffer );
+    auto* removed = fb->remove_from_avl();
 
     // Должен вернуть тот же адрес (reinterpret)
     PMM_TEST( reinterpret_cast<void*>( removed ) == reinterpret_cast<void*>( fb ) );
@@ -195,9 +194,9 @@ static bool test_p9_removed_avl_mark_allocated()
     alignas( 16 ) std::uint8_t buffer[32];
     std::memset( buffer, 0, sizeof( buffer ) );
 
-    auto* fb       = pmm::FreeBlock<A>::cast_from_raw( buffer );
-    auto* removed  = fb->remove_from_avl();
-    auto* alloc    = removed->mark_as_allocated( 5, 6 ); // size=5, idx=6
+    auto* fb      = pmm::FreeBlock<A>::cast_from_raw( buffer );
+    auto* removed = fb->remove_from_avl();
+    auto* alloc   = removed->mark_as_allocated( 5, 6 ); // size=5, idx=6
 
     PMM_TEST( reinterpret_cast<void*>( alloc ) == reinterpret_cast<void*>( fb ) );
     PMM_TEST( alloc->size() == 5 );
@@ -255,12 +254,12 @@ static bool test_p9_splitting_full_flow()
 
     // Инициализация текущего блока
     std::memset( buffer_curr, 0, sizeof( buffer_curr ) );
-    auto* curr_hdr         = reinterpret_cast<pmm::detail::BlockHeader*>( buffer_curr );
-    curr_hdr->next_offset  = 100; // Указывает на старый следующий
+    auto* curr_hdr        = reinterpret_cast<pmm::detail::BlockHeader*>( buffer_curr );
+    curr_hdr->next_offset = 100; // Указывает на старый следующий
 
     // Инициализация старого следующего блока
     std::memset( buffer_old_next, 0, sizeof( buffer_old_next ) );
-    auto* old_next_hdr      = reinterpret_cast<pmm::detail::BlockHeader*>( buffer_old_next );
+    auto* old_next_hdr        = reinterpret_cast<pmm::detail::BlockHeader*>( buffer_old_next );
     old_next_hdr->prev_offset = 6; // Указывает на текущий (idx=6)
 
     // Начинаем splitting
@@ -271,15 +270,15 @@ static bool test_p9_splitting_full_flow()
 
     // Проверяем новый блок
     auto* new_state = reinterpret_cast<pmm::BlockStateBase<A>*>( buffer_new );
-    PMM_TEST( new_state->prev_offset() == 6 );         // Указывает на текущий
-    PMM_TEST( new_state->next_offset() == 100 );       // Указывает на старый следующий
-    PMM_TEST( new_state->avl_height() == 1 );          // Готов к AVL
+    PMM_TEST( new_state->prev_offset() == 6 );   // Указывает на текущий
+    PMM_TEST( new_state->next_offset() == 100 ); // Указывает на старый следующий
+    PMM_TEST( new_state->avl_height() == 1 );    // Готов к AVL
 
     // 2. Связываем новый блок
     splitting->link_new_block( buffer_old_next, 8 );
 
-    PMM_TEST( splitting->next_offset() == 8 );         // Текущий → новый
-    PMM_TEST( old_next_hdr->prev_offset == 8 );        // Старый следующий ← новый
+    PMM_TEST( splitting->next_offset() == 8 );  // Текущий → новый
+    PMM_TEST( old_next_hdr->prev_offset == 8 ); // Старый следующий ← новый
 
     // 3. Финализируем split
     auto* alloc = splitting->finalize_split( 5, 6 );
@@ -302,8 +301,8 @@ static bool test_p9_allocated_block_cast_and_verify()
     std::memset( buffer, 0, sizeof( buffer ) );
 
     auto* blk_hdr        = reinterpret_cast<pmm::detail::BlockHeader*>( buffer );
-    blk_hdr->size        = 2;  // 2 гранулы данных
-    blk_hdr->root_offset = 0;  // idx=0
+    blk_hdr->size        = 2; // 2 гранулы данных
+    blk_hdr->root_offset = 0; // idx=0
 
     auto* alloc = pmm::AllocatedBlock<A>::cast_from_raw( buffer );
     PMM_TEST( alloc != nullptr );
@@ -368,8 +367,8 @@ static bool test_p9_not_avl_begin_coalescing()
     alignas( 16 ) std::uint8_t buffer[32];
     std::memset( buffer, 0, sizeof( buffer ) );
 
-    auto* not_avl     = pmm::FreeBlockNotInAVL<A>::cast_from_raw( buffer );
-    auto* coalescing  = not_avl->begin_coalescing();
+    auto* not_avl    = pmm::FreeBlockNotInAVL<A>::cast_from_raw( buffer );
+    auto* coalescing = not_avl->begin_coalescing();
 
     PMM_TEST( reinterpret_cast<void*>( coalescing ) == reinterpret_cast<void*>( not_avl ) );
 
@@ -395,13 +394,13 @@ static bool test_p9_coalesce_with_next()
 
     // Инициализация следующего блока (будет поглощён)
     std::memset( buffer_next, 0, sizeof( buffer_next ) );
-    auto* next_hdr         = reinterpret_cast<pmm::detail::BlockHeader*>( buffer_next );
-    next_hdr->prev_offset  = 6;  // ← текущий
-    next_hdr->next_offset  = 20; // → следующий следующего
+    auto* next_hdr        = reinterpret_cast<pmm::detail::BlockHeader*>( buffer_next );
+    next_hdr->prev_offset = 6;  // ← текущий
+    next_hdr->next_offset = 20; // → следующий следующего
 
     // Инициализация следующего следующего
     std::memset( buffer_nxt_nxt, 0, sizeof( buffer_nxt_nxt ) );
-    auto* nxt_nxt_hdr       = reinterpret_cast<pmm::detail::BlockHeader*>( buffer_nxt_nxt );
+    auto* nxt_nxt_hdr        = reinterpret_cast<pmm::detail::BlockHeader*>( buffer_nxt_nxt );
     nxt_nxt_hdr->prev_offset = 10; // ← следующий
 
     // Выполняем слияние
@@ -409,8 +408,8 @@ static bool test_p9_coalesce_with_next()
     coalescing->coalesce_with_next( buffer_next, buffer_nxt_nxt, 6 );
 
     // Проверяем результат
-    PMM_TEST( coalescing->next_offset() == 20 );        // Текущий → следующий следующего
-    PMM_TEST( nxt_nxt_hdr->prev_offset == 6 );          // Следующий следующего ← текущий
+    PMM_TEST( coalescing->next_offset() == 20 ); // Текущий → следующий следующего
+    PMM_TEST( nxt_nxt_hdr->prev_offset == 6 );   // Следующий следующего ← текущий
 
     // Следующий блок должен быть обнулён
     for ( size_t i = 0; i < sizeof( buffer_next ); ++i )
@@ -453,8 +452,8 @@ static bool test_p9_coalesce_with_prev()
 
     // Результат — предыдущий блок
     PMM_TEST( reinterpret_cast<void*>( result ) == reinterpret_cast<void*>( buffer_prev ) );
-    PMM_TEST( result->next_offset() == 20 );           // Предыдущий → следующий
-    PMM_TEST( next_hdr->prev_offset == 4 );            // Следующий ← предыдущий
+    PMM_TEST( result->next_offset() == 20 ); // Предыдущий → следующий
+    PMM_TEST( next_hdr->prev_offset == 4 );  // Следующий ← предыдущий
 
     // Текущий блок должен быть обнулён
     for ( size_t i = 0; i < sizeof( buffer_curr ); ++i )
@@ -500,7 +499,7 @@ static bool test_p9_detect_block_state()
     auto* blk_hdr        = reinterpret_cast<pmm::detail::BlockHeader*>( buffer );
     blk_hdr->size        = 5;
     blk_hdr->root_offset = 6;
-    PMM_TEST( pmm::detect_block_state<A>( buffer, 6 ) == 1 ); // AllocatedBlock
+    PMM_TEST( pmm::detect_block_state<A>( buffer, 6 ) == 1 );  // AllocatedBlock
     PMM_TEST( pmm::detect_block_state<A>( buffer, 7 ) == -1 ); // Неопределённое (неверный idx)
 
     // Некорректное состояние: size=0, но root_offset != 0
