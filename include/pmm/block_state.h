@@ -3,13 +3,13 @@
  * @brief BlockState machine — автомат состояний блока для атомарных операций (Issue #93).
  *
  * Реализует state machine через наследование состояний, где каждое состояние — это
- * наследник блока с приватными членами и доступными методами работы. Каждый метод
+ * наследник Block<A> с доступными методами работы. Каждый метод
  * выполняет один атомарный шаг критической операции и возвращает следующего
  * наследника, соответствующего новому состоянию блока.
  *
  * Корректные состояния:
- *   - FreeBlock        — свободный блок (size=0, root_offset=0, в AVL-дереве)
- *   - AllocatedBlock   — занятый блок (size>0, root_offset=idx, не в AVL)
+ *   - FreeBlock        — свободный блок (weight=0, root_offset=0, в AVL-дереве)
+ *   - AllocatedBlock   — занятый блок (weight>0, root_offset=idx, не в AVL)
  *
  * Переходные состояния (только во время операций):
  *   - FreeBlockRemovedAVL    — свободный, удалённый из AVL (перед allocate)
@@ -25,7 +25,7 @@
  *
  * @see docs/atomic_writes.md «Граф состояний блока»
  * @see plan_issue87.md §5 «Фаза 9: BlockState machine»
- * @version 0.1 (Issue #93)
+ * @version 0.2 (Issue #93 — based on Block<A>)
  */
 
 #pragma once
@@ -51,98 +51,85 @@ template <typename AddressTraitsT> class SplittingBlock;
 template <typename AddressTraitsT> class CoalescingBlock;
 
 /**
- * @brief Базовый класс блока с защищёнными атрибутами.
+ * @brief Базовый класс блока для state machine.
  *
+ * Наследует Block<A> (LinkedListNode<A> + TreeNode<A>).
  * Все поля приватные для потомков. Доступ только через методы состояний.
- * Бинарно совместим с BlockHeader (НЕ с Block<A>, т.к. они имеют разный layout).
  *
- * Layout BlockHeader (32 bytes):
- *   [0]  size (4)         — занятый размер в гранулах (0 = свободный)
- *   [4]  prev_offset (4)  — предыдущий блок
- *   [8]  next_offset (4)  — следующий блок
- *   [12] left_offset (4)  — левый дочерний узел AVL
- *   [16] right_offset (4) — правый дочерний узел AVL
- *   [20] parent_offset (4)— родительский узел AVL
- *   [24] avl_height (2)   — высота AVL-поддерева
- *   [26] _pad (2)         — padding
- *   [28] root_offset (4)  — идентификатор дерева
+ * Layout Block<A> (32 bytes при DefaultAddressTraits):
+ *   [0..7]   LinkedListNode<A>: prev_offset (4), next_offset (4)
+ *   [8..31]  TreeNode<A>:       left_offset (4), right_offset (4), parent_offset (4),
+ *                               avl_height (2), _pad (2), weight (4), root_offset (4)
  *
  * @tparam AddressTraitsT  Traits адресного пространства.
  */
-template <typename AddressTraitsT> class BlockStateBase
+template <typename AddressTraitsT> class BlockStateBase : private Block<AddressTraitsT>
 {
+  private:
+    using LLNode = LinkedListNode<AddressTraitsT>;
+    using TNode  = TreeNode<AddressTraitsT>;
+
   public:
     using address_traits = AddressTraitsT;
     using index_type     = typename AddressTraitsT::index_type;
+    using BaseBlock      = Block<AddressTraitsT>;
 
     // Прямое создание запрещено — используйте cast_from_raw()
     BlockStateBase() = delete;
 
-    // Read-only доступ к size (определяет состояние: 0 = свободный, >0 = занятый)
-    index_type size() const noexcept { return _size; }
+    // Read-only доступ к weight (определяет состояние: 0 = свободный, >0 = занятый)
+    index_type weight() const noexcept { return TNode::weight; }
 
     // Read-only доступ к полям связного списка (не критичны для состояния)
-    index_type prev_offset() const noexcept { return _prev_offset; }
-    index_type next_offset() const noexcept { return _next_offset; }
+    index_type prev_offset() const noexcept { return LLNode::prev_offset; }
+    index_type next_offset() const noexcept { return LLNode::next_offset; }
 
     // Read-only доступ к AVL-полям (для диагностики)
-    index_type   left_offset() const noexcept { return _left_offset; }
-    index_type   right_offset() const noexcept { return _right_offset; }
-    index_type   parent_offset() const noexcept { return _parent_offset; }
-    std::int16_t avl_height() const noexcept { return _avl_height; }
+    index_type   left_offset() const noexcept { return TNode::left_offset; }
+    index_type   right_offset() const noexcept { return TNode::right_offset; }
+    index_type   parent_offset() const noexcept { return TNode::parent_offset; }
+    std::int16_t avl_height() const noexcept { return TNode::avl_height; }
 
     // Read-only доступ к root_offset (определяет состояние)
-    index_type root_offset() const noexcept { return _root_offset; }
-
-    // Синоним для совместимости (weight == size в контексте state machine)
-    index_type weight() const noexcept { return _size; }
+    index_type root_offset() const noexcept { return TNode::root_offset; }
 
     /**
      * @brief Определить, является ли блок свободным (по структурным признакам).
-     * @return true если size == 0 и root_offset == 0.
+     * @return true если weight == 0 и root_offset == 0.
      */
-    bool is_free() const noexcept { return _size == 0 && _root_offset == 0; }
+    bool is_free() const noexcept { return weight() == 0 && root_offset() == 0; }
 
     /**
      * @brief Определить, является ли блок занятым (по структурным признакам).
      * @param own_idx Гранульный индекс данного блока.
-     * @return true если size > 0 и root_offset == own_idx.
+     * @return true если weight > 0 и root_offset == own_idx.
      */
-    bool is_allocated( index_type own_idx ) const noexcept { return _size > 0 && _root_offset == own_idx; }
+    bool is_allocated( index_type own_idx ) const noexcept { return weight() > 0 && root_offset() == own_idx; }
 
   protected:
-    // Поля — в ТОЧНОМ порядке как BlockHeader (бинарная совместимость)
-    index_type    _size;          // [0]  = BlockHeader.size
-    index_type    _prev_offset;   // [4]  = BlockHeader.prev_offset
-    index_type    _next_offset;   // [8]  = BlockHeader.next_offset
-    index_type    _left_offset;   // [12] = BlockHeader.left_offset
-    index_type    _right_offset;  // [16] = BlockHeader.right_offset
-    index_type    _parent_offset; // [20] = BlockHeader.parent_offset
-    std::int16_t  _avl_height;    // [24] = BlockHeader.avl_height
-    std::uint16_t _pad;           // [26] = BlockHeader._pad
-    index_type    _root_offset;   // [28] = BlockHeader.root_offset
-
     // Внутренние сеттеры для наследников
-    void set_size( index_type v ) noexcept { _size = v; }
-    void set_prev_offset( index_type v ) noexcept { _prev_offset = v; }
-    void set_next_offset( index_type v ) noexcept { _next_offset = v; }
-    void set_left_offset( index_type v ) noexcept { _left_offset = v; }
-    void set_right_offset( index_type v ) noexcept { _right_offset = v; }
-    void set_parent_offset( index_type v ) noexcept { _parent_offset = v; }
-    void set_avl_height( std::int16_t v ) noexcept { _avl_height = v; }
-    void set_root_offset( index_type v ) noexcept { _root_offset = v; }
+    void set_weight( index_type v ) noexcept { TNode::weight = v; }
+    void set_prev_offset( index_type v ) noexcept { LLNode::prev_offset = v; }
+    void set_next_offset( index_type v ) noexcept { LLNode::next_offset = v; }
+    void set_left_offset( index_type v ) noexcept { TNode::left_offset = v; }
+    void set_right_offset( index_type v ) noexcept { TNode::right_offset = v; }
+    void set_parent_offset( index_type v ) noexcept { TNode::parent_offset = v; }
+    void set_avl_height( std::int16_t v ) noexcept { TNode::avl_height = v; }
+    void set_root_offset( index_type v ) noexcept { TNode::root_offset = v; }
 
     // Reset AVL fields to "not in tree" state
     void reset_avl_fields() noexcept
     {
-        _left_offset   = AddressTraitsT::no_block;
-        _right_offset  = AddressTraitsT::no_block;
-        _parent_offset = AddressTraitsT::no_block;
-        _avl_height    = 0;
+        set_left_offset( AddressTraitsT::no_block );
+        set_right_offset( AddressTraitsT::no_block );
+        set_parent_offset( AddressTraitsT::no_block );
+        set_avl_height( 0 );
     }
 };
 
-// Проверка бинарной совместимости с BlockHeader
+// Проверка бинарной совместимости с Block<A>
+static_assert( sizeof( BlockStateBase<DefaultAddressTraits> ) == sizeof( Block<DefaultAddressTraits> ),
+               "BlockStateBase<A> must have same size as Block<A> (Issue #93)" );
 static_assert( sizeof( BlockStateBase<DefaultAddressTraits> ) == 32,
                "BlockStateBase<DefaultAddressTraits> must be 32 bytes (Issue #93)" );
 
@@ -150,7 +137,7 @@ static_assert( sizeof( BlockStateBase<DefaultAddressTraits> ) == 32,
  * @brief FreeBlock — свободный блок в корректном состоянии.
  *
  * Инварианты:
- *   - size == 0
+ *   - weight == 0
  *   - root_offset == 0
  *   - Блок находится в AVL-дереве свободных блоков
  *
@@ -166,7 +153,7 @@ template <typename AddressTraitsT> class FreeBlock : public BlockStateBase<Addre
     /**
      * @brief Интерпретировать сырые байты как FreeBlock.
      *
-     * @param raw Указатель на BlockHeader / Block<A>.
+     * @param raw Указатель на Block<A>.
      * @return Указатель на FreeBlock.
      *
      * @warning Вызывающий код должен гарантировать, что блок действительно свободен.
@@ -193,7 +180,7 @@ template <typename AddressTraitsT> class FreeBlock : public BlockStateBase<Addre
     FreeBlockRemovedAVL<AddressTraitsT>* remove_from_avl() noexcept
     {
         // AVL-удаление выполняется внешне; здесь только reinterpret
-        // (инварианты сохраняются: size=0, root_offset=0)
+        // (инварианты сохраняются: weight=0, root_offset=0)
         return reinterpret_cast<FreeBlockRemovedAVL<AddressTraitsT>*>( this );
     }
 };
@@ -204,7 +191,7 @@ template <typename AddressTraitsT> class FreeBlock : public BlockStateBase<Addre
  * Переходное состояние во время операции allocate.
  *
  * Инварианты:
- *   - size == 0
+ *   - weight == 0
  *   - root_offset == 0
  *   - Блок НЕ находится в AVL-дереве (удалён)
  *
@@ -235,7 +222,7 @@ template <typename AddressTraitsT> class FreeBlockRemovedAVL : public BlockState
      */
     AllocatedBlock<AddressTraitsT>* mark_as_allocated( index_type data_granules, index_type own_idx ) noexcept
     {
-        Base::set_size( data_granules );
+        Base::set_weight( data_granules );
         Base::set_root_offset( own_idx );
         Base::reset_avl_fields();
         return reinterpret_cast<AllocatedBlock<AddressTraitsT>*>( this );
@@ -290,22 +277,17 @@ template <typename AddressTraitsT> class SplittingBlock : public BlockStateBase<
      */
     void initialize_new_block( void* new_blk_ptr, [[maybe_unused]] index_type new_idx, index_type own_idx ) noexcept
     {
-        std::memset( new_blk_ptr, 0, sizeof( BlockStateBase<AddressTraitsT> ) );
-        // Прямая инициализация через reinterpret_cast к "сырой" структуре с публичными полями
-        struct RawBlock
-        {
-            index_type    size, prev, next, left, right, parent;
-            std::int16_t  h;
-            std::uint16_t pad;
-            index_type    root;
-        };
-        auto* raw   = reinterpret_cast<RawBlock*>( new_blk_ptr );
-        raw->prev   = own_idx;
-        raw->next   = Base::next_offset();
-        raw->left   = AddressTraitsT::no_block;
-        raw->right  = AddressTraitsT::no_block;
-        raw->parent = AddressTraitsT::no_block;
-        raw->h      = 1; // Будет вставлен в AVL
+        std::memset( new_blk_ptr, 0, sizeof( Block<AddressTraitsT> ) );
+        // Инициализация через Block<A> layout
+        auto* blk          = reinterpret_cast<Block<AddressTraitsT>*>( new_blk_ptr );
+        blk->prev_offset   = own_idx;
+        blk->next_offset   = Base::next_offset();
+        blk->left_offset   = AddressTraitsT::no_block;
+        blk->right_offset  = AddressTraitsT::no_block;
+        blk->parent_offset = AddressTraitsT::no_block;
+        blk->avl_height    = 1; // Будет вставлен в AVL
+        blk->weight        = 0;
+        blk->root_offset   = 0;
     }
 
     /**
@@ -318,16 +300,8 @@ template <typename AddressTraitsT> class SplittingBlock : public BlockStateBase<
     {
         if ( old_next_blk != nullptr )
         {
-            // Прямая модификация через "сырую" структуру (бинарно совместима с BlockHeader)
-            struct RawBlock
-            {
-                index_type    size, prev, next, left, right, parent;
-                std::int16_t  h;
-                std::uint16_t pad;
-                index_type    root;
-            };
-            auto* raw = reinterpret_cast<RawBlock*>( old_next_blk );
-            raw->prev = new_idx;
+            auto* blk        = reinterpret_cast<Block<AddressTraitsT>*>( old_next_blk );
+            blk->prev_offset = new_idx;
         }
         Base::set_next_offset( new_idx );
     }
@@ -341,7 +315,7 @@ template <typename AddressTraitsT> class SplittingBlock : public BlockStateBase<
      */
     AllocatedBlock<AddressTraitsT>* finalize_split( index_type data_granules, index_type own_idx ) noexcept
     {
-        Base::set_size( data_granules );
+        Base::set_weight( data_granules );
         Base::set_root_offset( own_idx );
         Base::reset_avl_fields();
         return reinterpret_cast<AllocatedBlock<AddressTraitsT>*>( this );
@@ -352,7 +326,7 @@ template <typename AddressTraitsT> class SplittingBlock : public BlockStateBase<
  * @brief AllocatedBlock — занятый блок в корректном состоянии.
  *
  * Инварианты:
- *   - size > 0
+ *   - weight > 0
  *   - root_offset == собственный гранульный индекс
  *   - Блок НЕ находится в AVL-дереве свободных блоков
  *
@@ -387,14 +361,11 @@ template <typename AddressTraitsT> class AllocatedBlock : public BlockStateBase<
      * @brief Получить указатель на пользовательские данные.
      * @return Указатель на данные (после заголовка блока).
      */
-    void* user_ptr() noexcept
-    {
-        return reinterpret_cast<std::uint8_t*>( this ) + sizeof( BlockStateBase<AddressTraitsT> );
-    }
+    void* user_ptr() noexcept { return reinterpret_cast<std::uint8_t*>( this ) + sizeof( Block<AddressTraitsT> ); }
 
     const void* user_ptr() const noexcept
     {
-        return reinterpret_cast<const std::uint8_t*>( this ) + sizeof( BlockStateBase<AddressTraitsT> );
+        return reinterpret_cast<const std::uint8_t*>( this ) + sizeof( Block<AddressTraitsT> );
     }
 
     /**
@@ -404,7 +375,7 @@ template <typename AddressTraitsT> class AllocatedBlock : public BlockStateBase<
      */
     FreeBlockNotInAVL<AddressTraitsT>* mark_as_free() noexcept
     {
-        Base::set_size( 0 );
+        Base::set_weight( 0 );
         Base::set_root_offset( 0 );
         return reinterpret_cast<FreeBlockNotInAVL<AddressTraitsT>*>( this );
     }
@@ -416,7 +387,7 @@ template <typename AddressTraitsT> class AllocatedBlock : public BlockStateBase<
  * Переходное состояние во время операции deallocate, перед coalesce.
  *
  * Инварианты:
- *   - size == 0
+ *   - weight == 0
  *   - root_offset == 0
  *   - Блок НЕ находится в AVL-дереве (ещё не добавлен)
  *
@@ -493,27 +464,18 @@ template <typename AddressTraitsT> class CoalescingBlock : public BlockStateBase
      */
     void coalesce_with_next( void* next_blk, void* next_next_blk, index_type own_idx ) noexcept
     {
-        // "Сырая" структура для прямого доступа (бинарно совместима с BlockHeader)
-        struct RawBlock
-        {
-            index_type    size, prev, next, left, right, parent;
-            std::int16_t  h;
-            std::uint16_t pad;
-            index_type    root;
-        };
-        auto* nxt = reinterpret_cast<RawBlock*>( next_blk );
+        auto* nxt = reinterpret_cast<Block<AddressTraitsT>*>( next_blk );
 
         // Обновляем связный список
-        Base::set_next_offset( nxt->next );
+        Base::set_next_offset( nxt->next_offset );
         if ( next_next_blk != nullptr )
         {
-            // Direct byte-level write: prev is at offset 4 (after size)
-            auto* byte_ptr                                 = reinterpret_cast<std::uint8_t*>( next_next_blk );
-            *reinterpret_cast<index_type*>( byte_ptr + 4 ) = own_idx;
+            auto* nxt_nxt        = reinterpret_cast<Block<AddressTraitsT>*>( next_next_blk );
+            nxt_nxt->prev_offset = own_idx;
         }
 
         // Обнуляем поглощённый блок
-        std::memset( next_blk, 0, sizeof( BlockStateBase<AddressTraitsT> ) );
+        std::memset( next_blk, 0, sizeof( Block<AddressTraitsT> ) );
     }
 
     /**
@@ -528,20 +490,17 @@ template <typename AddressTraitsT> class CoalescingBlock : public BlockStateBase
      */
     CoalescingBlock<AddressTraitsT>* coalesce_with_prev( void* prev_blk, void* next_blk, index_type prev_idx ) noexcept
     {
-        // Direct byte-level writes to ensure correct layout
-        auto* prv_bytes = reinterpret_cast<std::uint8_t*>( prev_blk );
-        // next is at offset 8
-        *reinterpret_cast<index_type*>( prv_bytes + 8 ) = Base::next_offset();
+        auto* prv        = reinterpret_cast<Block<AddressTraitsT>*>( prev_blk );
+        prv->next_offset = Base::next_offset();
 
         if ( next_blk != nullptr )
         {
-            auto* nxt_bytes = reinterpret_cast<std::uint8_t*>( next_blk );
-            // prev is at offset 4
-            *reinterpret_cast<index_type*>( nxt_bytes + 4 ) = prev_idx;
+            auto* nxt        = reinterpret_cast<Block<AddressTraitsT>*>( next_blk );
+            nxt->prev_offset = prev_idx;
         }
 
         // Обнуляем текущий блок (поглощён)
-        std::memset( this, 0, sizeof( BlockStateBase<AddressTraitsT> ) );
+        std::memset( this, 0, sizeof( Block<AddressTraitsT> ) );
 
         // Возвращаем левый сосед как результирующий блок
         return reinterpret_cast<CoalescingBlock<AddressTraitsT>*>( prev_blk );
@@ -566,7 +525,7 @@ template <typename AddressTraitsT> class CoalescingBlock : public BlockStateBase
  * @brief Определить состояние блока по сырым данным.
  *
  * @tparam AddressTraitsT Traits адресного пространства.
- * @param raw_blk   Указатель на блок (BlockHeader / Block<A>).
+ * @param raw_blk   Указатель на Block<A>.
  * @param own_idx   Гранульный индекс данного блока.
  * @return 0 = FreeBlock, 1 = AllocatedBlock, -1 = неопределённое/переходное.
  */
@@ -585,7 +544,7 @@ int detect_block_state( const void* raw_blk, typename AddressTraitsT::index_type
  * @brief Восстановить блок в корректное состояние (при load()).
  *
  * Используется для восстановления после crash — приводит блок к корректному
- * состоянию (FreeBlock или AllocatedBlock) в зависимости от size и root_offset.
+ * состоянию (FreeBlock или AllocatedBlock) в зависимости от weight и root_offset.
  *
  * @tparam AddressTraitsT Traits адресного пространства.
  * @param raw_blk   Указатель на блок.
@@ -594,27 +553,18 @@ int detect_block_state( const void* raw_blk, typename AddressTraitsT::index_type
 template <typename AddressTraitsT>
 void recover_block_state( void* raw_blk, typename AddressTraitsT::index_type own_idx ) noexcept
 {
-    using index_type = typename AddressTraitsT::index_type;
-    // "Сырая" структура для прямого доступа (бинарно совместима с BlockHeader)
-    struct RawBlock
-    {
-        index_type    size, prev, next, left, right, parent;
-        std::int16_t  h;
-        std::uint16_t pad;
-        index_type    root;
-    };
-    auto* blk = reinterpret_cast<RawBlock*>( raw_blk );
+    auto* blk = reinterpret_cast<Block<AddressTraitsT>*>( raw_blk );
 
-    // Если size > 0, но root_offset неверен — исправляем
-    if ( blk->size > 0 && blk->root != own_idx )
+    // Если weight > 0, но root_offset неверен — исправляем
+    if ( blk->weight > 0 && blk->root_offset != own_idx )
     {
-        blk->root = own_idx;
+        blk->root_offset = own_idx;
     }
 
-    // Если size == 0, но root_offset != 0 — исправляем
-    if ( blk->size == 0 && blk->root != 0 )
+    // Если weight == 0, но root_offset != 0 — исправляем
+    if ( blk->weight == 0 && blk->root_offset != 0 )
     {
-        blk->root = 0;
+        blk->root_offset = 0;
     }
 }
 
