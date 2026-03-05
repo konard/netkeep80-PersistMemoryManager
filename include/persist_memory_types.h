@@ -14,6 +14,11 @@
 
 #pragma once
 
+#include "pmm/address_traits.h"
+#include "pmm/block.h"
+#include "pmm/linked_list_node.h"
+#include "pmm/tree_node.h"
+
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
@@ -27,8 +32,11 @@ namespace pmm
 // ─── Константы ────────────────────────────────────────────────────────────────
 
 /// @brief Granule size in bytes (Issue #59, #83). All alignment/granularity expressed via this constant.
+/// Issue #87 Phase 1: matches DefaultAddressTraits::granule_size.
 inline constexpr std::size_t kGranuleSize = 16;
 static_assert( ( kGranuleSize & ( kGranuleSize - 1 ) ) == 0, "kGranuleSize must be a power of 2 (Issue #83)" );
+static_assert( kGranuleSize == pmm::DefaultAddressTraits::granule_size,
+               "kGranuleSize must match DefaultAddressTraits::granule_size (Issue #87)" );
 
 inline constexpr std::uint64_t kMagic = 0x504D4D5F56303833ULL; ///< "PMM_V083" (Issue #83: granule_size in header)
 
@@ -107,11 +115,43 @@ static_assert( sizeof( BlockHeader ) == 32, "BlockHeader must be exactly 32 byte
 static_assert( sizeof( BlockHeader ) % kGranuleSize == 0,
                "BlockHeader must be granule-aligned (Issue #59, #73 FR-03)" );
 
+// Issue #87 Phase 2: verify binary compatibility of LinkedListNode/TreeNode with BlockHeader.
+// LinkedListNode<DefaultAddressTraits> maps to prev_offset/next_offset (8 bytes).
+static_assert( sizeof( pmm::LinkedListNode<pmm::DefaultAddressTraits> ) == 2 * sizeof( std::uint32_t ),
+               "LinkedListNode<DefaultAddressTraits> must be 8 bytes (Issue #87)" );
+static_assert( offsetof( pmm::LinkedListNode<pmm::DefaultAddressTraits>, prev_offset ) == 0,
+               "LinkedListNode::prev_offset must be at offset 0 (Issue #87)" );
+static_assert( offsetof( pmm::LinkedListNode<pmm::DefaultAddressTraits>, next_offset ) == sizeof( std::uint32_t ),
+               "LinkedListNode::next_offset must be at offset 4 (Issue #87)" );
+// TreeNode<DefaultAddressTraits> maps to left/right/parent + avl_height/_pad + weight + root_offset (24 bytes).
+// Phase 2 v0.2: weight and root_offset are now part of TreeNode (moved from Block own fields).
+static_assert( sizeof( pmm::TreeNode<pmm::DefaultAddressTraits> ) ==
+                   3 * sizeof( std::uint32_t ) + 4 + 2 * sizeof( std::uint32_t ),
+               "TreeNode<DefaultAddressTraits> must be 24 bytes (Issue #87)" );
+static_assert( offsetof( pmm::TreeNode<pmm::DefaultAddressTraits>, left_offset ) == 0,
+               "TreeNode::left_offset must be at offset 0 within TreeNode (Issue #87)" );
+static_assert( offsetof( pmm::TreeNode<pmm::DefaultAddressTraits>, right_offset ) == sizeof( std::uint32_t ),
+               "TreeNode::right_offset must be at offset 4 within TreeNode (Issue #87)" );
+static_assert( offsetof( pmm::TreeNode<pmm::DefaultAddressTraits>, parent_offset ) == 2 * sizeof( std::uint32_t ),
+               "TreeNode::parent_offset must be at offset 8 within TreeNode (Issue #87)" );
+static_assert( offsetof( pmm::TreeNode<pmm::DefaultAddressTraits>, avl_height ) == 3 * sizeof( std::uint32_t ),
+               "TreeNode::avl_height must be at offset 12 within TreeNode (Issue #87)" );
+static_assert( offsetof( pmm::TreeNode<pmm::DefaultAddressTraits>, weight ) == 3 * sizeof( std::uint32_t ) + 4,
+               "TreeNode::weight must be at offset 16 within TreeNode (Issue #87)" );
+static_assert( offsetof( pmm::TreeNode<pmm::DefaultAddressTraits>, root_offset ) == 4 * sizeof( std::uint32_t ) + 4,
+               "TreeNode::root_offset must be at offset 20 within TreeNode (Issue #87)" );
+// Issue #87 Phase 3: verify sizeof(Block<DefaultAddressTraits>) == sizeof(BlockHeader).
+static_assert( sizeof( pmm::Block<pmm::DefaultAddressTraits> ) == 32,
+               "Block<DefaultAddressTraits> must be 32 bytes (Issue #87)" );
+
 /// @brief Число гранул в BlockHeader (2 гранулы = 32 байта)
 inline constexpr std::uint32_t kBlockHeaderGranules = sizeof( BlockHeader ) / kGranuleSize;
 
 // kBlockMagic removed (Issue #69): block validity now uses is_valid_block() structural invariants.
+/// Issue #87 Phase 1: matches DefaultAddressTraits::no_block.
 inline constexpr std::uint32_t kNoBlock = 0xFFFFFFFFU; ///< Sentinel: нет блока (гранульный индекс)
+static_assert( kNoBlock == pmm::DefaultAddressTraits::no_block,
+               "kNoBlock must match DefaultAddressTraits::no_block (Issue #87)" );
 
 /// @brief Manager header (Issue #59: 64 bytes). All _offset fields are granule indices.
 /// prev_base_ptr / prev_total_size are runtime-only (nulled by load() — not persisted).
