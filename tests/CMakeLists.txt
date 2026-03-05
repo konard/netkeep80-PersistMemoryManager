@@ -84,3 +84,6 @@ pmm_add_test(test_issue87_phase7 test_issue87_phase7.cpp)
 
 # ─── Тесты Phase 8: pmm_presets.h (Issue #87) ────────────────────────────────
 pmm_add_test(test_issue87_phase8 test_issue87_phase8.cpp)
+
+# ─── Тесты Phase 9: BlockState machine (Issue #93) ───────────────────────────
+pmm_add_test(test_block_state test_block_state.cpp)

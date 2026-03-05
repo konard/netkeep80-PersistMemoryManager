@@ -368,3 +368,185 @@ void recompute_counters(uint8_t* base, ManagerHeader* hdr) {
 Данный алгоритм обеспечивает **crash consistency** (согласованность после сбоя) в смысле: образ после восстановления будет структурно валидным, и менеджер сможет продолжить работу. Однако **полная атомарность операций выделения/освобождения** (т.е. гарантия того, что операция либо полностью применена, либо полностью откатится) требует журналирования (write-ahead log, WAL), что выходит за рамки данного issue.
 
 В рамках данного issue достигается: **структурная корректность образа после load() при любом сбое**, при этом частично выполненные операции выделения трактуются как "не выполненные" (блоки возвращаются в свободные).
+
+---
+
+## Граф состояний блока (Issue #93: BlockState machine)
+
+### Обзор состояний
+
+Блок памяти может находиться в одном из двух **корректных** состояний и одном из нескольких **переходных** состояний. Переходные состояния являются временными и возникают во время атомарных операций.
+
+### Корректные состояния
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         КОРРЕКТНЫЕ СОСТОЯНИЯ                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   ┌─────────────────────┐                    ┌─────────────────────┐        │
+│   │     FreeBlock       │                    │   AllocatedBlock    │        │
+│   │  ───────────────    │                    │  ───────────────    │        │
+│   │  size == 0          │ ──── allocate ──►  │  size > 0           │        │
+│   │  root_offset == 0   │                    │  root_offset == idx │        │
+│   │  в AVL-дереве       │ ◄── deallocate ─── │  не в AVL-дереве    │        │
+│   └─────────────────────┘                    └─────────────────────┘        │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Диаграмма переходов состояний (allocate)
+
+```
+┌─────────────┐
+│  FreeBlock  │  Корректное состояние: size=0, root_offset=0, в AVL-дереве
+└──────┬──────┘
+       │
+       │ (1) avl_remove(blk_idx)
+       ▼
+┌──────────────────────┐
+│ FreeBlock_RemovedAVL │  Переходное: size=0, root_offset=0, не в AVL
+└──────┬───────────────┘
+       │
+       │ (2) [если split] создать new_blk, memset(0)
+       │ (3) [если split] new_blk->next_offset = blk->next_offset
+       │ (4) [если split] new_blk->prev_offset = blk_idx
+       │ (5) [если split] old_next->prev_offset = new_idx
+       │ (6) [если split] blk->next_offset = new_idx
+       │ (7) [если split] avl_insert(new_idx)
+       ▼
+┌──────────────────────────────┐
+│ FreeBlock_SplitLinkedListOK  │  Переходное: линейный список обновлён
+└──────┬───────────────────────┘
+       │
+       │ (8) blk->size = data_gran
+       │ (9) blk->root_offset = blk_idx
+       ▼
+┌─────────────────┐
+│ AllocatedBlock  │  Корректное состояние: size>0, root_offset=idx
+└─────────────────┘
+```
+
+### Диаграмма переходов состояний (deallocate)
+
+```
+┌─────────────────┐
+│ AllocatedBlock  │  Корректное состояние: size>0, root_offset=idx, не в AVL
+└──────┬──────────┘
+       │
+       │ (1) blk->size = 0
+       │ (2) blk->root_offset = 0
+       ▼
+┌─────────────────────────┐
+│ FreeBlock_NotInAVL      │  Переходное: size=0, root_offset=0, не в AVL
+└──────┬──────────────────┘
+       │
+       │ [если coalesce с right]
+       │ (3) avl_remove(nxt_idx)
+       │ (4) blk->next_offset = nxt->next_offset
+       │ (5) nxt->next->prev_offset = blk_idx
+       │ (6) memset(nxt, 0)
+       │
+       │ [если coalesce с left]
+       │ (7) avl_remove(prv_idx)
+       │ (8) prv->next_offset = blk->next_offset
+       │ (9) blk->next->prev_offset = prv_idx
+       │ (10) memset(blk, 0)
+       │ (11) blk = prv (результирующий блок)
+       ▼
+┌──────────────────────────────┐
+│ FreeBlock_CoalesceComplete   │  Переходное: слияние завершено
+└──────┬───────────────────────┘
+       │
+       │ (12) avl_insert(result_blk_idx)
+       ▼
+┌─────────────┐
+│  FreeBlock  │  Корректное состояние: size=0, root_offset=0, в AVL
+└─────────────┘
+```
+
+### Допустимые и запрещённые состояния
+
+| Состояние | size | root_offset | AVL | Допустимо? | Комментарий |
+|-----------|------|-------------|-----|------------|-------------|
+| FreeBlock | 0 | 0 | Да | ✅ | Корректное — свободный блок |
+| AllocatedBlock | >0 | idx | Нет | ✅ | Корректное — занятый блок |
+| FreeBlock_RemovedAVL | 0 | 0 | Нет | ⚠️ | Переходное — допустимо только во время allocate |
+| FreeBlock_NotInAVL | 0 | 0 | Нет | ⚠️ | Переходное — допустимо только во время deallocate |
+| InvalidState | 0 | idx | — | ❌ | Запрещённое — противоречие |
+| InvalidState | >0 | 0 | — | ❌ | Запрещённое — противоречие |
+| InvalidState | >0 | idx | Да | ❌ | Запрещённое — занятый в AVL |
+
+### State machine API
+
+Реализация state machine через наследование обеспечивает типобезопасность на уровне компиляции:
+
+```cpp
+// Базовый класс — блок в корректном состоянии (недоступны атрибуты напрямую)
+class BlockBase {
+protected:
+    index_type _prev_offset;
+    index_type _next_offset;
+    index_type _left_offset;
+    index_type _right_offset;
+    index_type _parent_offset;
+    int16_t    _avl_height;
+    uint16_t   _pad;
+    index_type _weight;        // = size для занятых, = free_granules для свободных
+    index_type _root_offset;
+
+    // Конструктор защищён — прямое создание запрещено
+    BlockBase() = default;
+
+public:
+    // Только read-only доступ к некритическим полям
+    index_type prev_offset() const noexcept { return _prev_offset; }
+    index_type next_offset() const noexcept { return _next_offset; }
+};
+
+// FreeBlock — свободный блок (корректное состояние)
+class FreeBlock : public BlockBase {
+public:
+    // Методы возвращают следующее состояние
+    FreeBlock_RemovedAVL remove_from_avl() { ... }  // → переходное состояние
+};
+
+// FreeBlock_RemovedAVL — свободный блок, удалённый из AVL (переходное)
+class FreeBlock_RemovedAVL : public BlockBase {
+public:
+    AllocatedBlock mark_allocated(index_type size) { ... }  // → корректное
+    // Нельзя вернуться в FreeBlock без прохождения через allocate/deallocate цикл
+};
+
+// AllocatedBlock — занятый блок (корректное состояние)
+class AllocatedBlock : public BlockBase {
+public:
+    FreeBlock_NotInAVL mark_free() { ... }  // → переходное состояние
+};
+
+// FreeBlock_NotInAVL — только что освобождённый блок (переходное)
+class FreeBlock_NotInAVL : public BlockBase {
+public:
+    FreeBlock insert_to_avl() { ... }  // → корректное состояние
+    // Coalesce методы здесь
+};
+```
+
+### Гарантии state machine
+
+1. **Типобезопасность**: Компилятор запрещает вызов методов, недоступных в текущем состоянии
+2. **Восстановимость**: Все переходные состояния детектируются и восстанавливаются при load()
+3. **Атомарность**: Каждый метод выполняет один атомарный шаг; прерывание безопасно
+4. **Завершаемость**: Любая цепочка вызовов завершается в корректном состоянии или детектируется как незавершённая
+
+### Детекция и восстановление переходных состояний
+
+При `load()` после сбоя, система определяет переходные состояния:
+
+| Переходное состояние | Признаки | Восстановление |
+|----------------------|----------|----------------|
+| FreeBlock_RemovedAVL | size=0, root_offset=0, не в AVL-дереве (после traverse) | `avl_insert(idx)` |
+| FreeBlock_NotInAVL | size=0, root_offset=0, не в AVL-дереве | `avl_insert(idx)` |
+| Частичный coalesce | Несоответствие forward/backward в linked list | `repair_linked_list()` |
+
+Это реализовано в `rebuild_free_tree()` и `repair_linked_list()` (см. раздел «Алгоритм верификации и восстановления при загрузке»).
