@@ -60,3 +60,6 @@ pmm_add_test(test_issue83_constants test_issue83_constants.cpp)
 
 # ─── Тесты code review и маяки абстракций (Issue #87) ────────────────────────
 pmm_add_test(test_issue87_abstraction test_issue87_abstraction.cpp)
+
+# ─── Тесты Phase 1: AddressTraits (Issue #87) ────────────────────────────────
+pmm_add_test(test_issue87_phase1 test_issue87_phase1.cpp)

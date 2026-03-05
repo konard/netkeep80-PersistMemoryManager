@@ -20,6 +20,7 @@
 #include "persist_memory_types.h"
 #include "persist_avl_tree.h"
 #include "pmm_config.h"
+#include "pmm/address_traits.h"
 
 #include <cassert>
 #include <cstdlib>
@@ -283,35 +284,32 @@ static bool test_cr_thread_policy_injection()
 // PART B: Маяки будущих абстракций (закомментированы до реализации фаз)
 // =============================================================================
 
-// [Phase 1] AddressTraits
+// [Phase 1] AddressTraits — РЕАЛИЗОВАНО в include/pmm/address_traits.h
 // ────────────────────────────────────────────────────────────────────────────
-// После реализации include/pmm/address_traits.h раскомментировать:
-//
-// #include "pmm/address_traits.h"
-//
-// static bool test_phase1_address_traits()
-// {
-//     // 8-bit адресация, 8-байтная гранула (для tiny embedded)
-//     using A8 = pmm::AddressTraits<std::uint8_t, 8>;
-//     static_assert(A8::granule_size == 8);
-//     static_assert(A8::no_block == 0xFFU);
-//     static_assert(A8::bytes_to_granules(8) == 1);
-//     static_assert(A8::bytes_to_granules(9) == 2);
-//
-//     // 16-bit адресация, 16-байтная гранула
-//     using A16 = pmm::AddressTraits<std::uint16_t, 16>;
-//     static_assert(A16::no_block == 0xFFFFU);
-//
-//     // 32-bit адресация, 16-байтная гранула (текущий дефолт)
-//     using A32 = pmm::AddressTraits<std::uint32_t, 16>;
-//     static_assert(A32::no_block == pmm::detail::kNoBlock);
-//     static_assert(A32::granule_size == pmm::kGranuleSize);
-//
-//     // DefaultAddressTraits — алиас для A32
-//     static_assert(std::is_same<pmm::DefaultAddressTraits, A32>::value);
-//
-//     return true;
-// }
+
+static bool test_phase1_address_traits()
+{
+    // 8-bit адресация, 8-байтная гранула (для tiny embedded)
+    using A8 = pmm::AddressTraits<std::uint8_t, 8>;
+    static_assert( A8::granule_size == 8 );
+    static_assert( A8::no_block == 0xFFU );
+    static_assert( A8::bytes_to_granules( 8 ) == 1 );
+    static_assert( A8::bytes_to_granules( 9 ) == 2 );
+
+    // 16-bit адресация, 16-байтная гранула
+    using A16 = pmm::AddressTraits<std::uint16_t, 16>;
+    static_assert( A16::no_block == 0xFFFFU );
+
+    // 32-bit адресация, 16-байтная гранула (текущий дефолт)
+    using A32 = pmm::AddressTraits<std::uint32_t, 16>;
+    static_assert( A32::no_block == pmm::detail::kNoBlock );
+    static_assert( A32::granule_size == pmm::kGranuleSize );
+
+    // DefaultAddressTraits — алиас для A32
+    static_assert( std::is_same<pmm::DefaultAddressTraits, A32>::value );
+
+    return true;
+}
 
 // [Phase 2] LinkedListNode + TreeNode
 // ────────────────────────────────────────────────────────────────────────────
@@ -589,6 +587,9 @@ int main()
     PMM_RUN( "A8: only heap backend exists (static/mmap missing)", test_cr_only_heap_backend_exists );
     PMM_RUN( "A9: CRTP mixin chain works (good)", test_cr_crtp_mixin_chain );
     PMM_RUN( "A10: ThreadPolicy injection works (good)", test_cr_thread_policy_injection );
+
+    std::cout << "\n--- Part B: Phase 1 beacon (AddressTraits implemented) ---\n";
+    PMM_RUN( "B1: AddressTraits<> — 8/16/32-bit address buses and no_block", test_phase1_address_traits );
 
     std::cout << "\n--- Part C: Integration (must pass on all phases) ---\n";
     PMM_RUN( "C1: full lifecycle allocate/deallocate/validate", test_integration_full_lifecycle );

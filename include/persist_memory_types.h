@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include "pmm/address_traits.h"
+
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
@@ -27,8 +29,11 @@ namespace pmm
 // ─── Константы ────────────────────────────────────────────────────────────────
 
 /// @brief Granule size in bytes (Issue #59, #83). All alignment/granularity expressed via this constant.
+/// Issue #87 Phase 1: matches DefaultAddressTraits::granule_size.
 inline constexpr std::size_t kGranuleSize = 16;
 static_assert( ( kGranuleSize & ( kGranuleSize - 1 ) ) == 0, "kGranuleSize must be a power of 2 (Issue #83)" );
+static_assert( kGranuleSize == pmm::DefaultAddressTraits::granule_size,
+               "kGranuleSize must match DefaultAddressTraits::granule_size (Issue #87)" );
 
 inline constexpr std::uint64_t kMagic = 0x504D4D5F56303833ULL; ///< "PMM_V083" (Issue #83: granule_size in header)
 
@@ -111,7 +116,10 @@ static_assert( sizeof( BlockHeader ) % kGranuleSize == 0,
 inline constexpr std::uint32_t kBlockHeaderGranules = sizeof( BlockHeader ) / kGranuleSize;
 
 // kBlockMagic removed (Issue #69): block validity now uses is_valid_block() structural invariants.
+/// Issue #87 Phase 1: matches DefaultAddressTraits::no_block.
 inline constexpr std::uint32_t kNoBlock = 0xFFFFFFFFU; ///< Sentinel: нет блока (гранульный индекс)
+static_assert( kNoBlock == pmm::DefaultAddressTraits::no_block,
+               "kNoBlock must match DefaultAddressTraits::no_block (Issue #87)" );
 
 /// @brief Manager header (Issue #59: 64 bytes). All _offset fields are granule indices.
 /// prev_base_ptr / prev_total_size are runtime-only (nulled by load() — not persisted).
