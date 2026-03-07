@@ -17,8 +17,8 @@
  *   struct CacheTag {};
  *   struct PersistentTag {};
  *
- *   using CacheManager     = pmm::StaticPersistMemoryManager<pmm::config::DefaultConfig, CacheTag>;
- *   using PersistentManager = pmm::StaticPersistMemoryManager<pmm::config::DefaultConfig, PersistentTag>;
+ *   using CacheManager      = pmm::StaticPersistMemoryManager<pmm::CacheManagerConfig, CacheTag>;
+ *   using PersistentManager = pmm::StaticPersistMemoryManager<pmm::CacheManagerConfig, PersistentTag>;
  *
  *   CacheManager     cache_mgr;
  *   PersistentManager persist_mgr;
@@ -51,6 +51,7 @@
 #include "pmm/free_block_tree.h"
 #include "pmm/heap_storage.h"
 #include "pmm/manager_concept.h"
+#include "pmm/manager_configs.h"
 #include "pmm/pptr.h"
 #include "pmm/storage_backend.h"
 
@@ -74,7 +75,7 @@ struct DefaultManagerTag
  * но добавляет параметр `Tag`, делающий тип уникальным. Это позволяет
  * создавать несколько менеджеров одной конфигурации с разными типами.
  *
- * @tparam ConfigT Конфигурация менеджера (например pmm::config::DefaultConfig).
+ * @tparam ConfigT Конфигурация менеджера (например pmm::CacheManagerConfig).
  *                 Должна предоставлять:
  *                   - `lock_policy` — политика блокировок
  * @tparam Tag     Тег для уникализации типа (по умолчанию DefaultManagerTag).
@@ -91,7 +92,7 @@ struct DefaultManagerTag
  *       `StaticPersistMemoryManager<Config, TagB>::pptr<T>` — разные типы
  *       при `TagA != TagB`, что обеспечивает типобезопасность.
  */
-template <typename ConfigT = config::DefaultConfig, typename Tag = DefaultManagerTag>
+template <typename ConfigT = CacheManagerConfig, typename Tag = DefaultManagerTag>
 class StaticPersistMemoryManager
     : public AbstractPersistMemoryManager<DefaultAddressTraits, HeapStorage<DefaultAddressTraits>,
                                           AvlFreeTree<DefaultAddressTraits>, typename ConfigT::lock_policy>
@@ -134,7 +135,7 @@ class StaticPersistMemoryManager
      */
     template <typename T> pptr<T> allocate_typed() noexcept
     {
-        pmm::pptr<T, void> p = base_type::template allocate_typed<T>();
+        typename base_type::template pptr<T> p = base_type::template allocate_typed<T>();
         return pptr<T>( p.offset() );
     }
 
@@ -147,7 +148,7 @@ class StaticPersistMemoryManager
      */
     template <typename T> pptr<T> allocate_typed( std::size_t count ) noexcept
     {
-        pmm::pptr<T, void> p = base_type::template allocate_typed<T>( count );
+        typename base_type::template pptr<T> p = base_type::template allocate_typed<T>( count );
         return pptr<T>( p.offset() );
     }
 
@@ -159,7 +160,7 @@ class StaticPersistMemoryManager
      */
     template <typename T> void deallocate_typed( pptr<T> p ) noexcept
     {
-        base_type::template deallocate_typed<T>( pmm::pptr<T, void>( p.offset() ) );
+        base_type::template deallocate_typed<T>( typename base_type::template pptr<T>( p.offset() ) );
     }
 
     /**
@@ -171,7 +172,7 @@ class StaticPersistMemoryManager
      */
     template <typename T> T* resolve( pptr<T> p ) const noexcept
     {
-        return base_type::template resolve<T>( pmm::pptr<T, void>( p.offset() ) );
+        return base_type::template resolve<T>( typename base_type::template pptr<T>( p.offset() ) );
     }
 
     /**
@@ -184,12 +185,12 @@ class StaticPersistMemoryManager
      */
     template <typename T> T* resolve_at( pptr<T> p, std::size_t i ) const noexcept
     {
-        return base_type::template resolve_at<T>( pmm::pptr<T, void>( p.offset() ), i );
+        return base_type::template resolve_at<T>( typename base_type::template pptr<T>( p.offset() ), i );
     }
 };
 
 // Проверяем концепцию менеджера для StaticPersistMemoryManager
-static_assert( is_persist_memory_manager_v<StaticPersistMemoryManager<>>,
-               "StaticPersistMemoryManager<> must satisfy PersistMemoryManagerConcept" );
+static_assert( is_persist_memory_manager_v<StaticPersistMemoryManager<CacheManagerConfig>>,
+               "StaticPersistMemoryManager<CacheManagerConfig> must satisfy PersistMemoryManagerConcept" );
 
 } // namespace pmm

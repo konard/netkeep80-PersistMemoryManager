@@ -495,27 +495,32 @@ static bool test_p97_io_load_null_filename()
 // P97-G: pptr<T> typed API для AbstractPersistMemoryManager (Issue #97)
 // =============================================================================
 
+// Convenience aliases for P97-G tests
+using STHeap  = pmm::presets::SingleThreadedHeap;
+using MTHeap  = pmm::presets::MultiThreadedHeap;
+using EmbHeap = pmm::presets::EmbeddedStatic4K;
+
 /// @brief allocate_typed<T>() возвращает pptr<T> размером 4 байта.
 static bool test_p97_pptr_sizeof()
 {
-    PMM_TEST( sizeof( pmm::pptr<int> ) == 4 );
-    PMM_TEST( sizeof( pmm::pptr<double> ) == 4 );
-    PMM_TEST( sizeof( pmm::pptr<char> ) == 4 );
+    PMM_TEST( sizeof( STHeap::pptr<int> ) == 4 );
+    PMM_TEST( sizeof( STHeap::pptr<double> ) == 4 );
+    PMM_TEST( sizeof( STHeap::pptr<char> ) == 4 );
     return true;
 }
 
 /// @brief allocate_typed<T>() / resolve<T>() / deallocate_typed(): полный цикл.
 static bool test_p97_pptr_allocate_resolve_deallocate()
 {
-    pmm::presets::SingleThreadedHeap pmm;
+    STHeap pmm;
     PMM_TEST( pmm.create( 32 * 1024 ) );
 
     // Выделяем int через typed API
-    pmm::pptr<int> p = pmm.allocate_typed<int>();
+    STHeap::pptr<int> p = pmm.allocate_typed<int>();
     PMM_TEST( !p.is_null() );
     PMM_TEST( static_cast<bool>( p ) );
     PMM_TEST( p.offset() > 0 );
-    PMM_TEST( sizeof( p ) == 4 ); // pptr<T> — 4 байта
+    PMM_TEST( sizeof( p ) == 4 ); // pptr<T, MgrT> — 4 байта
 
     // Разыменовываем через resolve
     int* ptr = pmm.resolve( p );
@@ -533,13 +538,13 @@ static bool test_p97_pptr_allocate_resolve_deallocate()
 /// @brief allocate_typed<T>(count) / resolve_at<T>(): массив через pptr.
 static bool test_p97_pptr_allocate_array()
 {
-    pmm::presets::SingleThreadedHeap pmm;
+    STHeap pmm;
     PMM_TEST( pmm.create( 64 * 1024 ) );
 
     constexpr std::size_t kCount = 10;
 
     // Выделяем массив из 10 int
-    pmm::pptr<int> arr = pmm.allocate_typed<int>( kCount );
+    STHeap::pptr<int> arr = pmm.allocate_typed<int>( kCount );
     PMM_TEST( !arr.is_null() );
 
     // Записываем через resolve_at
@@ -561,13 +566,13 @@ static bool test_p97_pptr_allocate_array()
     return true;
 }
 
-/// @brief pptr<T> корректно хранит и восстанавливает гранульный индекс.
+/// @brief pptr<T, MgrT> корректно хранит и восстанавливает гранульный индекс.
 static bool test_p97_pptr_offset_persistence()
 {
-    pmm::presets::SingleThreadedHeap pmm;
+    STHeap pmm;
     PMM_TEST( pmm.create( 16 * 1024 ) );
 
-    pmm::pptr<int> p = pmm.allocate_typed<int>();
+    STHeap::pptr<int> p = pmm.allocate_typed<int>();
     PMM_TEST( !p.is_null() );
     *pmm.resolve( p ) = 12345;
 
@@ -576,7 +581,7 @@ static bool test_p97_pptr_offset_persistence()
     PMM_TEST( saved_offset > 0 );
 
     // Восстанавливаем pptr из сохранённого смещения
-    pmm::pptr<int> p2( saved_offset );
+    STHeap::pptr<int> p2( saved_offset );
     PMM_TEST( p == p2 );
     PMM_TEST( *pmm.resolve( p2 ) == 12345 );
 
@@ -585,13 +590,13 @@ static bool test_p97_pptr_offset_persistence()
     return true;
 }
 
-/// @brief Нулевой pptr<T> (null): resolve возвращает nullptr.
+/// @brief Нулевой pptr<T, MgrT> (null): resolve возвращает nullptr.
 static bool test_p97_pptr_null_resolve()
 {
-    pmm::presets::SingleThreadedHeap pmm;
+    STHeap pmm;
     PMM_TEST( pmm.create( 8 * 1024 ) );
 
-    pmm::pptr<int> p; // null по умолчанию
+    STHeap::pptr<int> p; // null по умолчанию
     PMM_TEST( p.is_null() );
     PMM_TEST( !static_cast<bool>( p ) );
     PMM_TEST( p.offset() == 0 );
@@ -604,10 +609,10 @@ static bool test_p97_pptr_null_resolve()
 /// @brief deallocate_typed(null pptr) не вызывает ошибок.
 static bool test_p97_pptr_deallocate_null()
 {
-    pmm::presets::SingleThreadedHeap pmm;
+    STHeap pmm;
     PMM_TEST( pmm.create( 8 * 1024 ) );
 
-    pmm::pptr<int> p;          // null
+    STHeap::pptr<int> p;       // null
     pmm.deallocate_typed( p ); // должно быть no-op без ошибок
 
     pmm.destroy();
@@ -617,25 +622,25 @@ static bool test_p97_pptr_deallocate_null()
 /// @brief allocate_typed<T>(0) возвращает null pptr.
 static bool test_p97_pptr_allocate_zero()
 {
-    pmm::presets::SingleThreadedHeap pmm;
+    STHeap pmm;
     PMM_TEST( pmm.create( 8 * 1024 ) );
 
-    pmm::pptr<int> p = pmm.allocate_typed<int>( 0 );
+    STHeap::pptr<int> p = pmm.allocate_typed<int>( 0 );
     PMM_TEST( p.is_null() );
 
     pmm.destroy();
     return true;
 }
 
-/// @brief pptr<T>: сравнение (== / !=).
+/// @brief pptr<T, MgrT>: сравнение (== / !=).
 static bool test_p97_pptr_comparison()
 {
-    pmm::presets::SingleThreadedHeap pmm;
+    STHeap pmm;
     PMM_TEST( pmm.create( 32 * 1024 ) );
 
-    pmm::pptr<int> p1 = pmm.allocate_typed<int>();
-    pmm::pptr<int> p2 = pmm.allocate_typed<int>();
-    pmm::pptr<int> p3 = p1;
+    STHeap::pptr<int> p1 = pmm.allocate_typed<int>();
+    STHeap::pptr<int> p2 = pmm.allocate_typed<int>();
+    STHeap::pptr<int> p3 = p1;
 
     PMM_TEST( p1 == p3 );
     PMM_TEST( p1 != p2 );
@@ -647,16 +652,16 @@ static bool test_p97_pptr_comparison()
     return true;
 }
 
-/// @brief pptr<T>: сохранение/загрузка через io.h с pptr offset.
+/// @brief pptr<T, MgrT>: сохранение/загрузка через io.h с pptr offset.
 static bool test_p97_pptr_persistence_via_io()
 {
     const char* test_file = "test_issue97_pptr_io.pmm";
 
-    pmm::presets::SingleThreadedHeap pmm1;
+    STHeap pmm1;
     PMM_TEST( pmm1.create( 16 * 1024 ) );
 
     // Выделяем структуру данных через pptr
-    pmm::pptr<int> p1 = pmm1.allocate_typed<int>();
+    STHeap::pptr<int> p1 = pmm1.allocate_typed<int>();
     PMM_TEST( !p1.is_null() );
     *pmm1.resolve( p1 ) = 99999;
 
@@ -667,13 +672,13 @@ static bool test_p97_pptr_persistence_via_io()
     pmm1.destroy();
 
     // Загружаем в новый менеджер
-    pmm::presets::SingleThreadedHeap pmm2;
+    STHeap pmm2;
     PMM_TEST( pmm2.create( 16 * 1024 ) );
     PMM_TEST( pmm::load_manager_from_file( pmm2, test_file ) );
     PMM_TEST( pmm2.is_initialized() );
 
     // Восстанавливаем pptr по сохранённому смещению
-    pmm::pptr<int> p2( saved_offset );
+    STHeap::pptr<int> p2( saved_offset );
     PMM_TEST( !p2.is_null() );
     PMM_TEST( *pmm2.resolve( p2 ) == 99999 ); // данные сохранились
 
@@ -684,15 +689,15 @@ static bool test_p97_pptr_persistence_via_io()
     return true;
 }
 
-/// @brief Несколько типов pptr<T> в одном менеджере.
+/// @brief Несколько типов pptr<T, MgrT> в одном менеджере.
 static bool test_p97_pptr_multiple_types()
 {
-    pmm::presets::SingleThreadedHeap pmm;
+    STHeap pmm;
     PMM_TEST( pmm.create( 64 * 1024 ) );
 
-    pmm::pptr<int>    pi = pmm.allocate_typed<int>();
-    pmm::pptr<double> pd = pmm.allocate_typed<double>();
-    pmm::pptr<char>   pc = pmm.allocate_typed<char>( 16 );
+    STHeap::pptr<int>    pi = pmm.allocate_typed<int>();
+    STHeap::pptr<double> pd = pmm.allocate_typed<double>();
+    STHeap::pptr<char>   pc = pmm.allocate_typed<char>( 16 );
 
     PMM_TEST( !pi.is_null() );
     PMM_TEST( !pd.is_null() );
@@ -714,13 +719,13 @@ static bool test_p97_pptr_multiple_types()
     return true;
 }
 
-/// @brief EmbeddedStatic4K: pptr<T> API (без malloc).
+/// @brief EmbeddedStatic4K: pptr<T, MgrT> API (без malloc).
 static bool test_p97_pptr_embedded_static()
 {
-    pmm::presets::EmbeddedStatic4K pmm;
+    EmbHeap pmm;
     PMM_TEST( pmm.create() );
 
-    pmm::pptr<std::uint32_t> p = pmm.allocate_typed<std::uint32_t>();
+    EmbHeap::pptr<std::uint32_t> p = pmm.allocate_typed<std::uint32_t>();
     PMM_TEST( !p.is_null() );
 
     *pmm.resolve( p ) = 0xDEADBEEFu;
@@ -731,10 +736,10 @@ static bool test_p97_pptr_embedded_static()
     return true;
 }
 
-/// @brief MultiThreadedHeap: concurrent pptr<T> allocations.
+/// @brief MultiThreadedHeap: concurrent pptr<T, MgrT> allocations.
 static bool test_p97_pptr_multi_threaded()
 {
-    pmm::presets::MultiThreadedHeap pmm;
+    MTHeap pmm;
     PMM_TEST( pmm.create( 256 * 1024 ) );
 
     constexpr int kThreads         = 4;
@@ -748,10 +753,10 @@ static bool test_p97_pptr_multi_threaded()
         threads.emplace_back(
             [&pmm, &fail_count, kAllocsPerThread]()
             {
-                std::vector<pmm::pptr<int>> ptrs;
+                std::vector<MTHeap::pptr<int>> ptrs;
                 for ( int i = 0; i < kAllocsPerThread; ++i )
                 {
-                    pmm::pptr<int> p = pmm.allocate_typed<int>();
+                    MTHeap::pptr<int> p = pmm.allocate_typed<int>();
                     if ( p.is_null() )
                     {
                         fail_count++;

@@ -1,15 +1,14 @@
 /**
  * @file test_persistence.cpp
- * @brief Тесты персистентности (save/load) — Фаза 3 (обновлено в Issue #61)
+ * @brief Тесты персистентности (save_manager/load_manager_from_file) (Issue #102 — новый API)
  *
- * Issue #61: менеджер — полностью статический класс.
- *   - save(filename) и load_from_file(filename, buf, size) без PersistMemoryManager*.
- *   - Все операции через статические методы PersistMemoryManager::xxx().
- *   - Выделение через allocate_typed<T>(), освобождение через deallocate_typed().
+ * Issue #102: использует AbstractPersistMemoryManager через pmm_presets.h.
+ *   - save_manager() и load_manager_from_file() с AbstractPersistMemoryManager.
+ *   - Все операции через экземпляр менеджера.
  */
 
 #include "pmm/io.h"
-#include "pmm/legacy_manager.h"
+#include "pmm/pmm_presets.h"
 
 #include <cassert>
 #include <cstdio>
@@ -42,6 +41,8 @@
         }                                                                                                              \
     } while ( false )
 
+using Mgr = pmm::presets::SingleThreadedHeap;
+
 static const char* TEST_FILE = "test_heap.dat";
 
 static void cleanup_file()
@@ -52,38 +53,33 @@ static void cleanup_file()
 static bool test_persistence_basic_roundtrip()
 {
     const std::size_t size = 64 * 1024;
-    void*             mem1 = std::malloc( size );
-    PMM_TEST( mem1 != nullptr );
 
-    PMM_TEST( pmm::PersistMemoryManager<>::create( mem1, size ) );
+    Mgr pmm1;
+    PMM_TEST( pmm1.create( size ) );
 
-    // Сохраняем статистику до destroy
-    std::size_t total1 = pmm::PersistMemoryManager<>::total_size();
-    std::size_t used1  = pmm::PersistMemoryManager<>::used_size();
-    std::size_t free1  = pmm::PersistMemoryManager<>::free_size();
-    auto        stats1 = pmm::get_stats();
+    std::size_t total1 = pmm1.total_size();
+    std::size_t used1  = pmm1.used_size();
+    std::size_t free1  = pmm1.free_size();
+    std::size_t blocks1 = pmm1.block_count();
+    std::size_t free_blocks1 = pmm1.free_block_count();
+    std::size_t alloc_blocks1 = pmm1.alloc_block_count();
 
-    PMM_TEST( pmm::save( TEST_FILE ) );
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem1 );
+    PMM_TEST( pmm::save_manager( pmm1, TEST_FILE ) );
+    pmm1.destroy();
 
-    void* mem2 = std::malloc( size );
-    PMM_TEST( mem2 != nullptr );
+    Mgr pmm2;
+    PMM_TEST( pmm2.create( size ) );
+    PMM_TEST( pmm::load_manager_from_file( pmm2, TEST_FILE ) );
+    PMM_TEST( pmm2.is_initialized() );
 
-    PMM_TEST( pmm::load_from_file( TEST_FILE, mem2, size ) );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    PMM_TEST( pmm2.total_size() == total1 );
+    PMM_TEST( pmm2.used_size() == used1 );
+    PMM_TEST( pmm2.free_size() == free1 );
+    PMM_TEST( pmm2.block_count() == blocks1 );
+    PMM_TEST( pmm2.free_block_count() == free_blocks1 );
+    PMM_TEST( pmm2.alloc_block_count() == alloc_blocks1 );
 
-    PMM_TEST( pmm::PersistMemoryManager<>::total_size() == total1 );
-    PMM_TEST( pmm::PersistMemoryManager<>::used_size() == used1 );
-    PMM_TEST( pmm::PersistMemoryManager<>::free_size() == free1 );
-
-    auto stats2 = pmm::get_stats();
-    PMM_TEST( stats2.total_blocks == stats1.total_blocks );
-    PMM_TEST( stats2.free_blocks == stats1.free_blocks );
-    PMM_TEST( stats2.allocated_blocks == stats1.allocated_blocks );
-
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem2 );
+    pmm2.destroy();
     cleanup_file();
     return true;
 }
@@ -91,42 +87,37 @@ static bool test_persistence_basic_roundtrip()
 static bool test_persistence_user_data_preserved()
 {
     const std::size_t size = 64 * 1024;
-    void*             mem1 = std::malloc( size );
-    PMM_TEST( mem1 != nullptr );
 
-    PMM_TEST( pmm::PersistMemoryManager<>::create( mem1, size ) );
+    Mgr pmm1;
+    PMM_TEST( pmm1.create( size ) );
 
     const std::size_t       data_size = 256;
-    pmm::pptr<std::uint8_t> ptr1      = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( data_size );
+    Mgr::pptr<std::uint8_t> ptr1      = pmm1.allocate_typed<std::uint8_t>( data_size );
     PMM_TEST( !ptr1.is_null() );
 
-    std::memset( ptr1.get(), 0xCA, data_size );
+    std::memset( ptr1.resolve( pmm1 ), 0xCA, data_size );
 
-    // Запоминаем смещение (гранульный индекс)
     std::uint32_t saved_offset = ptr1.offset();
 
-    PMM_TEST( pmm::save( TEST_FILE ) );
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem1 );
+    PMM_TEST( pmm::save_manager( pmm1, TEST_FILE ) );
+    pmm1.destroy();
 
-    void* mem2 = std::malloc( size );
-    PMM_TEST( mem2 != nullptr );
+    Mgr pmm2;
+    PMM_TEST( pmm2.create( size ) );
+    PMM_TEST( pmm::load_manager_from_file( pmm2, TEST_FILE ) );
+    PMM_TEST( pmm2.is_initialized() );
 
-    PMM_TEST( pmm::load_from_file( TEST_FILE, mem2, size ) );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    // Issue #75: 1 user block + BlockHeader_0
+    PMM_TEST( pmm2.alloc_block_count() == 2 );
 
-    auto stats2 = pmm::get_stats();
-    PMM_TEST( stats2.allocated_blocks == 2 ); // Issue #75: 1 user block + BlockHeader_0
-
-    // Восстанавливаем pptr по сохранённому смещению
-    pmm::pptr<std::uint8_t> ptr2( saved_offset );
-    const std::uint8_t*     p = ptr2.get();
+    // Recover pptr by saved offset
+    Mgr::pptr<std::uint8_t> ptr2( saved_offset );
+    const std::uint8_t*     p = ptr2.resolve( pmm2 );
     for ( std::size_t i = 0; i < data_size; i++ )
         PMM_TEST( p[i] == 0xCA );
 
-    pmm::PersistMemoryManager<>::deallocate_typed( ptr2 );
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem2 );
+    pmm2.deallocate_typed( ptr2 );
+    pmm2.destroy();
     cleanup_file();
     return true;
 }
@@ -134,44 +125,40 @@ static bool test_persistence_user_data_preserved()
 static bool test_persistence_multiple_blocks()
 {
     const std::size_t size = 128 * 1024;
-    void*             mem1 = std::malloc( size );
-    PMM_TEST( mem1 != nullptr );
 
-    PMM_TEST( pmm::PersistMemoryManager<>::create( mem1, size ) );
+    Mgr pmm1;
+    PMM_TEST( pmm1.create( size ) );
 
-    pmm::pptr<std::uint8_t> p1 = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 128 );
-    pmm::pptr<std::uint8_t> p2 = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 256 );
-    pmm::pptr<std::uint8_t> p3 = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 512 );
-    pmm::pptr<std::uint8_t> p4 = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 64 );
+    Mgr::pptr<std::uint8_t> p1 = pmm1.allocate_typed<std::uint8_t>( 128 );
+    Mgr::pptr<std::uint8_t> p2 = pmm1.allocate_typed<std::uint8_t>( 256 );
+    Mgr::pptr<std::uint8_t> p3 = pmm1.allocate_typed<std::uint8_t>( 512 );
+    Mgr::pptr<std::uint8_t> p4 = pmm1.allocate_typed<std::uint8_t>( 64 );
     PMM_TEST( !p1.is_null() && !p2.is_null() && !p3.is_null() && !p4.is_null() );
 
-    pmm::PersistMemoryManager<>::deallocate_typed( p2 );
-    pmm::PersistMemoryManager<>::deallocate_typed( p4 );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    pmm1.deallocate_typed( p2 );
+    pmm1.deallocate_typed( p4 );
 
-    auto        stats1 = pmm::get_stats();
-    std::size_t total1 = pmm::PersistMemoryManager<>::total_size();
-    std::size_t used1  = pmm::PersistMemoryManager<>::used_size();
+    std::size_t blocks1 = pmm1.block_count();
+    std::size_t free_blocks1 = pmm1.free_block_count();
+    std::size_t alloc_blocks1 = pmm1.alloc_block_count();
+    std::size_t total1 = pmm1.total_size();
+    std::size_t used1  = pmm1.used_size();
 
-    PMM_TEST( pmm::save( TEST_FILE ) );
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem1 );
+    PMM_TEST( pmm::save_manager( pmm1, TEST_FILE ) );
+    pmm1.destroy();
 
-    void* mem2 = std::malloc( size );
-    PMM_TEST( mem2 != nullptr );
+    Mgr pmm2;
+    PMM_TEST( pmm2.create( size ) );
+    PMM_TEST( pmm::load_manager_from_file( pmm2, TEST_FILE ) );
+    PMM_TEST( pmm2.is_initialized() );
 
-    PMM_TEST( pmm::load_from_file( TEST_FILE, mem2, size ) );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    PMM_TEST( pmm2.block_count() == blocks1 );
+    PMM_TEST( pmm2.free_block_count() == free_blocks1 );
+    PMM_TEST( pmm2.alloc_block_count() == alloc_blocks1 );
+    PMM_TEST( pmm2.total_size() == total1 );
+    PMM_TEST( pmm2.used_size() == used1 );
 
-    auto stats2 = pmm::get_stats();
-    PMM_TEST( stats2.total_blocks == stats1.total_blocks );
-    PMM_TEST( stats2.free_blocks == stats1.free_blocks );
-    PMM_TEST( stats2.allocated_blocks == stats1.allocated_blocks );
-    PMM_TEST( pmm::PersistMemoryManager<>::total_size() == total1 );
-    PMM_TEST( pmm::PersistMemoryManager<>::used_size() == used1 );
-
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem2 );
+    pmm2.destroy();
     cleanup_file();
     return true;
 }
@@ -179,79 +166,64 @@ static bool test_persistence_multiple_blocks()
 static bool test_persistence_allocate_after_load()
 {
     const std::size_t size = 64 * 1024;
-    void*             mem1 = std::malloc( size );
-    PMM_TEST( mem1 != nullptr );
 
-    PMM_TEST( pmm::PersistMemoryManager<>::create( mem1, size ) );
+    Mgr pmm1;
+    PMM_TEST( pmm1.create( size ) );
 
-    pmm::pptr<std::uint8_t> p1 = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 512 );
+    Mgr::pptr<std::uint8_t> p1 = pmm1.allocate_typed<std::uint8_t>( 512 );
     PMM_TEST( !p1.is_null() );
 
-    PMM_TEST( pmm::save( TEST_FILE ) );
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem1 );
+    PMM_TEST( pmm::save_manager( pmm1, TEST_FILE ) );
+    pmm1.destroy();
 
-    void* mem2 = std::malloc( size );
-    PMM_TEST( mem2 != nullptr );
+    Mgr pmm2;
+    PMM_TEST( pmm2.create( size ) );
+    PMM_TEST( pmm::load_manager_from_file( pmm2, TEST_FILE ) );
+    PMM_TEST( pmm2.is_initialized() );
 
-    PMM_TEST( pmm::load_from_file( TEST_FILE, mem2, size ) );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
-
-    pmm::pptr<std::uint8_t> p2 = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 256 );
+    Mgr::pptr<std::uint8_t> p2 = pmm2.allocate_typed<std::uint8_t>( 256 );
     PMM_TEST( !p2.is_null() );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
 
-    auto stats2 = pmm::get_stats();
-    PMM_TEST( stats2.allocated_blocks == 3 ); // Issue #75: 1 pre-load + 1 new user + BlockHeader_0
+    // Issue #75: 1 pre-load user + 1 new user + BlockHeader_0
+    PMM_TEST( pmm2.alloc_block_count() == 3 );
 
-    pmm::PersistMemoryManager<>::deallocate_typed( p2 );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    pmm2.deallocate_typed( p2 );
 
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem2 );
+    pmm2.destroy();
     cleanup_file();
     return true;
 }
 
 static bool test_persistence_save_null_filename()
 {
-    const std::size_t size = 16 * 1024;
-    void*             mem  = std::malloc( size );
-    PMM_TEST( mem != nullptr );
+    Mgr pmm;
+    PMM_TEST( pmm.create( 16 * 1024 ) );
 
-    PMM_TEST( pmm::PersistMemoryManager<>::create( mem, size ) );
+    PMM_TEST( pmm::save_manager( pmm, nullptr ) == false );
 
-    PMM_TEST( pmm::save( nullptr ) == false );
-
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem );
+    pmm.destroy();
     return true;
 }
 
 static bool test_persistence_load_nonexistent_file()
 {
-    const std::size_t size = 16 * 1024;
-    void*             mem  = std::malloc( size );
-    PMM_TEST( mem != nullptr );
+    Mgr pmm;
+    PMM_TEST( pmm.create( 16 * 1024 ) );
 
-    PMM_TEST( !pmm::load_from_file( "no_such_file_xyz123.dat", mem, size ) );
+    PMM_TEST( !pmm::load_manager_from_file( pmm, "no_such_file_xyz123.dat" ) );
 
-    std::free( mem );
+    pmm.destroy();
     return true;
 }
 
-static bool test_persistence_load_null_args()
+static bool test_persistence_load_null_filename()
 {
-    const std::size_t size = 16 * 1024;
-    void*             mem  = std::malloc( size );
-    PMM_TEST( mem != nullptr );
+    Mgr pmm;
+    PMM_TEST( pmm.create( 16 * 1024 ) );
 
-    PMM_TEST( !pmm::load_from_file( nullptr, mem, size ) );
-    PMM_TEST( !pmm::load_from_file( TEST_FILE, nullptr, size ) );
-    PMM_TEST( !pmm::load_from_file( TEST_FILE, mem, 0 ) );
+    PMM_TEST( !pmm::load_manager_from_file( pmm, nullptr ) );
 
-    std::free( mem );
-    cleanup_file();
+    pmm.destroy();
     return true;
 }
 
@@ -266,34 +238,29 @@ static bool test_persistence_corrupted_image()
         std::fclose( f );
     }
 
-    void* mem = std::malloc( size );
-    PMM_TEST( mem != nullptr );
+    Mgr pmm;
+    PMM_TEST( pmm.create( size ) );
 
-    PMM_TEST( !pmm::load_from_file( TEST_FILE, mem, size ) );
+    PMM_TEST( !pmm::load_manager_from_file( pmm, TEST_FILE ) );
 
-    std::free( mem );
+    pmm.destroy();
     cleanup_file();
     return true;
 }
 
 static bool test_persistence_buffer_too_small()
 {
-    const std::size_t size = 32 * 1024;
-    void*             mem1 = std::malloc( size );
-    PMM_TEST( mem1 != nullptr );
+    Mgr pmm1;
+    PMM_TEST( pmm1.create( 32 * 1024 ) );
+    PMM_TEST( pmm::save_manager( pmm1, TEST_FILE ) );
+    pmm1.destroy();
 
-    PMM_TEST( pmm::PersistMemoryManager<>::create( mem1, size ) );
-    PMM_TEST( pmm::save( TEST_FILE ) );
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem1 );
+    // Create smaller manager — load should fail since file is larger
+    Mgr pmm2;
+    PMM_TEST( pmm2.create( 4 * 1024 ) );
+    PMM_TEST( !pmm::load_manager_from_file( pmm2, TEST_FILE ) );
 
-    const std::size_t small_size = 4 * 1024;
-    void*             mem2       = std::malloc( small_size );
-    PMM_TEST( mem2 != nullptr );
-
-    PMM_TEST( !pmm::load_from_file( TEST_FILE, mem2, small_size ) );
-
-    std::free( mem2 );
+    pmm2.destroy();
     cleanup_file();
     return true;
 }
@@ -301,46 +268,42 @@ static bool test_persistence_buffer_too_small()
 static bool test_persistence_double_save_load()
 {
     const std::size_t size = 64 * 1024;
-    void*             mem1 = std::malloc( size );
-    PMM_TEST( mem1 != nullptr );
 
-    PMM_TEST( pmm::PersistMemoryManager<>::create( mem1, size ) );
+    Mgr pmm1;
+    PMM_TEST( pmm1.create( size ) );
 
-    pmm::pptr<std::uint8_t> p1 = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 128 );
-    pmm::pptr<std::uint8_t> p2 = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 256 );
+    Mgr::pptr<std::uint8_t> p1 = pmm1.allocate_typed<std::uint8_t>( 128 );
+    Mgr::pptr<std::uint8_t> p2 = pmm1.allocate_typed<std::uint8_t>( 256 );
     PMM_TEST( !p1.is_null() && !p2.is_null() );
-    std::memset( p1.get(), 0xAA, 128 );
-    std::memset( p2.get(), 0xBB, 256 );
+    std::memset( p1.resolve( pmm1 ), 0xAA, 128 );
+    std::memset( p2.resolve( pmm1 ), 0xBB, 256 );
 
-    auto        stats1 = pmm::get_stats();
-    std::size_t total1 = pmm::PersistMemoryManager<>::total_size();
+    std::size_t blocks1 = pmm1.block_count();
+    std::size_t alloc_blocks1 = pmm1.alloc_block_count();
+    std::size_t total1 = pmm1.total_size();
 
-    PMM_TEST( pmm::save( TEST_FILE ) );
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem1 );
+    PMM_TEST( pmm::save_manager( pmm1, TEST_FILE ) );
+    pmm1.destroy();
 
-    void* mem2 = std::malloc( size );
-    PMM_TEST( mem2 != nullptr );
-    PMM_TEST( pmm::load_from_file( TEST_FILE, mem2, size ) );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    Mgr pmm2;
+    PMM_TEST( pmm2.create( size ) );
+    PMM_TEST( pmm::load_manager_from_file( pmm2, TEST_FILE ) );
+    PMM_TEST( pmm2.is_initialized() );
 
     static const char* TEST_FILE2 = "test_heap2.dat";
-    PMM_TEST( pmm::save( TEST_FILE2 ) );
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem2 );
+    PMM_TEST( pmm::save_manager( pmm2, TEST_FILE2 ) );
+    pmm2.destroy();
 
-    void* mem3 = std::malloc( size );
-    PMM_TEST( mem3 != nullptr );
-    PMM_TEST( pmm::load_from_file( TEST_FILE2, mem3, size ) );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    Mgr pmm3;
+    PMM_TEST( pmm3.create( size ) );
+    PMM_TEST( pmm::load_manager_from_file( pmm3, TEST_FILE2 ) );
+    PMM_TEST( pmm3.is_initialized() );
 
-    auto stats3 = pmm::get_stats();
-    PMM_TEST( stats3.total_blocks == stats1.total_blocks );
-    PMM_TEST( stats3.allocated_blocks == stats1.allocated_blocks );
-    PMM_TEST( pmm::PersistMemoryManager<>::total_size() == total1 );
+    PMM_TEST( pmm3.block_count() == blocks1 );
+    PMM_TEST( pmm3.alloc_block_count() == alloc_blocks1 );
+    PMM_TEST( pmm3.total_size() == total1 );
 
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem3 );
+    pmm3.destroy();
     std::remove( TEST_FILE );
     std::remove( TEST_FILE2 );
     return true;
@@ -349,33 +312,28 @@ static bool test_persistence_double_save_load()
 static bool test_persistence_empty_manager()
 {
     const std::size_t size = 16 * 1024;
-    void*             mem1 = std::malloc( size );
-    PMM_TEST( mem1 != nullptr );
 
-    PMM_TEST( pmm::PersistMemoryManager<>::create( mem1, size ) );
+    Mgr pmm1;
+    PMM_TEST( pmm1.create( size ) );
 
-    auto stats1 = pmm::get_stats();
-    PMM_TEST( pmm::save( TEST_FILE ) );
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem1 );
+    std::size_t free_blocks1 = pmm1.free_block_count();
+    PMM_TEST( pmm::save_manager( pmm1, TEST_FILE ) );
+    pmm1.destroy();
 
-    void* mem2 = std::malloc( size );
-    PMM_TEST( mem2 != nullptr );
+    Mgr pmm2;
+    PMM_TEST( pmm2.create( size ) );
+    PMM_TEST( pmm::load_manager_from_file( pmm2, TEST_FILE ) );
+    PMM_TEST( pmm2.is_initialized() );
 
-    PMM_TEST( pmm::load_from_file( TEST_FILE, mem2, size ) );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    // Issue #75: only BlockHeader_0 remains as allocated
+    PMM_TEST( pmm2.alloc_block_count() == 1 );
+    PMM_TEST( pmm2.free_block_count() == free_blocks1 );
 
-    auto stats2 = pmm::get_stats();
-    PMM_TEST( stats2.allocated_blocks == 1 ); // Issue #75: only BlockHeader_0 remains
-    PMM_TEST( stats2.free_blocks == stats1.free_blocks );
-
-    pmm::pptr<std::uint8_t> p = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 512 );
+    Mgr::pptr<std::uint8_t> p = pmm2.allocate_typed<std::uint8_t>( 512 );
     PMM_TEST( !p.is_null() );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
 
-    pmm::PersistMemoryManager<>::deallocate_typed( p );
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem2 );
+    pmm2.deallocate_typed( p );
+    pmm2.destroy();
     cleanup_file();
     return true;
 }
@@ -383,44 +341,35 @@ static bool test_persistence_empty_manager()
 static bool test_persistence_deallocate_after_load()
 {
     const std::size_t size = 64 * 1024;
-    void*             mem1 = std::malloc( size );
-    PMM_TEST( mem1 != nullptr );
 
-    PMM_TEST( pmm::PersistMemoryManager<>::create( mem1, size ) );
+    Mgr pmm1;
+    PMM_TEST( pmm1.create( size ) );
 
-    pmm::pptr<std::uint8_t> p1 = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 256 );
-    pmm::pptr<std::uint8_t> p2 = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 512 );
+    Mgr::pptr<std::uint8_t> p1 = pmm1.allocate_typed<std::uint8_t>( 256 );
+    Mgr::pptr<std::uint8_t> p2 = pmm1.allocate_typed<std::uint8_t>( 512 );
     PMM_TEST( !p1.is_null() && !p2.is_null() );
 
-    // Запоминаем гранульные индексы
     std::uint32_t off1 = p1.offset();
     std::uint32_t off2 = p2.offset();
 
-    PMM_TEST( pmm::save( TEST_FILE ) );
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem1 );
+    PMM_TEST( pmm::save_manager( pmm1, TEST_FILE ) );
+    pmm1.destroy();
 
-    void* mem2 = std::malloc( size );
-    PMM_TEST( mem2 != nullptr );
+    Mgr pmm2;
+    PMM_TEST( pmm2.create( size ) );
+    PMM_TEST( pmm::load_manager_from_file( pmm2, TEST_FILE ) );
+    PMM_TEST( pmm2.is_initialized() );
 
-    PMM_TEST( pmm::load_from_file( TEST_FILE, mem2, size ) );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    Mgr::pptr<std::uint8_t> q1( off1 );
+    Mgr::pptr<std::uint8_t> q2( off2 );
 
-    // Восстанавливаем pptr по сохранённым смещениям
-    pmm::pptr<std::uint8_t> q1( off1 );
-    pmm::pptr<std::uint8_t> q2( off2 );
+    pmm2.deallocate_typed( q1 );
+    pmm2.deallocate_typed( q2 );
 
-    pmm::PersistMemoryManager<>::deallocate_typed( q1 );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    // Issue #75: only BlockHeader_0 remains
+    PMM_TEST( pmm2.alloc_block_count() == 1 );
 
-    pmm::PersistMemoryManager<>::deallocate_typed( q2 );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
-
-    auto stats2 = pmm::get_stats();
-    PMM_TEST( stats2.allocated_blocks == 1 ); // Issue #75: only BlockHeader_0 remains
-
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem2 );
+    pmm2.destroy();
     cleanup_file();
     return true;
 }
@@ -436,7 +385,7 @@ int main()
     PMM_RUN( "persistence_allocate_after_load", test_persistence_allocate_after_load );
     PMM_RUN( "persistence_save_null_filename", test_persistence_save_null_filename );
     PMM_RUN( "persistence_load_nonexistent_file", test_persistence_load_nonexistent_file );
-    PMM_RUN( "persistence_load_null_args", test_persistence_load_null_args );
+    PMM_RUN( "persistence_load_null_filename", test_persistence_load_null_filename );
     PMM_RUN( "persistence_corrupted_image", test_persistence_corrupted_image );
     PMM_RUN( "persistence_buffer_too_small", test_persistence_buffer_too_small );
     PMM_RUN( "persistence_double_save_load", test_persistence_double_save_load );

@@ -1,17 +1,20 @@
 /**
  * @file stress_test.cpp
- * @brief Стресс-тест PersistMemoryManager (Фаза 4)
+ * @brief PersistMemoryManager stress test (updated #102)
  *
- * Проверяет производительность и корректность при:
- * - 100 000 последовательных аллокаций.
- * - 1 000 000 чередующихся операций allocate/deallocate.
+ * Tests correctness and performance under:
+ * - 100 000 sequential allocations
+ * - 1 000 000 alternating allocate/deallocate operations
  *
- * Результаты выводятся с замером времени выполнения каждой фазы.
- *
- * Issue #61: использует новый статический API PersistMemoryManager.
+ * Issue #102: uses new AbstractPersistMemoryManager API via pmm_presets.h.
+ * - No legacy_manager.h
+ * - No singleton PersistMemoryManager<>
+ * - Uses Manager::pptr<T> instead of pmm::pptr<T>
+ * - Uses p.resolve(mgr) instead of p.get()
+ * - Uses pmm.is_initialized() instead of pmm.validate()
  */
 
-#include "pmm/legacy_manager.h"
+#include "pmm/pmm_presets.h"
 
 #include <chrono>
 #include <cstdlib>
@@ -19,91 +22,72 @@
 #include <iostream>
 #include <vector>
 
-// ─── Вспомогательные функции ──────────────────────────────────────────────────
+using Mgr = pmm::presets::SingleThreadedHeap;
 
-/// Вернуть текущее время высокого разрешения
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 static auto now()
 {
     return std::chrono::high_resolution_clock::now();
 }
 
-/// Вернуть время в миллисекундах между двумя моментами
 static double elapsed_ms( std::chrono::high_resolution_clock::time_point start,
                           std::chrono::high_resolution_clock::time_point end )
 {
     return std::chrono::duration<double, std::milli>( end - start ).count();
 }
 
-// ─── Тест 1: 100 000 последовательных аллокаций ───────────────────────────────
+// ─── Test 1: 100 000 sequential allocations ───────────────────────────────────
 
-/**
- * @brief Стресс-тест: 100 000 аллокаций с последующим освобождением.
- *
- * Выделяет 100 000 блоков по 64 байта в менеджере с достаточным буфером,
- * затем освобождает все блоки. Проверяет корректность и замеряет время.
- *
- * @return true при успешном прохождении теста.
- */
 static bool test_100k_allocations()
 {
-    std::cout << "\n[Тест 1] 100 000 последовательных аллокаций\n";
+    std::cout << "\n[Test 1] 100 000 sequential allocations\n";
 
-    // Каждый блок: 64 байта данных + ~64 байта BlockHeader = ~128 байт на блок
-    // 100 000 блоков × 128 байт = ~12.8 МБ + запас для заголовков
-    const std::size_t memory_size = 32UL * 1024 * 1024; // 32 МБ
-    void*             mem         = std::malloc( memory_size );
-    if ( mem == nullptr )
+    const std::size_t memory_size = 32UL * 1024 * 1024; // 32 MB
+
+    Mgr pmm;
+    if ( !pmm.create( memory_size ) )
     {
-        std::cerr << "  ОШИБКА: не удалось выделить системную память (" << memory_size / 1024 / 1024 << " МБ)\n";
+        std::cerr << "  ERROR: failed to create manager\n";
         return false;
     }
 
-    // Issue #61: create() возвращает bool
-    if ( !pmm::PersistMemoryManager<>::create( mem, memory_size ) )
-    {
-        std::cerr << "  ОШИБКА: не удалось создать PersistMemoryManager\n";
-        std::free( mem );
-        return false;
-    }
+    const int         N    = 100'000;
+    const std::size_t BSIZ = 64;
+    std::vector<Mgr::pptr<uint8_t>> ptrs( N );
 
-    const int                       N    = 100'000;
-    const std::size_t               BSIZ = 64; // размер каждого блока в байтах
-    std::vector<pmm::pptr<uint8_t>> ptrs( N );
-
-    // ── Фаза аллокации ────────────────────────────────────────────────────────
+    // Allocation phase
     auto t0        = now();
     int  allocated = 0;
     for ( int i = 0; i < N; i++ )
     {
-        // Issue #61: allocate_typed<uint8_t>(N) — N это количество uint8_t = байт
-        ptrs[i] = pmm::PersistMemoryManager<>::allocate_typed<uint8_t>( BSIZ );
+        ptrs[i] = pmm.allocate_typed<uint8_t>( BSIZ );
         if ( ptrs[i].is_null() )
         {
-            std::cout << "  Достигнут лимит при i=" << i << " (не хватило памяти в буфере)\n";
+            std::cout << "  Limit reached at i=" << i << " (not enough memory)\n";
             break;
         }
-        // Записываем паттерн для проверки
-        std::memset( ptrs[i].get(), static_cast<int>( i & 0xFF ), BSIZ );
+        std::memset( ptrs[i].resolve( pmm ), static_cast<int>( i & 0xFF ), BSIZ );
         allocated++;
     }
     auto   t1       = now();
     double ms_alloc = elapsed_ms( t0, t1 );
 
-    std::cout << "  Выделено блоков: " << allocated << " / " << N << "\n";
-    std::cout << "  Время аллокации: " << ms_alloc << " мс\n";
+    std::cout << "  Allocated: " << allocated << " / " << N << "\n";
+    std::cout << "  Alloc time: " << ms_alloc << " ms\n";
 
-    // Проверяем целостность данных в нескольких блоках
+    // Data integrity check on first 1000 blocks
     bool data_ok = true;
     for ( int i = 0; i < allocated && i < 1000; i++ )
     {
-        const std::uint8_t* p       = ptrs[i].get();
+        const std::uint8_t* p       = ptrs[i].resolve( pmm );
         const std::uint8_t  pattern = static_cast<std::uint8_t>( i & 0xFF );
         for ( std::size_t j = 0; j < BSIZ; j++ )
         {
             if ( p[j] != pattern )
             {
                 data_ok = false;
-                std::cerr << "  ОШИБКА данных в блоке " << i << " смещении " << j << "\n";
+                std::cerr << "  DATA ERROR in block " << i << " offset " << j << "\n";
                 break;
             }
         }
@@ -111,85 +95,49 @@ static bool test_100k_allocations()
             break;
     }
 
-    // Issue #61: статический вызов validate()
-    if ( !pmm::PersistMemoryManager<>::validate() )
+    if ( !pmm.is_initialized() )
     {
-        std::cerr << "  ОШИБКА: validate() провалился после аллокаций\n";
-        pmm::PersistMemoryManager<>::destroy();
-        std::free( mem );
+        std::cerr << "  ERROR: manager not initialized after allocations\n";
+        pmm.destroy();
         return false;
     }
 
-    // ── Фаза освобождения ─────────────────────────────────────────────────────
+    // Deallocation phase
     auto t2 = now();
     for ( int i = 0; i < allocated; i++ )
-    {
-        // Issue #61: deallocate_typed(pptr)
-        pmm::PersistMemoryManager<>::deallocate_typed( ptrs[i] );
-    }
+        pmm.deallocate_typed( ptrs[i] );
     auto   t3         = now();
     double ms_dealloc = elapsed_ms( t2, t3 );
 
-    std::cout << "  Время освобождения: " << ms_dealloc << " мс\n";
+    std::cout << "  Dealloc time: " << ms_dealloc << " ms\n";
+    std::cout << "  Free after dealloc: " << pmm.free_size() << " bytes\n";
+    std::cout << "  Used after dealloc: " << pmm.used_size() << " bytes\n";
 
-    if ( !pmm::PersistMemoryManager<>::validate() )
-    {
-        std::cerr << "  ОШИБКА: validate() провалился после освобождений\n";
-        pmm::PersistMemoryManager<>::destroy();
-        std::free( mem );
-        return false;
-    }
-
-    // Проверяем статистику через статические методы (Issue #61)
-    std::size_t free_after = pmm::PersistMemoryManager<>::free_size();
-    std::size_t used_after = pmm::PersistMemoryManager<>::used_size();
-    std::cout << "  Свободно после освобождений: " << free_after << " байт\n";
-    std::cout << "  Занято (метаданные)         : " << used_after << " байт\n";
-
-    // Issue #61: после destroy() нужно вручную освободить буфер
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem );
+    pmm.destroy();
 
     bool passed = data_ok && ( allocated > 0 );
-    std::cout << "  Результат: " << ( passed ? "PASS" : "FAIL" ) << "\n";
+    std::cout << "  Result: " << ( passed ? "PASS" : "FAIL" ) << "\n";
     return passed;
 }
 
-// ─── Тест 2: 1 000 000 чередующихся аллокаций/освобождений ───────────────────
+// ─── Test 2: 1 000 000 alternating allocations/deallocations ──────────────────
 
-/**
- * @brief Стресс-тест: 1 000 000 чередующихся операций allocate/deallocate.
- *
- * Поддерживает пул из N блоков. На каждом шаге случайно выбирается слот:
- * если пуст — аллоцируется, если занят — освобождается.
- * Это имитирует реальный паттерн использования менеджера.
- *
- * @return true при успешном прохождении теста.
- */
 static bool test_1m_alternating()
 {
-    std::cout << "\n[Тест 2] 1 000 000 чередующихся allocate/deallocate\n";
+    std::cout << "\n[Test 2] 1 000 000 alternating allocate/deallocate\n";
 
-    const std::size_t memory_size = 8UL * 1024 * 1024; // 8 МБ
-    void*             mem         = std::malloc( memory_size );
-    if ( mem == nullptr )
+    const std::size_t memory_size = 8UL * 1024 * 1024; // 8 MB
+
+    Mgr pmm;
+    if ( !pmm.create( memory_size ) )
     {
-        std::cerr << "  ОШИБКА: не удалось выделить системную память\n";
+        std::cerr << "  ERROR: failed to create manager\n";
         return false;
     }
 
-    // Issue #61: create() возвращает bool
-    if ( !pmm::PersistMemoryManager<>::create( mem, memory_size ) )
-    {
-        std::cerr << "  ОШИБКА: не удалось создать PersistMemoryManager\n";
-        std::free( mem );
-        return false;
-    }
-
-    // Небольшой пул из 64 слотов, в каждом блоки от 32 до 512 байт
-    const int                       POOL     = 64;
-    const std::size_t               SIZES[8] = { 32, 64, 128, 256, 512, 64, 128, 256 };
-    std::vector<pmm::pptr<uint8_t>> pool( POOL );
+    const int         POOL     = 64;
+    const std::size_t SIZES[8] = { 32, 64, 128, 256, 512, 64, 128, 256 };
+    std::vector<Mgr::pptr<uint8_t>> pool( POOL );
     std::vector<std::size_t>        pool_sizes( POOL, 0 );
 
     const int TOTAL_OPS     = 1'000'000;
@@ -197,7 +145,6 @@ static bool test_1m_alternating()
     int       dealloc_ops   = 0;
     int       failed_allocs = 0;
 
-    // Простой псевдослучайный генератор (LCG) — воспроизводимые результаты
     uint32_t rng      = 42;
     auto     next_rng = [&]() -> uint32_t
     {
@@ -211,27 +158,23 @@ static bool test_1m_alternating()
         int slot = static_cast<int>( next_rng() % POOL );
         if ( pool[slot].is_null() )
         {
-            // Аллоцируем (Issue #61: allocate_typed<uint8_t>)
             std::size_t sz   = SIZES[next_rng() % 8];
-            pool[slot]       = pmm::PersistMemoryManager<>::allocate_typed<uint8_t>( sz );
+            pool[slot]       = pmm.allocate_typed<uint8_t>( sz );
             pool_sizes[slot] = sz;
             if ( !pool[slot].is_null() )
             {
-                // Записываем паттерн для проверки
-                std::memset( pool[slot].get(), static_cast<int>( slot & 0xFF ), sz );
+                std::memset( pool[slot].resolve( pmm ), static_cast<int>( slot & 0xFF ), sz );
                 alloc_ops++;
             }
             else
             {
-                // Нет места — продолжаем
                 pool_sizes[slot] = 0;
                 failed_allocs++;
             }
         }
         else
         {
-            // Освобождаем (Issue #61: deallocate_typed)
-            pmm::PersistMemoryManager<>::deallocate_typed( pool[slot] );
+            pmm.deallocate_typed( pool[slot] );
             pool_sizes[slot] = 0;
             dealloc_ops++;
         }
@@ -239,54 +182,45 @@ static bool test_1m_alternating()
     auto   t1       = now();
     double ms_total = elapsed_ms( t0, t1 );
 
-    std::cout << "  Аллокаций выполнено  : " << alloc_ops << "\n";
-    std::cout << "  Освобождений выполнено: " << dealloc_ops << "\n";
-    std::cout << "  Неудачных аллокаций  : " << failed_allocs << "\n";
-    std::cout << "  Общее время          : " << ms_total << " мс\n";
-    std::cout << "  Среднее на операцию  : " << ( ms_total / TOTAL_OPS * 1000.0 ) << " мкс\n";
+    std::cout << "  Allocations done   : " << alloc_ops << "\n";
+    std::cout << "  Deallocations done : " << dealloc_ops << "\n";
+    std::cout << "  Failed allocations : " << failed_allocs << "\n";
+    std::cout << "  Total time         : " << ms_total << " ms\n";
+    std::cout << "  Avg per op         : " << ( ms_total / TOTAL_OPS * 1000.0 ) << " us\n";
 
-    // Проверяем данные в оставшихся занятых блоках
+    // Data integrity check on remaining allocated blocks
     bool data_ok = true;
     for ( int i = 0; i < POOL; i++ )
     {
         if ( !pool[i].is_null() && pool_sizes[i] > 0 )
         {
-            const std::uint8_t* p       = pool[i].get();
+            const std::uint8_t* p       = pool[i].resolve( pmm );
             const std::uint8_t  pattern = static_cast<std::uint8_t>( i & 0xFF );
-            // Проверяем первые несколько байт
             for ( std::size_t j = 0; j < std::min( pool_sizes[i], std::size_t( 8 ) ); j++ )
             {
                 if ( p[j] != pattern )
                 {
                     data_ok = false;
-                    std::cerr << "  ОШИБКА данных в слоте " << i << "\n";
+                    std::cerr << "  DATA ERROR in slot " << i << "\n";
                     break;
                 }
             }
         }
     }
 
-    // Освобождаем оставшиеся занятые блоки
+    // Free remaining blocks
     for ( int i = 0; i < POOL; i++ )
     {
         if ( !pool[i].is_null() )
-        {
-            pmm::PersistMemoryManager<>::deallocate_typed( pool[i] );
-        }
+            pmm.deallocate_typed( pool[i] );
     }
 
-    bool validate_ok = pmm::PersistMemoryManager<>::validate();
-    if ( !validate_ok )
-    {
-        std::cerr << "  ОШИБКА: validate() провалился после теста\n";
-    }
+    bool valid = pmm.is_initialized();
 
-    // Issue #61: после destroy() нужно вручную освободить буфер
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem );
+    pmm.destroy();
 
-    bool passed = data_ok && validate_ok;
-    std::cout << "  Результат: " << ( passed ? "PASS" : "FAIL" ) << "\n";
+    bool passed = data_ok && valid;
+    std::cout << "  Result: " << ( passed ? "PASS" : "FAIL" ) << "\n";
     return passed;
 }
 
@@ -294,7 +228,7 @@ static bool test_1m_alternating()
 
 int main()
 {
-    std::cout << "=== PersistMemoryManager — Стресс-тест (Фаза 4) ===\n";
+    std::cout << "=== PersistMemoryManager — Stress Test (updated #102) ===\n";
 
     bool all_passed = true;
 
@@ -304,6 +238,6 @@ int main()
     if ( !test_1m_alternating() )
         all_passed = false;
 
-    std::cout << "\n=== Итог: " << ( all_passed ? "ВСЕ ТЕСТЫ ПРОШЛИ" : "ЕСТЬ ОШИБКИ" ) << " ===\n";
+    std::cout << "\n=== Result: " << ( all_passed ? "ALL TESTS PASSED" : "SOME TESTS FAILED" ) << " ===\n";
     return all_passed ? 0 : 1;
 }

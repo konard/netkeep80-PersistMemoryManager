@@ -1,17 +1,19 @@
 /**
  * @file benchmark.cpp
- * @brief Бенчмарк производительности PersistMemoryManager (Фаза 6)
+ * @brief PersistMemoryManager performance benchmark (updated #102)
  *
- * Измеряет производительность allocate/deallocate согласно целевым показателям ТЗ:
- *   - allocate 100K блоков ≤ 100 мс
- *   - deallocate 100K блоков ≤ 100 мс
+ * Measures allocate/deallocate performance per target benchmarks:
+ *   - allocate 100K blocks ≤ 100 ms
+ *   - deallocate 100K blocks ≤ 100 ms
  *
- * Результаты выводятся в виде таблицы с указанием соответствия целевым показателям.
- *
- * Issue #61: использует новый статический API PersistMemoryManager.
+ * Issue #102: uses new AbstractPersistMemoryManager API via pmm_presets.h.
+ * - No legacy_manager.h
+ * - No singleton PersistMemoryManager<>
+ * - No reallocate_typed() — uses manual alloc-copy-dealloc
+ * - Uses Manager::pptr<T> instead of pmm::pptr<T>
  */
 
-#include "pmm/legacy_manager.h"
+#include "pmm/pmm_presets.h"
 
 #include <chrono>
 #include <cstdlib>
@@ -19,58 +21,44 @@
 #include <iostream>
 #include <vector>
 
-// ─── Вспомогательные функции ──────────────────────────────────────────────────
+using Mgr = pmm::presets::SingleThreadedHeap;
 
-/// Вернуть текущее время высокого разрешения
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 static auto now()
 {
     return std::chrono::high_resolution_clock::now();
 }
 
-/// Вернуть время в миллисекундах между двумя моментами
 static double elapsed_ms( std::chrono::high_resolution_clock::time_point start,
                           std::chrono::high_resolution_clock::time_point end )
 {
     return std::chrono::duration<double, std::milli>( end - start ).count();
 }
 
-// ─── Бенчмарк 1: 100 000 последовательных аллокаций ──────────────────────────
+// ─── Benchmark 1: 100K sequential allocations ─────────────────────────────────
 
-/**
- * @brief Бенчмарк: 100 000 последовательных аллокаций.
- *
- * Цель: allocate 100K блоков ≤ 100 мс.
- *
- * @return true если целевой показатель достигнут.
- */
 static bool bench_100k_alloc()
 {
-    const std::size_t MEMORY_SIZE = 32UL * 1024 * 1024; // 32 МБ
+    const std::size_t MEMORY_SIZE = 32UL * 1024 * 1024; // 32 MB
     const int         N           = 100'000;
-    const std::size_t BLOCK_SIZE  = 64; // байт
+    const std::size_t BLOCK_SIZE  = 64;
 
-    void* mem = std::malloc( MEMORY_SIZE );
-    if ( mem == nullptr )
+    Mgr pmm;
+    if ( !pmm.create( MEMORY_SIZE ) )
     {
-        std::cerr << "  ОШИБКА: не удалось выделить системную память\n";
+        std::cerr << "  ERROR: failed to create manager\n";
         return false;
     }
 
-    // Issue #61: create() возвращает bool
-    if ( !pmm::PersistMemoryManager<>::create( mem, MEMORY_SIZE ) )
-    {
-        std::free( mem );
-        return false;
-    }
+    std::vector<Mgr::pptr<uint8_t>> ptrs( N );
 
-    std::vector<pmm::pptr<uint8_t>> ptrs( N );
-
-    // ── Аллокация (Issue #61: allocate_typed<uint8_t>) ────────────────────────
+    // Allocation
     auto t0        = now();
     int  allocated = 0;
     for ( int i = 0; i < N; i++ )
     {
-        ptrs[i] = pmm::PersistMemoryManager<>::allocate_typed<uint8_t>( BLOCK_SIZE );
+        ptrs[i] = pmm.allocate_typed<uint8_t>( BLOCK_SIZE );
         if ( ptrs[i].is_null() )
             break;
         allocated++;
@@ -78,73 +66,51 @@ static bool bench_100k_alloc()
     auto   t1       = now();
     double ms_alloc = elapsed_ms( t0, t1 );
 
-    // ── Деаллокация (Issue #61: deallocate_typed) ─────────────────────────────
+    // Deallocation
     auto t2 = now();
     for ( int i = 0; i < allocated; i++ )
-    {
-        pmm::PersistMemoryManager<>::deallocate_typed( ptrs[i] );
-    }
+        pmm.deallocate_typed( ptrs[i] );
     auto   t3         = now();
     double ms_dealloc = elapsed_ms( t2, t3 );
 
-    // Issue #61: статический вызов validate()
-    bool valid      = pmm::PersistMemoryManager<>::validate();
+    bool valid      = pmm.is_initialized();
     bool alloc_ok   = ( ms_alloc <= 100.0 );
     bool dealloc_ok = ( ms_dealloc <= 100.0 );
 
-    std::cout << "  Выделено блоков    : " << allocated << " / " << N << "\n";
-    std::cout << "  Время allocate     : " << ms_alloc << " мс" << " [цель ≤ 100 мс: " << ( alloc_ok ? "PASS" : "FAIL" )
+    std::cout << "  Allocated          : " << allocated << " / " << N << "\n";
+    std::cout << "  Alloc time         : " << ms_alloc << " ms [target ≤ 100 ms: " << ( alloc_ok ? "PASS" : "FAIL" )
               << "]\n";
-    std::cout << "  Время deallocate   : " << ms_dealloc << " мс"
-              << " [цель ≤ 100 мс: " << ( dealloc_ok ? "PASS" : "FAIL" ) << "]\n";
-    std::cout << "  Validate           : " << ( valid ? "OK" : "FAIL" ) << "\n";
+    std::cout << "  Dealloc time       : " << ms_dealloc << " ms [target ≤ 100 ms: " << ( dealloc_ok ? "PASS" : "FAIL" )
+              << "]\n";
+    std::cout << "  Manager valid      : " << ( valid ? "OK" : "FAIL" ) << "\n";
 
-    // Issue #61: после destroy() нужно вручную освободить буфер
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem );
-
+    pmm.destroy();
     return alloc_ok && dealloc_ok && valid && ( allocated == N );
 }
 
-// ─── Бенчмарк 2: 100K блоков разного размера ──────────────────────────────────
+// ─── Benchmark 2: 100K blocks of mixed sizes ──────────────────────────────────
 
-/**
- * @brief Бенчмарк: 100 000 аллокаций блоков разного размера.
- *
- * Цель: allocate 100K блоков ≤ 100 мс при переменных размерах.
- *
- * @return true если целевой показатель достигнут.
- */
 static bool bench_100k_mixed_sizes()
 {
-    const std::size_t MEMORY_SIZE = 64UL * 1024 * 1024; // 64 МБ
+    const std::size_t MEMORY_SIZE = 64UL * 1024 * 1024; // 64 MB
     const int         N           = 100'000;
 
-    void* mem = std::malloc( MEMORY_SIZE );
-    if ( mem == nullptr )
+    Mgr pmm;
+    if ( !pmm.create( MEMORY_SIZE ) )
     {
-        std::cerr << "  ОШИБКА: не удалось выделить системную память\n";
+        std::cerr << "  ERROR: failed to create manager\n";
         return false;
     }
 
-    // Issue #61: create() возвращает bool
-    if ( !pmm::PersistMemoryManager<>::create( mem, MEMORY_SIZE ) )
-    {
-        std::free( mem );
-        return false;
-    }
-
-    // Размеры блоков: 32, 64, 128, 256 байт (по 25K каждый)
     const std::size_t SIZES[4] = { 32, 64, 128, 256 };
 
-    std::vector<pmm::pptr<uint8_t>> ptrs( N );
+    std::vector<Mgr::pptr<uint8_t>> ptrs( N );
 
-    // ── Аллокация (Issue #61: allocate_typed<uint8_t>) ────────────────────────
     auto t0        = now();
     int  allocated = 0;
     for ( int i = 0; i < N; i++ )
     {
-        ptrs[i] = pmm::PersistMemoryManager<>::allocate_typed<uint8_t>( SIZES[i % 4] );
+        ptrs[i] = pmm.allocate_typed<uint8_t>( SIZES[i % 4] );
         if ( ptrs[i].is_null() )
             break;
         allocated++;
@@ -152,82 +118,63 @@ static bool bench_100k_mixed_sizes()
     auto   t1       = now();
     double ms_alloc = elapsed_ms( t0, t1 );
 
-    // ── Деаллокация (Issue #61: deallocate_typed) ─────────────────────────────
     auto t2 = now();
     for ( int i = 0; i < allocated; i++ )
-    {
-        pmm::PersistMemoryManager<>::deallocate_typed( ptrs[i] );
-    }
+        pmm.deallocate_typed( ptrs[i] );
     auto   t3         = now();
     double ms_dealloc = elapsed_ms( t2, t3 );
 
-    bool valid      = pmm::PersistMemoryManager<>::validate();
+    bool valid      = pmm.is_initialized();
     bool alloc_ok   = ( ms_alloc <= 100.0 );
     bool dealloc_ok = ( ms_dealloc <= 100.0 );
 
-    std::cout << "  Выделено блоков    : " << allocated << " / " << N << "\n";
-    std::cout << "  Время allocate     : " << ms_alloc << " мс" << " [цель ≤ 100 мс: " << ( alloc_ok ? "PASS" : "FAIL" )
+    std::cout << "  Allocated          : " << allocated << " / " << N << "\n";
+    std::cout << "  Alloc time         : " << ms_alloc << " ms [target ≤ 100 ms: " << ( alloc_ok ? "PASS" : "FAIL" )
               << "]\n";
-    std::cout << "  Время deallocate   : " << ms_dealloc << " мс"
-              << " [цель ≤ 100 мс: " << ( dealloc_ok ? "PASS" : "FAIL" ) << "]\n";
-    std::cout << "  Validate           : " << ( valid ? "OK" : "FAIL" ) << "\n";
+    std::cout << "  Dealloc time       : " << ms_dealloc << " ms [target ≤ 100 ms: " << ( dealloc_ok ? "PASS" : "FAIL" )
+              << "]\n";
+    std::cout << "  Manager valid      : " << ( valid ? "OK" : "FAIL" ) << "\n";
 
-    // Issue #61: после destroy() нужно вручную освободить буфер
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem );
-
+    pmm.destroy();
     return alloc_ok && dealloc_ok && valid && ( allocated == N );
 }
 
-// ─── Бенчмарк 3: производительность reallocate ────────────────────────────────
+// ─── Benchmark 3: manual realloc (alloc-copy-dealloc) ─────────────────────────
 
-/**
- * @brief Бенчмарк: 10 000 reallocate операций.
- *
- * @return true при успехе.
- */
-static bool bench_reallocate()
+static bool bench_manual_realloc()
 {
-    const std::size_t MEMORY_SIZE = 16UL * 1024 * 1024; // 16 МБ
+    const std::size_t MEMORY_SIZE = 16UL * 1024 * 1024; // 16 MB
     const int         N           = 10'000;
 
-    void* mem = std::malloc( MEMORY_SIZE );
-    if ( mem == nullptr )
+    Mgr pmm;
+    if ( !pmm.create( MEMORY_SIZE ) )
     {
-        std::cerr << "  ОШИБКА: не удалось выделить системную память\n";
+        std::cerr << "  ERROR: failed to create manager\n";
         return false;
     }
 
-    // Issue #61: create() возвращает bool
-    if ( !pmm::PersistMemoryManager<>::create( mem, MEMORY_SIZE ) )
-    {
-        std::free( mem );
-        return false;
-    }
+    std::vector<Mgr::pptr<uint8_t>> ptrs( N );
 
-    std::vector<pmm::pptr<uint8_t>> ptrs( N );
-
-    // Выделяем начальные блоки по 64 байта
+    // Allocate initial 64-byte blocks
     for ( int i = 0; i < N; i++ )
     {
-        ptrs[i] = pmm::PersistMemoryManager<>::allocate_typed<uint8_t>( 64 );
+        ptrs[i] = pmm.allocate_typed<uint8_t>( 64 );
         if ( !ptrs[i].is_null() )
-        {
-            std::memset( ptrs[i].get(), i & 0xFF, 64 );
-        }
+            std::memset( ptrs[i].resolve( pmm ), i & 0xFF, 64 );
     }
 
-    // ── Reallocate (увеличение до 128 байт) ───────────────────────────────────
-    // Issue #61: reallocate_typed(pptr, count) — count это кол-во T (uint8_t), = байтам
+    // Manual realloc: alloc-copy-dealloc (128 bytes)
     auto t0               = now();
     int  realloc_ok_count = 0;
     for ( int i = 0; i < N; i++ )
     {
         if ( ptrs[i].is_null() )
             continue;
-        pmm::pptr<uint8_t> new_ptr = pmm::PersistMemoryManager<>::reallocate_typed( ptrs[i], 128 );
+        Mgr::pptr<uint8_t> new_ptr = pmm.allocate_typed<uint8_t>( 128 );
         if ( !new_ptr.is_null() )
         {
+            std::memcpy( new_ptr.resolve( pmm ), ptrs[i].resolve( pmm ), 64 );
+            pmm.deallocate_typed( ptrs[i] );
             ptrs[i] = new_ptr;
             realloc_ok_count++;
         }
@@ -235,25 +182,19 @@ static bool bench_reallocate()
     auto   t1 = now();
     double ms = elapsed_ms( t0, t1 );
 
-    bool valid = pmm::PersistMemoryManager<>::validate();
+    bool valid = pmm.is_initialized();
 
-    // Освобождаем
     for ( int i = 0; i < N; i++ )
     {
         if ( !ptrs[i].is_null() )
-        {
-            pmm::PersistMemoryManager<>::deallocate_typed( ptrs[i] );
-        }
+            pmm.deallocate_typed( ptrs[i] );
     }
 
-    std::cout << "  Realloc выполнено  : " << realloc_ok_count << " / " << N << "\n";
-    std::cout << "  Время reallocate   : " << ms << " мс\n";
-    std::cout << "  Validate           : " << ( valid ? "OK" : "FAIL" ) << "\n";
+    std::cout << "  Manual reallocs    : " << realloc_ok_count << " / " << N << "\n";
+    std::cout << "  Total realloc time : " << ms << " ms\n";
+    std::cout << "  Manager valid      : " << ( valid ? "OK" : "FAIL" ) << "\n";
 
-    // Issue #61: после destroy() нужно вручную освободить буфер
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem );
-
+    pmm.destroy();
     return valid;
 }
 
@@ -261,23 +202,23 @@ static bool bench_reallocate()
 
 int main()
 {
-    std::cout << "=== PersistMemoryManager — Бенчмарк (Фаза 6) ===\n";
-    std::cout << "Целевые показатели: allocate/deallocate 100K блоков ≤ 100 мс\n\n";
+    std::cout << "=== PersistMemoryManager — Benchmark (updated #102) ===\n";
+    std::cout << "Targets: allocate/deallocate 100K blocks ≤ 100 ms\n\n";
 
     bool all_passed = true;
 
-    std::cout << "[Бенчмарк 1] 100K блоков по 64 байта (последовательно)\n";
+    std::cout << "[Benchmark 1] 100K blocks of 64 bytes (sequential)\n";
     if ( !bench_100k_alloc() )
         all_passed = false;
 
-    std::cout << "\n[Бенчмарк 2] 100K блоков разного размера (32–256 байт)\n";
+    std::cout << "\n[Benchmark 2] 100K blocks of mixed sizes (32-256 bytes)\n";
     if ( !bench_100k_mixed_sizes() )
         all_passed = false;
 
-    std::cout << "\n[Бенчмарк 3] 10K операций reallocate\n";
-    if ( !bench_reallocate() )
+    std::cout << "\n[Benchmark 3] 10K manual realloc operations\n";
+    if ( !bench_manual_realloc() )
         all_passed = false;
 
-    std::cout << "\n=== Итог: " << ( all_passed ? "ВСЕ ЦЕЛИ ДОСТИГНУТЫ" : "ЕСТЬ НЕСООТВЕТСТВИЯ" ) << " ===\n";
+    std::cout << "\n=== Result: " << ( all_passed ? "ALL TARGETS MET" : "SOME TARGETS MISSED" ) << " ===\n";
     return all_passed ? 0 : 1;
 }

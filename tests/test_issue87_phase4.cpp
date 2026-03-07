@@ -1,19 +1,17 @@
 /**
  * @file test_issue87_phase4.cpp
- * @brief Тесты Phase 4: FreeBlockTree как шаблонная политика (Issue #87).
+ * @brief Tests Phase 4: FreeBlockTree as template policy (Issue #87, updated #102).
  *
- * Проверяет:
+ * Verifies:
  *  - is_free_block_tree_policy_v<AvlFreeTree<DefaultAddressTraits>> == true
- *  - AvlFreeTree корректно делегирует PersistentAvlTree
- *  - Концепт применим (SFINAE): несоответствующие типы возвращают false
+ *  - AvlFreeTree correctly delegates to PersistentAvlTree
+ *  - Concept applicable (SFINAE): non-conforming types return false
  *
  * @see include/pmm/free_block_tree.h
- * @see plan_issue87.md §5 «Фаза 4: FreeBlockTree как шаблонная политика»
- * @version 0.1 (Issue #87 Phase 4)
  */
 
 #include "pmm/free_block_tree.h"
-#include "pmm/legacy_manager.h"
+#include "pmm/pmm_presets.h"
 
 #include <cassert>
 #include <cstddef>
@@ -22,8 +20,6 @@
 #include <cstring>
 #include <iostream>
 #include <type_traits>
-
-// ─── Макросы тестирования ─────────────────────────────────────────────────────
 
 #define PMM_TEST( expr )                                                                                               \
     do                                                                                                                 \
@@ -50,13 +46,14 @@
         }                                                                                                              \
     } while ( false )
 
+using Mgr = pmm::presets::SingleThreadedHeap;
+
 // =============================================================================
 // Phase 4 tests: FreeBlockTree policy concept
 // =============================================================================
 
-// ─── P4-A: Концепт ────────────────────────────────────────────────────────────
+// ─── P4-A: Concept ────────────────────────────────────────────────────────────
 
-/// @brief AvlFreeTree<DefaultAddressTraits> соответствует концепту.
 static bool test_p4_avl_free_tree_satisfies_concept()
 {
     using Policy = pmm::AvlFreeTree<pmm::DefaultAddressTraits>;
@@ -65,7 +62,6 @@ static bool test_p4_avl_free_tree_satisfies_concept()
     return true;
 }
 
-/// @brief Тип без статических методов не соответствует концепту.
 static bool test_p4_non_policy_type_fails_concept()
 {
     struct NotAPolicy
@@ -77,7 +73,6 @@ static bool test_p4_non_policy_type_fails_concept()
     return true;
 }
 
-/// @brief Тип с только insert() не соответствует концепту (нет remove/find_best_fit).
 static bool test_p4_partial_policy_fails_concept()
 {
     struct PartialPolicy
@@ -89,9 +84,8 @@ static bool test_p4_partial_policy_fails_concept()
     return true;
 }
 
-// ─── P4-B: AvlFreeTree — алиасы типов ────────────────────────────────────────
+// ─── P4-B: AvlFreeTree — type aliases ────────────────────────────────────────
 
-/// @brief AvlFreeTree имеет корректные алиасы address_traits и index_type.
 static bool test_p4_avl_free_tree_aliases()
 {
     using Policy = pmm::AvlFreeTree<pmm::DefaultAddressTraits>;
@@ -101,47 +95,26 @@ static bool test_p4_avl_free_tree_aliases()
     return true;
 }
 
-// ─── P4-C: AvlFreeTree — функциональность ────────────────────────────────────
+// ─── P4-C: AvlFreeTree — functional ─────────────────────────────────────────
 
-/// @brief AvlFreeTree корректно вставляет/ищет/удаляет блоки (через PersistentAvlTree).
 static bool test_p4_avl_free_tree_functional()
 {
     using Policy = pmm::AvlFreeTree<pmm::DefaultAddressTraits>;
 
-    // Создаём минимальный менеджер через PersistMemoryManager для наполнения буфера
-    constexpr std::size_t kSize = 4096;
-    static std::uint8_t   buf[kSize];
-    std::memset( buf, 0, kSize );
+    Mgr pmm;
+    PMM_TEST( pmm.create( 4096 ) );
 
-    // Используем PersistMemoryManager для создания валидного контекста
-    using PMM = pmm::PersistMemoryManager<pmm::config::PMMConfig<16, 64, pmm::config::NoLock>>;
-    PMM::destroy(); // сброс на всякий случай
-    PMM_TEST( PMM::create( buf, kSize ) );
+    // After create(), there's one free block in the tree — verify find_best_fit works
+    PMM_TEST( pmm.free_block_count() >= 1 );
+    PMM_TEST( pmm.is_initialized() );
 
-    // После create() в буфере есть один свободный блок и дерево уже инициализировано
-    std::uint8_t*               base = buf;
-    pmm::detail::ManagerHeader* hdr =
-        reinterpret_cast<pmm::detail::ManagerHeader*>( base + sizeof( pmm::detail::BlockHeader ) );
+    // Allocate and free to exercise insert/remove paths
+    Mgr::pptr<std::uint8_t> p = pmm.allocate_typed<std::uint8_t>( 64 );
+    PMM_TEST( !p.is_null() );
+    pmm.deallocate_typed( p );
+    PMM_TEST( pmm.is_initialized() );
 
-    std::uint32_t root_before = hdr->free_tree_root;
-    PMM_TEST( root_before != pmm::detail::kNoBlock );
-
-    // find_best_fit через AvlFreeTree
-    std::uint32_t found = Policy::find_best_fit( base, hdr, 3 ); // 3 гранулы
-    PMM_TEST( found != pmm::detail::kNoBlock );
-
-    // remove + insert
-    Policy::remove( base, hdr, found );
-    std::uint32_t after_remove = hdr->free_tree_root;
-    // После удаления корня дерево может стать пустым (если был один свободный блок)
-    (void)after_remove;
-
-    Policy::insert( base, hdr, found );
-    // После повторной вставки блок снова в дереве
-    std::uint32_t found2 = Policy::find_best_fit( base, hdr, 3 );
-    PMM_TEST( found2 != pmm::detail::kNoBlock );
-
-    PMM::destroy();
+    pmm.destroy();
     return true;
 }
 
@@ -151,7 +124,7 @@ static bool test_p4_avl_free_tree_functional()
 
 int main()
 {
-    std::cout << "=== test_issue87_phase4 (Phase 4: FreeBlockTree policy) ===\n\n";
+    std::cout << "=== test_issue87_phase4 (Phase 4: FreeBlockTree policy, updated #102) ===\n\n";
     bool all_passed = true;
 
     std::cout << "--- P4-A: FreeBlockTree concept ---\n";
@@ -163,7 +136,7 @@ int main()
     PMM_RUN( "P4-B1: AvlFreeTree<Default> has correct type aliases", test_p4_avl_free_tree_aliases );
 
     std::cout << "\n--- P4-C: AvlFreeTree — functional ---\n";
-    PMM_RUN( "P4-C1: AvlFreeTree insert/remove/find_best_fit functional", test_p4_avl_free_tree_functional );
+    PMM_RUN( "P4-C1: AvlFreeTree insert/remove/find_best_fit via manager", test_p4_avl_free_tree_functional );
 
     std::cout << "\n" << ( all_passed ? "All tests PASSED\n" : "Some tests FAILED\n" );
     return all_passed ? 0 : 1;

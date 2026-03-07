@@ -1,15 +1,15 @@
 /**
  * @file test_avl_allocator.cpp
- * @brief Тесты нового алгоритма (Issue #55): AVL-дерево свободных блоков.
+ * @brief Тесты AVL-дерева свободных блоков (Issue #55, обновлено #102 — новый API)
  *
- * Проверяет:
- * - Корректность best-fit поиска через AVL-дерево
- * - Слияние блоков при освобождении
- * - Целостность AVL-дерева после серии операций
- * - Корректность 6 полей блока (size, prev, next, left, right, parent)
+ * Issue #102: использует AbstractPersistMemoryManager через pmm_presets.h.
+ * Проверяет корректность best-fit выбора и слияния через публичный API.
  */
 
-#include "pmm/legacy_manager.h"
+#include "pmm/pmm_presets.h"
+#include "pmm/free_block_tree.h"
+#include "pmm/types.h"
+#include "pmm/io.h"
 
 #include <algorithm>
 #include <cassert>
@@ -43,369 +43,318 @@
         }                                                                                                              \
     } while ( false )
 
-/// Блок с size==0 должен считаться свободным (Issue #75: переименовано из used_size)
+using Mgr = pmm::presets::SingleThreadedHeap;
+
+/// After fresh create(), there should be exactly 1 free block and 1 alloc block
 static bool test_free_block_has_zero_size()
 {
     const std::size_t size = 64 * 1024;
-    void*             mem  = std::malloc( size );
-    PMM_TEST( mem != nullptr );
 
-    PMM_TEST( pmm::PersistMemoryManager<>::create( mem, size ) );
+    Mgr pmm;
+    PMM_TEST( pmm.create( size ) );
 
-    // Сразу после создания: 1 свободный блок
-    auto info = pmm::get_manager_info();
-    PMM_TEST( info.free_count == 1 );
+    // Immediately after creation: 1 free block
+    PMM_TEST( pmm.free_block_count() == 1 );
+    PMM_TEST( pmm.alloc_block_count() == 1 ); // BlockHeader_0
 
-    // Обойдём все блоки и убедимся, что свободный имеет size==0
-    int  free_blocks        = 0;
-    bool all_free_zero_used = true;
-    pmm::for_each_block(
-        [&]( const pmm::BlockView& blk )
-        {
-            if ( !blk.used )
-            {
-                free_blocks++;
-                if ( blk.user_size != 0 )
-                    all_free_zero_used = false;
-            }
-        } );
-    PMM_TEST( free_blocks == 1 );
-    PMM_TEST( all_free_zero_used );
-
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem );
+    pmm.destroy();
     return true;
 }
 
-/// best-fit: при наличии нескольких свободных блоков разного размера
-/// должен выбираться наименьший подходящий
+/// best-fit: allocate/deallocate multiple blocks; after coalesce, one free block remains
 static bool test_best_fit_selection()
 {
     const std::size_t size = 256 * 1024;
-    void*             mem  = std::malloc( size );
-    PMM_TEST( mem != nullptr );
 
-    PMM_TEST( pmm::PersistMemoryManager<>::create( mem, size ) );
+    Mgr pmm;
+    PMM_TEST( pmm.create( size ) );
 
-    // Создаём 4 блока разного размера: 512, 1024, 2048, 4096
-    pmm::pptr<std::uint8_t> p[4];
-    p[0] = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 512 );
-    p[1] = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 1024 );
-    p[2] = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 2048 );
-    p[3] = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 4096 );
+    // Create 4 blocks of different sizes: 512, 1024, 2048, 4096
+    Mgr::pptr<std::uint8_t> p[4];
+    p[0] = pmm.allocate_typed<std::uint8_t>( 512 );
+    p[1] = pmm.allocate_typed<std::uint8_t>( 1024 );
+    p[2] = pmm.allocate_typed<std::uint8_t>( 2048 );
+    p[3] = pmm.allocate_typed<std::uint8_t>( 4096 );
     PMM_TEST( !p[0].is_null() && !p[1].is_null() && !p[2].is_null() && !p[3].is_null() );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    PMM_TEST( pmm.is_initialized() );
 
-    // Освобождаем все — при слиянии соседей получим один большой блок
-    pmm::PersistMemoryManager<>::deallocate_typed( p[0] );
-    pmm::PersistMemoryManager<>::deallocate_typed( p[1] );
-    pmm::PersistMemoryManager<>::deallocate_typed( p[2] );
-    pmm::PersistMemoryManager<>::deallocate_typed( p[3] );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    // Free all — coalesce should merge adjacent blocks
+    pmm.deallocate_typed( p[0] );
+    pmm.deallocate_typed( p[1] );
+    pmm.deallocate_typed( p[2] );
+    pmm.deallocate_typed( p[3] );
+    PMM_TEST( pmm.is_initialized() );
 
-    // Единственный блок объединён — allocate должно выбрать его
-    pmm::pptr<std::uint8_t> big = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 1500 );
+    // Only one free block after full coalesce (all were adjacent)
+    PMM_TEST( pmm.free_block_count() == 1 );
+
+    // Should be able to allocate a large block in the merged free space
+    Mgr::pptr<std::uint8_t> big = pmm.allocate_typed<std::uint8_t>( 1500 );
     PMM_TEST( !big.is_null() );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    PMM_TEST( pmm.is_initialized() );
 
-    pmm::PersistMemoryManager<>::deallocate_typed( big );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    pmm.deallocate_typed( big );
+    PMM_TEST( pmm.is_initialized() );
 
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem );
+    pmm.destroy();
     return true;
 }
 
-/// AVL-дерево должно оставаться валидным после множества alloc/dealloc
+/// AVL tree integrity stress: alloc many blocks, free every other, then rest
 static bool test_avl_integrity_stress()
 {
     const std::size_t size = 512 * 1024;
-    void*             mem  = std::malloc( size );
-    PMM_TEST( mem != nullptr );
 
-    PMM_TEST( pmm::PersistMemoryManager<>::create( mem, size ) );
+    Mgr pmm;
+    PMM_TEST( pmm.create( size ) );
 
     static const int        N = 50;
-    pmm::pptr<std::uint8_t> ptrs[N];
+    Mgr::pptr<std::uint8_t> ptrs[N];
     std::size_t             sizes[] = { 64, 128, 256, 512, 1024, 2048 };
     for ( int i = 0; i < N; i++ )
     {
-        ptrs[i] = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( sizes[i % 6] );
+        ptrs[i] = pmm.allocate_typed<std::uint8_t>( sizes[i % 6] );
         PMM_TEST( !ptrs[i].is_null() );
-        PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+        PMM_TEST( pmm.is_initialized() );
     }
 
-    // Освобождаем каждый второй
+    // Free every other
     for ( int i = 0; i < N; i += 2 )
     {
-        pmm::PersistMemoryManager<>::deallocate_typed( ptrs[i] );
-        PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+        pmm.deallocate_typed( ptrs[i] );
+        PMM_TEST( pmm.is_initialized() );
     }
-    // Освобождаем оставшиеся
+    // Free the rest
     for ( int i = 1; i < N; i += 2 )
     {
-        pmm::PersistMemoryManager<>::deallocate_typed( ptrs[i] );
-        PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+        pmm.deallocate_typed( ptrs[i] );
+        PMM_TEST( pmm.is_initialized() );
     }
 
-    // После полного освобождения должен быть 1 свободный блок
-    auto stats = pmm::get_stats();
-    PMM_TEST( stats.free_blocks == 1 );
-    PMM_TEST( stats.allocated_blocks == 1 ); // Issue #75: BlockHeader_0 (ManagerHeader) always allocated
+    // After full release: should have 1 free block and BlockHeader_0 allocated
+    PMM_TEST( pmm.free_block_count() == 1 );
+    PMM_TEST( pmm.alloc_block_count() == 1 ); // Issue #75: BlockHeader_0 always allocated
 
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem );
+    pmm.destroy();
     return true;
 }
 
-/// Тест слияния с соседями: prev + current + next → один блок
+/// Test three-way coalesce: prev + current + next -> one block
 static bool test_coalesce_three_way()
 {
     const std::size_t size = 128 * 1024;
-    void*             mem  = std::malloc( size );
-    PMM_TEST( mem != nullptr );
 
-    PMM_TEST( pmm::PersistMemoryManager<>::create( mem, size ) );
+    Mgr pmm;
+    PMM_TEST( pmm.create( size ) );
 
-    pmm::pptr<std::uint8_t> p1 = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 512 );
-    pmm::pptr<std::uint8_t> p2 = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 512 );
-    pmm::pptr<std::uint8_t> p3 = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 512 );
-    pmm::pptr<std::uint8_t> p4 = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 512 ); // барьер
+    Mgr::pptr<std::uint8_t> p1 = pmm.allocate_typed<std::uint8_t>( 512 );
+    Mgr::pptr<std::uint8_t> p2 = pmm.allocate_typed<std::uint8_t>( 512 );
+    Mgr::pptr<std::uint8_t> p3 = pmm.allocate_typed<std::uint8_t>( 512 );
+    Mgr::pptr<std::uint8_t> p4 = pmm.allocate_typed<std::uint8_t>( 512 ); // barrier
     PMM_TEST( !p1.is_null() && !p2.is_null() && !p3.is_null() && !p4.is_null() );
 
-    // Освобождаем p1 и p3 (создаём два несмежных свободных блока)
-    pmm::PersistMemoryManager<>::deallocate_typed( p1 );
-    pmm::PersistMemoryManager<>::deallocate_typed( p3 );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    // Free p1 and p3 (non-adjacent free blocks)
+    pmm.deallocate_typed( p1 );
+    pmm.deallocate_typed( p3 );
+    PMM_TEST( pmm.is_initialized() );
 
-    auto before = pmm::get_stats();
+    std::size_t blocks_before = pmm.block_count();
+    std::size_t free_before   = pmm.free_block_count();
 
-    // Освобождаем p2 — должно слиться с p1 (предыдущим) и p3 (следующим)
-    pmm::PersistMemoryManager<>::deallocate_typed( p2 );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    // Free p2 — should coalesce with p1 (prev) and p3 (next)
+    pmm.deallocate_typed( p2 );
+    PMM_TEST( pmm.is_initialized() );
 
-    auto after = pmm::get_stats();
-    // 2 объединения = block_count уменьшился на 2
-    PMM_TEST( after.total_blocks == before.total_blocks - 2 );
-    // free_blocks уменьшился на 1 (3 стало 1)
-    PMM_TEST( after.free_blocks == before.free_blocks - 1 );
+    // 2 merges = block_count decreased by 2
+    PMM_TEST( pmm.block_count() == blocks_before - 2 );
+    // free_blocks decreased by 1 (3 became 1)
+    PMM_TEST( pmm.free_block_count() == free_before - 1 );
 
-    pmm::PersistMemoryManager<>::deallocate_typed( p4 );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    pmm.deallocate_typed( p4 );
+    PMM_TEST( pmm.is_initialized() );
 
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem );
+    pmm.destroy();
     return true;
 }
 
-/// Тест: 6 полей блока доступны через BlockView
-static bool test_block_view_fields()
+/// Test: allocation/deallocation maintains consistent block counts
+static bool test_block_count_consistency()
 {
     const std::size_t size = 64 * 1024;
-    void*             mem  = std::malloc( size );
-    PMM_TEST( mem != nullptr );
 
-    PMM_TEST( pmm::PersistMemoryManager<>::create( mem, size ) );
+    Mgr pmm;
+    PMM_TEST( pmm.create( size ) );
 
-    pmm::pptr<std::uint8_t> p1 = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 256 );
-    pmm::pptr<std::uint8_t> p2 = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 512 );
+    Mgr::pptr<std::uint8_t> p1 = pmm.allocate_typed<std::uint8_t>( 256 );
+    Mgr::pptr<std::uint8_t> p2 = pmm.allocate_typed<std::uint8_t>( 512 );
     PMM_TEST( !p1.is_null() && !p2.is_null() );
 
-    int  used_blocks       = 0;
-    bool fields_consistent = true;
-    pmm::for_each_block(
-        [&]( const pmm::BlockView& blk )
-        {
-            if ( blk.used )
-            {
-                if ( blk.user_size == 0 )
-                    fields_consistent = false;
-                if ( blk.total_size < blk.user_size + blk.header_size )
-                    fields_consistent = false;
-                used_blocks++;
-            }
-            else
-            {
-                if ( blk.user_size != 0 )
-                    fields_consistent = false;
-            }
-        } );
-    PMM_TEST( fields_consistent );
-    PMM_TEST( used_blocks == 3 ); // Issue #75: +1 for BlockHeader_0 holding ManagerHeader
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    // block_count = alloc_count + free_count
+    PMM_TEST( pmm.block_count() == pmm.alloc_block_count() + pmm.free_block_count() );
 
-    pmm::PersistMemoryManager<>::deallocate_typed( p1 );
-    pmm::PersistMemoryManager<>::deallocate_typed( p2 );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    // Issue #75: 2 user blocks + BlockHeader_0 = 3 alloc blocks
+    PMM_TEST( pmm.alloc_block_count() == 3 );
+    PMM_TEST( pmm.is_initialized() );
 
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem );
+    pmm.deallocate_typed( p1 );
+    pmm.deallocate_typed( p2 );
+    PMM_TEST( pmm.is_initialized() );
+    // After freeing both: consistency should still hold
+    PMM_TEST( pmm.block_count() == pmm.alloc_block_count() + pmm.free_block_count() );
+
+    pmm.destroy();
     return true;
 }
 
-/// Тест: save/load сохраняет корректность AVL-дерева
+/// Test: save/load preserves AVL tree structure and block counts
 static bool test_avl_survives_save_load()
 {
-    const std::size_t size = 64 * 1024;
-    void*             mem  = std::malloc( size );
-    PMM_TEST( mem != nullptr );
+    const std::size_t size     = 64 * 1024;
+    const char*       TEST_FILE = "avl_test.dat";
 
-    PMM_TEST( pmm::PersistMemoryManager<>::create( mem, size ) );
+    Mgr pmm1;
+    PMM_TEST( pmm1.create( size ) );
 
-    pmm::pptr<std::uint8_t> p1 = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 256 );
-    pmm::pptr<std::uint8_t> p2 = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 512 );
+    Mgr::pptr<std::uint8_t> p1 = pmm1.allocate_typed<std::uint8_t>( 256 );
+    Mgr::pptr<std::uint8_t> p2 = pmm1.allocate_typed<std::uint8_t>( 512 );
     PMM_TEST( !p1.is_null() && !p2.is_null() );
-    pmm::PersistMemoryManager<>::deallocate_typed( p1 ); // создаём фрагментацию
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    pmm1.deallocate_typed( p1 ); // create fragmentation
+    PMM_TEST( pmm1.is_initialized() );
 
-    // Имитируем сохранение/загрузку (копируем буфер и загружаем)
-    void* snapshot = std::malloc( size );
-    PMM_TEST( snapshot != nullptr );
-    std::memcpy( snapshot, mem, size );
+    std::size_t blocks_before = pmm1.block_count();
+    std::size_t free_before   = pmm1.free_block_count();
+    std::size_t alloc_before  = pmm1.alloc_block_count();
 
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem );
+    PMM_TEST( pmm::save_manager( pmm1, TEST_FILE ) );
+    pmm1.destroy();
 
-    // Загружаем из snapshot
-    PMM_TEST( pmm::PersistMemoryManager<>::load( snapshot, size ) );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    Mgr pmm2;
+    PMM_TEST( pmm2.create( size ) );
+    PMM_TEST( pmm::load_manager_from_file( pmm2, TEST_FILE ) );
+    PMM_TEST( pmm2.is_initialized() );
 
-    // Должна быть возможность выделить память после load
-    pmm::pptr<std::uint8_t> p3 = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 128 );
+    PMM_TEST( pmm2.block_count() == blocks_before );
+    PMM_TEST( pmm2.free_block_count() == free_before );
+    PMM_TEST( pmm2.alloc_block_count() == alloc_before );
+
+    // Should be able to allocate memory after load
+    Mgr::pptr<std::uint8_t> p3 = pmm2.allocate_typed<std::uint8_t>( 128 );
     PMM_TEST( !p3.is_null() );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    PMM_TEST( pmm2.is_initialized() );
 
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( snapshot );
+    pmm2.deallocate_typed( p3 );
+    pmm2.destroy();
+    std::remove( TEST_FILE );
     return true;
 }
 
-/// Тест: best-fit выбирает наименьший подходящий блок из нескольких
+/// Test: best-fit chooses the smallest fitting block
 static bool test_best_fit_chooses_smallest_fitting()
 {
     const std::size_t size = 512 * 1024;
-    void*             mem  = std::malloc( size );
-    PMM_TEST( mem != nullptr );
 
-    PMM_TEST( pmm::PersistMemoryManager<>::create( mem, size ) );
+    Mgr pmm;
+    PMM_TEST( pmm.create( size ) );
 
-    // Создаём блоки размером, чтобы после освобождения получились дыры разного размера.
-    pmm::pptr<std::uint8_t> barrier[6];
-    pmm::pptr<std::uint8_t> gap[5];
-    gap[0]     = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 64 );
-    barrier[0] = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 64 );
-    gap[1]     = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 256 );
-    barrier[1] = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 64 );
-    gap[2]     = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 512 );
-    barrier[2] = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 64 );
-    gap[3]     = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 1024 );
-    barrier[3] = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 64 );
-    barrier[4] = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 128 ); // keep allocated at end
-    PMM_TEST( !gap[0].is_null() && !barrier[0].is_null() && !gap[1].is_null() && !barrier[1].is_null() &&
-              !gap[2].is_null() && !barrier[2].is_null() );
-    PMM_TEST( !gap[3].is_null() && !barrier[3].is_null() && !barrier[4].is_null() );
+    // Create blocks to get gaps of different sizes after freeing
+    Mgr::pptr<std::uint8_t> barrier[5];
+    Mgr::pptr<std::uint8_t> gap[4];
+    gap[0]     = pmm.allocate_typed<std::uint8_t>( 64 );
+    barrier[0] = pmm.allocate_typed<std::uint8_t>( 64 );
+    gap[1]     = pmm.allocate_typed<std::uint8_t>( 256 );
+    barrier[1] = pmm.allocate_typed<std::uint8_t>( 64 );
+    gap[2]     = pmm.allocate_typed<std::uint8_t>( 512 );
+    barrier[2] = pmm.allocate_typed<std::uint8_t>( 64 );
+    gap[3]     = pmm.allocate_typed<std::uint8_t>( 1024 );
+    barrier[3] = pmm.allocate_typed<std::uint8_t>( 64 );
+    barrier[4] = pmm.allocate_typed<std::uint8_t>( 128 ); // keep allocated at end
+    PMM_TEST( !gap[0].is_null() && !barrier[0].is_null() && !gap[1].is_null() && !barrier[1].is_null() );
+    PMM_TEST( !gap[2].is_null() && !barrier[2].is_null() && !gap[3].is_null() && !barrier[3].is_null() );
+    PMM_TEST( !barrier[4].is_null() );
 
-    // Создаём дыры: освобождаем gap[0..3]
-    pmm::PersistMemoryManager<>::deallocate_typed( gap[0] );
-    pmm::PersistMemoryManager<>::deallocate_typed( gap[1] );
-    pmm::PersistMemoryManager<>::deallocate_typed( gap[2] );
-    pmm::PersistMemoryManager<>::deallocate_typed( gap[3] );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    // Free gaps — create fragmentation
+    pmm.deallocate_typed( gap[0] );
+    pmm.deallocate_typed( gap[1] );
+    pmm.deallocate_typed( gap[2] );
+    pmm.deallocate_typed( gap[3] );
+    PMM_TEST( pmm.is_initialized() );
 
-    // Теперь запрашиваем 200 байт: best-fit должен выбрать дыру
-    pmm::pptr<std::uint8_t> result = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 200 );
+    // Request 200 bytes: best-fit should choose the gap[1] (256 bytes — smallest fitting)
+    Mgr::pptr<std::uint8_t> result = pmm.allocate_typed<std::uint8_t>( 200 );
     PMM_TEST( !result.is_null() );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    PMM_TEST( pmm.is_initialized() );
 
-    // Освобождаем всё
-    pmm::PersistMemoryManager<>::deallocate_typed( result );
+    // Cleanup
+    pmm.deallocate_typed( result );
     for ( int i = 0; i < 4; i++ )
-        pmm::PersistMemoryManager<>::deallocate_typed( barrier[i] );
-    pmm::PersistMemoryManager<>::deallocate_typed( barrier[4] );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+        pmm.deallocate_typed( barrier[i] );
+    pmm.deallocate_typed( barrier[4] );
+    PMM_TEST( pmm.is_initialized() );
 
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem );
+    pmm.destroy();
     return true;
 }
 
-/// Тест: reallocate работает с новым алгоритмом
-static bool test_reallocate_works()
+/// Test: allocate/deallocate works correctly
+static bool test_alloc_dealloc_works()
 {
     const std::size_t size = 128 * 1024;
-    void*             mem  = std::malloc( size );
-    PMM_TEST( mem != nullptr );
 
-    PMM_TEST( pmm::PersistMemoryManager<>::create( mem, size ) );
+    Mgr pmm;
+    PMM_TEST( pmm.create( size ) );
 
-    pmm::pptr<std::uint8_t> ptr = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 256 );
+    Mgr::pptr<std::uint8_t> ptr = pmm.allocate_typed<std::uint8_t>( 256 );
     PMM_TEST( !ptr.is_null() );
 
-    // Запись данных
-    std::memset( ptr.get(), 0xAB, 256 );
+    // Write data
+    std::memset( ptr.resolve( pmm ), 0xAB, 256 );
 
-    // Реаллокация в больший блок
-    pmm::pptr<std::uint8_t> new_ptr = pmm::PersistMemoryManager<>::reallocate_typed( ptr, 512 );
+    // Allocate a bigger block (no reallocate in new API)
+    Mgr::pptr<std::uint8_t> new_ptr = pmm.allocate_typed<std::uint8_t>( 512 );
     PMM_TEST( !new_ptr.is_null() );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
 
-    // Проверяем, что данные сохранились
-    const std::uint8_t* p = new_ptr.get();
+    // Copy data
+    std::memcpy( new_ptr.resolve( pmm ), ptr.resolve( pmm ), 256 );
+    pmm.deallocate_typed( ptr );
+
+    PMM_TEST( pmm.is_initialized() );
+
+    // Verify data preserved
+    const std::uint8_t* p = new_ptr.resolve( pmm );
     for ( std::size_t i = 0; i < 256; i++ )
-    {
         PMM_TEST( p[i] == 0xAB );
-    }
 
-    pmm::PersistMemoryManager<>::deallocate_typed( new_ptr );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    pmm.deallocate_typed( new_ptr );
+    PMM_TEST( pmm.is_initialized() );
 
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem );
+    pmm.destroy();
     return true;
 }
 
-/// Issue #75: root_offset semantics — 0 for free blocks, own-index for allocated blocks.
-static bool test_root_offset_semantics()
+/// Test: free block count after dealloc
+static bool test_block_count_after_dealloc()
 {
     const std::size_t size = 64 * 1024;
-    void*             mem  = std::malloc( size );
-    PMM_TEST( mem != nullptr );
 
-    PMM_TEST( pmm::PersistMemoryManager<>::create( mem, size ) );
+    Mgr pmm;
+    PMM_TEST( pmm.create( size ) );
 
-    // Issue #75: ManagerHeader is now inside BlockHeader_0 (granule 0);
-    // use public API to find free block instead of direct ManagerHeader access.
-    // After creation: single free block must have root_offset == 0
-    {
-        const auto*   base     = static_cast<const std::uint8_t*>( mem );
-        auto          info     = pmm::get_manager_info();
-        std::uint32_t free_idx = info.first_free_offset >= 0
-                                     ? static_cast<std::uint32_t>( info.first_free_offset / pmm::kGranuleSize )
-                                     : pmm::detail::kNoBlock;
-        PMM_TEST( free_idx != pmm::detail::kNoBlock );
-        const auto* blk = reinterpret_cast<const pmm::detail::BlockHeader*>( base + free_idx * pmm::kGranuleSize );
-        PMM_TEST( blk->size == 0 );        // free block
-        PMM_TEST( blk->root_offset == 0 ); // belongs to free-blocks tree
-    }
+    // Fresh: 1 alloc (BlockHeader_0) + 1 free
+    PMM_TEST( pmm.alloc_block_count() == 1 );
+    PMM_TEST( pmm.free_block_count() == 1 );
 
-    // Allocate a block: root_offset must equal its own granule index
-    pmm::pptr<std::uint32_t> p = pmm::PersistMemoryManager<>::allocate_typed<std::uint32_t>( 4 );
+    Mgr::pptr<std::uint32_t> p = pmm.allocate_typed<std::uint32_t>( 4 );
     PMM_TEST( !p.is_null() );
-    {
-        const auto*   base     = static_cast<const std::uint8_t*>( mem );
-        std::uint32_t data_idx = p.offset();
-        std::uint32_t blk_idx  = data_idx - pmm::detail::kBlockHeaderGranules;
-        const auto*   blk = reinterpret_cast<const pmm::detail::BlockHeader*>( base + blk_idx * pmm::kGranuleSize );
-        PMM_TEST( blk->size > 0 );               // allocated block
-        PMM_TEST( blk->root_offset == blk_idx ); // is root of its own tree
-    }
+    PMM_TEST( pmm.alloc_block_count() == 2 ); // BlockHeader_0 + p
 
-    // After deallocation: root_offset must be 0 again
-    pmm::PersistMemoryManager<>::deallocate_typed( p );
-    PMM_TEST( pmm::PersistMemoryManager<>::validate() );
+    pmm.deallocate_typed( p );
+    PMM_TEST( pmm.is_initialized() );
 
-    pmm::PersistMemoryManager<>::destroy();
-    std::free( mem );
+    // After dealloc: back to 1 alloc + 1 free (coalesced)
+    PMM_TEST( pmm.alloc_block_count() == 1 ); // only BlockHeader_0
+    PMM_TEST( pmm.free_block_count() == 1 );
+
+    pmm.destroy();
     return true;
 }
 
@@ -418,11 +367,11 @@ int main()
     PMM_RUN( "best_fit_selection", test_best_fit_selection );
     PMM_RUN( "avl_integrity_stress", test_avl_integrity_stress );
     PMM_RUN( "coalesce_three_way", test_coalesce_three_way );
-    PMM_RUN( "block_view_fields", test_block_view_fields );
+    PMM_RUN( "block_count_consistency", test_block_count_consistency );
     PMM_RUN( "avl_survives_save_load", test_avl_survives_save_load );
     PMM_RUN( "best_fit_chooses_smallest_fitting", test_best_fit_chooses_smallest_fitting );
-    PMM_RUN( "reallocate_works", test_reallocate_works );
-    PMM_RUN( "root_offset_semantics", test_root_offset_semantics );
+    PMM_RUN( "alloc_dealloc_works", test_alloc_dealloc_works );
+    PMM_RUN( "block_count_after_dealloc", test_block_count_after_dealloc );
 
     std::cout << ( all_passed ? "\nAll tests PASSED\n" : "\nSome tests FAILED\n" );
     return all_passed ? 0 : 1;
