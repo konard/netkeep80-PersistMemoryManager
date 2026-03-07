@@ -51,15 +51,15 @@ static void demo_embedded_static()
     std::cout << "Total: " << pmm.total_size() << " bytes\n";
     std::cout << "Free:  " << pmm.free_size() << " bytes\n";
 
-    // Issue #97: снаружи менеджера используем только pptr<T>
-    pmm::pptr<std::uint8_t> p = pmm.allocate_typed<std::uint8_t>( 64 );
+    // Issue #97: снаружи менеджера используем только pptr<T, MgrT>
+    pmm::presets::EmbeddedStatic4K::pptr<std::uint8_t> p = pmm.allocate_typed<std::uint8_t>( 64 );
     if ( p )
     {
         std::uint8_t* raw = pmm.resolve( p );
         std::memset( raw, 0xAA, 64 );
         std::cout << "Allocated 64 bytes (pptr offset=" << p.offset() << ", sizeof(pptr)=" << sizeof( p ) << ")\n";
         pmm.deallocate_typed( p );
-        std::cout << "Deallocated via pptr<T>.\n";
+        std::cout << "Deallocated via pptr<T, MgrT>.\n";
     }
 
     pmm.destroy();
@@ -86,9 +86,10 @@ static void demo_single_threaded_heap()
 
     std::cout << "Total: " << pmm.total_size() << " bytes\n";
 
-    // Выделяем структуру через typed API — снаружи только pptr<T>
-    pmm::pptr<Point> p_point = pmm.allocate_typed<Point>();
-    pmm::pptr<int>   p_arr   = pmm.allocate_typed<int>( 10 ); // массив из 10 int
+    // Выделяем структуру через typed API — снаружи только pptr<T, MgrT>
+    using STHeap                = pmm::presets::SingleThreadedHeap;
+    STHeap::pptr<Point> p_point = pmm.allocate_typed<Point>();
+    STHeap::pptr<int>   p_arr   = pmm.allocate_typed<int>( 10 ); // массив из 10 int
 
     if ( p_point && p_arr )
     {
@@ -156,13 +157,13 @@ static void demo_persistent_file_mapped()
             std::cout << "Subsequent run: loaded existing PMM\n";
         }
 
-        // Выделяем через pptr<T>
-        pmm::pptr<int> p = pmm.allocate_typed<int>();
+        // Выделяем через pptr<T, MgrT>
+        pmm::presets::PersistentFileMapped::pptr<int> p = pmm.allocate_typed<int>();
         if ( p )
         {
             *pmm.resolve( p ) = 42;
             saved_offset      = p.offset(); // Сохраняем pptr offset (не адрес!)
-            std::cout << "Allocated int=42 via pptr<int> (offset=" << saved_offset << ")\n";
+            std::cout << "Allocated int=42 via pptr<int, MgrT> (offset=" << saved_offset << ")\n";
         }
 
         std::cout << "Blocks: " << pmm.alloc_block_count() << " allocated\n";
@@ -179,7 +180,7 @@ static void demo_persistent_file_mapped()
         else
         {
             // Восстанавливаем pptr из сохранённого смещения
-            pmm::pptr<int> p( saved_offset );
+            pmm::presets::PersistentFileMapped::pptr<int> p( saved_offset );
             std::cout << "Reloaded: pptr<int>(offset=" << saved_offset << ") → value=" << *pmm.resolve( p )
                       << " (expected: 42)\n";
             pmm.backend().close();
@@ -191,7 +192,7 @@ static void demo_persistent_file_mapped()
         pmm::presets::SingleThreadedHeap pmm;
         if ( pmm.create( kSize ) )
         {
-            pmm::pptr<double> p = pmm.allocate_typed<double>();
+            pmm::presets::SingleThreadedHeap::pptr<double> p = pmm.allocate_typed<double>();
             if ( p )
                 *pmm.resolve( p ) = 3.14;
 

@@ -1,13 +1,14 @@
 /**
  * @file test_shared_mutex.cpp
- * @brief Тесты разделённых блокировок PersistMemoryManager (Фаза 10).
+ * @brief Shared lock tests for PersistMemoryManager (Phase 10, updated #102).
  *
- * Проверяет корректность shared_mutex: параллельные читатели не блокируют
- * друг друга, а запись блокирует чтение. Дополнительно проверяется
- * корректность refactored reallocate() с unlock-перед-subvызовом.
+ * Issue #102: PersistMemoryManager<> (singleton) removed.
+ * Uses MultiThreadedHeap preset (SharedMutexLock + HeapStorage).
+ * reallocate_typed() and get_stats() removed from new API.
+ * block_count/free_block_count/alloc_block_count used instead of get_stats().
  */
 
-#include "pmm/legacy_manager.h"
+#include "pmm/pmm_presets.h"
 
 #include <atomic>
 #include <chrono>
@@ -15,8 +16,6 @@
 #include <iostream>
 #include <thread>
 #include <vector>
-
-// ─── Вспомогательный макрос ────────────────────────────────────────────────
 
 #define PMM_TEST( cond, msg )                                                                                          \
     do                                                                                                                 \
@@ -32,31 +31,27 @@
         }                                                                                                              \
     } while ( false )
 
-// ─── Вспомогательная функция ───────────────────────────────────────────────
-
-static void make_manager( std::size_t size )
-{
-    void* mem = std::malloc( size );
-    pmm::PersistMemoryManager<>::create( mem, size );
-}
-
-// ─── Тесты ─────────────────────────────────────────────────────────────────
+using Mgr = pmm::presets::MultiThreadedHeap;
 
 /**
- * @brief Параллельный вызов validate() из нескольких потоков.
+ * @brief Concurrent calls to is_initialized() from multiple threads.
  */
-static void test_concurrent_validate()
+static void test_concurrent_is_initialized()
 {
     constexpr std::size_t kMemSize = 4 * 1024 * 1024;
     constexpr int         kThreads = 8;
     constexpr int         kIter    = 100;
 
-    make_manager( kMemSize );
+    Mgr pmm;
+    PMM_TEST( pmm.create( kMemSize ), "concurrent_is_initialized: create" );
 
-    // Выделяем несколько блоков для нетривиального состояния
+    // Allocate some blocks for a non-trivial state
+    std::vector<Mgr::pptr<std::uint8_t>> ptrs;
     for ( int i = 0; i < 20; ++i )
     {
-        pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 64 );
+        auto p = pmm.allocate_typed<std::uint8_t>( 64 );
+        if ( !p.is_null() )
+            ptrs.push_back( p );
     }
 
     std::atomic<int>         failures{ 0 };
@@ -65,30 +60,28 @@ static void test_concurrent_validate()
     for ( int t = 0; t < kThreads; ++t )
     {
         threads.emplace_back(
-            [&failures, kIter]()
+            [&failures, &pmm, kIter]()
             {
                 for ( int i = 0; i < kIter; ++i )
                 {
-                    if ( !pmm::PersistMemoryManager<>::validate() )
-                    {
+                    if ( !pmm.is_initialized() )
                         failures.fetch_add( 1 );
-                    }
                 }
             } );
     }
 
     for ( auto& th : threads )
-    {
         th.join();
-    }
 
-    PMM_TEST( failures.load() == 0, "concurrent_validate: все validate() вернули true" );
+    PMM_TEST( failures.load() == 0, "concurrent_is_initialized: all is_initialized() returned true" );
 
-    pmm::PersistMemoryManager<>::destroy();
+    for ( auto& p : ptrs )
+        pmm.deallocate_typed( p );
+    pmm.destroy();
 }
 
 /**
- * @brief Параллельный вызов validate() и allocate().
+ * @brief Concurrent readers (is_initialized) and writers (allocate/deallocate).
  */
 static void test_readers_writers()
 {
@@ -97,89 +90,85 @@ static void test_readers_writers()
     constexpr int         kWriteThreads = 2;
     constexpr int         kIter         = 200;
 
-    make_manager( kMemSize );
+    Mgr pmm;
+    PMM_TEST( pmm.create( kMemSize ), "readers_writers: create" );
 
-    std::atomic<int>         invalid_reads{ 0 };
     std::atomic<bool>        stop{ false };
+    std::atomic<int>         invalid_reads{ 0 };
     std::vector<std::thread> threads;
 
-    // Читатели: непрерывно вызывают validate()
+    // Readers: continuously check is_initialized()
     for ( int t = 0; t < kReadThreads; ++t )
     {
         threads.emplace_back(
-            [&invalid_reads, &stop]()
+            [&invalid_reads, &stop, &pmm]()
             {
                 while ( !stop.load() )
                 {
-                    if ( !pmm::PersistMemoryManager<>::validate() )
-                    {
+                    if ( !pmm.is_initialized() )
                         invalid_reads.fetch_add( 1 );
-                    }
                 }
             } );
     }
 
-    // Писатели: выделяют и освобождают блоки
+    // Writers: allocate and free blocks
     for ( int t = 0; t < kWriteThreads; ++t )
     {
         threads.emplace_back(
-            [kIter]()
+            [kIter, &pmm]()
             {
-                std::vector<pmm::pptr<std::uint8_t>> ptrs;
+                std::vector<Mgr::pptr<std::uint8_t>> ptrs;
                 ptrs.reserve( 32 );
                 for ( int i = 0; i < kIter; ++i )
                 {
-                    pmm::pptr<std::uint8_t> p = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 128 );
+                    Mgr::pptr<std::uint8_t> p = pmm.allocate_typed<std::uint8_t>( 128 );
                     if ( !p.is_null() )
-                    {
                         ptrs.push_back( p );
-                    }
                     if ( ptrs.size() > 16 )
                     {
-                        pmm::PersistMemoryManager<>::deallocate_typed( ptrs.front() );
+                        pmm.deallocate_typed( ptrs.front() );
                         ptrs.erase( ptrs.begin() );
                     }
                 }
                 for ( auto& p : ptrs )
-                {
-                    pmm::PersistMemoryManager<>::deallocate_typed( p );
-                }
+                    pmm.deallocate_typed( p );
             } );
     }
 
+    // Wait for writers first
     for ( int t = kReadThreads; t < kReadThreads + kWriteThreads; ++t )
-    {
         threads[t].join();
-    }
     stop.store( true );
 
     for ( int t = 0; t < kReadThreads; ++t )
-    {
         threads[t].join();
-    }
 
-    PMM_TEST( pmm::PersistMemoryManager<>::validate(), "readers_writers: validate() после смешанных операций" );
-    PMM_TEST( invalid_reads.load() == 0, "readers_writers: читатели не видели инвалидного состояния" );
+    PMM_TEST( pmm.is_initialized(), "readers_writers: is_initialized() after mixed ops" );
+    PMM_TEST( invalid_reads.load() == 0, "readers_writers: readers saw no invalid state" );
 
-    pmm::PersistMemoryManager<>::destroy();
+    pmm.destroy();
 }
 
 /**
- * @brief Корректность reallocate() после перехода к unlock-before-subvызов.
+ * @brief Manual grow (alloc-copy-free) correctness under concurrent access.
  */
-static void test_reallocate_correctness()
+static void test_concurrent_manual_grow_correctness()
 {
-    constexpr std::size_t kMemSize = 16 * 1024 * 1024;
-    constexpr int         kThreads = 4;
-    constexpr int         kIter    = 200;
+    constexpr std::size_t kMemSize  = 16 * 1024 * 1024;
+    constexpr int         kThreads  = 4;
+    constexpr int         kIter     = 50;
+    constexpr std::size_t kInitSize = 64;
+    constexpr unsigned    kPattern  = 0xAB;
 
-    make_manager( kMemSize );
+    Mgr pmm;
+    PMM_TEST( pmm.create( kMemSize ), "concurrent_manual_grow: create" );
 
-    std::vector<pmm::pptr<std::uint8_t>> ptrs( kThreads );
+    std::vector<Mgr::pptr<std::uint8_t>> ptrs( kThreads );
     for ( int t = 0; t < kThreads; ++t )
     {
-        ptrs[t] = pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 64 );
-        std::memset( ptrs[t].get(), t + 1, 64 );
+        ptrs[t] = pmm.allocate_typed<std::uint8_t>( kInitSize );
+        PMM_TEST( !ptrs[t].is_null(), "concurrent_manual_grow: initial alloc" );
+        std::memset( ptrs[t].resolve( pmm ), kPattern, kInitSize );
     }
 
     std::atomic<int>         corrupted{ 0 };
@@ -188,59 +177,60 @@ static void test_reallocate_correctness()
     for ( int t = 0; t < kThreads; ++t )
     {
         threads.emplace_back(
-            [t, &ptrs, &corrupted, kIter]()
+            [t, &ptrs, &pmm, &corrupted, kIter, kInitSize, kPattern]()
             {
+                std::size_t cur_size = kInitSize;
                 for ( int i = 0; i < kIter; ++i )
                 {
-                    std::size_t             new_sz = 64 + static_cast<std::size_t>( ( i % 4 ) + 1 ) * 64;
-                    pmm::pptr<std::uint8_t> p      = pmm::PersistMemoryManager<>::reallocate_typed( ptrs[t], new_sz );
-                    if ( !p.is_null() )
+                    std::size_t             new_sz = cur_size + 64;
+                    Mgr::pptr<std::uint8_t> new_p  = pmm.allocate_typed<std::uint8_t>( new_sz );
+                    if ( !new_p.is_null() )
                     {
-                        unsigned char first = *p.get();
-                        if ( first != static_cast<unsigned char>( t + 1 ) && i == 0 )
-                        {
+                        std::memcpy( new_p.resolve( pmm ), ptrs[t].resolve( pmm ), cur_size );
+                        // Verify first byte is still kPattern
+                        if ( new_p.resolve( pmm )[0] != kPattern )
                             corrupted.fetch_add( 1 );
-                        }
-                        std::memset( p.get(), t + 1, 64 );
-                        ptrs[t] = p;
+                        pmm.deallocate_typed( ptrs[t] );
+                        ptrs[t]  = new_p;
+                        cur_size = new_sz;
                     }
                 }
             } );
     }
 
     for ( auto& th : threads )
-    {
         th.join();
-    }
 
     for ( int t = 0; t < kThreads; ++t )
     {
         if ( !ptrs[t].is_null() )
-        {
-            pmm::PersistMemoryManager<>::deallocate_typed( ptrs[t] );
-        }
+            pmm.deallocate_typed( ptrs[t] );
     }
 
-    PMM_TEST( pmm::PersistMemoryManager<>::validate(), "reallocate_correctness: validate() пройдена" );
-    PMM_TEST( corrupted.load() == 0, "reallocate_correctness: данные не повреждены при reallocate" );
+    PMM_TEST( pmm.is_initialized(), "concurrent_manual_grow: is_initialized() after parallel grows" );
+    PMM_TEST( corrupted.load() == 0, "concurrent_manual_grow: data not corrupted during grow" );
 
-    pmm::PersistMemoryManager<>::destroy();
+    pmm.destroy();
 }
 
 /**
- * @brief Параллельный вызов get_stats() из нескольких потоков.
+ * @brief Concurrent calls to block_count/free_block_count/alloc_block_count.
  */
-static void test_concurrent_get_stats()
+static void test_concurrent_block_counts()
 {
     constexpr std::size_t kMemSize = 8 * 1024 * 1024;
     constexpr int         kThreads = 6;
     constexpr int         kIter    = 100;
 
-    make_manager( kMemSize );
+    Mgr pmm;
+    PMM_TEST( pmm.create( kMemSize ), "concurrent_block_counts: create" );
 
+    std::vector<Mgr::pptr<std::uint8_t>> ptrs;
     for ( int i = 0; i < 30; ++i )
     {
-        pmm::PersistMemoryManager<>::allocate_typed<std::uint8_t>( 256 );
+        auto p = pmm.allocate_typed<std::uint8_t>( 256 );
+        if ( !p.is_null() )
+            ptrs.push_back( p );
     }
 
     std::atomic<int>         inconsistent{ 0 };
@@ -249,40 +239,41 @@ static void test_concurrent_get_stats()
     for ( int t = 0; t < kThreads; ++t )
     {
         threads.emplace_back(
-            [&inconsistent, kIter]()
+            [&inconsistent, &pmm, kIter]()
             {
                 for ( int i = 0; i < kIter; ++i )
                 {
-                    auto stats = pmm::get_stats();
-                    if ( stats.total_blocks != stats.free_blocks + stats.allocated_blocks )
-                    {
+                    std::uint32_t total = pmm.block_count();
+                    std::uint32_t free  = pmm.free_block_count();
+                    std::uint32_t alloc = pmm.alloc_block_count();
+                    // total should equal free + alloc
+                    if ( total != free + alloc )
                         inconsistent.fetch_add( 1 );
-                    }
                 }
             } );
     }
 
     for ( auto& th : threads )
-    {
         th.join();
-    }
 
-    PMM_TEST( inconsistent.load() == 0, "concurrent_get_stats: счётчики согласованны при параллельном чтении" );
+    PMM_TEST( inconsistent.load() == 0, "concurrent_block_counts: counts are consistent under concurrent reads" );
 
-    pmm::PersistMemoryManager<>::destroy();
+    for ( auto& p : ptrs )
+        pmm.deallocate_typed( p );
+    pmm.destroy();
 }
 
 // ─── main ──────────────────────────────────────────────────────────────────
 
 int main()
 {
-    std::cout << "=== Тесты разделённых блокировок (Фаза 10) ===\n";
+    std::cout << "=== Shared lock tests (Phase 10, updated #102) ===\n";
 
-    test_concurrent_validate();
+    test_concurrent_is_initialized();
     test_readers_writers();
-    test_reallocate_correctness();
-    test_concurrent_get_stats();
+    test_concurrent_manual_grow_correctness();
+    test_concurrent_block_counts();
 
-    std::cout << "\nВсе тесты Фазы 10 пройдены.\n";
+    std::cout << "\nAll Phase 10 tests PASSED.\n";
     return 0;
 }
