@@ -12,13 +12,17 @@
  * Issue #95: Moved from persist_memory_types.h to pmm/types.h as part of
  * refactoring to consolidate all PMM code under include/pmm/.
  *
- * @version 2.0 (Issue #95 refactoring)
+ * Issue #106: Added Block<A>* utilities alongside BlockHeader* ones to support
+ * migration to BlockState machine. Internal allocator code now uses Block<A> layout.
+ *
+ * @version 2.1 (Issue #106 — BlockState machine integration)
  */
 
 #pragma once
 
 #include "pmm/address_traits.h"
 #include "pmm/block.h"
+#include "pmm/block_state.h"
 #include "pmm/linked_list_node.h"
 #include "pmm/tree_node.h"
 
@@ -229,18 +233,32 @@ inline bool is_valid_alignment( std::size_t align )
     return align == kGranuleSize;
 }
 
-/// @brief Get pointer to BlockHeader by granule index.
+/// @brief Get pointer to BlockHeader by granule index (legacy format).
 inline BlockHeader* block_at( std::uint8_t* base, std::uint32_t idx )
 {
     assert( idx != kNoBlock );
     return reinterpret_cast<BlockHeader*>( base + idx_to_byte_off( idx ) );
 }
 
-/// @brief Get const pointer to BlockHeader by granule index (read-only).
+/// @brief Get const pointer to BlockHeader by granule index (read-only, legacy format).
 inline const BlockHeader* block_at( const std::uint8_t* base, std::uint32_t idx )
 {
     assert( idx != kNoBlock );
     return reinterpret_cast<const BlockHeader*>( base + idx_to_byte_off( idx ) );
+}
+
+/// @brief Get pointer to Block<DefaultAddressTraits> by granule index (Issue #106: BlockState layout).
+inline pmm::Block<pmm::DefaultAddressTraits>* block_at_block( std::uint8_t* base, std::uint32_t idx )
+{
+    assert( idx != kNoBlock );
+    return reinterpret_cast<pmm::Block<pmm::DefaultAddressTraits>*>( base + idx_to_byte_off( idx ) );
+}
+
+/// @brief Get const pointer to Block<DefaultAddressTraits> by granule index (read-only).
+inline const pmm::Block<pmm::DefaultAddressTraits>* block_at_block( const std::uint8_t* base, std::uint32_t idx )
+{
+    assert( idx != kNoBlock );
+    return reinterpret_cast<const pmm::Block<pmm::DefaultAddressTraits>*>( base + idx_to_byte_off( idx ) );
 }
 
 /// @brief Get granule index of BlockHeader.
@@ -251,7 +269,26 @@ inline std::uint32_t block_idx( const std::uint8_t* base, const BlockHeader* blo
     return static_cast<std::uint32_t>( byte_off / kGranuleSize );
 }
 
-/// @brief Compute total_size of block in granules.
+/// @brief Get granule index of Block<A> (Issue #106).
+inline std::uint32_t block_idx( const std::uint8_t* base, const pmm::Block<pmm::DefaultAddressTraits>* block )
+{
+    std::size_t byte_off = reinterpret_cast<const std::uint8_t*>( block ) - base;
+    assert( byte_off % kGranuleSize == 0 );
+    return static_cast<std::uint32_t>( byte_off / kGranuleSize );
+}
+
+/// @brief Compute total_size of block in granules (Block<A> layout, Issue #106).
+/// Issue #59: total_size is no longer stored — computed via next_offset.
+inline std::uint32_t block_total_granules( const std::uint8_t* base, const ManagerHeader* hdr,
+                                           const pmm::Block<pmm::DefaultAddressTraits>* blk )
+{
+    std::uint32_t this_idx = block_idx( base, blk );
+    if ( blk->next_offset != kNoBlock )
+        return blk->next_offset - this_idx;
+    return byte_off_to_idx( static_cast<std::size_t>( hdr->total_size ) ) - this_idx;
+}
+
+/// @brief Compute total_size of block in granules (legacy BlockHeader layout).
 /// Issue #59: total_size is no longer stored — computed via next_offset.
 inline std::uint32_t block_total_granules( const std::uint8_t* base, const ManagerHeader* hdr, const BlockHeader* blk )
 {
@@ -261,8 +298,8 @@ inline std::uint32_t block_total_granules( const std::uint8_t* base, const Manag
     return byte_off_to_idx( static_cast<std::size_t>( hdr->total_size ) ) - this_idx;
 }
 
-/// @brief Issue #69: Structural block validity (replaces magic check).
-/// Invariants: size<total_gran, prev<idx<next, avl_height<32, distinct AVL refs.
+/// @brief Issue #69/#106: Structural block validity using Block<A> layout.
+/// Invariants: weight<total_gran, prev<idx<next, avl_height<32, distinct AVL refs.
 inline bool is_valid_block( const std::uint8_t* base, const ManagerHeader* hdr, std::uint32_t idx )
 {
     if ( idx == kNoBlock )
@@ -270,11 +307,11 @@ inline bool is_valid_block( const std::uint8_t* base, const ManagerHeader* hdr, 
     if ( idx_to_byte_off( idx ) + sizeof( BlockHeader ) > hdr->total_size )
         return false;
 
-    const BlockHeader* blk        = reinterpret_cast<const BlockHeader*>( base + idx_to_byte_off( idx ) );
-    std::uint32_t      total_gran = ( blk->next_offset != kNoBlock )
-                                        ? ( blk->next_offset - idx )
-                                        : ( byte_off_to_idx( static_cast<std::size_t>( hdr->total_size ) ) - idx );
-    if ( blk->size >= total_gran )
+    const auto*   blk = reinterpret_cast<const pmm::Block<pmm::DefaultAddressTraits>*>( base + idx_to_byte_off( idx ) );
+    std::uint32_t total_gran = ( blk->next_offset != kNoBlock )
+                                   ? ( blk->next_offset - idx )
+                                   : ( byte_off_to_idx( static_cast<std::size_t>( hdr->total_size ) ) - idx );
+    if ( blk->weight >= total_gran )
         return false;
     if ( blk->prev_offset != kNoBlock && blk->prev_offset >= idx )
         return false;
@@ -292,14 +329,21 @@ inline bool is_valid_block( const std::uint8_t* base, const ManagerHeader* hdr, 
     return true;
 }
 
-/// @brief Compute user data address for block (block + sizeof(BlockHeader)).
+/// @brief Compute user data address for block (block + sizeof(Block<A>), Issue #106).
+inline void* user_ptr( pmm::Block<pmm::DefaultAddressTraits>* block )
+{
+    return reinterpret_cast<std::uint8_t*>( block ) + sizeof( pmm::Block<pmm::DefaultAddressTraits> );
+}
+
+/// @brief Compute user data address for block (BlockHeader legacy).
 inline void* user_ptr( BlockHeader* block )
 {
     return reinterpret_cast<std::uint8_t*>( block ) + sizeof( BlockHeader );
 }
 
-/// @brief O(1) get BlockHeader from user_ptr (ptr - sizeof(BlockHeader)); validated via is_valid_block().
-inline BlockHeader* header_from_ptr( std::uint8_t* base, void* ptr, std::size_t total_size )
+/// @brief O(1) get Block<A> from user_ptr (ptr - sizeof(Block<A>)); validated via is_valid_block().
+/// Issue #106: Block<A> layout replaces BlockHeader for allocator internals.
+inline pmm::Block<pmm::DefaultAddressTraits>* header_from_ptr( std::uint8_t* base, void* ptr, std::size_t total_size )
 {
     if ( ptr == nullptr )
         return nullptr;
@@ -318,8 +362,8 @@ inline BlockHeader* header_from_ptr( std::uint8_t* base, void* ptr, std::size_t 
     const ManagerHeader* hdr_const = reinterpret_cast<const ManagerHeader*>( base + sizeof( BlockHeader ) );
     if ( !is_valid_block( base, hdr_const, cand_idx ) )
         return nullptr;
-    BlockHeader* cand = reinterpret_cast<BlockHeader*>( cand_addr );
-    if ( cand->size == 0 )
+    auto* cand = reinterpret_cast<pmm::Block<pmm::DefaultAddressTraits>*>( cand_addr );
+    if ( cand->weight == 0 )
         return nullptr;
     return cand;
 }

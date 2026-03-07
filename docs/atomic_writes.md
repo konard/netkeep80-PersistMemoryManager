@@ -1,4 +1,4 @@
-# Атомизация записи и модернизация блока (Issue #69, Issue #75)
+# Атомизация записи и модернизация блока (Issue #69, Issue #75, Issue #106)
 
 ## Обзор
 
@@ -29,26 +29,50 @@
 Байты 56-63: prev_base_ptr   — runtime-only (не персистентно)
 ```
 
-### BlockHeader (32 байта = 2 гранулы, Issue #75)
+### Block<A> (32 байта = 2 гранулы, Issue #106)
+
+**Issue #106:** Внутренний формат блоков изменён с `BlockHeader` на `Block<AddressTraitsT>` (= `LinkedListNode<A>` + `TreeNode<A>`). Все внутренние операции (allocator_policy.h, free_block_tree.h, abstract_pmm.h) теперь используют `Block<A>` layout.
 
 ```
-Байты 0-3:   size          — [1] занятый размер в гранулах (0 = свободный блок, Issue #75)
-Байты 4-7:   prev_offset   — [2] предыдущий блок (гранульный индекс)
-Байты 8-11:  next_offset   — [3] следующий блок (гранульный индекс)
-Байты 12-15: left_offset   — [4] левый дочерний узел AVL-дерева (гранульный индекс)
-Байты 16-19: right_offset  — [5] правый дочерний узел AVL-дерева (гранульный индекс)
-Байты 20-23: parent_offset — [6] родительский узел AVL-дерева (гранульный индекс)
+Block<A> layout (при DefaultAddressTraits):
+  [LinkedListNode<A>]
+    Байты 0-3:   prev_offset   — предыдущий блок (гранульный индекс)
+    Байты 4-7:   next_offset   — следующий блок (гранульный индекс)
+  [TreeNode<A>]
+    Байты 8-11:  left_offset   — левый дочерний узел AVL-дерева (гранульный индекс)
+    Байты 12-15: right_offset  — правый дочерний узел AVL-дерева (гранульный индекс)
+    Байты 16-19: parent_offset — родительский узел AVL-дерева (гранульный индекс)
+    Байты 20-21: avl_height    — высота AVL-поддерева (0 = не в дереве)
+    Байты 22-23: _pad          — зарезервировано
+    Байты 24-27: weight        — занятый размер в гранулах (0 = свободный блок)
+    Байты 28-31: root_offset   — 0 = свободный; own_idx = занятый (Issue #75)
+```
+
+**Отличие от legacy BlockHeader**: `weight` (byte 24) вместо `size` (byte 0); `prev_offset` на byte 0 (раньше `size` был на byte 0, `prev_offset` на byte 4).
+
+### BlockHeader (32 байта, legacy — только для совместимости)
+
+```
+Байты 0-3:   size          — [legacy] занятый размер в гранулах (0 = свободный блок)
+Байты 4-7:   prev_offset   — [legacy] предыдущий блок (гранульный индекс)
+Байты 8-11:  next_offset   — [legacy] следующий блок
+Байты 12-15: left_offset   — [legacy] левый дочерний узел AVL
+Байты 16-19: right_offset  — [legacy] правый дочерний узел AVL
+Байты 20-23: parent_offset — [legacy] родительский узел AVL
 Байты 24-25: avl_height    — высота AVL-поддерева (0 = не в дереве)
 Байты 26-27: _pad          — зарезервировано
-Байты 28-31: root_offset   — корень дерева: 0 = дерево свободных блоков;
-                              own_index = занятый блок является корнем своего AVL-дерева (Issue #75)
+Байты 28-31: root_offset   — 0 = свободный; own_idx = занятый (Issue #75)
 ```
+
+Структура `BlockHeader` сохраняется в `types.h` для обратной совместимости, но внутренние алгоритмы теперь используют исключительно `Block<A>`.
 
 **Issue #69:** поле `magic` удалено из `BlockHeader`. Валидность блока теперь определяется структурными инвариантами (см. раздел "Верификация блока").
 
 **Issue #75 (v5.0):** поля переименованы: `used_size` → `size`, `_reserved` → `root_offset`. Семантика `root_offset`: значение `0` означает принадлежность дереву свободных блоков; значение равное собственному гранульному индексу означает, что блок является корнем своего AVL-дерева.
 
 **Issue #75 (v6.0):** PAP-гомогенизация — `ManagerHeader` перемещён внутрь `BlockHeader_0`. Теперь `BlockHeader_0` находится по смещению 0 (гранула 0), а `ManagerHeader` начинается по смещению `sizeof(BlockHeader) = 32 байта`. Пользовательские блоки начинаются с гранулы 6 (96 байт от начала). Все образы PMM_V050 несовместимы с PMM_V060.
+
+**Issue #106 (v0.4):** Внутренний layout сменён на `Block<A>`. Поле `size` заменено на `weight` в позиции byte 24. Вся логика allocate/deallocate/coalesce теперь идёт через BlockState machine (block_state.h).
 
 ---
 
@@ -63,16 +87,19 @@
 
 ### Псевдокод `is_valid_block`
 
+**Issue #106:** Функция использует `Block<A>` layout (`weight` вместо `size`).
+
 ```cpp
 bool is_valid_block(const uint8_t* base, const ManagerHeader* hdr, uint32_t idx) {
     if (idx == kNoBlock) return false;
-    if (idx_to_byte_off(idx) + sizeof(BlockHeader) > hdr->total_size) return false;
+    if (idx_to_byte_off(idx) + sizeof(Block<A>) > hdr->total_size) return false;
 
-    const BlockHeader* blk = block_at(base, idx);
+    // Block<A> layout: prev_offset[0], next_offset[4], ..., weight[24], root_offset[28]
+    const auto* blk = reinterpret_cast<const Block<DefaultAddressTraits>*>(base + idx_to_byte_off(idx));
 
-    // 1. Проверка size vs total_granules
+    // 1. Проверка weight vs total_granules
     uint32_t total_gran = block_total_granules(base, hdr, blk);
-    if (blk->size >= total_gran) return false;  // size должен быть СТРОГО меньше
+    if (blk->weight >= total_gran) return false;  // weight должен быть СТРОГО меньше
 
     // 2. Проверка prev_offset < this_idx < next_offset
     if (blk->prev_offset != kNoBlock && blk->prev_offset >= idx) return false;
@@ -311,13 +338,14 @@ void recompute_counters(uint8_t* base, ManagerHeader* hdr) {
 
     uint32_t idx = hdr->first_block_offset;
     while (idx != kNoBlock) {
-        BlockHeader* blk = block_at(base, idx);
+        // Issue #106: Block<A> layout — weight instead of size
+        Block<A>* blk = block_at_block(base, idx);
         block_count++;
         used_gran += kBlockHeaderGranules;  // Overhead заголовка
 
-        if (blk->size > 0) {
+        if (blk->weight > 0) {  // Issue #106: weight (byte 24) instead of size (byte 0)
             alloc_count++;
-            used_gran += blk->size;
+            used_gran += blk->weight;
         } else {
             free_count++;
         }
@@ -387,7 +415,7 @@ void recompute_counters(uint8_t* base, ManagerHeader* hdr) {
 │   ┌─────────────────────┐                    ┌─────────────────────┐        │
 │   │     FreeBlock       │                    │   AllocatedBlock    │        │
 │   │  ───────────────    │                    │  ───────────────    │        │
-│   │  size == 0          │ ──── allocate ──►  │  size > 0           │        │
+│   │  weight == 0        │ ──── allocate ──►  │  weight > 0         │        │
 │   │  root_offset == 0   │                    │  root_offset == idx │        │
 │   │  в AVL-дереве       │ ◄── deallocate ─── │  не в AVL-дереве    │        │
 │   └─────────────────────┘                    └─────────────────────┘        │
@@ -399,85 +427,87 @@ void recompute_counters(uint8_t* base, ManagerHeader* hdr) {
 
 ```
 ┌─────────────┐
-│  FreeBlock  │  Корректное состояние: size=0, root_offset=0, в AVL-дереве
+│  FreeBlock  │  Корректное состояние: weight=0, root_offset=0, в AVL-дереве
 └──────┬──────┘
        │
-       │ (1) avl_remove(blk_idx)
+       │ (1) avl_remove(blk_idx)   [FreeBlockTreeT::remove]
        ▼
 ┌──────────────────────┐
-│ FreeBlock_RemovedAVL │  Переходное: size=0, root_offset=0, не в AVL
+│ FreeBlockRemovedAVL  │  Переходное: weight=0, root_offset=0, не в AVL
 └──────┬───────────────┘
        │
-       │ (2) [если split] создать new_blk, memset(0)
-       │ (3) [если split] new_blk->next_offset = blk->next_offset
-       │ (4) [если split] new_blk->prev_offset = blk_idx
-       │ (5) [если split] old_next->prev_offset = new_idx
-       │ (6) [если split] blk->next_offset = new_idx
-       │ (7) [если split] avl_insert(new_idx)
-       ▼
-┌──────────────────────────────┐
-│ FreeBlock_SplitLinkedListOK  │  Переходное: линейный список обновлён
-└──────┬───────────────────────┘
-       │
-       │ (8) blk->size = data_gran
-       │ (9) blk->root_offset = blk_idx
+       │ (2) [если split] begin_splitting() → SplittingBlock
+       │ (3) [если split] initialize_new_block(new_blk_ptr, new_idx, blk_idx)
+       │ (4) [если split] link new block into linked list
+       │ (5) [если split] avl_insert(new_idx)
+       │ (6) [если split] finalize_split(data_gran, blk_idx) → AllocatedBlock
        ▼
 ┌─────────────────┐
-│ AllocatedBlock  │  Корректное состояние: size>0, root_offset=idx
+│ AllocatedBlock  │  Корректное состояние: weight>0, root_offset=idx
 └─────────────────┘
+
+Issue #106: Все шаги выполняются через методы BlockState machine (block_state.h).
 ```
 
 ### Диаграмма переходов состояний (deallocate)
 
 ```
 ┌─────────────────┐
-│ AllocatedBlock  │  Корректное состояние: size>0, root_offset=idx, не в AVL
+│ AllocatedBlock  │  Корректное состояние: weight>0, root_offset=idx, не в AVL
 └──────┬──────────┘
        │
-       │ (1) blk->size = 0
-       │ (2) blk->root_offset = 0
+       │ (1) AllocatedBlock::mark_as_free()   [Issue #106: state machine]
+       │     → blk->weight = 0
+       │     → blk->root_offset = 0
        ▼
 ┌─────────────────────────┐
-│ FreeBlock_NotInAVL      │  Переходное: size=0, root_offset=0, не в AVL
+│ FreeBlockNotInAVL       │  Переходное: weight=0, root_offset=0, не в AVL
 └──────┬──────────────────┘
        │
+       │ begin_coalescing() → CoalescingBlock
+       │
        │ [если coalesce с right]
-       │ (3) avl_remove(nxt_idx)
-       │ (4) blk->next_offset = nxt->next_offset
-       │ (5) nxt->next->prev_offset = blk_idx
-       │ (6) memset(nxt, 0)
+       │ (3) avl_remove(nxt_idx)                  [FreeBlockTreeT::remove]
+       │ (4) coalesce_with_next(nxt, nxt_nxt, b_idx)  [Issue #106: state machine]
+       │     → blk->next_offset = nxt->next_offset
+       │     → nxt->next->prev_offset = b_idx
+       │     → memset(nxt, 0)
        │
        │ [если coalesce с left]
-       │ (7) avl_remove(prv_idx)
-       │ (8) prv->next_offset = blk->next_offset
-       │ (9) blk->next->prev_offset = prv_idx
-       │ (10) memset(blk, 0)
-       │ (11) blk = prv (результирующий блок)
+       │ (5) avl_remove(prv_idx)                  [FreeBlockTreeT::remove]
+       │ (6) coalesce_with_prev(prv, next, prv_idx)   [Issue #106: state machine]
+       │     → prv->next_offset = blk->next_offset
+       │     → next->prev_offset = prv_idx
+       │     → memset(blk, 0)
+       │     → result = prv (CoalescingBlock)
        ▼
 ┌──────────────────────────────┐
-│ FreeBlock_CoalesceComplete   │  Переходное: слияние завершено
+│ CoalescingBlock              │  Переходное: слияние завершено
 └──────┬───────────────────────┘
        │
-       │ (12) avl_insert(result_blk_idx)
+       │ finalize_coalesce() → FreeBlock   [Issue #106: state machine]
+       │ avl_insert(result_blk_idx)        [FreeBlockTreeT::insert]
        ▼
 ┌─────────────┐
-│  FreeBlock  │  Корректное состояние: size=0, root_offset=0, в AVL
+│  FreeBlock  │  Корректное состояние: weight=0, root_offset=0, в AVL
 └─────────────┘
 ```
 
 ### Допустимые и запрещённые состояния
 
-| Состояние | weight | root_offset | AVL | Допустимо? | Комментарий |
+| Состояние | weight (byte 24) | root_offset (byte 28) | AVL | Допустимо? | Комментарий |
 |-----------|--------|-------------|-----|------------|-------------|
 | FreeBlock | 0 | 0 | Да | ✅ | Корректное — свободный блок |
 | AllocatedBlock | >0 | idx | Нет | ✅ | Корректное — занятый блок |
 | FreeBlockRemovedAVL | 0 | 0 | Нет | ⚠️ | Переходное — допустимо только во время allocate |
 | FreeBlockNotInAVL | 0 | 0 | Нет | ⚠️ | Переходное — допустимо только во время deallocate |
+| SplittingBlock | 0 | 0 | Нет | ⚠️ | Переходное — во время split в allocate |
+| CoalescingBlock | 0 | 0 | Нет | ⚠️ | Переходное — во время coalesce в deallocate |
 | InvalidState | 0 | idx | — | ❌ | Запрещённое — противоречие |
 | InvalidState | >0 | 0 | — | ❌ | Запрещённое — противоречие |
 | InvalidState | >0 | idx | Да | ❌ | Запрещённое — занятый в AVL |
 
-**Примечание:** `weight` в `Block<A>` соответствует `size` в старом `BlockHeader`. Поле находится в `TreeNode<A>` по смещению 24 байта от начала `Block<A>`.
+**Issue #106:** `weight` — поле в `TreeNode<A>` по смещению **24 байта** от начала `Block<A>` (смещение 16 байт внутри `TreeNode<A>`). Заменяет поле `size` из legacy `BlockHeader`, которое было по смещению 0 байт.
 
 ### State machine API
 

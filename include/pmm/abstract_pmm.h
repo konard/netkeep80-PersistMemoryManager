@@ -36,13 +36,15 @@
  *
  * @see pmm_presets.h — готовые инстанции менеджера
  * @see plan_issue87.md §5 «Фаза 7: AbstractPersistMemoryManager»
- * @version 0.3 (Issue #102 — legacy API removed, sole public API)
+ * @version 0.4 (Issue #106 — Block<A> layout migration; AllocatedBlock::mark_as_free() in deallocate)
  */
 
 #pragma once
 
 #include "pmm/types.h"
 #include "pmm/address_traits.h"
+#include "pmm/block.h"
+#include "pmm/block_state.h"
 #include "pmm/allocator_policy.h"
 #include "pmm/free_block_tree.h"
 #include "pmm/heap_storage.h"
@@ -216,7 +218,7 @@ class AbstractPersistMemoryManager
         std::uint32_t          idx    = FreeBlockTreeT::find_best_fit( base, hdr, needed );
 
         if ( idx != detail::kNoBlock )
-            return allocator::allocate_from_block( base, hdr, detail::block_at( base, idx ), user_size );
+            return allocator::allocate_from_block( base, hdr, idx, user_size );
 
         // Попытка расширить (если бэкенд поддерживает)
         if ( !do_expand( user_size ) )
@@ -226,7 +228,7 @@ class AbstractPersistMemoryManager
         hdr  = get_header( base );
         idx  = FreeBlockTreeT::find_best_fit( base, hdr, needed );
         if ( idx != detail::kNoBlock )
-            return allocator::allocate_from_block( base, hdr, detail::block_at( base, idx ), user_size );
+            return allocator::allocate_from_block( base, hdr, idx, user_size );
         return nullptr;
     }
 
@@ -238,20 +240,25 @@ class AbstractPersistMemoryManager
         typename ThreadPolicyT::unique_lock_type lock( _mutex );
         if ( !_initialized || ptr == nullptr )
             return;
-        std::uint8_t*          base = _backend.base_ptr();
-        detail::ManagerHeader* hdr  = get_header( base );
-        detail::BlockHeader*   blk  = detail::header_from_ptr( base, ptr, static_cast<std::size_t>( hdr->total_size ) );
-        if ( blk == nullptr || blk->size == 0 )
+        std::uint8_t*               base = _backend.base_ptr();
+        detail::ManagerHeader*      hdr  = get_header( base );
+        pmm::Block<AddressTraitsT>* blk =
+            detail::header_from_ptr( base, ptr, static_cast<std::size_t>( hdr->total_size ) );
+        if ( blk == nullptr || blk->weight == 0 )
             return;
 
-        std::uint32_t freed = blk->size;
-        blk->size           = 0;
-        blk->root_offset    = 0;
+        std::uint32_t freed   = blk->weight;
+        std::uint32_t blk_idx = detail::block_idx( base, blk );
+
+        // State: AllocatedBlock → FreeBlockNotInAVL [mark_as_free]
+        AllocatedBlock<AddressTraitsT>* alloc = AllocatedBlock<AddressTraitsT>::cast_from_raw( blk );
+        alloc->mark_as_free();
+
         hdr->alloc_count--;
         hdr->free_count++;
         if ( hdr->used_size >= freed )
             hdr->used_size -= freed;
-        allocator::coalesce( base, hdr, blk );
+        allocator::coalesce( base, hdr, blk_idx );
     }
 
     // ─── Типизированный API с pptr<T> (Issue #97) ─────────────────────────────
@@ -392,12 +399,12 @@ class AbstractPersistMemoryManager
 
     static detail::ManagerHeader* get_header( std::uint8_t* base ) noexcept
     {
-        return reinterpret_cast<detail::ManagerHeader*>( base + sizeof( detail::BlockHeader ) );
+        return reinterpret_cast<detail::ManagerHeader*>( base + sizeof( Block<AddressTraitsT> ) );
     }
 
     static const detail::ManagerHeader* get_header_c( const std::uint8_t* base ) noexcept
     {
-        return reinterpret_cast<const detail::ManagerHeader*>( base + sizeof( detail::BlockHeader ) );
+        return reinterpret_cast<const detail::ManagerHeader*>( base + sizeof( Block<AddressTraitsT> ) );
     }
 
     bool init_layout( std::uint8_t* base, std::size_t size ) noexcept
@@ -405,18 +412,20 @@ class AbstractPersistMemoryManager
         static constexpr std::uint32_t kHdrBlkIdx  = 0;
         static constexpr std::uint32_t kFreeBlkIdx = detail::kBlockHeaderGranules + detail::kManagerHeaderGranules;
 
-        if ( detail::idx_to_byte_off( kFreeBlkIdx ) + sizeof( detail::BlockHeader ) + detail::kMinBlockSize > size )
+        if ( detail::idx_to_byte_off( kFreeBlkIdx ) + sizeof( Block<AddressTraitsT> ) + detail::kMinBlockSize > size )
             return false;
 
-        detail::BlockHeader* hdr_blk = detail::block_at( base, kHdrBlkIdx );
-        std::memset( hdr_blk, 0, sizeof( detail::BlockHeader ) );
-        hdr_blk->size          = detail::kManagerHeaderGranules;
+        // BlockHeader_0: allocated block containing ManagerHeader (Block<A> layout)
+        Block<AddressTraitsT>* hdr_blk = reinterpret_cast<Block<AddressTraitsT>*>( base );
+        std::memset( hdr_blk, 0, sizeof( Block<AddressTraitsT> ) );
+        hdr_blk->weight        = detail::kManagerHeaderGranules; // data size = kManagerHeaderGranules
         hdr_blk->prev_offset   = detail::kNoBlock;
         hdr_blk->next_offset   = kFreeBlkIdx;
         hdr_blk->left_offset   = detail::kNoBlock;
         hdr_blk->right_offset  = detail::kNoBlock;
         hdr_blk->parent_offset = detail::kNoBlock;
-        hdr_blk->root_offset   = kHdrBlkIdx;
+        hdr_blk->avl_height    = 0;
+        hdr_blk->root_offset   = kHdrBlkIdx; // allocated: root_offset == own_idx
 
         detail::ManagerHeader* hdr = get_header( base );
         std::memset( hdr, 0, sizeof( detail::ManagerHeader ) );
@@ -427,14 +436,18 @@ class AbstractPersistMemoryManager
         hdr->free_tree_root     = detail::kNoBlock;
         hdr->granule_size       = static_cast<std::uint16_t>( kGranuleSize );
 
-        detail::BlockHeader* blk = detail::block_at( base, kFreeBlkIdx );
-        std::memset( blk, 0, sizeof( detail::BlockHeader ) );
+        // Initial free block (Block<A> layout)
+        Block<AddressTraitsT>* blk =
+            reinterpret_cast<Block<AddressTraitsT>*>( base + detail::idx_to_byte_off( kFreeBlkIdx ) );
+        std::memset( blk, 0, sizeof( Block<AddressTraitsT> ) );
         blk->prev_offset   = kHdrBlkIdx;
         blk->next_offset   = detail::kNoBlock;
         blk->left_offset   = detail::kNoBlock;
         blk->right_offset  = detail::kNoBlock;
         blk->parent_offset = detail::kNoBlock;
-        blk->avl_height    = 1;
+        blk->avl_height    = 1; // ready for AVL insertion
+        blk->weight        = 0; // free block
+        blk->root_offset   = 0; // free block: root_offset == 0
 
         hdr->last_block_offset = kFreeBlkIdx;
         hdr->free_tree_root    = kFreeBlkIdx;
@@ -476,11 +489,12 @@ class AbstractPersistMemoryManager
         std::uint32_t extra_idx  = detail::byte_off_to_idx( old_size );
         std::size_t   extra_size = new_size - old_size;
 
-        detail::BlockHeader* last_blk = ( hdr->last_block_offset != detail::kNoBlock )
-                                            ? detail::block_at( new_base, hdr->last_block_offset )
-                                            : nullptr;
+        Block<AddressTraitsT>* last_blk = ( hdr->last_block_offset != detail::kNoBlock )
+                                              ? reinterpret_cast<Block<AddressTraitsT>*>(
+                                                    new_base + detail::idx_to_byte_off( hdr->last_block_offset ) )
+                                              : nullptr;
 
-        if ( last_blk != nullptr && last_blk->size == 0 )
+        if ( last_blk != nullptr && last_blk->weight == 0 ) // free block: weight == 0
         {
             // Расширяем последний свободный блок
             std::uint32_t loff = detail::block_idx( new_base, last_blk );
@@ -490,14 +504,17 @@ class AbstractPersistMemoryManager
         }
         else
         {
-            if ( extra_size < sizeof( detail::BlockHeader ) + detail::kMinBlockSize )
+            if ( extra_size < sizeof( Block<AddressTraitsT> ) + detail::kMinBlockSize )
                 return false;
-            detail::BlockHeader* nb_blk = detail::block_at( new_base, extra_idx );
-            std::memset( nb_blk, 0, sizeof( detail::BlockHeader ) );
+            Block<AddressTraitsT>* nb_blk =
+                reinterpret_cast<Block<AddressTraitsT>*>( new_base + detail::idx_to_byte_off( extra_idx ) );
+            std::memset( nb_blk, 0, sizeof( Block<AddressTraitsT> ) );
             nb_blk->left_offset   = detail::kNoBlock;
             nb_blk->right_offset  = detail::kNoBlock;
             nb_blk->parent_offset = detail::kNoBlock;
             nb_blk->avl_height    = 1;
+            nb_blk->weight        = 0; // free block
+            nb_blk->root_offset   = 0; // free block
             if ( last_blk != nullptr )
             {
                 std::uint32_t loff    = detail::block_idx( new_base, last_blk );

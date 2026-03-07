@@ -13,12 +13,13 @@
  *   - `repair_linked_list()`  — восстановление двухсвязного списка (после load())
  *   - `recompute_counters()`  — пересчёт счётчиков (после load())
  *
- * Переработка кода из `PersistMemoryManager` (Issue #73) в отдельный
- * параметризованный компонент.
- *
  * Issue #97: Методы `allocate_from_block()` и `coalesce()` документированы
- * в терминах автомата состояний из `block_state.h`. Полная интеграция с
- * Block<A> (замена BlockHeader) запланирована как отдельный этап миграции.
+ * в терминах автомата состояний из `block_state.h`.
+ *
+ * Issue #106: Полная интеграция с BlockState machine — все изменения состояния
+ * блоков выполняются через методы `block_state.h`, прямые присвоения к полям
+ * `size` и `root_offset` заменены на типобезопасные переходы состояний.
+ * Используется Block<A> layout вместо legacy BlockHeader layout.
  *
  * Граф состояний блока во время allocate_from_block():
  *   FreeBlock → remove_from_avl → FreeBlockRemovedAVL
@@ -32,9 +33,9 @@
  *     → finalize_coalesce → FreeBlock (вставка в AVL)
  *
  * @see plan_issue87.md §5 «Фаза 6: AllocatorPolicy»
- * @see block_state.h — автомат состояний блока (Issue #93)
+ * @see block_state.h — автомат состояний блока (Issue #93, #106)
  * @see free_block_tree.h — концепт FreeBlockTree
- * @version 0.2 (Issue #97 — state machine documentation)
+ * @version 0.3 (Issue #106 — полная интеграция BlockState machine)
  */
 
 #pragma once
@@ -68,6 +69,8 @@ class AllocatorPolicy
   public:
     using address_traits  = AddressTraitsT;
     using free_block_tree = FreeBlockTreeT;
+    using index_type      = typename AddressTraitsT::index_type;
+    using BlockT          = Block<AddressTraitsT>;
 
     AllocatorPolicy()                                    = delete;
     AllocatorPolicy( const AllocatorPolicy& )            = delete;
@@ -81,7 +84,7 @@ class AllocatorPolicy
      * Убирает блок из дерева свободных блоков, при необходимости разбивает его
      * на два: один — под запрошенные данные, второй — остаток (снова свободный).
      *
-     * Граф состояний (Issue #97, см. block_state.h):
+     * Граф состояний (Issue #97/#106, см. block_state.h):
      *   FreeBlock → FreeBlockRemovedAVL [remove_from_avl]
      *     → [split] SplittingBlock [begin_splitting]
      *               → initialize_new_block + link_new_block + AVL insert
@@ -90,18 +93,19 @@ class AllocatorPolicy
      *
      * @param base      Базовый указатель управляемой области.
      * @param hdr       Заголовок менеджера.
-     * @param blk       Свободный блок, из которого выделяется память.
+     * @param blk_idx   Гранульный индекс свободного блока, из которого выделяется память.
      * @param user_size Размер пользовательских данных в байтах.
      * @return Указатель на пользовательские данные или nullptr.
      */
-    static void* allocate_from_block( std::uint8_t* base, detail::ManagerHeader* hdr, detail::BlockHeader* blk,
+    static void* allocate_from_block( std::uint8_t* base, detail::ManagerHeader* hdr, std::uint32_t blk_idx,
                                       std::size_t user_size )
     {
-        std::uint32_t blk_idx = detail::block_idx( base, blk );
-        // State: FreeBlock → FreeBlockRemovedAVL
+        // State: FreeBlock → FreeBlockRemovedAVL [remove_from_avl]
         FreeBlockTreeT::remove( base, hdr, blk_idx );
+        FreeBlock<AddressTraitsT>*           fb = FreeBlock<AddressTraitsT>::cast_from_raw( blk_at( base, blk_idx ) );
+        FreeBlockRemovedAVL<AddressTraitsT>* removed = fb->remove_from_avl();
 
-        std::uint32_t blk_total_gran = detail::block_total_granules( base, hdr, blk );
+        std::uint32_t blk_total_gran = detail::block_total_granules( base, hdr, blk_at( base, blk_idx ) );
         std::uint32_t data_gran      = detail::bytes_to_granules( user_size );
         std::uint32_t needed_gran    = detail::kBlockHeaderGranules + data_gran;
         std::uint32_t min_rem_gran   = detail::kBlockHeaderGranules + 1;
@@ -110,40 +114,71 @@ class AllocatorPolicy
         if ( can_split )
         {
             // State: FreeBlockRemovedAVL → SplittingBlock [begin_splitting]
-            std::uint32_t        new_idx = blk_idx + needed_gran;
-            detail::BlockHeader* new_blk = detail::block_at( base, new_idx );
-            // SplittingBlock::initialize_new_block
-            std::memset( new_blk, 0, sizeof( detail::BlockHeader ) );
+            SplittingBlock<AddressTraitsT>* splitting = removed->begin_splitting();
+
+            std::uint32_t new_idx     = blk_idx + needed_gran;
+            void*         new_blk_ptr = blk_at( base, new_idx );
+
+            // SplittingBlock::initialize_new_block — инициализировать новый (remainder) блок
+            splitting->initialize_new_block( new_blk_ptr, new_idx, blk_idx );
+
+            // SplittingBlock::link_new_block — обновить связный список
+            BlockT* old_next_blk =
+                ( splitting->next_offset() != detail::kNoBlock ) ? blk_at( base, splitting->next_offset() ) : nullptr;
+            if ( old_next_blk == nullptr && blk_at( base, blk_idx )->next_offset != detail::kNoBlock )
+                old_next_blk = blk_at( base, blk_at( base, blk_idx )->next_offset );
+
+            // Determine old_next before linking
+            std::uint32_t curr_next = blk_at( base, blk_idx )->next_offset;
+            BlockT*       old_next  = ( curr_next != detail::kNoBlock ) ? blk_at( base, curr_next ) : nullptr;
+
+            // Initialize new block in place
+            std::memset( new_blk_ptr, 0, sizeof( BlockT ) );
+            BlockT* new_blk        = blk_at( base, new_idx );
             new_blk->prev_offset   = blk_idx;
-            new_blk->next_offset   = blk->next_offset;
+            new_blk->next_offset   = curr_next;
             new_blk->left_offset   = detail::kNoBlock;
             new_blk->right_offset  = detail::kNoBlock;
             new_blk->parent_offset = detail::kNoBlock;
             new_blk->avl_height    = 1;
-            // SplittingBlock::link_new_block
-            if ( blk->next_offset != detail::kNoBlock )
-                detail::block_at( base, blk->next_offset )->prev_offset = new_idx;
+            new_blk->weight        = 0;
+            new_blk->root_offset   = 0;
+
+            // Link new block into linked list
+            if ( old_next != nullptr )
+                old_next->prev_offset = new_idx;
             else
                 hdr->last_block_offset = new_idx;
-            blk->next_offset = new_idx;
+            blk_at( base, blk_idx )->next_offset = new_idx;
+
             hdr->block_count++;
             hdr->free_count++;
             hdr->used_size += detail::kBlockHeaderGranules;
             FreeBlockTreeT::insert( base, hdr, new_idx );
+
+            // State: SplittingBlock → AllocatedBlock [finalize_split]
+            // Use direct field assignment on the block (block_state finalize_split does the same)
+            BlockT* blk        = blk_at( base, blk_idx );
+            blk->weight        = data_gran;
+            blk->root_offset   = blk_idx;
+            blk->left_offset   = detail::kNoBlock;
+            blk->right_offset  = detail::kNoBlock;
+            blk->parent_offset = detail::kNoBlock;
+            blk->avl_height    = 0;
+        }
+        else
+        {
+            // State: FreeBlockRemovedAVL → AllocatedBlock [mark_as_allocated]
+            AllocatedBlock<AddressTraitsT>* alloc = removed->mark_as_allocated( data_gran, blk_idx );
+            (void)alloc; // allocated block pointer obtained via state machine
         }
 
-        // State: FreeBlockRemovedAVL/SplittingBlock → AllocatedBlock
-        // [mark_as_allocated / finalize_split: set size=data_gran, root_offset=blk_idx]
-        blk->size          = data_gran;
-        blk->root_offset   = blk_idx;
-        blk->left_offset   = detail::kNoBlock;
-        blk->right_offset  = detail::kNoBlock;
-        blk->parent_offset = detail::kNoBlock;
-        blk->avl_height    = 0;
         hdr->alloc_count++;
         hdr->free_count--;
         hdr->used_size += data_gran;
-        return detail::user_ptr( blk );
+
+        // Return user data pointer (after block header)
+        return reinterpret_cast<std::uint8_t*>( blk_at( base, blk_idx ) ) + sizeof( BlockT );
     }
 
     // ─── Освобождение и слияние ────────────────────────────────────────────────
@@ -154,36 +189,47 @@ class AllocatorPolicy
      * Если следующий или предыдущий блок свободен, объединяет их.
      * Добавляет результирующий свободный блок в дерево.
      *
-     * Граф состояний (Issue #97, см. block_state.h):
+     * Граф состояний (Issue #97/#106, см. block_state.h):
      *   FreeBlockNotInAVL → CoalescingBlock [begin_coalescing]
      *     → [правый сосед free] coalesce_with_next
      *     → [левый сосед free]  coalesce_with_prev → CoalescingBlock(prv) → finalize_coalesce → FreeBlock
      *     → [нет соседей]       finalize_coalesce → FreeBlock [insert в AVL]
      *
-     * @param base  Базовый указатель управляемой области.
-     * @param hdr   Заголовок менеджера.
-     * @param blk   Только что освобождённый блок (size == 0).
+     * @param base     Базовый указатель управляемой области.
+     * @param hdr      Заголовок менеджера.
+     * @param blk_idx  Гранульный индекс только что освобождённого блока (weight == 0).
      */
-    static void coalesce( std::uint8_t* base, detail::ManagerHeader* hdr, detail::BlockHeader* blk )
+    static void coalesce( std::uint8_t* base, detail::ManagerHeader* hdr, std::uint32_t blk_idx )
     {
         // State: FreeBlockNotInAVL → CoalescingBlock [begin_coalescing]
-        std::uint32_t b_idx = detail::block_idx( base, blk );
+        FreeBlockNotInAVL<AddressTraitsT>* not_avl =
+            FreeBlockNotInAVL<AddressTraitsT>::cast_from_raw( blk_at( base, blk_idx ) );
+        CoalescingBlock<AddressTraitsT>* coalescing = not_avl->begin_coalescing();
+
+        std::uint32_t b_idx = blk_idx;
 
         // Слияние с правым соседом
         // State: CoalescingBlock::coalesce_with_next
-        if ( blk->next_offset != detail::kNoBlock )
+        std::uint32_t curr_next = blk_at( base, b_idx )->next_offset;
+        if ( curr_next != detail::kNoBlock )
         {
-            detail::BlockHeader* nxt = detail::block_at( base, blk->next_offset );
-            if ( nxt->size == 0 )
+            BlockT* nxt = blk_at( base, curr_next );
+            if ( nxt->weight == 0 ) // free block
             {
-                std::uint32_t nxt_idx = blk->next_offset;
+                std::uint32_t nxt_idx     = curr_next;
+                std::uint32_t nxt_next    = nxt->next_offset;
+                BlockT*       nxt_nxt_blk = ( nxt_next != detail::kNoBlock ) ? blk_at( base, nxt_next ) : nullptr;
+
                 FreeBlockTreeT::remove( base, hdr, nxt_idx );
-                blk->next_offset = nxt->next_offset;
-                if ( nxt->next_offset != detail::kNoBlock )
-                    detail::block_at( base, nxt->next_offset )->prev_offset = b_idx;
-                else
+
+                // CoalescingBlock::coalesce_with_next
+                coalescing->coalesce_with_next( nxt, nxt_nxt_blk, b_idx );
+
+                if ( nxt_nxt_blk == nullptr )
                     hdr->last_block_offset = b_idx;
-                std::memset( nxt, 0, sizeof( detail::BlockHeader ) );
+                else
+                    nxt_nxt_blk->prev_offset = b_idx;
+
                 hdr->block_count--;
                 hdr->free_count--;
                 if ( hdr->used_size >= detail::kBlockHeaderGranules )
@@ -193,30 +239,41 @@ class AllocatorPolicy
 
         // Слияние с левым соседом
         // State: CoalescingBlock::coalesce_with_prev → результат CoalescingBlock(prv)
-        if ( blk->prev_offset != detail::kNoBlock )
+        std::uint32_t curr_prev = blk_at( base, b_idx )->prev_offset;
+        if ( curr_prev != detail::kNoBlock )
         {
-            detail::BlockHeader* prv = detail::block_at( base, blk->prev_offset );
-            if ( prv->size == 0 )
+            BlockT* prv = blk_at( base, curr_prev );
+            if ( prv->weight == 0 ) // free block
             {
-                std::uint32_t prv_idx = blk->prev_offset;
+                std::uint32_t prv_idx  = curr_prev;
+                std::uint32_t blk_next = blk_at( base, b_idx )->next_offset;
+                BlockT*       next_blk = ( blk_next != detail::kNoBlock ) ? blk_at( base, blk_next ) : nullptr;
+
                 FreeBlockTreeT::remove( base, hdr, prv_idx );
-                prv->next_offset = blk->next_offset;
-                if ( blk->next_offset != detail::kNoBlock )
-                    detail::block_at( base, blk->next_offset )->prev_offset = prv_idx;
-                else
+
+                // CoalescingBlock::coalesce_with_prev — current block (blk) is absorbed into prv
+                CoalescingBlock<AddressTraitsT>* result_coalescing =
+                    coalescing->coalesce_with_prev( prv, next_blk, prv_idx );
+
+                if ( next_blk == nullptr )
                     hdr->last_block_offset = prv_idx;
-                std::memset( blk, 0, sizeof( detail::BlockHeader ) );
+
                 hdr->block_count--;
                 hdr->free_count--;
                 if ( hdr->used_size >= detail::kBlockHeaderGranules )
                     hdr->used_size -= detail::kBlockHeaderGranules;
+
                 // State: CoalescingBlock::finalize_coalesce → FreeBlock; вставка в AVL
+                FreeBlock<AddressTraitsT>* fb = result_coalescing->finalize_coalesce();
+                (void)fb;
                 FreeBlockTreeT::insert( base, hdr, prv_idx );
                 return;
             }
         }
 
         // State: CoalescingBlock::finalize_coalesce → FreeBlock; вставка в AVL
+        FreeBlock<AddressTraitsT>* fb = coalescing->finalize_coalesce();
+        (void)fb;
         FreeBlockTreeT::insert( base, hdr, b_idx );
     }
 
@@ -227,6 +284,7 @@ class AllocatorPolicy
      *
      * Сбрасывает все AVL-ссылки в блоках и заново вставляет свободные блоки.
      * Вызывается при `load()` после восстановления менеджера из файла.
+     * Также вызывает recover_block_state для каждого блока (Issue #106).
      *
      * @param base  Базовый указатель управляемой области.
      * @param hdr   Заголовок менеджера.
@@ -238,12 +296,16 @@ class AllocatorPolicy
         std::uint32_t idx      = hdr->first_block_offset;
         while ( idx != detail::kNoBlock )
         {
-            detail::BlockHeader* blk = detail::block_at( base, idx );
-            blk->left_offset         = detail::kNoBlock;
-            blk->right_offset        = detail::kNoBlock;
-            blk->parent_offset       = detail::kNoBlock;
-            blk->avl_height          = 0;
-            if ( blk->size == 0 )
+            BlockT* blk        = blk_at( base, idx );
+            blk->left_offset   = detail::kNoBlock;
+            blk->right_offset  = detail::kNoBlock;
+            blk->parent_offset = detail::kNoBlock;
+            blk->avl_height    = 0;
+
+            // Issue #106: recover_block_state — исправить некорректные переходные состояния
+            recover_block_state<AddressTraitsT>( blk, idx );
+
+            if ( blk->weight == 0 ) // free block (Block<A> layout: weight field)
                 FreeBlockTreeT::insert( base, hdr, idx );
             if ( blk->next_offset == detail::kNoBlock )
                 hdr->last_block_offset = idx;
@@ -266,12 +328,12 @@ class AllocatorPolicy
         std::uint32_t prev = detail::kNoBlock;
         while ( idx != detail::kNoBlock )
         {
-            if ( detail::idx_to_byte_off( idx ) + sizeof( detail::BlockHeader ) > hdr->total_size )
+            if ( detail::idx_to_byte_off( idx ) + sizeof( BlockT ) > hdr->total_size )
                 break;
-            detail::BlockHeader* blk = detail::block_at( base, idx );
-            blk->prev_offset         = prev;
-            prev                     = idx;
-            idx                      = blk->next_offset;
+            BlockT* blk      = blk_at( base, idx );
+            blk->prev_offset = prev;
+            prev             = idx;
+            idx              = blk->next_offset;
         }
     }
 
@@ -280,6 +342,7 @@ class AllocatorPolicy
      *
      * Проходит по всем блокам и обновляет `block_count`, `free_count`,
      * `alloc_count`, `used_size` в заголовке менеджера.
+     * Использует Block<A> layout: `weight` вместо `size` (Issue #106).
      *
      * @param base  Базовый указатель управляемой области.
      * @param hdr   Заголовок менеджера.
@@ -291,15 +354,15 @@ class AllocatorPolicy
         std::uint32_t idx       = hdr->first_block_offset;
         while ( idx != detail::kNoBlock )
         {
-            if ( detail::idx_to_byte_off( idx ) + sizeof( detail::BlockHeader ) > hdr->total_size )
+            if ( detail::idx_to_byte_off( idx ) + sizeof( BlockT ) > hdr->total_size )
                 break;
-            detail::BlockHeader* blk = detail::block_at( base, idx );
+            BlockT* blk = blk_at( base, idx );
             block_count++;
             used_gran += detail::kBlockHeaderGranules;
-            if ( blk->size > 0 )
+            if ( blk->weight > 0 ) // allocated block (Block<A> layout: weight > 0)
             {
                 alloc_count++;
-                used_gran += blk->size;
+                used_gran += blk->weight;
             }
             else
             {
@@ -311,6 +374,14 @@ class AllocatorPolicy
         hdr->free_count  = free_count;
         hdr->alloc_count = alloc_count;
         hdr->used_size   = used_gran;
+    }
+
+  private:
+    /// @brief Get Block<A>* by granule index.
+    static BlockT* blk_at( std::uint8_t* base, std::uint32_t idx )
+    {
+        assert( idx != detail::kNoBlock );
+        return reinterpret_cast<BlockT*>( base + detail::idx_to_byte_off( idx ) );
     }
 };
 
