@@ -341,7 +341,7 @@ static bool test_p97_multi_threaded_heap_concurrent()
     for ( int t = 0; t < kThreads; ++t )
     {
         threads.emplace_back(
-            [&pmm, &fail_count]()
+            [&pmm, &fail_count, kAllocsPerThread]()
             {
                 std::vector<void*> ptrs;
                 for ( int i = 0; i < kAllocsPerThread; ++i )
