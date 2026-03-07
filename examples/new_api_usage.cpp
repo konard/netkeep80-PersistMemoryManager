@@ -87,7 +87,7 @@ static void demo_single_threaded_heap()
     std::cout << "Total: " << pmm.total_size() << " bytes\n";
 
     // Выделяем структуру через typed API — снаружи только pptr<T, MgrT>
-    using STHeap = pmm::presets::SingleThreadedHeap;
+    using STHeap                = pmm::presets::SingleThreadedHeap;
     STHeap::pptr<Point> p_point = pmm.allocate_typed<Point>();
     STHeap::pptr<int>   p_arr   = pmm.allocate_typed<int>( 10 ); // массив из 10 int
 

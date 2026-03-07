@@ -130,8 +130,8 @@ static bool test_manual_repeated_grow()
     PMM_TEST( !p.is_null() );
     std::memset( p.resolve( pmm ), 0xAB, 64 );
 
-    std::size_t prev_count  = 64;
-    std::size_t counts[]    = { 128, 256, 512, 1024 };
+    std::size_t prev_count = 64;
+    std::size_t counts[]   = { 128, 256, 512, 1024 };
     for ( std::size_t new_count : counts )
     {
         Mgr::pptr<std::uint8_t> p2 = manual_realloc( pmm, p, prev_count, new_count );

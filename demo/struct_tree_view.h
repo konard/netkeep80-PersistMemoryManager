@@ -23,12 +23,12 @@ namespace demo
  */
 struct TreeSnapshot
 {
-    std::size_t total_size   = 0;
-    std::size_t used_size    = 0;
-    std::size_t free_size    = 0;
-    std::size_t block_count  = 0;
-    std::size_t free_count   = 0;
-    std::size_t alloc_count  = 0;
+    std::size_t total_size  = 0;
+    std::size_t used_size   = 0;
+    std::size_t free_size   = 0;
+    std::size_t block_count = 0;
+    std::size_t free_count  = 0;
+    std::size_t alloc_count = 0;
 };
 
 /**

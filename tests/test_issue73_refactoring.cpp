@@ -87,7 +87,7 @@ static bool test_instance_api()
     PMM_TEST( pmm.create( 64 * 1024 ) );
     PMM_TEST( pmm.is_initialized() );
 
-    PMM_TEST( pmm.alloc_block_count() > 0 );  // BlockHeader_0
+    PMM_TEST( pmm.alloc_block_count() > 0 ); // BlockHeader_0
     PMM_TEST( pmm.free_block_count() == 1 );
     PMM_TEST( pmm.alloc_block_count() == 1 ); // BlockHeader_0
 

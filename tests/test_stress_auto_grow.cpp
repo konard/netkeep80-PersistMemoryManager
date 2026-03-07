@@ -70,10 +70,7 @@ struct Rng
 
     uint32_t next_n( uint32_t n ) { return ( next() >> 16 ) % n; }
 
-    std::size_t next_block_size_small()
-    {
-        return static_cast<std::size_t>( ( next_n( 32 ) + 1 ) * 8 );
-    }
+    std::size_t next_block_size_small() { return static_cast<std::size_t>( ( next_n( 32 ) + 1 ) * 8 ); }
 };
 
 } // namespace
@@ -354,8 +351,8 @@ static bool test_large_alloc_triggers_expand()
     std::size_t size_before = pmm.total_size();
 
     // Allocate a large block that won't fit in the initial buffer
-    const std::size_t big_sz = initial_size * 2;
-    Mgr::pptr<std::uint8_t> big = pmm.allocate_typed<std::uint8_t>( big_sz );
+    const std::size_t       big_sz = initial_size * 2;
+    Mgr::pptr<std::uint8_t> big    = pmm.allocate_typed<std::uint8_t>( big_sz );
     PMM_TEST( !big.is_null() );
 
     std::size_t size_after = pmm.total_size();

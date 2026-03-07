@@ -198,9 +198,9 @@ static bool test_shredder()
 
 struct Node
 {
-    int              id;
-    Mgr::pptr<Node>  next;
-    unsigned int     checksum;
+    int             id;
+    Mgr::pptr<Node> next;
+    unsigned int    checksum;
 };
 
 static unsigned int compute_checksum( int id, std::uint32_t next_offset )
@@ -238,9 +238,9 @@ static bool test_persistent_cycle()
             return false;
         }
 
-        Node* node_ptr  = n.resolve( pmm1 );
-        node_ptr->id    = i;
-        node_ptr->next  = Mgr::pptr<Node>(); // null initially
+        Node* node_ptr = n.resolve( pmm1 );
+        node_ptr->id   = i;
+        node_ptr->next = Mgr::pptr<Node>(); // null initially
         // Checksum will be updated when next is set
         node_ptr->checksum = 0;
 
@@ -312,8 +312,8 @@ static bool test_persistent_cycle()
         unsigned int expected_cs = compute_checksum( n->id, n->next.offset() );
         if ( n->checksum != expected_cs )
         {
-            std::cerr << "  ERROR: checksum mismatch at node " << traversed << " (expected " << expected_cs
-                      << ", got " << n->checksum << ")\n";
+            std::cerr << "  ERROR: checksum mismatch at node " << traversed << " (expected " << expected_cs << ", got "
+                      << n->checksum << ")\n";
             data_ok = false;
             break;
         }

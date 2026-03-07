@@ -280,7 +280,7 @@ static bool test_integration_persistence()
     PMM_TEST( pmm1.create( 64 * 1024 ) );
     auto p = pmm1.allocate_typed<std::uint64_t>( 1 );
     PMM_TEST( !p.is_null() );
-    *p.resolve( pmm1 ) = 0xDEADBEEFCAFEBABEULL;
+    *p.resolve( pmm1 )         = 0xDEADBEEFCAFEBABEULL;
     std::uint32_t saved_offset = p.offset();
 
     PMM_TEST( pmm::save_manager( pmm1, TEST_FILE ) );

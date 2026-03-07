@@ -117,8 +117,8 @@ static void test_metrics_view_update_validation_failed()
 
 static void test_validate_fresh_pmm_returns_ok()
 {
-    const char*       name = "validate_fresh_pmm_returns_ok";
-    demo::DemoMgr*    mgr  = make_pmm( 1 * 1024 * 1024 );
+    const char*    name = "validate_fresh_pmm_returns_ok";
+    demo::DemoMgr* mgr  = make_pmm( 1 * 1024 * 1024 );
 
     bool ok = mgr->is_initialized();
     if ( !ok )

@@ -112,7 +112,6 @@ template <class T, class ManagerT> class pptr
 
 // pptr<T, ManagerT> должен быть 4 байта (uint32_t гранульный индекс) — ManagerT не хранится
 static_assert( sizeof( pptr<int, struct DummyMgr> ) == 4, "sizeof(pptr<T,ManagerT>) must be 4 bytes (Issue #59)" );
-static_assert( sizeof( pptr<double, struct DummyMgr2> ) == 4,
-               "sizeof(pptr<T,ManagerT>) must be 4 bytes (Issue #59)" );
+static_assert( sizeof( pptr<double, struct DummyMgr2> ) == 4, "sizeof(pptr<T,ManagerT>) must be 4 bytes (Issue #59)" );
 
 } // namespace pmm

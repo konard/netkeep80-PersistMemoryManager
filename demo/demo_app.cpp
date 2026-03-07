@@ -38,10 +38,9 @@ DemoApp::DemoApp()
     : mem_map_view_( std::make_unique<MemMapView>() ), metrics_view_( std::make_unique<MetricsView>() ),
       struct_tree_view_( std::make_unique<StructTreeView>() ), scenario_manager_( std::make_unique<ScenarioManager>() ),
       avl_tree_view_( std::make_unique<AvlTreeView>() ), manual_alloc_view_( std::make_unique<ManualAllocView>() ),
-      last_ops_sample_( std::chrono::steady_clock::now() )
+      pmm_manager_( std::make_unique<DemoMgr>() ), last_ops_sample_( std::chrono::steady_clock::now() )
 {
-    pmm_size_    = kPmmSizes[pmm_size_idx_];
-    pmm_manager_ = std::make_unique<DemoMgr>();
+    pmm_size_ = kPmmSizes[pmm_size_idx_];
     pmm_manager_->create( pmm_size_ );
     g_pmm.store( pmm_manager_.get() );
 }
@@ -276,10 +275,10 @@ void DemoApp::apply_pmm_size()
 
 void DemoApp::run_validate()
 {
-    last_validate_time_    = std::chrono::steady_clock::now();
-    auto* mgr              = g_pmm.load();
-    bool  ok               = ( mgr != nullptr ) && mgr->is_initialized();
-    last_validation_.state = ok ? ValidationResult::State::Ok : ValidationResult::State::Failed;
+    last_validate_time_        = std::chrono::steady_clock::now();
+    auto* mgr                  = g_pmm.load();
+    bool  ok                   = ( mgr != nullptr ) && mgr->is_initialized();
+    last_validation_.state     = ok ? ValidationResult::State::Ok : ValidationResult::State::Failed;
     last_validation_.timestamp = last_validate_time_;
     metrics_view_->update_validation( last_validation_ );
 }

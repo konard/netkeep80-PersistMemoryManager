@@ -45,8 +45,8 @@ void MemMapView::render()
     }
 
     // ── Used/Free bar ─────────────────────────────────────────────────────────
-    float used_ratio = ( total_bytes_ > 0 ) ? static_cast<float>( used_bytes_ ) / static_cast<float>( total_bytes_ )
-                                            : 0.0f;
+    float used_ratio =
+        ( total_bytes_ > 0 ) ? static_cast<float>( used_bytes_ ) / static_cast<float>( total_bytes_ ) : 0.0f;
 
     char overlay[64];
     std::snprintf( overlay, sizeof( overlay ), "Used: %zu / %zu bytes  (%.1f%%)", used_bytes_, total_bytes_,

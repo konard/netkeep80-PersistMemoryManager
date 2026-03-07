@@ -52,8 +52,8 @@ static bool test_100k_allocations()
         return false;
     }
 
-    const int         N    = 100'000;
-    const std::size_t BSIZ = 64;
+    const int                       N    = 100'000;
+    const std::size_t               BSIZ = 64;
     std::vector<Mgr::pptr<uint8_t>> ptrs( N );
 
     // Allocation phase
@@ -135,8 +135,8 @@ static bool test_1m_alternating()
         return false;
     }
 
-    const int         POOL     = 64;
-    const std::size_t SIZES[8] = { 32, 64, 128, 256, 512, 64, 128, 256 };
+    const int                       POOL     = 64;
+    const std::size_t               SIZES[8] = { 32, 64, 128, 256, 512, 64, 128, 256 };
     std::vector<Mgr::pptr<uint8_t>> pool( POOL );
     std::vector<std::size_t>        pool_sizes( POOL, 0 );
 

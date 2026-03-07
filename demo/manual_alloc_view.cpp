@@ -59,8 +59,7 @@ void ManualAllocView::render()
 
     if ( ImGui::Button( "Alloc" ) && can_alloc )
     {
-        DemoMgr::pptr<std::uint8_t> ptr =
-            mgr->allocate_typed<std::uint8_t>( static_cast<std::size_t>( alloc_size_ ) );
+        DemoMgr::pptr<std::uint8_t> ptr = mgr->allocate_typed<std::uint8_t>( static_cast<std::size_t>( alloc_size_ ) );
         if ( !ptr.is_null() )
         {
             ManualBlock blk;

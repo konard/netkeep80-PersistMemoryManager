@@ -108,7 +108,7 @@ static bool test_stress_realistic()
         int  failed = 0;
         for ( int i = 0; i < kPhase0Iters; i++ )
         {
-            std::size_t           sz  = rng.next_block_size();
+            std::size_t             sz  = rng.next_block_size();
             Mgr::pptr<std::uint8_t> ptr = pmm.allocate_typed<std::uint8_t>( sz );
             if ( !ptr.is_null() )
                 live.push_back( ptr );
@@ -136,7 +136,7 @@ static bool test_stress_realistic()
         {
             if ( rng.next_n( 3 ) < 2 )
             {
-                std::size_t           sz  = rng.next_block_size();
+                std::size_t             sz  = rng.next_block_size();
                 Mgr::pptr<std::uint8_t> ptr = pmm.allocate_typed<std::uint8_t>( sz );
                 if ( !ptr.is_null() )
                 {
@@ -182,7 +182,7 @@ static bool test_stress_realistic()
         {
             if ( rng.next_n( 2 ) == 0 )
             {
-                std::size_t           sz  = rng.next_block_size();
+                std::size_t             sz  = rng.next_block_size();
                 Mgr::pptr<std::uint8_t> ptr = pmm.allocate_typed<std::uint8_t>( sz );
                 if ( !ptr.is_null() )
                 {
@@ -230,7 +230,7 @@ static bool test_stress_realistic()
 
             if ( rng.next_n( 3 ) < 1 )
             {
-                std::size_t           sz  = rng.next_block_size();
+                std::size_t             sz  = rng.next_block_size();
                 Mgr::pptr<std::uint8_t> ptr = pmm.allocate_typed<std::uint8_t>( sz );
                 if ( !ptr.is_null() )
                 {

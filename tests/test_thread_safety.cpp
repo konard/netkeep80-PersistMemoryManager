@@ -104,7 +104,7 @@ static void test_concurrent_alloc_dealloc()
         threads.emplace_back(
             [t, kIter, &pmm, &errors]()
             {
-                unsigned                              state = static_cast<unsigned>( t * 1234567 + 42 );
+                unsigned                             state = static_cast<unsigned>( t * 1234567 + 42 );
                 std::vector<Mgr::pptr<std::uint8_t>> live;
                 live.reserve( 64 );
 

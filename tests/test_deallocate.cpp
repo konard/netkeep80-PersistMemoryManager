@@ -183,8 +183,7 @@ static bool test_deallocate_interleaved()
     Mgr::pptr<std::uint8_t> prev;
     for ( int i = 0; i < 50; i++ )
     {
-        Mgr::pptr<std::uint8_t> ptr =
-            pmm.allocate_typed<std::uint8_t>( static_cast<std::size_t>( 64 + i * 32 ) );
+        Mgr::pptr<std::uint8_t> ptr = pmm.allocate_typed<std::uint8_t>( static_cast<std::size_t>( 64 + i * 32 ) );
         PMM_TEST( !ptr.is_null() );
         if ( !prev.is_null() )
             pmm.deallocate_typed( prev );

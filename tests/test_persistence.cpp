@@ -57,11 +57,11 @@ static bool test_persistence_basic_roundtrip()
     Mgr pmm1;
     PMM_TEST( pmm1.create( size ) );
 
-    std::size_t total1 = pmm1.total_size();
-    std::size_t used1  = pmm1.used_size();
-    std::size_t free1  = pmm1.free_size();
-    std::size_t blocks1 = pmm1.block_count();
-    std::size_t free_blocks1 = pmm1.free_block_count();
+    std::size_t total1        = pmm1.total_size();
+    std::size_t used1         = pmm1.used_size();
+    std::size_t free1         = pmm1.free_size();
+    std::size_t blocks1       = pmm1.block_count();
+    std::size_t free_blocks1  = pmm1.free_block_count();
     std::size_t alloc_blocks1 = pmm1.alloc_block_count();
 
     PMM_TEST( pmm::save_manager( pmm1, TEST_FILE ) );
@@ -138,11 +138,11 @@ static bool test_persistence_multiple_blocks()
     pmm1.deallocate_typed( p2 );
     pmm1.deallocate_typed( p4 );
 
-    std::size_t blocks1 = pmm1.block_count();
-    std::size_t free_blocks1 = pmm1.free_block_count();
+    std::size_t blocks1       = pmm1.block_count();
+    std::size_t free_blocks1  = pmm1.free_block_count();
     std::size_t alloc_blocks1 = pmm1.alloc_block_count();
-    std::size_t total1 = pmm1.total_size();
-    std::size_t used1  = pmm1.used_size();
+    std::size_t total1        = pmm1.total_size();
+    std::size_t used1         = pmm1.used_size();
 
     PMM_TEST( pmm::save_manager( pmm1, TEST_FILE ) );
     pmm1.destroy();
@@ -278,9 +278,9 @@ static bool test_persistence_double_save_load()
     std::memset( p1.resolve( pmm1 ), 0xAA, 128 );
     std::memset( p2.resolve( pmm1 ), 0xBB, 256 );
 
-    std::size_t blocks1 = pmm1.block_count();
+    std::size_t blocks1       = pmm1.block_count();
     std::size_t alloc_blocks1 = pmm1.alloc_block_count();
-    std::size_t total1 = pmm1.total_size();
+    std::size_t total1        = pmm1.total_size();
 
     PMM_TEST( pmm::save_manager( pmm1, TEST_FILE ) );
     pmm1.destroy();

@@ -209,7 +209,7 @@ static bool test_block_count_consistency()
 /// Test: save/load preserves AVL tree structure and block counts
 static bool test_avl_survives_save_load()
 {
-    const std::size_t size     = 64 * 1024;
+    const std::size_t size      = 64 * 1024;
     const char*       TEST_FILE = "avl_test.dat";
 
     Mgr pmm1;
