@@ -97,3 +97,6 @@ add_test(NAME test_issue97_presets COMMAND test_issue97_presets)
 add_executable(test_issue100 test_issue100.cpp)
 target_link_libraries(test_issue100 PRIVATE pmm Threads::Threads)
 add_test(NAME test_issue100 COMMAND test_issue100)
+
+# ─── Интеграционные тесты BlockState machine (Issue #106) ─────────────────────
+pmm_add_test(test_issue106_block_state_integration test_issue106_block_state_integration.cpp)
