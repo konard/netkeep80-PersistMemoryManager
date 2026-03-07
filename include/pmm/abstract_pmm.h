@@ -240,9 +240,10 @@ class AbstractPersistMemoryManager
         typename ThreadPolicyT::unique_lock_type lock( _mutex );
         if ( !_initialized || ptr == nullptr )
             return;
-        std::uint8_t*                      base = _backend.base_ptr();
-        detail::ManagerHeader*             hdr  = get_header( base );
-        pmm::Block<AddressTraitsT>*        blk  = detail::header_from_ptr( base, ptr, static_cast<std::size_t>( hdr->total_size ) );
+        std::uint8_t*               base = _backend.base_ptr();
+        detail::ManagerHeader*      hdr  = get_header( base );
+        pmm::Block<AddressTraitsT>* blk =
+            detail::header_from_ptr( base, ptr, static_cast<std::size_t>( hdr->total_size ) );
         if ( blk == nullptr || blk->weight == 0 )
             return;
 
@@ -417,14 +418,14 @@ class AbstractPersistMemoryManager
         // BlockHeader_0: allocated block containing ManagerHeader (Block<A> layout)
         Block<AddressTraitsT>* hdr_blk = reinterpret_cast<Block<AddressTraitsT>*>( base );
         std::memset( hdr_blk, 0, sizeof( Block<AddressTraitsT> ) );
-        hdr_blk->weight         = detail::kManagerHeaderGranules; // data size = kManagerHeaderGranules
-        hdr_blk->prev_offset    = detail::kNoBlock;
-        hdr_blk->next_offset    = kFreeBlkIdx;
-        hdr_blk->left_offset    = detail::kNoBlock;
-        hdr_blk->right_offset   = detail::kNoBlock;
-        hdr_blk->parent_offset  = detail::kNoBlock;
-        hdr_blk->avl_height     = 0;
-        hdr_blk->root_offset    = kHdrBlkIdx; // allocated: root_offset == own_idx
+        hdr_blk->weight        = detail::kManagerHeaderGranules; // data size = kManagerHeaderGranules
+        hdr_blk->prev_offset   = detail::kNoBlock;
+        hdr_blk->next_offset   = kFreeBlkIdx;
+        hdr_blk->left_offset   = detail::kNoBlock;
+        hdr_blk->right_offset  = detail::kNoBlock;
+        hdr_blk->parent_offset = detail::kNoBlock;
+        hdr_blk->avl_height    = 0;
+        hdr_blk->root_offset   = kHdrBlkIdx; // allocated: root_offset == own_idx
 
         detail::ManagerHeader* hdr = get_header( base );
         std::memset( hdr, 0, sizeof( detail::ManagerHeader ) );
@@ -439,14 +440,14 @@ class AbstractPersistMemoryManager
         Block<AddressTraitsT>* blk =
             reinterpret_cast<Block<AddressTraitsT>*>( base + detail::idx_to_byte_off( kFreeBlkIdx ) );
         std::memset( blk, 0, sizeof( Block<AddressTraitsT> ) );
-        blk->prev_offset    = kHdrBlkIdx;
-        blk->next_offset    = detail::kNoBlock;
-        blk->left_offset    = detail::kNoBlock;
-        blk->right_offset   = detail::kNoBlock;
-        blk->parent_offset  = detail::kNoBlock;
-        blk->avl_height     = 1; // ready for AVL insertion
-        blk->weight         = 0; // free block
-        blk->root_offset    = 0; // free block: root_offset == 0
+        blk->prev_offset   = kHdrBlkIdx;
+        blk->next_offset   = detail::kNoBlock;
+        blk->left_offset   = detail::kNoBlock;
+        blk->right_offset  = detail::kNoBlock;
+        blk->parent_offset = detail::kNoBlock;
+        blk->avl_height    = 1; // ready for AVL insertion
+        blk->weight        = 0; // free block
+        blk->root_offset   = 0; // free block: root_offset == 0
 
         hdr->last_block_offset = kFreeBlkIdx;
         hdr->free_tree_root    = kFreeBlkIdx;
@@ -488,11 +489,10 @@ class AbstractPersistMemoryManager
         std::uint32_t extra_idx  = detail::byte_off_to_idx( old_size );
         std::size_t   extra_size = new_size - old_size;
 
-        Block<AddressTraitsT>* last_blk =
-            ( hdr->last_block_offset != detail::kNoBlock )
-                ? reinterpret_cast<Block<AddressTraitsT>*>( new_base +
-                                                            detail::idx_to_byte_off( hdr->last_block_offset ) )
-                : nullptr;
+        Block<AddressTraitsT>* last_blk = ( hdr->last_block_offset != detail::kNoBlock )
+                                              ? reinterpret_cast<Block<AddressTraitsT>*>(
+                                                    new_base + detail::idx_to_byte_off( hdr->last_block_offset ) )
+                                              : nullptr;
 
         if ( last_blk != nullptr && last_blk->weight == 0 ) // free block: weight == 0
         {

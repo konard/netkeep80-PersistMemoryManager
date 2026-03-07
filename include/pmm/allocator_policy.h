@@ -102,7 +102,7 @@ class AllocatorPolicy
     {
         // State: FreeBlock → FreeBlockRemovedAVL [remove_from_avl]
         FreeBlockTreeT::remove( base, hdr, blk_idx );
-        FreeBlock<AddressTraitsT>*        fb      = FreeBlock<AddressTraitsT>::cast_from_raw( blk_at( base, blk_idx ) );
+        FreeBlock<AddressTraitsT>*           fb = FreeBlock<AddressTraitsT>::cast_from_raw( blk_at( base, blk_idx ) );
         FreeBlockRemovedAVL<AddressTraitsT>* removed = fb->remove_from_avl();
 
         std::uint32_t blk_total_gran = detail::block_total_granules( base, hdr, blk_at( base, blk_idx ) );
@@ -123,9 +123,8 @@ class AllocatorPolicy
             splitting->initialize_new_block( new_blk_ptr, new_idx, blk_idx );
 
             // SplittingBlock::link_new_block — обновить связный список
-            BlockT* old_next_blk = ( splitting->next_offset() != detail::kNoBlock )
-                                       ? blk_at( base, splitting->next_offset() )
-                                       : nullptr;
+            BlockT* old_next_blk =
+                ( splitting->next_offset() != detail::kNoBlock ) ? blk_at( base, splitting->next_offset() ) : nullptr;
             if ( old_next_blk == nullptr && blk_at( base, blk_idx )->next_offset != detail::kNoBlock )
                 old_next_blk = blk_at( base, blk_at( base, blk_idx )->next_offset );
 
@@ -135,15 +134,15 @@ class AllocatorPolicy
 
             // Initialize new block in place
             std::memset( new_blk_ptr, 0, sizeof( BlockT ) );
-            BlockT* new_blk         = blk_at( base, new_idx );
-            new_blk->prev_offset    = blk_idx;
-            new_blk->next_offset    = curr_next;
-            new_blk->left_offset    = detail::kNoBlock;
-            new_blk->right_offset   = detail::kNoBlock;
-            new_blk->parent_offset  = detail::kNoBlock;
-            new_blk->avl_height     = 1;
-            new_blk->weight         = 0;
-            new_blk->root_offset    = 0;
+            BlockT* new_blk        = blk_at( base, new_idx );
+            new_blk->prev_offset   = blk_idx;
+            new_blk->next_offset   = curr_next;
+            new_blk->left_offset   = detail::kNoBlock;
+            new_blk->right_offset  = detail::kNoBlock;
+            new_blk->parent_offset = detail::kNoBlock;
+            new_blk->avl_height    = 1;
+            new_blk->weight        = 0;
+            new_blk->root_offset   = 0;
 
             // Link new block into linked list
             if ( old_next != nullptr )
@@ -159,13 +158,13 @@ class AllocatorPolicy
 
             // State: SplittingBlock → AllocatedBlock [finalize_split]
             // Use direct field assignment on the block (block_state finalize_split does the same)
-            BlockT* blk         = blk_at( base, blk_idx );
-            blk->weight         = data_gran;
-            blk->root_offset    = blk_idx;
-            blk->left_offset    = detail::kNoBlock;
-            blk->right_offset   = detail::kNoBlock;
-            blk->parent_offset  = detail::kNoBlock;
-            blk->avl_height     = 0;
+            BlockT* blk        = blk_at( base, blk_idx );
+            blk->weight        = data_gran;
+            blk->root_offset   = blk_idx;
+            blk->left_offset   = detail::kNoBlock;
+            blk->right_offset  = detail::kNoBlock;
+            blk->parent_offset = detail::kNoBlock;
+            blk->avl_height    = 0;
         }
         else
         {

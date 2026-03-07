@@ -64,8 +64,7 @@ using A   = pmm::DefaultAddressTraits;
 // Helper: get Block<A>* at user_ptr - sizeof(Block<A>)
 static pmm::Block<A>* block_of( [[maybe_unused]] Mgr& pmm, void* user_ptr )
 {
-    return reinterpret_cast<pmm::Block<A>*>( static_cast<std::uint8_t*>( user_ptr ) -
-                                             sizeof( pmm::Block<A> ) );
+    return reinterpret_cast<pmm::Block<A>*>( static_cast<std::uint8_t*>( user_ptr ) - sizeof( pmm::Block<A> ) );
 }
 
 // Helper: get granule index of block
@@ -384,7 +383,8 @@ static bool test_i106_split_creates_valid_free_remainder()
     if ( blk->next_offset != pmm::detail::kNoBlock )
     {
         std::uint8_t*  base = pmm.backend().base_ptr();
-        pmm::Block<A>* rem  = reinterpret_cast<pmm::Block<A>*>( base + pmm::detail::idx_to_byte_off( blk->next_offset ) );
+        pmm::Block<A>* rem =
+            reinterpret_cast<pmm::Block<A>*>( base + pmm::detail::idx_to_byte_off( blk->next_offset ) );
         PMM_TEST( rem->weight == 0 );      // FreeBlock: weight == 0
         PMM_TEST( rem->root_offset == 0 ); // FreeBlock: root_offset == 0
     }

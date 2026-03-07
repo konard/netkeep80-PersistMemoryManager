@@ -270,8 +270,7 @@ inline std::uint32_t block_idx( const std::uint8_t* base, const BlockHeader* blo
 }
 
 /// @brief Get granule index of Block<A> (Issue #106).
-inline std::uint32_t block_idx( const std::uint8_t*                                   base,
-                                const pmm::Block<pmm::DefaultAddressTraits>* block )
+inline std::uint32_t block_idx( const std::uint8_t* base, const pmm::Block<pmm::DefaultAddressTraits>* block )
 {
     std::size_t byte_off = reinterpret_cast<const std::uint8_t*>( block ) - base;
     assert( byte_off % kGranuleSize == 0 );
@@ -308,8 +307,7 @@ inline bool is_valid_block( const std::uint8_t* base, const ManagerHeader* hdr, 
     if ( idx_to_byte_off( idx ) + sizeof( BlockHeader ) > hdr->total_size )
         return false;
 
-    const auto* blk = reinterpret_cast<const pmm::Block<pmm::DefaultAddressTraits>*>(
-        base + idx_to_byte_off( idx ) );
+    const auto*   blk = reinterpret_cast<const pmm::Block<pmm::DefaultAddressTraits>*>( base + idx_to_byte_off( idx ) );
     std::uint32_t total_gran = ( blk->next_offset != kNoBlock )
                                    ? ( blk->next_offset - idx )
                                    : ( byte_off_to_idx( static_cast<std::size_t>( hdr->total_size ) ) - idx );
@@ -345,8 +343,7 @@ inline void* user_ptr( BlockHeader* block )
 
 /// @brief O(1) get Block<A> from user_ptr (ptr - sizeof(Block<A>)); validated via is_valid_block().
 /// Issue #106: Block<A> layout replaces BlockHeader for allocator internals.
-inline pmm::Block<pmm::DefaultAddressTraits>* header_from_ptr( std::uint8_t* base, void* ptr,
-                                                               std::size_t total_size )
+inline pmm::Block<pmm::DefaultAddressTraits>* header_from_ptr( std::uint8_t* base, void* ptr, std::size_t total_size )
 {
     if ( ptr == nullptr )
         return nullptr;
