@@ -110,12 +110,12 @@ static bool test_save_load_new_format()
     std::uint32_t off1         = p1.offset();
     std::uint32_t off3         = p3.offset();
 
-    PMM_TEST( pmm::save_manager<decltype(pmm1)>( TEST_FILE ) );
+    PMM_TEST( pmm::save_manager<decltype( pmm1 )>( TEST_FILE ) );
     pmm1.destroy();
 
     Mgr pmm2;
     PMM_TEST( pmm2.create( 64 * 1024 ) );
-    PMM_TEST( pmm::load_manager_from_file<decltype(pmm2)>( TEST_FILE ) );
+    PMM_TEST( pmm::load_manager_from_file<decltype( pmm2 )>( TEST_FILE ) );
     PMM_TEST( pmm2.is_initialized() );
 
     // Verify block counts are preserved
@@ -192,12 +192,12 @@ static bool test_stress_save_load()
     std::uint32_t alloc_before = pmm1.alloc_block_count();
     std::uint32_t free_before  = pmm1.free_block_count();
 
-    PMM_TEST( pmm::save_manager<decltype(pmm1)>( TEST_FILE ) );
+    PMM_TEST( pmm::save_manager<decltype( pmm1 )>( TEST_FILE ) );
     pmm1.destroy();
 
     Mgr pmm2;
     PMM_TEST( pmm2.create( 128 * 1024 ) );
-    PMM_TEST( pmm::load_manager_from_file<decltype(pmm2)>( TEST_FILE ) );
+    PMM_TEST( pmm::load_manager_from_file<decltype( pmm2 )>( TEST_FILE ) );
     PMM_TEST( pmm2.is_initialized() );
 
     PMM_TEST( pmm2.alloc_block_count() == alloc_before );

@@ -82,8 +82,7 @@ template <typename T> struct has_storage_backend_type<T, std::void_t<typename T:
 template <typename T, typename = void> struct has_is_initialized : std::false_type
 {
 };
-template <typename T>
-struct has_is_initialized<T, std::void_t<decltype( T::is_initialized() )>> : std::true_type
+template <typename T> struct has_is_initialized<T, std::void_t<decltype( T::is_initialized() )>> : std::true_type
 {
 };
 
@@ -107,16 +106,14 @@ struct has_deallocate_method<T, std::void_t<decltype( T::deallocate( static_cast
 template <typename T, typename = void> struct has_total_size_method : std::false_type
 {
 };
-template <typename T>
-struct has_total_size_method<T, std::void_t<decltype( T::total_size() )>> : std::true_type
+template <typename T> struct has_total_size_method<T, std::void_t<decltype( T::total_size() )>> : std::true_type
 {
 };
 
 template <typename T, typename = void> struct has_destroy_method : std::false_type
 {
 };
-template <typename T>
-struct has_destroy_method<T, std::void_t<decltype( T::destroy() )>> : std::true_type
+template <typename T> struct has_destroy_method<T, std::void_t<decltype( T::destroy() )>> : std::true_type
 {
 };
 

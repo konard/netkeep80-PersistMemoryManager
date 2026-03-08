@@ -133,8 +133,7 @@ static bool test_two_instances_independent()
 /// @brief Ensure PersistMemoryManager has no virtual functions (AR-02).
 static bool test_no_virtual_functions()
 {
-    static_assert( !std::is_polymorphic<Mgr>::value,
-                   "AR-02: PersistMemoryManager must have no virtual functions" );
+    static_assert( !std::is_polymorphic<Mgr>::value, "AR-02: PersistMemoryManager must have no virtual functions" );
     static_assert( !std::is_polymorphic<pmm::PersistentAvlTree>::value,
                    "AR-02: PersistentAvlTree must have no virtual functions" );
     return true;

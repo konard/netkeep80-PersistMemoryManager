@@ -226,12 +226,12 @@ static bool test_free_list_after_load()
     std::uint32_t off1 = p1.offset();
     std::uint32_t off3 = p3.offset();
 
-    PMM_TEST( pmm::save_manager<decltype(pmm1)>( TEST_FILE ) );
+    PMM_TEST( pmm::save_manager<decltype( pmm1 )>( TEST_FILE ) );
     pmm1.destroy();
 
     Mgr pmm2;
     PMM_TEST( pmm2.create( MEMORY_SIZE ) );
-    PMM_TEST( pmm::load_manager_from_file<decltype(pmm2)>( TEST_FILE ) );
+    PMM_TEST( pmm::load_manager_from_file<decltype( pmm2 )>( TEST_FILE ) );
     PMM_TEST( pmm2.is_initialized() );
 
     Mgr::pptr<std::uint8_t> p4 = pmm2.allocate_typed<std::uint8_t>( 64 );

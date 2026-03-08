@@ -458,7 +458,7 @@ static bool test_p97_pptr_deallocate_null()
     using STH = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 324>;
     PMM_TEST( STH::create( 8 * 1024 ) );
 
-    STH::pptr<int> p;       // null
+    STH::pptr<int> p;           // null
     STH::deallocate_typed( p ); // должно быть no-op без ошибок
 
     STH::destroy();

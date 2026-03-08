@@ -96,8 +96,8 @@ static bool test_persistence_user_data_preserved()
 
     PMM_TEST( Mgr1::create( size ) );
 
-    const std::size_t         data_size = 256;
-    Mgr1::pptr<std::uint8_t>  ptr1      = Mgr1::allocate_typed<std::uint8_t>( data_size );
+    const std::size_t        data_size = 256;
+    Mgr1::pptr<std::uint8_t> ptr1      = Mgr1::allocate_typed<std::uint8_t>( data_size );
     PMM_TEST( !ptr1.is_null() );
 
     std::memset( ptr1.resolve(), 0xCA, data_size );

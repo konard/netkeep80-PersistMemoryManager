@@ -60,8 +60,7 @@ static bool test_p8_all_presets_compile()
     using MTH = pmm::presets::MultiThreadedHeap;
 
     // Проверяем thread_policy
-    static_assert( std::is_same<STH::thread_policy, pmm::config::NoLock>::value,
-                   "SingleThreadedHeap must use NoLock" );
+    static_assert( std::is_same<STH::thread_policy, pmm::config::NoLock>::value, "SingleThreadedHeap must use NoLock" );
     static_assert( std::is_same<MTH::thread_policy, pmm::config::SharedMutexLock>::value,
                    "MultiThreadedHeap must use SharedMutexLock" );
 

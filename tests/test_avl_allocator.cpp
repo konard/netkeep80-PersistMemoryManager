@@ -225,12 +225,12 @@ static bool test_avl_survives_save_load()
     std::size_t free_before   = pmm1.free_block_count();
     std::size_t alloc_before  = pmm1.alloc_block_count();
 
-    PMM_TEST( pmm::save_manager<decltype(pmm1)>( TEST_FILE ) );
+    PMM_TEST( pmm::save_manager<decltype( pmm1 )>( TEST_FILE ) );
     pmm1.destroy();
 
     Mgr pmm2;
     PMM_TEST( pmm2.create( size ) );
-    PMM_TEST( pmm::load_manager_from_file<decltype(pmm2)>( TEST_FILE ) );
+    PMM_TEST( pmm::load_manager_from_file<decltype( pmm2 )>( TEST_FILE ) );
     PMM_TEST( pmm2.is_initialized() );
 
     PMM_TEST( pmm2.block_count() == blocks_before );

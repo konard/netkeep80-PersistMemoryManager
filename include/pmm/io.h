@@ -51,8 +51,7 @@ namespace pmm
  * Предусловие:  filename != nullptr, MgrT::is_initialized() == true.
  * Постусловие: файл содержит точную копию управляемой области памяти.
  */
-template <typename MgrT>
-inline bool save_manager( const char* filename )
+template <typename MgrT> inline bool save_manager( const char* filename )
 {
     if ( filename == nullptr || !MgrT::is_initialized() )
         return false;
@@ -84,8 +83,7 @@ inline bool save_manager( const char* filename )
  * Предусловие:  filename != nullptr, MgrT::backend().base_ptr() != nullptr.
  * Постусловие: менеджер восстановлен из файла.
  */
-template <typename MgrT>
-inline bool load_manager_from_file( const char* filename )
+template <typename MgrT> inline bool load_manager_from_file( const char* filename )
 {
     if ( filename == nullptr )
         return false;

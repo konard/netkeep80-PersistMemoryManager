@@ -253,9 +253,8 @@ static bool test_persistent_cycle()
         {
             tail.resolve()->next = n;
             // Update tail checksum
-            tail.resolve()->checksum =
-                compute_checksum( tail.resolve()->id, tail.resolve()->next.offset() );
-            tail = n;
+            tail.resolve()->checksum = compute_checksum( tail.resolve()->id, tail.resolve()->next.offset() );
+            tail                     = n;
         }
     }
     // Final node checksum (no next)
@@ -270,7 +269,7 @@ static bool test_persistent_cycle()
     // Phase 2: Save
     std::cout << "  Phase 2: saving state...\n";
     auto t1 = now();
-    PMM_TEST( pmm::save_manager<decltype(pmm1)>( filename ) );
+    PMM_TEST( pmm::save_manager<decltype( pmm1 )>( filename ) );
     pmm1.destroy();
     std::cout << "    Saved in " << elapsed_ms( t1, now() ) << " ms\n";
 
@@ -278,7 +277,7 @@ static bool test_persistent_cycle()
     std::cout << "  Phase 3: loading state...\n";
     Mgr pmm2;
     PMM_TEST( pmm2.create( memory_size ) );
-    PMM_TEST( pmm::load_manager_from_file<decltype(pmm2)>( filename ) );
+    PMM_TEST( pmm::load_manager_from_file<decltype( pmm2 )>( filename ) );
     PMM_TEST( pmm2.is_initialized() );
     std::cout << "    Loaded (new manager instance)\n";
 

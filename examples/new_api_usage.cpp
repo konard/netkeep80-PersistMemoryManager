@@ -105,8 +105,7 @@ static void demo_multi_threaded_heap()
     if ( !p.is_null() )
     {
         std::memset( p.resolve(), 0xBB, 128 );
-        std::cout << "Allocated 128 bytes (pptr offset=" << p.offset()
-                  << ", sizeof(pptr)=" << sizeof( p ) << ")\n";
+        std::cout << "Allocated 128 bytes (pptr offset=" << p.offset() << ", sizeof(pptr)=" << sizeof( p ) << ")\n";
         Mgr::deallocate_typed( p );
         std::cout << "Deallocated via pptr<T, MgrT>.\n";
     }
@@ -141,7 +140,7 @@ static void demo_persistence()
     SessionA::pptr<double> p = SessionA::allocate_typed<double>();
     if ( !p.is_null() )
     {
-        *p.resolve()  = 3.14;
+        *p.resolve() = 3.14;
         saved_offset = p.offset();
         std::cout << "Allocated double=3.14 via pptr<double> (offset=" << saved_offset << ")\n";
     }
@@ -171,8 +170,8 @@ static void demo_persistence()
     {
         // Reconstruct pptr from saved granule offset
         SessionB::pptr<double> q( saved_offset );
-        std::cout << "Reloaded: pptr<double>(offset=" << saved_offset
-                  << ") → value=" << *q.resolve() << " (expected: 3.14)\n";
+        std::cout << "Reloaded: pptr<double>(offset=" << saved_offset << ") → value=" << *q.resolve()
+                  << " (expected: 3.14)\n";
     }
     else
     {
