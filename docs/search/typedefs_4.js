@@ -1,6 +1,4 @@
 var searchData=
 [
-  ['element_5ftype_0',['element_type',['../classpmm_1_1pptr.html#a2011f31a800c4ca766683e66aaed2b7d',1,'pmm::pptr']]],
-  ['embeddedstatic1k_1',['EmbeddedStatic1K',['../namespacepmm_1_1presets.html#ae7c6fd7329eadc7f94d36ef043c7cd2d',1,'pmm::presets']]],
-  ['embeddedstatic4k_2',['EmbeddedStatic4K',['../namespacepmm_1_1presets.html#a3e3ded46509ef6fcad7235579cd68105',1,'pmm::presets']]]
+  ['free_5fblock_5ftree_0',['free_block_tree',['../classpmm_1_1AllocatorPolicy.html#ac7c45abb52719d611b4a013d199d54e4',1,'pmm::AllocatorPolicy::free_block_tree'],['../structpmm_1_1CacheManagerConfig.html#ae1a5ef4f8f774a09a56c2f65206acbbb',1,'pmm::CacheManagerConfig::free_block_tree'],['../structpmm_1_1PersistentDataConfig.html#a231734905eee3d741afdb76bb19cbc9d',1,'pmm::PersistentDataConfig::free_block_tree'],['../structpmm_1_1EmbeddedManagerConfig.html#a8660de0fc6c0066d4e9a97b66992b88e',1,'pmm::EmbeddedManagerConfig::free_block_tree'],['../structpmm_1_1IndustrialDBConfig.html#ab5bc885f76dd03e2b5a10f03dade5f94',1,'pmm::IndustrialDBConfig::free_block_tree'],['../classpmm_1_1PersistMemoryManager.html#ad107012f32abc286a000fe9dff9a6720',1,'pmm::PersistMemoryManager::free_block_tree']]]
 ];
