@@ -1,10 +1,10 @@
 /**
  * @file pmm/block.h
- * @brief Block<AddressTraits> — блок памяти как составной тип (Issue #87 Phase 3).
+ * @brief Block<AddressTraits> — блок памяти как составной тип (Issue #87 Phase 3, #138).
  *
  * Block<AddressTraits> является составным типом, объединяющим:
- *   - LinkedListNode<AddressTraits> — узел двухсвязного списка всех блоков
- *   - TreeNode<AddressTraits>       — узел AVL-дерева (включает weight и root_offset)
+ *   - поля связного списка (prev_offset, next_offset) — хранятся прямо в Block
+ *   - TreeNode<AddressTraits>  — узел AVL-дерева (включает weight и root_offset)
  *
  * Концептуальная модель:
  *   ПАП-менеджер организует память как лес AVL-деревьев.  Каждый блок является
@@ -13,29 +13,31 @@
  *   узлу дерева (TreeNode), а не блоку напрямую.
  *
  * Раскладка полей при AddressTraitsT = DefaultAddressTraits (uint32_t, 16):
- *   [0..7]   LinkedListNode<A>: prev_offset (4), next_offset (4)
- *   [8..31]  TreeNode<A>:       weight (4), left_offset (4), right_offset (4),
- *                                parent_offset (4), root_offset (4),
- *                                avl_height (2), node_type (2)
+ *   [0..23]  TreeNode<A>: weight (4), left_offset (4), right_offset (4),
+ *                         parent_offset (4), root_offset (4),
+ *                         avl_height (2), node_type (2)
+ *   [24..31] Block:       prev_offset (4), next_offset (4)
  *
  * Issue #126: поле weight перемещено в начало TreeNode для ускорения доступа.
  *             avl_height и node_type (бывший _pad) перемещены в конец TreeNode.
+ * Issue #138: LinkedListNode удалена как отдельная сущность; поля prev_offset
+ *             и next_offset перемещены прямо в Block.
  *
  * Размер и выравнивание:
  *   sizeof(Block<DefaultAddressTraits>) == 32 байта (2 гранулы по 16 байт).
  *   Подтверждено через static_assert в types.h. Issue #112: Block<A> — единственный тип блока.
  *
  * @see plan_issue87.md §5 «Фаза 3: Block — блок как составной тип»
- * @version 0.4 (Issue #126 — TreeNode fields reordered, _pad renamed to node_type)
+ * @version 0.5 (Issue #138 — LinkedListNode merged into Block)
  */
 
 #pragma once
 
 #include "pmm/address_traits.h"
-#include "pmm/linked_list_node.h"
 #include "pmm/tree_node.h"
 
 #include <cstdint>
+#include <type_traits>
 
 namespace pmm
 {
@@ -46,22 +48,37 @@ namespace pmm
  * @tparam AddressTraitsT  Traits адресного пространства (из address_traits.h).
  *                         Определяет тип индексных полей.
  *
- * Наследует LinkedListNode<AddressTraitsT> и TreeNode<AddressTraitsT>.
- * Все поля (включая weight и root_offset) хранятся в базовых классах.
+ * Наследует TreeNode<AddressTraitsT>.
+ * Поля связного списка (prev_offset, next_offset) хранятся прямо в Block
+ * (Issue #138: LinkedListNode удалена как отдельная сущность).
  *
- * Доступ к полям через наследование:
- *   - prev_offset, next_offset          — через LinkedListNode<A>
+ * Доступ к полям:
+ *   - prev_offset, next_offset          — прямые поля Block<A>
  *   - weight, left_offset, right_offset,
  *     parent_offset, root_offset,
  *     avl_height, node_type             — через TreeNode<A>
  *
  * При AddressTraitsT = DefaultAddressTraits (uint32_t, 16):
  *   sizeof(Block<DefaultAddressTraits>) == 32 байта
+ *   Layout: [0..23] TreeNode fields, [24..31] prev_offset, next_offset
  */
-template <typename AddressTraitsT> struct Block : LinkedListNode<AddressTraitsT>, TreeNode<AddressTraitsT>
+template <typename AddressTraitsT> struct Block : TreeNode<AddressTraitsT>
 {
     using address_traits = AddressTraitsT;
     using index_type     = typename AddressTraitsT::index_type;
+
+  protected:
+    /// Гранульный индекс предыдущего блока (или no_block).
+    index_type prev_offset;
+    /// Гранульный индекс следующего блока (или no_block).
+    index_type next_offset;
 };
+
+// Issue #138: Block inherits TreeNode and adds prev_offset/next_offset as own members.
+// Note: Block is NOT standard-layout (both base and derived have data members), but
+// the memory layout is still predictable: TreeNode fields first, then Block own fields.
+// The layout is validated via kOffset* constants in BlockStateBase (block_state.h).
+static_assert( sizeof( pmm::Block<pmm::DefaultAddressTraits> ) == 32,
+               "Block<DefaultAddressTraits> must be 32 bytes (Issue #87, #138)" );
 
 } // namespace pmm

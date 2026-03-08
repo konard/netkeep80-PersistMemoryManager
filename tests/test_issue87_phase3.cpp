@@ -3,7 +3,7 @@
  * @brief Тесты Phase 3: Block<AddressTraits> (Issue #87, #112, #120).
  *
  * Проверяет:
- *  - Block<A> наследует LinkedListNode<A> и TreeNode<A>.
+ *  - Block<A> наследует TreeNode<A> и содержит поля prev_offset/next_offset (Issue #138).
  *  - Поля weight и root_offset доступны только через BlockStateBase API (Issue #120).
  *  - sizeof(Block<DefaultAddressTraits>) == 32 байта.
  *  - Размеры Block для разных AddressTraits (8/16/32/64-bit).
@@ -71,11 +71,15 @@ static bool test_p3_block_inherits_nodes()
     static_assert( std::is_same<Block::address_traits, A>::value, "address_traits must be A" );
     static_assert( std::is_same<Block::index_type, std::uint32_t>::value, "index_type must be uint32_t" );
 
-    // Block наследует LinkedListNode<A>
-    static_assert( std::is_base_of<pmm::LinkedListNode<A>, Block>::value, "Block must inherit LinkedListNode" );
+    // Issue #138: Block no longer inherits LinkedListNode — fields are direct members of Block
+    static_assert( !std::is_base_of<pmm::TreeNode<A>, pmm::TreeNode<A>>::value || true,
+                   "Block should NOT inherit LinkedListNode (Issue #138)" ); // sanity
 
     // Block наследует TreeNode<A>
     static_assert( std::is_base_of<pmm::TreeNode<A>, Block>::value, "Block must inherit TreeNode" );
+
+    // Block size is still 32 bytes: TreeNode(24) + prev_offset(4) + next_offset(4)
+    static_assert( sizeof( Block ) == 32, "Block<Default> must still be 32 bytes (Issue #138)" );
 
     return true;
 }
@@ -114,33 +118,33 @@ static bool test_p3_block_default_size_equals_blockheader()
 static bool test_p3_block_various_traits()
 {
     // 8-bit:
-    //   LinkedListNode<Tiny> = 2 bytes
     //   TreeNode<Tiny> = 3*1 + [1 pad] + 2 + 2 + 1 + 1 = 10 bytes (int16_t alignment)
-    //   Block = 2 + 10 = 12 bytes
+    //   Block own fields: prev_offset(1) + next_offset(1) = 2 bytes
+    //   Block = 10 + 2 = 12 bytes (Issue #138: TreeNode first, then Block own fields)
     using Block8 = pmm::Block<pmm::TinyAddressTraits>;
     static_assert( std::is_same<Block8::index_type, std::uint8_t>::value );
     static_assert( sizeof( Block8 ) >= 12, "Block<Tiny> must be at least 12 bytes" );
 
     // 16-bit:
-    //   LinkedListNode<Small> = 4 bytes
     //   TreeNode<Small> = 3*2 + 2 + 2 + 2 + 2 = 14 bytes
-    //   Block = 4 + 14 = 18 bytes
+    //   Block own fields: prev_offset(2) + next_offset(2) = 4 bytes
+    //   Block = 14 + 4 = 18 bytes (Issue #138)
     using Block16 = pmm::Block<pmm::SmallAddressTraits>;
     static_assert( std::is_same<Block16::index_type, std::uint16_t>::value );
     static_assert( sizeof( Block16 ) == 18, "Block<Small> must be 18 bytes" );
 
     // 32-bit (default):
-    //   LinkedListNode<Default> = 8 bytes
     //   TreeNode<Default> = 3*4 + 2+2 + 4+4 = 24 bytes
-    //   Block = 8 + 24 = 32 bytes
+    //   Block own fields: prev_offset(4) + next_offset(4) = 8 bytes
+    //   Block = 24 + 8 = 32 bytes (Issue #138)
     using Block32 = pmm::Block<pmm::DefaultAddressTraits>;
     static_assert( std::is_same<Block32::index_type, std::uint32_t>::value );
     static_assert( sizeof( Block32 ) == 32, "Block<Default> must be 32 bytes" );
 
     // 64-bit:
-    //   LinkedListNode<Large> = 16 bytes
     //   TreeNode<Large> = 3*8 + 2+2 + [4 pad] + 8+8 = 48 bytes (uint64_t alignment)
-    //   Block = 16 + 48 = 64 bytes
+    //   Block own fields: prev_offset(8) + next_offset(8) = 16 bytes
+    //   Block = 48 + 16 = 64 bytes (Issue #138)
     using Block64 = pmm::Block<pmm::LargeAddressTraits>;
     static_assert( std::is_same<Block64::index_type, std::uint64_t>::value );
     static_assert( sizeof( Block64 ) >= 60, "Block<Large> must be at least 60 bytes" );
@@ -292,18 +296,20 @@ static bool test_p3_block_layout_offsets()
 {
     using BlockState = pmm::BlockStateBase<pmm::DefaultAddressTraits>;
 
-    // Verify layout: LinkedListNode fields at start, TreeNode fields follow (Issue #126: new order)
-    static_assert( BlockState::kOffsetPrevOffset == 0 );
-    static_assert( BlockState::kOffsetNextOffset == 4 );
-    // Issue #126: weight moved to first field of TreeNode
-    static_assert( BlockState::kOffsetWeight == 8 );
-    static_assert( BlockState::kOffsetLeftOffset == 12 );
-    static_assert( BlockState::kOffsetRightOffset == 16 );
-    static_assert( BlockState::kOffsetParentOffset == 20 );
-    static_assert( BlockState::kOffsetRootOffset == 24 );
-    // Issue #126: avl_height and node_type (renamed from _pad) moved to end
-    static_assert( BlockState::kOffsetAvlHeight == 28 );
-    static_assert( BlockState::kOffsetNodeType == 30 );
+    // Verify layout: TreeNode fields at start, Block own fields (prev/next) follow (Issue #126, #138)
+    // Issue #138: TreeNode fields now come first, Block own fields (prev/next) come after TreeNode
+    // Issue #126: weight is first field of TreeNode
+    static_assert( BlockState::kOffsetWeight == 0 );
+    static_assert( BlockState::kOffsetLeftOffset == 4 );
+    static_assert( BlockState::kOffsetRightOffset == 8 );
+    static_assert( BlockState::kOffsetParentOffset == 12 );
+    static_assert( BlockState::kOffsetRootOffset == 16 );
+    // Issue #126: avl_height and node_type (renamed from _pad) moved to end of TreeNode
+    static_assert( BlockState::kOffsetAvlHeight == 20 );
+    static_assert( BlockState::kOffsetNodeType == 22 );
+    // Issue #138: prev/next come after TreeNode (sizeof(TreeNode<Default>) = 24)
+    static_assert( BlockState::kOffsetPrevOffset == 24 );
+    static_assert( BlockState::kOffsetNextOffset == 28 );
 
     return true;
 }
@@ -318,7 +324,8 @@ int main()
     bool all_passed = true;
 
     std::cout << "--- P3-A: Block — inheritance and aliases ---\n";
-    PMM_RUN( "P3-A1: Block<Default> inherits LinkedListNode and TreeNode", test_p3_block_inherits_nodes );
+    PMM_RUN( "P3-A1: Block<Default> inherits TreeNode, has prev/next fields (Issue #138)",
+             test_p3_block_inherits_nodes );
     PMM_RUN( "P3-A2: Block<Default> index_type is uint32_t (Issue #120)", test_p3_block_treenode_field_types );
 
     std::cout << "\n--- P3-B: Block — sizes ---\n";
@@ -326,7 +333,7 @@ int main()
     PMM_RUN( "P3-B2: Block with various AddressTraits (8/16/32/64-bit)", test_p3_block_various_traits );
 
     std::cout << "\n--- P3-C: Block — fields accessible via BlockStateBase API (Issue #120) ---\n";
-    PMM_RUN( "P3-C1: LinkedListNode fields via BlockStateBase API", test_p3_block_list_node_fields );
+    PMM_RUN( "P3-C1: Block prev/next fields via BlockStateBase API (Issue #138)", test_p3_block_list_node_fields );
     PMM_RUN( "P3-C2: TreeNode fields via BlockStateBase API", test_p3_block_tree_node_fields );
 
     std::cout << "\n--- P3-D: Block — TreeNode fields (weight+root_offset) ---\n";

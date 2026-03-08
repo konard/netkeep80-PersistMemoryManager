@@ -75,17 +75,18 @@ static bool test_cr_no_block_is_max_uint32()
 static bool test_cr_block_header_combines_list_and_tree()
 {
     using BlockState = pmm::BlockStateBase<pmm::DefaultAddressTraits>;
-    // LinkedListNode fields at start of Block (verified via BlockStateBase::kOffset* — Issue #120)
-    static_assert( BlockState::kOffsetPrevOffset == 0 );
-    static_assert( BlockState::kOffsetNextOffset == 4 );
-    // TreeNode fields follow LinkedListNode (Issue #126: weight moved to first field)
-    static_assert( BlockState::kOffsetWeight == 8 );
-    static_assert( BlockState::kOffsetLeftOffset == 12 );
-    static_assert( BlockState::kOffsetRightOffset == 16 );
-    static_assert( BlockState::kOffsetParentOffset == 20 );
-    static_assert( BlockState::kOffsetRootOffset == 24 );
-    static_assert( BlockState::kOffsetAvlHeight == 28 );
-    static_assert( BlockState::kOffsetNodeType == 30 );
+    // Issue #138: TreeNode fields come FIRST (TreeNode is base class), prev/next come AFTER
+    // New layout: [0..23] TreeNode fields, [24..31] prev_offset, next_offset
+    static_assert( BlockState::kOffsetWeight == 0 );
+    static_assert( BlockState::kOffsetLeftOffset == 4 );
+    static_assert( BlockState::kOffsetRightOffset == 8 );
+    static_assert( BlockState::kOffsetParentOffset == 12 );
+    static_assert( BlockState::kOffsetRootOffset == 16 );
+    static_assert( BlockState::kOffsetAvlHeight == 20 );
+    static_assert( BlockState::kOffsetNodeType == 22 );
+    // Issue #138: prev/next come after TreeNode (sizeof(TreeNode<Default>) = 24)
+    static_assert( BlockState::kOffsetPrevOffset == 24 );
+    static_assert( BlockState::kOffsetNextOffset == 28 );
     static_assert( sizeof( pmm::Block<pmm::DefaultAddressTraits> ) == 32 );
     return true;
 }
@@ -202,16 +203,16 @@ static bool test_phase1_address_traits()
     return true;
 }
 
-// [Phase 2] LinkedListNode + TreeNode
+// [Phase 2] TreeNode + Block prev/next fields (Issue #138: LinkedListNode merged into Block)
 // Note: Fields are protected (Issue #120). Type verified via BlockStateBase::index_type.
 
 static bool test_phase2_list_and_tree_nodes()
 {
     using A = pmm::DefaultAddressTraits;
 
-    // Fields are protected (Issue #120): verify type via LinkedListNode::index_type alias
-    static_assert( std::is_same<pmm::LinkedListNode<A>::index_type, typename A::index_type>::value,
-                   "LinkedListNode::index_type must match A::index_type" );
+    // Fields are protected (Issue #120): verify type via Block::index_type alias (Issue #138)
+    static_assert( std::is_same<pmm::Block<A>::index_type, typename A::index_type>::value,
+                   "Block::index_type must match A::index_type (Issue #138)" );
     static_assert( std::is_same<pmm::TreeNode<A>::index_type, typename A::index_type>::value,
                    "TreeNode::index_type must match A::index_type" );
 
@@ -220,8 +221,8 @@ static bool test_phase2_list_and_tree_nodes()
                    "BlockStateBase::index_type must match A::index_type" );
 
     using A8 = pmm::TinyAddressTraits;
-    static_assert( std::is_same<pmm::LinkedListNode<A8>::index_type, std::uint8_t>::value,
-                   "LinkedListNode<TinyAddressTraits>::index_type must be uint8_t" );
+    static_assert( std::is_same<pmm::Block<A8>::index_type, std::uint8_t>::value,
+                   "Block<TinyAddressTraits>::index_type must be uint8_t (Issue #138)" );
     static_assert( std::is_same<pmm::TreeNode<A8>::index_type, std::uint8_t>::value,
                    "TreeNode<TinyAddressTraits>::index_type must be uint8_t" );
 
@@ -235,8 +236,10 @@ static bool test_phase3_block_layout()
     using A = pmm::DefaultAddressTraits;
 
     static_assert( sizeof( pmm::Block<A> ) == 32 );
-    static_assert( std::is_base_of<pmm::LinkedListNode<A>, pmm::Block<A>>::value );
+    // Issue #138: Block no longer inherits LinkedListNode — prev/next are direct Block fields
     static_assert( std::is_base_of<pmm::TreeNode<A>, pmm::Block<A>>::value );
+    // Verify total size is still 32 bytes: TreeNode(24) + prev(4) + next(4)
+    static_assert( sizeof( pmm::Block<A> ) == 32, "Block must still be 32 bytes (Issue #138)" );
 
     return true;
 }
@@ -359,8 +362,8 @@ int main()
 
     std::cout << "\n--- Part B: Phase beacons ---\n";
     PMM_RUN( "B1: AddressTraits<> — 8/16/32-bit", test_phase1_address_traits );
-    PMM_RUN( "B2: LinkedListNode<A> + TreeNode<A>", test_phase2_list_and_tree_nodes );
-    PMM_RUN( "B3: Block<A> inherits LinkedListNode + TreeNode", test_phase3_block_layout );
+    PMM_RUN( "B2: TreeNode<A> + Block prev/next fields (Issue #138)", test_phase2_list_and_tree_nodes );
+    PMM_RUN( "B3: Block<A> inherits TreeNode + has prev/next fields (Issue #138)", test_phase3_block_layout );
 
     std::cout << "\n--- Part C: Integration ---\n";
     PMM_RUN( "C1: full lifecycle allocate/deallocate", test_integration_full_lifecycle );
