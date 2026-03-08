@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [0.7.0] - 2026-03-08
+
+### Changed
+- Rewrote README.md from scratch in English (Issue #124): updated from outdated C++17 content to accurate C++20 documentation, added single-header quick start, full API reference, configuration guide, architecture overview, performance table, and repository structure
+
+### Changed
+- Merged `LinkedListNode` into `Block` (Issue #138): `prev_offset` and `next_offset` fields moved directly into `Block<AddressTraitsT>` as protected member variables; `Block` now inherits only `TreeNode<AddressTraitsT>`; file `include/pmm/linked_list_node.h` deleted
+- Updated binary block layout (Issue #138): `TreeNode` fields now occupy bytes 0–23, `prev_offset`/`next_offset` occupy bytes 24–31 (total 32 bytes unchanged)
+- Updated `kMagic` format version from `"PMM_V083"` to `"PMM_V098"` to reflect layout change; old persisted files are incompatible
+- Moved single-header preset files from `include/` root to `single_include/pmm/` (Issue #138), following the nlohmann::json single_include pattern
+- Updated `scripts/generate-single-headers.sh` to output to `single_include/pmm/` by default
+- Regenerated all four single-header preset files in `single_include/pmm/` with new block layout
+- Updated `CMakeLists.txt` to expose both `include` and `single_include` paths for the `pmm` interface target
+
+### Changed
+- Consolidated `blk_at()` duplication (Issue #141): removed per-file private `blk_at()` helpers from `AllocatorPolicy` and `AvlFreeTree`; all call sites now use the single canonical `detail::block_at<AddressTraitsT>(base, idx)` template from `types.h`
+- Unified `user_ptr()` duplication (Issue #141): `detail::user_ptr()` in `types.h` is now a template `detail::user_ptr<AddressTraitsT>(block)`, and `AllocatorPolicy::allocate_from_block()` now delegates to it instead of repeating the inline pointer arithmetic
+- Documented 12 `get_tree_*/set_tree_*` wrapper methods in `persist_memory_manager.h` as intentional safe-adapters over `BlockStateBase` (Issue #141)
+- Added explanatory comment for byte/granule conversion functions in `detail` namespace of `types.h` clarifying why they coexist with `AddressTraits` methods (Issue #141)
+
+### Fixed
+- Fixed release pipeline (Issue #138): updated `git add` paths in `.github/workflows/release.yml` to use `single_include/pmm/*.h` instead of the old `include/pmm_*.h` location, so generated single-header presets are correctly committed during auto and manual releases
+
+
 ## [0.6.1] - 2026-03-08
 
 ### Changed (Issue #138)
