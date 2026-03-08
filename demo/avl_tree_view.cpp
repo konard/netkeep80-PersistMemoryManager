@@ -26,11 +26,7 @@ void AvlTreeView::update_snapshot()
     free_size_        = DemoMgr::free_size();
 
     free_blocks_.clear();
-    DemoMgr::for_each_free_block(
-        [&]( const pmm::FreeBlockView& v )
-        {
-            free_blocks_.push_back( v );
-        } );
+    DemoMgr::for_each_free_block( [&]( const pmm::FreeBlockView& v ) { free_blocks_.push_back( v ); } );
 }
 
 // ─── Main render ──────────────────────────────────────────────────────────────
@@ -55,16 +51,15 @@ void AvlTreeView::render()
 
     if ( ImGui::TreeNode( header ) )
     {
-        if ( ImGui::BeginTable( "avl_tbl", 5,
-                                ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY,
+        if ( ImGui::BeginTable( "avl_tbl", 5, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY,
                                 ImVec2( 0.0f, 200.0f ) ) )
         {
             ImGui::TableSetupScrollFreeze( 0, 1 );
-            ImGui::TableSetupColumn( "Offset",    ImGuiTableColumnFlags_WidthFixed, 90.0f );
-            ImGui::TableSetupColumn( "Free (B)",  ImGuiTableColumnFlags_WidthFixed, 80.0f );
+            ImGui::TableSetupColumn( "Offset", ImGuiTableColumnFlags_WidthFixed, 90.0f );
+            ImGui::TableSetupColumn( "Free (B)", ImGuiTableColumnFlags_WidthFixed, 80.0f );
             ImGui::TableSetupColumn( "Total (B)", ImGuiTableColumnFlags_WidthFixed, 80.0f );
-            ImGui::TableSetupColumn( "Height",    ImGuiTableColumnFlags_WidthFixed, 55.0f );
-            ImGui::TableSetupColumn( "Depth",     ImGuiTableColumnFlags_WidthFixed, 50.0f );
+            ImGui::TableSetupColumn( "Height", ImGuiTableColumnFlags_WidthFixed, 55.0f );
+            ImGui::TableSetupColumn( "Depth", ImGuiTableColumnFlags_WidthFixed, 50.0f );
             ImGui::TableHeadersRow();
 
             for ( const pmm::FreeBlockView& v : free_blocks_ )

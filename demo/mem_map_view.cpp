@@ -29,12 +29,18 @@ static ImVec4 pixel_colour( PixelKind k, bool highlighted )
 
     switch ( k )
     {
-    case PixelKind::ManagerHeader: return ImVec4( 0.53f, 0.27f, 1.0f, 1.0f ); // purple
-    case PixelKind::UsedHeader:    return ImVec4( 0.13f, 0.13f, 0.53f, 1.0f ); // dark blue
-    case PixelKind::UsedData:      return ImVec4( 0.27f, 0.27f, 1.0f, 1.0f );  // bright blue
-    case PixelKind::FreeHeader:    return ImVec4( 0.27f, 0.27f, 0.27f, 1.0f ); // dark grey
-    case PixelKind::FreeData:      return ImVec4( 1.0f, 1.0f, 1.0f, 1.0f );    // white
-    default:                       return ImVec4( 0.0f, 0.0f, 0.0f, 1.0f );    // black (unused)
+    case PixelKind::ManagerHeader:
+        return ImVec4( 0.53f, 0.27f, 1.0f, 1.0f ); // purple
+    case PixelKind::UsedHeader:
+        return ImVec4( 0.13f, 0.13f, 0.53f, 1.0f ); // dark blue
+    case PixelKind::UsedData:
+        return ImVec4( 0.27f, 0.27f, 1.0f, 1.0f ); // bright blue
+    case PixelKind::FreeHeader:
+        return ImVec4( 0.27f, 0.27f, 0.27f, 1.0f ); // dark grey
+    case PixelKind::FreeData:
+        return ImVec4( 1.0f, 1.0f, 1.0f, 1.0f ); // white
+    default:
+        return ImVec4( 0.0f, 0.0f, 0.0f, 1.0f ); // black (unused)
     }
 }
 
@@ -63,7 +69,7 @@ void MemMapView::rebuild_pixel_map()
     // Block<A> header size in bytes (32 bytes for DefaultAddressTraits).
     const std::size_t kBlockHdrSize = pmm::kGranuleSize * pmm::detail::kBlockHeaderGranules;
     // ManagerHeader size in bytes (64 bytes).
-    const std::size_t kMgrHdrSize   = sizeof( pmm::detail::ManagerHeader );
+    const std::size_t kMgrHdrSize = sizeof( pmm::detail::ManagerHeader );
 
     // First block (Block_0) starts at offset 0; ManagerHeader follows immediately.
     // Mark Block_0 + ManagerHeader as ManagerHeader colour (manager metadata region).
@@ -149,12 +155,12 @@ void MemMapView::render_pixel_map( float map_width )
                 dominant = k;
         }
 
-        bool hl = ( hl_byte_start != static_cast<std::size_t>( -1 ) && byte_start < hl_byte_end &&
-                    byte_end > hl_byte_start );
+        bool hl =
+            ( hl_byte_start != static_cast<std::size_t>( -1 ) && byte_start < hl_byte_end && byte_end > hl_byte_start );
 
-        ImU32  col   = ImGui::ColorConvertFloat4ToU32( pixel_colour( dominant, hl ) );
-        ImVec2 pmin  = ImVec2( cursor.x + static_cast<float>( p ) * px_w, cursor.y );
-        ImVec2 pmax  = ImVec2( pmin.x + px_w, cursor.y + px_h );
+        ImU32  col  = ImGui::ColorConvertFloat4ToU32( pixel_colour( dominant, hl ) );
+        ImVec2 pmin = ImVec2( cursor.x + static_cast<float>( p ) * px_w, cursor.y );
+        ImVec2 pmax = ImVec2( pmin.x + px_w, cursor.y + px_h );
         dl->AddRectFilled( pmin, pmax, col );
     }
 

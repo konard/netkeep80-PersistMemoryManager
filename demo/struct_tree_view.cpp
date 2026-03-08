@@ -28,11 +28,7 @@ void StructTreeView::update_snapshot()
     snapshot_.alloc_count = DemoMgr::alloc_block_count();
 
     blocks_.clear();
-    DemoMgr::for_each_block(
-        [&]( const pmm::BlockView& v )
-        {
-            blocks_.push_back( v );
-        } );
+    DemoMgr::for_each_block( [&]( const pmm::BlockView& v ) { blocks_.push_back( v ); } );
 }
 
 // ─── Renderer ─────────────────────────────────────────────────────────────────
@@ -68,11 +64,8 @@ void StructTreeView::render( std::size_t& highlighted_block )
                 // Build a label: "[used|free] offset=N  size=M"
                 char label[128];
                 std::snprintf( label, sizeof( label ), "[%s] offset=0x%zX  total=%zu  user=%zu##blk%zu",
-                               v.used ? "used" : "free",
-                               static_cast<std::size_t>( v.offset ),
-                               v.total_size,
-                               v.user_size,
-                               v.index );
+                               v.used ? "used" : "free", static_cast<std::size_t>( v.offset ), v.total_size,
+                               v.user_size, v.index );
 
                 // Colour used blocks blue, free blocks grey.
                 if ( v.used )

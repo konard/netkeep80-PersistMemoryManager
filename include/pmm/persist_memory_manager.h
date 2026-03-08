@@ -492,20 +492,20 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         // Visit current node
         std::uint32_t total_gran = detail::block_total_granules( base, hdr, blk );
         FreeBlockView view;
-        view.offset       = static_cast<std::ptrdiff_t>( detail::idx_to_byte_off( node_idx ) );
-        view.total_size   = detail::granules_to_bytes( total_gran );
-        view.free_size    = detail::granules_to_bytes( total_gran - detail::kBlockHeaderGranules );
-        view.left_offset  = ( blk->left_offset != detail::kNoBlock )
-                                ? static_cast<std::ptrdiff_t>( detail::idx_to_byte_off( blk->left_offset ) )
-                                : -1;
-        view.right_offset = ( blk->right_offset != detail::kNoBlock )
-                                ? static_cast<std::ptrdiff_t>( detail::idx_to_byte_off( blk->right_offset ) )
-                                : -1;
+        view.offset        = static_cast<std::ptrdiff_t>( detail::idx_to_byte_off( node_idx ) );
+        view.total_size    = detail::granules_to_bytes( total_gran );
+        view.free_size     = detail::granules_to_bytes( total_gran - detail::kBlockHeaderGranules );
+        view.left_offset   = ( blk->left_offset != detail::kNoBlock )
+                                 ? static_cast<std::ptrdiff_t>( detail::idx_to_byte_off( blk->left_offset ) )
+                                 : -1;
+        view.right_offset  = ( blk->right_offset != detail::kNoBlock )
+                                 ? static_cast<std::ptrdiff_t>( detail::idx_to_byte_off( blk->right_offset ) )
+                                 : -1;
         view.parent_offset = ( blk->parent_offset != detail::kNoBlock )
                                  ? static_cast<std::ptrdiff_t>( detail::idx_to_byte_off( blk->parent_offset ) )
                                  : -1;
-        view.avl_height = blk->avl_height;
-        view.avl_depth  = depth;
+        view.avl_height    = blk->avl_height;
+        view.avl_depth     = depth;
         callback( view );
 
         // Visit right subtree (larger blocks)

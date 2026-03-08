@@ -59,7 +59,7 @@ class StructTreeView
     void render( std::size_t& highlighted_block );
 
   private:
-    TreeSnapshot               snapshot_;
+    TreeSnapshot                snapshot_;
     std::vector<pmm::BlockView> blocks_; ///< Per-block snapshot from last update_snapshot().
 };
 
