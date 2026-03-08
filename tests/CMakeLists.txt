@@ -110,6 +110,9 @@ pmm_add_test(test_issue123_presets test_issue123_presets.cpp)
 # ─── Тесты улучшений по code review (Issue #144) ─────────────────────────────
 pmm_add_test(test_issue144_code_review test_issue144_code_review.cpp)
 
+# ─── Тесты переосмысления конфигураций (Issue #146) ──────────────────────────
+pmm_add_test(test_issue146_configs test_issue146_configs.cpp)
+
 # ─── Тесты самодостаточности single-header файлов (Issue #123) ───────────────
 # Каждый single-header файл тестируется отдельным исполняемым файлом.
 # Это гарантирует автономность: каждый файл компилируется без include/pmm/*.
@@ -121,3 +124,11 @@ foreach(preset single_threaded multi_threaded embedded industrial_db)
     target_link_libraries(${target} PRIVATE Threads::Threads)
     add_test(NAME ${target} COMMAND ${target})
 endforeach()
+
+# ─── Тест самодостаточности single-header файла для EmbeddedStaticHeap (Issue #146) ─
+set(target test_issue146_sh_embedded_static)
+add_executable(${target} test_issue146_sh_embedded_static.cpp)
+target_include_directories(${target} PRIVATE ${CMAKE_SOURCE_DIR}/single_include ${CMAKE_SOURCE_DIR}/single_include/pmm)
+target_compile_features(${target} PRIVATE cxx_std_20)
+target_link_libraries(${target} PRIVATE Threads::Threads)
+add_test(NAME ${target} COMMAND ${target})

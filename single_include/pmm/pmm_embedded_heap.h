@@ -27,26 +27,32 @@
 
 /**
  * @file pmm/pmm_presets.h
- * @brief pmm_presets — готовые инстанции PersistMemoryManager (Issue #87 Phase 8, #110, #123).
+ * @brief pmm_presets — готовые инстанции PersistMemoryManager (Issue #87 Phase 8, #110, #123, #146).
  *
  * Предоставляет набор готовых псевдонимов для наиболее распространённых
  * конфигураций менеджера персистентной памяти:
  *
- *   - `SingleThreadedHeap`  — 32-bit, NoLock, HeapStorage (однопоточные приложения)
- *   - `MultiThreadedHeap`   — 32-bit, SharedMutexLock, HeapStorage (многопоточные)
- *   - `EmbeddedHeap`        — 32-bit, NoLock, HeapStorage, рост 50% (встраиваемые системы)
- *   - `IndustrialDBHeap`    — 32-bit, SharedMutexLock, HeapStorage, рост 100% (промышленные БД)
+ *   --- Embedded (статические, однопоточные) ---
+ *   - `EmbeddedStaticHeap<N>`   — 32-bit, NoLock, StaticStorage<N> (без heap, фиксированный пул)
+ *   - `EmbeddedHeap`            — 32-bit, NoLock, HeapStorage, рост 50% (embedded с heap)
+ *
+ *   --- Desktop (динамические, однопоточные/многопоточные) ---
+ *   - `SingleThreadedHeap`      — 32-bit/16B, NoLock, HeapStorage, рост 25%
+ *   - `MultiThreadedHeap`       — 32-bit/16B, SharedMutexLock, HeapStorage, рост 25%
+ *
+ *   --- Industrial DB (высоконагруженные, многопоточные) ---
+ *   - `IndustrialDBHeap`        — 32-bit/16B, SharedMutexLock, HeapStorage, рост 100%
  *
  * Использует унифицированный `PersistMemoryManager<ConfigT, InstanceId>` (Issue #110).
  *
  * @see persist_memory_manager.h — PersistMemoryManager (Issue #110)
  * @see manager_configs.h — готовые конфигурации менеджеров
- * @version 0.3 (Issue #123 — добавлены EmbeddedHeap и IndustrialDBHeap)
+ * @version 0.4 (Issue #146 — новые архитектурные пресеты и правила: EmbeddedStaticHeap)
  */
 
 /**
  * @file pmm/manager_configs.h
- * @brief Готовые конфигурационные структуры для менеджеров ПАП (Issue #100, #110).
+ * @brief Готовые конфигурационные структуры для менеджеров ПАП (Issue #100, #110, #146).
  *
  * Предоставляет набор предопределённых конфигурационных структур для использования
  * с `PersistMemoryManager<ConfigT, InstanceId>`. Каждая конфигурация описывает
@@ -61,26 +67,53 @@
  *   - `max_memory_gb`    — максимальный объём памяти в ГБ
  *   - `grow_numerator` / `grow_denominator` — коэффициент роста хранилища
  *
+ * Правила выбора конфигурации (Issue #146):
+ *
+ *   Поддерживаемый размер гранулы: 16 байт (DefaultAddressTraits::granule_size).
+ *   Поддерживаемый размер индекса: uint32_t — текущий уровень поддержки PersistMemoryManager.
+ *
+ *   Ключевые ограничения (задокументированы static_assert-ами):
+ *     1. granule_size >= kMinGranuleSize (4 байта — минимум размер слова архитектуры).
+ *     2. granule_size — степень двойки.
+ *
+ *   Архитектурные сценарии:
+ *     - Embedded (без heap, статический пул):
+ *         StaticStorage<N, DefaultAddressTraits> + NoLock, гранула 16B.
+ *         Нет динамического расширения, только однопоточный доступ.
+ *     - Desktop/server (до 64 ГБ):
+ *         HeapStorage<DefaultAddressTraits> + NoLock/SharedMutexLock, гранула 16B.
+ *     - Industrial DB (высоконагруженный):
+ *         HeapStorage<DefaultAddressTraits> + SharedMutexLock + агрессивный рост, гранула 16B.
+ *
  * Доступные конфигурации:
- *   - `CacheManagerConfig`      — кеш-менеджер (однопоточный, NoLock, HeapStorage)
- *   - `PersistentDataConfig`    — персистентные данные (многопоточный, SharedMutexLock, HeapStorage)
- *   - `EmbeddedManagerConfig`   — embedded-системы (однопоточный, NoLock, HeapStorage)
- *   - `IndustrialDBConfig`      — промышленная БД (многопоточный, SharedMutexLock, HeapStorage)
+ *   --- Embedded (статическое хранилище, однопоточный) ---
+ *   - `EmbeddedStaticConfig<N>` — StaticStorage<N>, NoLock, 16B гранула (фиксированный пул)
+ *
+ *   --- Desktop (динамическое хранилище) ---
+ *   - `CacheManagerConfig`      — однопоточный, NoLock, HeapStorage, 16B, рост 25%
+ *   - `PersistentDataConfig`    — многопоточный, SharedMutexLock, HeapStorage, 16B, рост 25%
+ *   - `EmbeddedManagerConfig`   — однопоточный, NoLock, HeapStorage, 16B, рост 50%
+ *
+ *   --- Industrial DB (высокая нагрузка) ---
+ *   - `IndustrialDBConfig`      — многопоточный, SharedMutexLock, HeapStorage, 16B, рост 100%
  *
  * Пример использования:
  * @code
- *   // Используем готовую конфигурацию для создания менеджера
+ *   // Кеш-менеджер (однопоточный, 64 МБ)
  *   using AppCache = pmm::PersistMemoryManager<pmm::CacheManagerConfig>;
- *
- *   AppCache::create(64 * 1024);
- *
+ *   AppCache::create(64 * 1024 * 1024);
  *   AppCache::pptr<int> ptr = AppCache::allocate_typed<int>();
  *   *ptr = 42;
+ *
+ *   // Embedded-менеджер с фиксированным пулом 8 КБ (без heap)
+ *   using EmbMgr = pmm::PersistMemoryManager<pmm::EmbeddedStaticConfig<8192>>;
+ *   EmbMgr::create(8192);
+ *   void* p = EmbMgr::allocate(64);
  * @endcode
  *
  * @see persist_memory_manager.h — PersistMemoryManager (Issue #110)
  * @see config.h — базовые политики блокировок (NoLock, SharedMutexLock)
- * @version 0.2 (Issue #110 — добавлены address_traits, storage_backend, free_block_tree в конфигурации)
+ * @version 0.3 (Issue #146 — переосмысление конфигов: новые архитектурные пресеты и правила)
  */
 
 /**
@@ -2295,22 +2328,156 @@ static_assert( is_storage_backend_v<HeapStorage<>>, "HeapStorage must satisfy St
 
 } // namespace pmm
 
+/**
+ * @file pmm/static_storage.h
+ * @brief StaticStorage — статический бэкенд хранилища ПАП (Issue #87 Phase 5).
+ *
+ * Хранит управляемую область в фиксированном буфере размером `Size` байт,
+ * расположенном внутри объекта (подходит для глобальных объектов и стека).
+ *
+ * Ограничения:
+ *   - Размер фиксирован на этапе компиляции — expand() всегда возвращает false.
+ *   - Не владеет памятью в смысле dynamic allocation — owns_memory() == false.
+ *   - Требует выравнивания буфера по `AddressTraitsT::granule_size`.
+ *
+ * Применение: embedded-системы, тесты с маленьким фиксированным пулом,
+ * быстрые unit-тесты без динамической памяти.
+ *
+ * @tparam Size           Размер буфера в байтах (compile-time константа).
+ * @tparam AddressTraitsT Traits адресного пространства (из address_traits.h).
+ *
+ * @see plan_issue87.md §5 «Фаза 5: StorageBackend — StaticStorage»
+ * @see storage_backend.h — концепт StorageBackend
+ * @version 0.1 (Issue #87 Phase 5)
+ */
+
+#include <cstddef>
+#include <cstdint>
+
 namespace pmm
 {
 
 /**
- * @brief Конфигурация кеш-менеджера.
+ * @brief Статический бэкенд хранилища — фиксированный буфер внутри объекта.
+ *
+ * @tparam Size           Размер буфера в байтах.
+ * @tparam AddressTraitsT Traits адресного пространства (определяет выравнивание).
+ */
+template <std::size_t Size, typename AddressTraitsT = DefaultAddressTraits> class StaticStorage
+{
+    static_assert( Size > 0, "StaticStorage: Size must be > 0" );
+    static_assert( Size % AddressTraitsT::granule_size == 0, "StaticStorage: Size must be a multiple of granule_size" );
+
+  public:
+    using address_traits = AddressTraitsT;
+
+    StaticStorage() noexcept                         = default;
+    StaticStorage( const StaticStorage& )            = delete;
+    StaticStorage& operator=( const StaticStorage& ) = delete;
+    StaticStorage( StaticStorage&& )                 = delete;
+    StaticStorage& operator=( StaticStorage&& )      = delete;
+
+    /// @brief Указатель на начало буфера.
+    std::uint8_t*       base_ptr() noexcept { return _buffer; }
+    const std::uint8_t* base_ptr() const noexcept { return _buffer; }
+
+    /// @brief Текущий размер буфера (фиксированный = Size).
+    constexpr std::size_t total_size() const noexcept { return Size; }
+
+    /// @brief Расширить хранилище — невозможно для статического буфера.
+    /// @return Всегда false.
+    bool expand( std::size_t /*additional_bytes*/ ) noexcept { return false; }
+
+    /// @brief StaticStorage не владеет динамически выделенной памятью.
+    /// @return Всегда false.
+    constexpr bool owns_memory() const noexcept { return false; }
+
+  private:
+    alignas( AddressTraitsT::granule_size ) std::uint8_t _buffer[Size]{};
+};
+
+// ─── static_assert: StaticStorage соответствует концепту StorageBackend ────────
+
+static_assert( is_storage_backend_v<StaticStorage<64>>, "StaticStorage must satisfy StorageBackendConcept" );
+
+} // namespace pmm
+
+namespace pmm
+{
+
+// ─── Правила для гранул (Issue #146) ─────────────────────────────────────────
+
+/// @brief Минимальный допустимый размер гранулы (размер слова архитектуры = 4 байта).
+inline constexpr std::size_t kMinGranuleSize = 4;
+
+// ─── Embedded / статические конфигурации ─────────────────────────────────────
+
+/**
+ * @brief Конфигурация embedded-менеджера со статическим фиксированным буфером.
+ *
+ * Предназначена для систем без heap (микроконтроллеры, RTOS, bare-metal):
+ *   - uint32_t индекс (DefaultAddressTraits), 16-байтная гранула
+ *   - StaticStorage<BufferSize> — фиксированный буфер в BSS/глобальной области, нет malloc
+ *   - Нет блокировок (NoLock) — только однопоточный контекст
+ *   - Не расширяется (StaticStorage::expand() всегда false)
+ *
+ * Статические проверки (Issue #146):
+ *   - granule_size >= kMinGranuleSize (16 >= 4) ✓
+ *   - granule_size — степень двойки ✓
+ *   - BufferSize кратно granule_size ✓ (проверяется в StaticStorage)
+ *
+ * Типичный сценарий: встраиваемые системы без heap, Linux bare-metal, фиксированный пул.
+ *
+ * @tparam BufferSize Размер статического буфера в байтах (кратно 16).
+ *                    По умолчанию 4096 байт (4 КБ).
+ *
+ * @code
+ *   using EmbMgr = pmm::PersistMemoryManager<pmm::EmbeddedStaticConfig<8192>>;
+ *   EmbMgr::create(8192);
+ *   void* ptr = EmbMgr::allocate(64);
+ * @endcode
+ */
+template <std::size_t BufferSize = 4096> struct EmbeddedStaticConfig
+{
+    static_assert( DefaultAddressTraits::granule_size >= kMinGranuleSize,
+                   "EmbeddedStaticConfig: granule_size must be >= kMinGranuleSize (4 bytes)" );
+    static_assert( ( DefaultAddressTraits::granule_size & ( DefaultAddressTraits::granule_size - 1 ) ) == 0,
+                   "EmbeddedStaticConfig: granule_size must be a power of 2" );
+
+    using address_traits                          = DefaultAddressTraits;
+    using storage_backend                         = StaticStorage<BufferSize, DefaultAddressTraits>;
+    using free_block_tree                         = AvlFreeTree<DefaultAddressTraits>;
+    using lock_policy                             = config::NoLock;
+    static constexpr std::size_t granule_size     = DefaultAddressTraits::granule_size;
+    static constexpr std::size_t max_memory_gb    = 0; // Нет расширения — StaticStorage
+    static constexpr std::size_t grow_numerator   = 3;
+    static constexpr std::size_t grow_denominator = 2;
+};
+
+// ─── Desktop / динамические конфигурации ─────────────────────────────────────
+
+/**
+ * @brief Конфигурация кеш-менеджера (однопоточный, heap, 16B гранула).
  *
  * Оптимизирован для временного кеша с однопоточным доступом:
  *   - Нет блокировок (NoLock) — максимальная производительность
  *   - 16-байтная гранула (DefaultAddressTraits), поддержка до 64 ГБ
- *   - HeapStorage — динамическая память
+ *   - HeapStorage — динамическая память с авторасширением
  *   - Коэффициент роста 5/4 (25%)
+ *
+ * Статические проверки (Issue #146):
+ *   - granule_size >= kMinGranuleSize (16 >= 4) ✓
+ *   - granule_size — степень двойки ✓
  *
  * Типичный сценарий: кеш вычислений, временные буферы в однопоточном коде.
  */
 struct CacheManagerConfig
 {
+    static_assert( DefaultAddressTraits::granule_size >= kMinGranuleSize,
+                   "CacheManagerConfig: granule_size must be >= kMinGranuleSize (4 bytes)" );
+    static_assert( ( DefaultAddressTraits::granule_size & ( DefaultAddressTraits::granule_size - 1 ) ) == 0,
+                   "CacheManagerConfig: granule_size must be a power of 2" );
+
     using address_traits                          = DefaultAddressTraits;
     using storage_backend                         = HeapStorage<DefaultAddressTraits>;
     using free_block_tree                         = AvlFreeTree<DefaultAddressTraits>;
@@ -2322,7 +2489,7 @@ struct CacheManagerConfig
 };
 
 /**
- * @brief Конфигурация менеджера персистентных данных.
+ * @brief Конфигурация менеджера персистентных данных (многопоточный, heap, 16B гранула).
  *
  * Оптимизирован для хранения персистентных данных с многопоточным доступом:
  *   - SharedMutexLock — потокобезопасность
@@ -2330,10 +2497,19 @@ struct CacheManagerConfig
  *   - HeapStorage — динамическая память
  *   - Коэффициент роста 5/4 (25%)
  *
+ * Статические проверки (Issue #146):
+ *   - granule_size >= kMinGranuleSize (16 >= 4) ✓
+ *   - granule_size — степень двойки ✓
+ *
  * Типичный сценарий: долговременное хранение данных, файловые менеджеры.
  */
 struct PersistentDataConfig
 {
+    static_assert( DefaultAddressTraits::granule_size >= kMinGranuleSize,
+                   "PersistentDataConfig: granule_size must be >= kMinGranuleSize (4 bytes)" );
+    static_assert( ( DefaultAddressTraits::granule_size & ( DefaultAddressTraits::granule_size - 1 ) ) == 0,
+                   "PersistentDataConfig: granule_size must be a power of 2" );
+
     using address_traits                          = DefaultAddressTraits;
     using storage_backend                         = HeapStorage<DefaultAddressTraits>;
     using free_block_tree                         = AvlFreeTree<DefaultAddressTraits>;
@@ -2345,18 +2521,27 @@ struct PersistentDataConfig
 };
 
 /**
- * @brief Конфигурация embedded-менеджера.
+ * @brief Конфигурация embedded-менеджера с динамическим хранилищем.
  *
- * Оптимизирован для встраиваемых систем с ограниченными ресурсами:
+ * Оптимизирован для встраиваемых/ресурсоограниченных систем с heap:
  *   - Нет блокировок (NoLock) — минимальные накладные расходы
  *   - 16-байтная гранула (DefaultAddressTraits), поддержка до 64 ГБ
  *   - HeapStorage — динамическая память
- *   - Консервативный коэффициент роста 3/2 (50%) для лучшего использования памяти
+ *   - Консервативный коэффициент роста 3/2 (50%) для экономии памяти
  *
- * Типичный сценарий: микроконтроллеры, RTOS, системы с ограниченной памятью.
+ * Статические проверки (Issue #146):
+ *   - granule_size >= kMinGranuleSize (16 >= 4) ✓
+ *   - granule_size — степень двойки ✓
+ *
+ * Типичный сценарий: Linux embedded (RPi, etc.), системы с ограниченной памятью.
  */
 struct EmbeddedManagerConfig
 {
+    static_assert( DefaultAddressTraits::granule_size >= kMinGranuleSize,
+                   "EmbeddedManagerConfig: granule_size must be >= kMinGranuleSize (4 bytes)" );
+    static_assert( ( DefaultAddressTraits::granule_size & ( DefaultAddressTraits::granule_size - 1 ) ) == 0,
+                   "EmbeddedManagerConfig: granule_size must be a power of 2" );
+
     using address_traits                          = DefaultAddressTraits;
     using storage_backend                         = HeapStorage<DefaultAddressTraits>;
     using free_block_tree                         = AvlFreeTree<DefaultAddressTraits>;
@@ -2367,8 +2552,10 @@ struct EmbeddedManagerConfig
     static constexpr std::size_t grow_denominator = 2;
 };
 
+// ─── Industrial DB конфигурации ───────────────────────────────────────────────
+
 /**
- * @brief Конфигурация промышленной базы данных.
+ * @brief Конфигурация промышленной базы данных (многопоточный, heap, 16B гранула).
  *
  * Оптимизирован для высоконагруженных промышленных систем:
  *   - SharedMutexLock — потокобезопасность с поддержкой конкурентного чтения
@@ -2376,10 +2563,19 @@ struct EmbeddedManagerConfig
  *   - HeapStorage — динамическая память
  *   - Агрессивный коэффициент роста 2/1 (100%) для минимизации перевыделений
  *
+ * Статические проверки (Issue #146):
+ *   - granule_size >= kMinGranuleSize (16 >= 4) ✓
+ *   - granule_size — степень двойки ✓
+ *
  * Типичный сценарий: промышленные базы данных, time-series хранилища.
  */
 struct IndustrialDBConfig
 {
+    static_assert( DefaultAddressTraits::granule_size >= kMinGranuleSize,
+                   "IndustrialDBConfig: granule_size must be >= kMinGranuleSize (4 bytes)" );
+    static_assert( ( DefaultAddressTraits::granule_size & ( DefaultAddressTraits::granule_size - 1 ) ) == 0,
+                   "IndustrialDBConfig: granule_size must be a power of 2" );
+
     using address_traits                          = DefaultAddressTraits;
     using storage_backend                         = HeapStorage<DefaultAddressTraits>;
     using free_block_tree                         = AvlFreeTree<DefaultAddressTraits>;
@@ -3976,6 +4172,51 @@ namespace pmm
 namespace presets
 {
 
+// ─── Embedded пресеты ─────────────────────────────────────────────────────────
+
+/**
+ * @brief Embedded-менеджер с фиксированным статическим буфером (без heap).
+ *
+ * - 32-bit адресация (DefaultAddressTraits), 16-байтная гранула
+ * - StaticStorage<BufferSize> — фиксированный буфер в BSS/глобальной области, нет malloc
+ * - Без блокировок (для однопоточных embedded-систем без heap)
+ * - Не расширяется (expand() всегда false)
+ * - InstanceId=0 (по умолчанию)
+ *
+ * @tparam BufferSize Размер статического буфера в байтах (кратно 16).
+ *                    По умолчанию 4096 байт (4 КБ).
+ *
+ * Использование:
+ * @code
+ *   using MyEmbMgr = pmm::presets::EmbeddedStaticHeap<8192>; // 8 KiB статический пул
+ *   MyEmbMgr::create(8192);
+ *   void* ptr = MyEmbMgr::allocate(64);
+ *   MyEmbMgr::deallocate(ptr);
+ * @endcode
+ */
+template <std::size_t BufferSize = 4096>
+using EmbeddedStaticHeap = PersistMemoryManager<EmbeddedStaticConfig<BufferSize>, 0>;
+
+/**
+ * @brief Стандартный embedded-менеджер с динамической памятью.
+ *
+ * - 32-bit адресация, 16-байтная гранула
+ * - Динамическая память через HeapStorage
+ * - Без блокировок (однопоточный доступ)
+ * - Консервативный коэффициент роста 3/2 (50%) для экономии памяти
+ * - InstanceId=0 (по умолчанию)
+ *
+ * Использование:
+ * @code
+ *   pmm::presets::EmbeddedHeap::create(4 * 1024); // 4 KiB начальный размер
+ *   void* ptr = pmm::presets::EmbeddedHeap::allocate(64);
+ *   pmm::presets::EmbeddedHeap::deallocate(ptr);
+ * @endcode
+ */
+using EmbeddedHeap = PersistMemoryManager<EmbeddedManagerConfig, 0>;
+
+// ─── Desktop пресеты ──────────────────────────────────────────────────────────
+
 /**
  * @brief Стандартный однопоточный динамический менеджер.
  *
@@ -4012,23 +4253,7 @@ using SingleThreadedHeap = PersistMemoryManager<CacheManagerConfig, 0>;
  */
 using MultiThreadedHeap = PersistMemoryManager<PersistentDataConfig, 0>;
 
-/**
- * @brief Менеджер для встраиваемых систем с ограниченными ресурсами.
- *
- * - 32-bit адресация, 16-байтная гранула
- * - Динамическая память через HeapStorage
- * - Без блокировок (однопоточный доступ)
- * - Консервативный коэффициент роста 3/2 (50%) для экономии памяти
- * - InstanceId=0 (по умолчанию)
- *
- * Использование:
- * @code
- *   pmm::presets::EmbeddedHeap::create(4 * 1024); // 4 KiB начальный размер
- *   void* ptr = pmm::presets::EmbeddedHeap::allocate(64);
- *   pmm::presets::EmbeddedHeap::deallocate(ptr);
- * @endcode
- */
-using EmbeddedHeap = PersistMemoryManager<EmbeddedManagerConfig, 0>;
+// ─── Industrial DB пресеты ────────────────────────────────────────────────────
 
 /**
  * @brief Менеджер для промышленных баз данных с высокой нагрузкой.
@@ -4174,80 +4399,6 @@ template <typename MgrT> inline bool load_manager_from_file( const char* filenam
 
     return MgrT::load();
 }
-
-} // namespace pmm
-
-/**
- * @file pmm/static_storage.h
- * @brief StaticStorage — статический бэкенд хранилища ПАП (Issue #87 Phase 5).
- *
- * Хранит управляемую область в фиксированном буфере размером `Size` байт,
- * расположенном внутри объекта (подходит для глобальных объектов и стека).
- *
- * Ограничения:
- *   - Размер фиксирован на этапе компиляции — expand() всегда возвращает false.
- *   - Не владеет памятью в смысле dynamic allocation — owns_memory() == false.
- *   - Требует выравнивания буфера по `AddressTraitsT::granule_size`.
- *
- * Применение: embedded-системы, тесты с маленьким фиксированным пулом,
- * быстрые unit-тесты без динамической памяти.
- *
- * @tparam Size           Размер буфера в байтах (compile-time константа).
- * @tparam AddressTraitsT Traits адресного пространства (из address_traits.h).
- *
- * @see plan_issue87.md §5 «Фаза 5: StorageBackend — StaticStorage»
- * @see storage_backend.h — концепт StorageBackend
- * @version 0.1 (Issue #87 Phase 5)
- */
-
-#include <cstddef>
-#include <cstdint>
-
-namespace pmm
-{
-
-/**
- * @brief Статический бэкенд хранилища — фиксированный буфер внутри объекта.
- *
- * @tparam Size           Размер буфера в байтах.
- * @tparam AddressTraitsT Traits адресного пространства (определяет выравнивание).
- */
-template <std::size_t Size, typename AddressTraitsT = DefaultAddressTraits> class StaticStorage
-{
-    static_assert( Size > 0, "StaticStorage: Size must be > 0" );
-    static_assert( Size % AddressTraitsT::granule_size == 0, "StaticStorage: Size must be a multiple of granule_size" );
-
-  public:
-    using address_traits = AddressTraitsT;
-
-    StaticStorage() noexcept                         = default;
-    StaticStorage( const StaticStorage& )            = delete;
-    StaticStorage& operator=( const StaticStorage& ) = delete;
-    StaticStorage( StaticStorage&& )                 = delete;
-    StaticStorage& operator=( StaticStorage&& )      = delete;
-
-    /// @brief Указатель на начало буфера.
-    std::uint8_t*       base_ptr() noexcept { return _buffer; }
-    const std::uint8_t* base_ptr() const noexcept { return _buffer; }
-
-    /// @brief Текущий размер буфера (фиксированный = Size).
-    constexpr std::size_t total_size() const noexcept { return Size; }
-
-    /// @brief Расширить хранилище — невозможно для статического буфера.
-    /// @return Всегда false.
-    bool expand( std::size_t /*additional_bytes*/ ) noexcept { return false; }
-
-    /// @brief StaticStorage не владеет динамически выделенной памятью.
-    /// @return Всегда false.
-    constexpr bool owns_memory() const noexcept { return false; }
-
-  private:
-    alignas( AddressTraitsT::granule_size ) std::uint8_t _buffer[Size]{};
-};
-
-// ─── static_assert: StaticStorage соответствует концепту StorageBackend ────────
-
-static_assert( is_storage_backend_v<StaticStorage<64>>, "StaticStorage must satisfy StorageBackendConcept" );
 
 } // namespace pmm
 

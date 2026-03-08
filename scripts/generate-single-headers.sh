@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# generate-single-headers.sh - Generate single-header preset files for PMM (Issue #123)
+# generate-single-headers.sh - Generate single-header preset files for PMM (Issue #123, #146)
 #
 # Usage: ./scripts/generate-single-headers.sh [--output-dir DIR]
 #
@@ -9,11 +9,14 @@
 #
 # Prerequisites: quom >= 4.0.0 (pip install quom)
 #
-# Output files:
+# Output files (Issue #123 — original presets):
 #   single_include/pmm/pmm_single_threaded_heap.h  — NoLock + HeapStorage (CacheManagerConfig)
 #   single_include/pmm/pmm_multi_threaded_heap.h   — SharedMutexLock + HeapStorage (PersistentDataConfig)
 #   single_include/pmm/pmm_embedded_heap.h         — NoLock + HeapStorage, grow 50% (EmbeddedManagerConfig)
 #   single_include/pmm/pmm_industrial_db_heap.h    — SharedMutexLock + HeapStorage, grow 100% (IndustrialDBConfig)
+#
+# Output files (Issue #146 — new presets):
+#   single_include/pmm/pmm_embedded_static_heap.h     — NoLock + StaticStorage/16B, 4 KiB (EmbeddedStaticConfig<4096>)
 
 set -euo pipefail
 
@@ -122,9 +125,15 @@ make_entry_point \
     "IndustrialDBHeap" \
     "SharedMutexLock + HeapStorage, grow 100% (IndustrialDBConfig)"
 
+make_entry_point \
+    "pmm_embedded_static_heap.h" \
+    "EmbeddedStaticHeap" \
+    "NoLock + StaticStorage/16B granule (EmbeddedStaticConfig)"
+
 echo ""
 echo "All single-header presets generated in $OUTPUT_DIR:"
 for f in pmm_single_threaded_heap.h pmm_multi_threaded_heap.h \
-          pmm_embedded_heap.h pmm_industrial_db_heap.h; do
+          pmm_embedded_heap.h pmm_industrial_db_heap.h \
+          pmm_embedded_static_heap.h; do
     echo "  $OUTPUT_DIR/$f ($(wc -l < "$OUTPUT_DIR/$f") lines)"
 done
