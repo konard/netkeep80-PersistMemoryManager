@@ -5,18 +5,21 @@
  * Параметрический узел двухсвязного списка, где тип индексных полей определяется
  * через `AddressTraits::index_type`.
  *
- * Issue #136: prev_offset вынесен из заголовка блока в область данных свободного блока
- * (см. FreeBlockData<A> в free_block_data.h). В заголовке Block<A> остаётся только
- * next_offset. Это позволяет уменьшить заголовок блока с 32 до 16 байт.
- *
  * Поля:
- *   `next_offset` — гранульный индекс следующего блока.
+ *   `prev_offset` и `next_offset` — гранульные индексы соседних блоков.
  *   Совместимость с Block<DefaultAddressTraits> подтверждена через
  *   `static_assert` в `types.h`.
  *
+ * Issue #136: Поля `left_offset`, `right_offset`, `parent_offset` перемещены из TreeNode<A>
+ * в FreeBlockData<A> (область данных свободного блока). `prev_offset` остаётся в заголовке
+ * для O(1) доступа при слиянии блоков (coalescing) — без него каждое освобождение блока
+ * требовало бы O(n) сканирования.
+ *
+ * `prev_offset` не персистируется (восстанавливается при load() через repair_linked_list()).
+ *
  * @see plan_issue87.md §5 «Фаза 2: LinkedListNode и TreeNode»
- * @see free_block_data.h — FreeBlockData (Issue #136: prev_offset и AVL-ссылки в области данных)
- * @version 0.2 (Issue #136 — prev_offset removed from header, moved to FreeBlockData)
+ * @see free_block_data.h — FreeBlockData (Issue #136: left/right/parent в области данных)
+ * @version 0.3 (Issue #136 — left/right/parent moved to FreeBlockData; prev_offset kept in header)
  */
 
 #pragma once
@@ -34,14 +37,18 @@ namespace pmm
  * @brief Узел двухсвязного списка для адресного пространства ПАП, использование только через наследование.
  *
  * @tparam AddressTraitsT  Traits адресного пространства (из address_traits.h).
- *                         Определяет тип индексного поля `next_offset`.
+ *                         Определяет тип индексных полей `prev_offset` / `next_offset`.
  *
- * Issue #136: поле `prev_offset` перемещено в `FreeBlockData<A>` (область данных свободного блока).
- * В заголовке хранится только `next_offset` — индекс следующего блока,
- * необходимый для вычисления размера блока у ВСЕХ блоков (свободных и занятых).
+ * Поля хранят гранульные индексы блоков-соседей в ПАП.
+ * Sentinel «нет соседа» = `AddressTraitsT::no_block`.
+ *
+ * Issue #136: `prev_offset` остаётся в заголовке блока для O(1) доступа при слиянии
+ * (coalescing). Без prev_offset в заголовке каждое освобождение блока потребовало бы
+ * O(n) сканирования от начала списка.
+ * Поля `left_offset`, `right_offset`, `parent_offset` перемещены в FreeBlockData<A>
+ * (область данных свободного блока), поскольку они нужны только для свободных блоков.
  *
  * `prev_offset` не персистируется (восстанавливается при load() через repair_linked_list()).
- * Для свободных блоков он доступен через FreeBlockData<A>.
  * Sentinel «нет соседа» = `AddressTraitsT::no_block`.
  */
 template <typename AddressTraitsT> struct LinkedListNode
@@ -50,13 +57,15 @@ template <typename AddressTraitsT> struct LinkedListNode
     using index_type     = typename AddressTraitsT::index_type;
 
   protected:
+    /// Гранульный индекс предыдущего блока (или no_block).
+    /// Issue #136: остаётся в заголовке для O(1) доступа при coalescing.
+    index_type prev_offset;
     /// Гранульный индекс следующего блока (или no_block).
-    /// Issue #136: prev_offset перемещён в FreeBlockData<A>.
     index_type next_offset;
 };
 
-// Layout: LinkedListNode is a standard-layout struct with exactly 1 index_type field.
-// next_offset at byte 0.
+// Layout: LinkedListNode is a standard-layout struct with exactly 2 index_type fields.
+// prev_offset at byte 0, next_offset at byte sizeof(index_type).
 static_assert( std::is_standard_layout<pmm::LinkedListNode<pmm::DefaultAddressTraits>>::value,
                "LinkedListNode must be standard-layout (Issue #87)" );
 

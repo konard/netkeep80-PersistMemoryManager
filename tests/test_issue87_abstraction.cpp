@@ -75,21 +75,22 @@ static bool test_cr_no_block_is_max_uint32()
 static bool test_cr_block_header_combines_list_and_tree()
 {
     using BlockState = pmm::BlockStateBase<pmm::DefaultAddressTraits>;
-    // Issue #136: LinkedListNode now has only next_offset (4 bytes); prev_offset moved to FreeBlockData.
-    // next_offset is the only field, at offset 0 (start of LinkedListNode = start of Block).
-    static_assert( BlockState::kOffsetNextOffset == 0 );
-    // TreeNode fields follow LinkedListNode (Issue #126: weight moved to first field)
-    static_assert( BlockState::kOffsetWeight == 4 );
-    static_assert( BlockState::kOffsetRootOffset == 8 );
-    static_assert( BlockState::kOffsetAvlHeight == 12 );
-    static_assert( BlockState::kOffsetNodeType == 14 );
-    // Issue #136: FreeBlockData stored after block header (offset 16) in data area of free blocks
-    static_assert( BlockState::kOffsetPrevOffset == 16 );
-    static_assert( BlockState::kOffsetLeftOffset == 20 );
-    static_assert( BlockState::kOffsetRightOffset == 24 );
-    static_assert( BlockState::kOffsetParentOffset == 28 );
-    // Issue #136: Block<A> reduced from 32 bytes (2 granules) to 16 bytes (1 granule)
-    static_assert( sizeof( pmm::Block<pmm::DefaultAddressTraits> ) == 16 );
+    // Issue #136: LinkedListNode has prev_offset (4 bytes) + next_offset (4 bytes).
+    // prev_offset is at offset 0 (start of LinkedListNode = start of Block) — kept for O(1) coalescing.
+    static_assert( BlockState::kOffsetPrevOffset == 0 );
+    static_assert( BlockState::kOffsetNextOffset == 4 );
+    // TreeNode fields follow LinkedListNode
+    static_assert( BlockState::kOffsetWeight == 8 );
+    static_assert( BlockState::kOffsetRootOffset == 12 );
+    static_assert( BlockState::kOffsetAvlHeight == 16 );
+    static_assert( BlockState::kOffsetNodeType == 18 );
+    // Issue #136: FreeBlockData stored after 32-byte block header in data area of free blocks
+    // Only AVL refs (left/right/parent) — no prev_offset
+    static_assert( BlockState::kOffsetLeftOffset == 32 );
+    static_assert( BlockState::kOffsetRightOffset == 36 );
+    static_assert( BlockState::kOffsetParentOffset == 40 );
+    // Issue #136: Block<A> = LinkedListNode(8) + TreeNode(12) + padding(12) = 32 bytes (2 granules)
+    static_assert( sizeof( pmm::Block<pmm::DefaultAddressTraits> ) == 32 );
     return true;
 }
 
@@ -237,8 +238,9 @@ static bool test_phase3_block_layout()
 {
     using A = pmm::DefaultAddressTraits;
 
-    // Issue #136: Block<A> reduced from 32 bytes (2 granules) to 16 bytes (1 granule)
-    static_assert( sizeof( pmm::Block<A> ) == 16 );
+    // Issue #136: Block<A> = LinkedListNode(8) + TreeNode(12) + padding(12) = 32 bytes (2 granules)
+    // AVL refs moved to FreeBlockData in data area; prev_offset kept in header for O(1) coalescing.
+    static_assert( sizeof( pmm::Block<A> ) == 32 );
     static_assert( std::is_base_of<pmm::LinkedListNode<A>, pmm::Block<A>>::value );
     static_assert( std::is_base_of<pmm::TreeNode<A>, pmm::Block<A>>::value );
 

@@ -82,23 +82,26 @@ static bool test_power_of_two()
 
 static bool test_min_block_size_computed()
 {
-    // Issue #136: kMinBlockSize = Block<A>(16) + FreeBlockData<A>(16) = 32
-    // A free block must be large enough to hold FreeBlockData (16 bytes = 1 granule).
-    // Previously (pre-Issue #136): Block<A>(32) + kGranuleSize(16) = 48
-    PMM_TEST( pmm::detail::kMinBlockSize == 32 );
-    PMM_TEST( pmm::detail::kMinBlockSize == sizeof( pmm::Block<pmm::DefaultAddressTraits> ) + pmm::kGranuleSize );
+    // Issue #136: kMinBlockSize = Block<A>(32) + max(FreeBlockData(12), kGranuleSize(16)) = 32 + 16 = 48
+    // A free block must be large enough to hold the block header + at least 1 granule of data.
+    // FreeBlockData<A>(12) < kGranuleSize(16), so minimum data area = 1 granule = 16 bytes.
+    PMM_TEST( pmm::detail::kMinBlockSize == 48 );
+    using Block = pmm::Block<pmm::DefaultAddressTraits>;
+    constexpr std::size_t fbd_size = sizeof( pmm::FreeBlockData<pmm::DefaultAddressTraits> );
+    constexpr std::size_t expected = sizeof( Block ) + ( fbd_size > pmm::kGranuleSize ? fbd_size : pmm::kGranuleSize );
+    PMM_TEST( pmm::detail::kMinBlockSize == expected );
     return true;
 }
 
 static bool test_min_memory_size_computed()
 {
-    // Issue #136: kMinMemorySize = Block_0(16) + ManagerHeader(64) + Block_1(16) + kMinBlockSize(32) = 128
-    // Previously (pre-Issue #136): Block_0(32) + ManagerHeader(64) + Block_1(32) + kMinBlockSize(48) = 176
+    // Issue #136: kMinMemorySize = Block_0(32) + ManagerHeader(64) + Block_1(32) + kMinBlockSize(48) = 176
+    // Block_0 always allocated (holds ManagerHeader data), Block_1 is the first free block.
     using Block = pmm::Block<pmm::DefaultAddressTraits>;
     std::size_t expected =
         sizeof( Block ) + sizeof( pmm::detail::ManagerHeader ) + sizeof( Block ) + pmm::detail::kMinBlockSize;
     PMM_TEST( pmm::detail::kMinMemorySize == expected );
-    PMM_TEST( pmm::detail::kMinMemorySize == 128 );
+    PMM_TEST( pmm::detail::kMinMemorySize == 176 );
     return true;
 }
 

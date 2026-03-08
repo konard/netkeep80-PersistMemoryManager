@@ -420,7 +420,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
             return 0;
         const std::uint8_t* base    = _backend.base_ptr();
         const void*         blk_raw = base + detail::idx_to_byte_off( p.offset() ) - sizeof( Block<address_traits> );
-        index_type          left    = BlockStateBase<address_traits>::get_left_offset( blk_raw );
+        // Issue #136: user AVL-tree pointers stored in block header [20..31] (not in FreeBlockData)
+        index_type left = BlockStateBase<address_traits>::get_user_left_offset( blk_raw );
         return ( left == address_traits::no_block ) ? static_cast<index_type>( 0 ) : left;
     }
 
@@ -439,7 +440,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
             return 0;
         const std::uint8_t* base    = _backend.base_ptr();
         const void*         blk_raw = base + detail::idx_to_byte_off( p.offset() ) - sizeof( Block<address_traits> );
-        index_type          right   = BlockStateBase<address_traits>::get_right_offset( blk_raw );
+        // Issue #136: user AVL-tree pointers stored in block header [20..31] (not in FreeBlockData)
+        index_type right = BlockStateBase<address_traits>::get_user_right_offset( blk_raw );
         return ( right == address_traits::no_block ) ? static_cast<index_type>( 0 ) : right;
     }
 
@@ -458,7 +460,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
             return 0;
         const std::uint8_t* base    = _backend.base_ptr();
         const void*         blk_raw = base + detail::idx_to_byte_off( p.offset() ) - sizeof( Block<address_traits> );
-        index_type          parent  = BlockStateBase<address_traits>::get_parent_offset( blk_raw );
+        // Issue #136: user AVL-tree pointers stored in block header [20..31] (not in FreeBlockData)
+        index_type parent = BlockStateBase<address_traits>::get_user_parent_offset( blk_raw );
         return ( parent == address_traits::no_block ) ? static_cast<index_type>( 0 ) : parent;
     }
 
@@ -477,9 +480,10 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( p.is_null() || !_initialized )
             return;
         std::uint8_t* base    = _backend.base_ptr();
-        void*         blk_raw = base + detail::idx_to_byte_off( p.offset() ) - sizeof( Block<address_traits> );
-        index_type    v       = ( left == 0 ) ? address_traits::no_block : left;
-        BlockStateBase<address_traits>::set_left_offset_of( blk_raw, v );
+        void*      blk_raw = base + detail::idx_to_byte_off( p.offset() ) - sizeof( Block<address_traits> );
+        index_type v       = ( left == 0 ) ? address_traits::no_block : left;
+        // Issue #136: user AVL-tree pointers stored in block header [20..31] (not in FreeBlockData)
+        BlockStateBase<address_traits>::set_user_left_offset_of( blk_raw, v );
     }
 
     /**
@@ -497,9 +501,10 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( p.is_null() || !_initialized )
             return;
         std::uint8_t* base    = _backend.base_ptr();
-        void*         blk_raw = base + detail::idx_to_byte_off( p.offset() ) - sizeof( Block<address_traits> );
-        index_type    v       = ( right == 0 ) ? address_traits::no_block : right;
-        BlockStateBase<address_traits>::set_right_offset_of( blk_raw, v );
+        void*      blk_raw = base + detail::idx_to_byte_off( p.offset() ) - sizeof( Block<address_traits> );
+        index_type v       = ( right == 0 ) ? address_traits::no_block : right;
+        // Issue #136: user AVL-tree pointers stored in block header [20..31] (not in FreeBlockData)
+        BlockStateBase<address_traits>::set_user_right_offset_of( blk_raw, v );
     }
 
     /**
@@ -517,9 +522,10 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( p.is_null() || !_initialized )
             return;
         std::uint8_t* base    = _backend.base_ptr();
-        void*         blk_raw = base + detail::idx_to_byte_off( p.offset() ) - sizeof( Block<address_traits> );
-        index_type    v       = ( parent == 0 ) ? address_traits::no_block : parent;
-        BlockStateBase<address_traits>::set_parent_offset_of( blk_raw, v );
+        void*      blk_raw = base + detail::idx_to_byte_off( p.offset() ) - sizeof( Block<address_traits> );
+        index_type v       = ( parent == 0 ) ? address_traits::no_block : parent;
+        // Issue #136: user AVL-tree pointers stored in block header [20..31] (not in FreeBlockData)
+        BlockStateBase<address_traits>::set_user_parent_offset_of( blk_raw, v );
     }
 
     /**

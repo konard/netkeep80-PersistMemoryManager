@@ -57,14 +57,15 @@
 
 // ─── P9-A: Бинарная совместимость BlockStateBase ──────────────────────────────
 
-/// @brief sizeof(BlockStateBase<DefaultAddressTraits>) == sizeof(Block<A>) == 16 (Issue #136).
+/// @brief sizeof(BlockStateBase<DefaultAddressTraits>) == sizeof(Block<A>) == 32 (Issue #136).
 static bool test_p9_block_state_base_size()
 {
     using A = pmm::DefaultAddressTraits;
 
-    // Issue #136: Block<A> reduced from 32 to 16 bytes. FreeBlockData stored separately.
-    static_assert( sizeof( pmm::BlockStateBase<A> ) == 16,
-                   "BlockStateBase<DefaultAddressTraits> must be 16 bytes (Issue #136)" );
+    // Issue #136: Block<A> = LinkedListNode(8) + TreeNode(12) + padding(12) = 32 bytes (2 granules).
+    // AVL refs (left/right/parent) moved to FreeBlockData in data area; prev_offset kept in header.
+    static_assert( sizeof( pmm::BlockStateBase<A> ) == 32,
+                   "BlockStateBase<DefaultAddressTraits> must be 32 bytes (Issue #136)" );
     static_assert( sizeof( pmm::BlockStateBase<A> ) == sizeof( pmm::Block<A> ),
                    "BlockStateBase must match Block size" );
 
@@ -72,19 +73,20 @@ static bool test_p9_block_state_base_size()
 }
 
 /// @brief Все состояния блока имеют одинаковый размер (бинарная совместимость).
-/// Issue #136: Block<A> reduced to 16 bytes. State wrapper types match Block<A> size.
+/// Issue #136: Block<A> = 32 bytes. State wrapper types match Block<A> size.
 static bool test_p9_all_states_same_size()
 {
     using A = pmm::DefaultAddressTraits;
 
-    // Issue #136: All state types are wrappers over Block<A> = 16 bytes.
-    // FreeBlockData (prev/left/right/parent) is at block+16 in memory, not in the struct.
-    static_assert( sizeof( pmm::FreeBlock<A> ) == 16, "FreeBlock must be 16 bytes (Issue #136)" );
-    static_assert( sizeof( pmm::AllocatedBlock<A> ) == 16, "AllocatedBlock must be 16 bytes (Issue #136)" );
-    static_assert( sizeof( pmm::FreeBlockRemovedAVL<A> ) == 16, "FreeBlockRemovedAVL must be 16 bytes (Issue #136)" );
-    static_assert( sizeof( pmm::FreeBlockNotInAVL<A> ) == 16, "FreeBlockNotInAVL must be 16 bytes (Issue #136)" );
-    static_assert( sizeof( pmm::SplittingBlock<A> ) == 16, "SplittingBlock must be 16 bytes (Issue #136)" );
-    static_assert( sizeof( pmm::CoalescingBlock<A> ) == 16, "CoalescingBlock must be 16 bytes (Issue #136)" );
+    // Issue #136: All state types are wrappers over Block<A> = 32 bytes.
+    // FreeBlockData (left/right/parent) is at block+32 in memory; prev_offset is in header.
+    static_assert( sizeof( pmm::FreeBlock<A> ) == 32, "FreeBlock must be 32 bytes (Issue #136)" );
+    static_assert( sizeof( pmm::AllocatedBlock<A> ) == 32, "AllocatedBlock must be 32 bytes (Issue #136)" );
+    static_assert( sizeof( pmm::FreeBlockRemovedAVL<A> ) == 32,
+                   "FreeBlockRemovedAVL must be 32 bytes (Issue #136)" );
+    static_assert( sizeof( pmm::FreeBlockNotInAVL<A> ) == 32, "FreeBlockNotInAVL must be 32 bytes (Issue #136)" );
+    static_assert( sizeof( pmm::SplittingBlock<A> ) == 32, "SplittingBlock must be 32 bytes (Issue #136)" );
+    static_assert( sizeof( pmm::CoalescingBlock<A> ) == 32, "CoalescingBlock must be 32 bytes (Issue #136)" );
 
     return true;
 }
@@ -97,28 +99,28 @@ static bool test_p9_accessors()
     using A          = pmm::DefaultAddressTraits;
     using BlockState = pmm::BlockStateBase<A>;
 
-    // Issue #136: prev_offset is stored in FreeBlockData (data area of free blocks).
-    // For allocated blocks (weight > 0), prev_offset is not stored.
-    // Test prev_offset with a free block (weight == 0).
-    // Buffer must include space for FreeBlockData (16 bytes after Block<A> header).
+    // Issue #136: prev_offset is stored in LinkedListNode header (offset 0 in Block<A>).
+    // Both free and allocated blocks have prev_offset accessible in O(1).
+    // Buffer must include space for FreeBlockData (12 bytes after 32-byte Block<A> header).
     alignas( 16 ) std::uint8_t buffer[sizeof( pmm::Block<A> ) + sizeof( pmm::FreeBlockData<A> )];
     std::memset( buffer, 0, sizeof( buffer ) );
 
-    // weight=0 → free block; prev_offset=10 will be stored in FreeBlockData
+    // weight=0 → free block; prev_offset=10 stored in LinkedListNode header
     BlockState::init_fields( buffer, 10u, 20u, 1, 0u, 0u );
 
     auto* state = reinterpret_cast<pmm::BlockStateBase<A>*>( buffer );
 
-    PMM_TEST( state->prev_offset() == 10 ); // stored in FreeBlockData (Issue #136)
+    PMM_TEST( state->prev_offset() == 10 ); // stored in block header (LinkedListNode, Issue #136)
     PMM_TEST( state->next_offset() == 20 );
     PMM_TEST( state->weight() == 0 );
     PMM_TEST( state->root_offset() == 0 );
 
-    // For an allocated block, prev_offset is not stored (user data area)
+    // For an allocated block, prev_offset is also in header — accessible in O(1)
     alignas( 16 ) std::uint8_t alloc_buf[sizeof( pmm::Block<A> )];
     std::memset( alloc_buf, 0, sizeof( alloc_buf ) );
     BlockState::init_fields( alloc_buf, 10u, 20u, 0, 5u, 6u );
     auto* alloc_state = reinterpret_cast<pmm::BlockStateBase<A>*>( alloc_buf );
+    PMM_TEST( alloc_state->prev_offset() == 10 ); // Issue #136: prev_offset accessible in header for all blocks
     PMM_TEST( alloc_state->next_offset() == 20 );
     PMM_TEST( alloc_state->weight() == 5 );
     PMM_TEST( alloc_state->root_offset() == 6 );
@@ -259,13 +261,15 @@ static bool test_p9_splitting_full_flow()
     using BlockState = pmm::BlockStateBase<A>;
 
     // Два блока: текущий и новый (результат split)
-    alignas( 16 ) std::uint8_t buffer_curr[32];
-    alignas( 16 ) std::uint8_t buffer_new[32];
-    alignas( 16 ) std::uint8_t buffer_old_next[32];
+    // buffer_new needs to hold Block<A>(32) + FreeBlockData<A>(12) = 44 bytes for initialize_new_block
+    alignas( 16 ) std::uint8_t buffer_curr[sizeof( pmm::Block<A> ) + sizeof( pmm::FreeBlockData<A> )];
+    alignas( 16 ) std::uint8_t buffer_new[sizeof( pmm::Block<A> ) + sizeof( pmm::FreeBlockData<A> )];
+    alignas( 16 ) std::uint8_t buffer_old_next[sizeof( pmm::Block<A> )];
 
     // Инициализация текущего блока (via BlockStateBase static API, Issue #120)
     std::memset( buffer_curr, 0, sizeof( buffer_curr ) );
     BlockState::set_next_offset_of( buffer_curr, 100u ); // Указывает на старый следующий
+    BlockState::set_weight_of( buffer_curr, 0u );        // Make it a free block (for SplittingBlock)
 
     // Инициализация старого следующего блока (via BlockStateBase static API, Issue #120)
     std::memset( buffer_old_next, 0, sizeof( buffer_old_next ) );
@@ -307,7 +311,7 @@ static bool test_p9_allocated_block_cast_and_verify()
     using A          = pmm::DefaultAddressTraits;
     using BlockState = pmm::BlockStateBase<A>;
 
-    alignas( 16 ) std::uint8_t buffer[64]; // 16 header + 48 data
+    alignas( 16 ) std::uint8_t buffer[96]; // 32 header + 64 data
     std::memset( buffer, 0, sizeof( buffer ) );
 
     // Initialize via BlockStateBase static API (Issue #120)
@@ -319,9 +323,9 @@ static bool test_p9_allocated_block_cast_and_verify()
     PMM_TEST( alloc->verify_invariants( 0 ) == true );
     PMM_TEST( alloc->verify_invariants( 1 ) == false ); // Неверный idx
 
-    // Issue #136: user_ptr = header + sizeof(Block<A>) = header + 16
+    // Issue #136: user_ptr = header + sizeof(Block<A>) = header + 32
     void* uptr = alloc->user_ptr();
-    PMM_TEST( uptr == buffer + 16 );
+    PMM_TEST( uptr == buffer + 32 );
 
     return true;
 }
@@ -332,7 +336,9 @@ static bool test_p9_allocated_mark_as_free()
     using A          = pmm::DefaultAddressTraits;
     using BlockState = pmm::BlockStateBase<A>;
 
-    alignas( 16 ) std::uint8_t buffer[32];
+    // Buffer must hold Block<A>(32) + FreeBlockData<A>(12) = 44 bytes because
+    // mark_as_free() initialises FreeBlockData at block_base + sizeof(Block<A>).
+    alignas( 16 ) std::uint8_t buffer[sizeof( pmm::Block<A> ) + sizeof( pmm::FreeBlockData<A> )];
     std::memset( buffer, 0, sizeof( buffer ) );
 
     // Создаём занятый блок (via BlockStateBase static API, Issue #120)
@@ -393,9 +399,14 @@ static bool test_p9_coalesce_with_next()
     using A          = pmm::DefaultAddressTraits;
     using BlockState = pmm::BlockStateBase<A>;
 
+    // coalesce_with_next zeroes next_blk for sizeof(Block)+sizeof(FreeBlockData)=44 bytes.
+    // buffer_next must hold at least that many bytes to avoid stack overflow.
+    static constexpr std::size_t kCoalesceBlockBufSize =
+        sizeof( pmm::Block<A> ) + sizeof( pmm::FreeBlockData<A> );
+
     // Три блока: текущий (idx=6), следующий (idx=10), следующий следующего (idx=20)
     alignas( 16 ) std::uint8_t buffer_curr[32];
-    alignas( 16 ) std::uint8_t buffer_next[32];
+    alignas( 16 ) std::uint8_t buffer_next[kCoalesceBlockBufSize]; // gets zeroed by coalesce_with_next
     alignas( 16 ) std::uint8_t buffer_nxt_nxt[32];
 
     // Инициализация текущего блока (via BlockStateBase static API, Issue #120)
@@ -419,8 +430,8 @@ static bool test_p9_coalesce_with_next()
     PMM_TEST( coalescing->next_offset() == 20 ); // Текущий → следующий следующего
     PMM_TEST( BlockState::get_prev_offset( buffer_nxt_nxt ) == 6 ); // Следующий следующего ← текущий
 
-    // Следующий блок должен быть обнулён
-    for ( size_t i = 0; i < sizeof( buffer_next ); ++i )
+    // Следующий блок должен быть обнулён (all kCoalesceBlockBufSize bytes)
+    for ( size_t i = 0; i < kCoalesceBlockBufSize; ++i )
     {
         PMM_TEST( buffer_next[i] == 0 );
     }
@@ -434,9 +445,13 @@ static bool test_p9_coalesce_with_prev()
     using A          = pmm::DefaultAddressTraits;
     using BlockState = pmm::BlockStateBase<A>;
 
+    // coalesce_with_prev zeroes 'this' (buffer_curr) for sizeof(Block)+sizeof(FreeBlockData)=44 bytes.
+    static constexpr std::size_t kCoalesceBlockBufSize2 =
+        sizeof( pmm::Block<A> ) + sizeof( pmm::FreeBlockData<A> );
+
     // Три блока: предыдущий (idx=4), текущий (idx=10), следующий (idx=20)
     alignas( 16 ) std::uint8_t buffer_prev[32];
-    alignas( 16 ) std::uint8_t buffer_curr[32];
+    alignas( 16 ) std::uint8_t buffer_curr[kCoalesceBlockBufSize2]; // gets zeroed by coalesce_with_prev
     alignas( 16 ) std::uint8_t buffer_next[32];
 
     // Инициализация предыдущего блока (via BlockStateBase static API, Issue #120)
@@ -461,8 +476,8 @@ static bool test_p9_coalesce_with_prev()
     PMM_TEST( result->next_offset() == 20 );                     // Предыдущий → следующий
     PMM_TEST( BlockState::get_prev_offset( buffer_next ) == 4 ); // Следующий ← предыдущий
 
-    // Текущий блок должен быть обнулён
-    for ( size_t i = 0; i < sizeof( buffer_curr ); ++i )
+    // Текущий блок должен быть обнулён (all kCoalesceBlockBufSize2 bytes)
+    for ( size_t i = 0; i < kCoalesceBlockBufSize2; ++i )
     {
         PMM_TEST( buffer_curr[i] == 0 );
     }
@@ -583,7 +598,9 @@ static bool test_p9_deallocate_flow_no_coalesce()
     using A          = pmm::DefaultAddressTraits;
     using BlockState = pmm::BlockStateBase<A>;
 
-    alignas( 16 ) std::uint8_t buffer[32];
+    // Buffer must hold Block<A>(32) + FreeBlockData<A>(12) = 44 bytes because
+    // mark_as_free() initialises FreeBlockData at block_base + sizeof(Block<A>).
+    alignas( 16 ) std::uint8_t buffer[sizeof( pmm::Block<A> ) + sizeof( pmm::FreeBlockData<A> )];
     std::memset( buffer, 0, sizeof( buffer ) );
 
     // 1. Создаём занятый блок (via BlockStateBase static API, Issue #120)

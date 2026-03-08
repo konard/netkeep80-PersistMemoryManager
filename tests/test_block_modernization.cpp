@@ -43,12 +43,13 @@ using Mgr = pmm::presets::SingleThreadedHeap;
 
 // ─── Test 1: Block<A> structural sizes ────────────────────────────────────────
 
-/// Block<DefaultAddressTraits> must be 16 bytes = 1 granule (Issue #136).
+/// Block<DefaultAddressTraits> must be 32 bytes = 2 granules (Issue #136).
 static bool test_block_header_no_magic()
 {
     using Block = pmm::Block<pmm::DefaultAddressTraits>;
-    // Issue #136: Block<A> reduced from 32 bytes (2 granules) to 16 bytes (1 granule).
-    static_assert( sizeof( Block ) == 16, "Block<DefaultAddressTraits> must be exactly 16 bytes (Issue #136)" );
+    // Issue #136: Block<A> = LinkedListNode(8) + TreeNode(12) + padding(12) = 32 bytes (2 granules).
+    // AVL refs (left/right/parent) moved to FreeBlockData in data area; prev_offset kept in header for O(1) coalescing.
+    static_assert( sizeof( Block ) == 32, "Block<DefaultAddressTraits> must be exactly 32 bytes (Issue #136)" );
     static_assert( sizeof( Block ) % pmm::kGranuleSize == 0, "Block<DefaultAddressTraits> must be granule-aligned" );
     // kBlockMagic is gone (Issue #69): compilation success means this test passes
     return true;

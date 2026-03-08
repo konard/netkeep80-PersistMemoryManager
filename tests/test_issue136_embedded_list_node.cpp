@@ -1,26 +1,26 @@
 /**
  * @file test_issue136_embedded_list_node.cpp
- * @brief Тесты для переноса узла двухсвязного списка внутрь блока (Issue #136).
+ * @brief Тесты для переноса AVL-ссылок в область данных свободного блока (Issue #136).
  *
  * Issue #136: «Перенос узла двухсвязного списка внутрь самого блока».
  *
- * Проверяет:
- *  - Block<DefaultAddressTraits> теперь имеет размер 16 байт (1 грануля вместо 2).
- *  - FreeBlockData<DefaultAddressTraits> хранит prev_offset, left_offset,
- *    right_offset, parent_offset (16 байт = 1 грануля).
- *  - LinkedListNode<DefaultAddressTraits> содержит только next_offset (4 байта).
+ * Финальная архитектура (с O(1) coalescing):
+ *  - Block<DefaultAddressTraits> == 32 байта (2 гранулы).
+ *    Включает prev_offset в заголовке для O(1) доступа при освобождении блока.
+ *  - FreeBlockData<DefaultAddressTraits> хранит left_offset, right_offset,
+ *    parent_offset (12 байт = 3 поля).
+ *  - LinkedListNode<DefaultAddressTraits> содержит prev_offset + next_offset (8 байт).
  *  - TreeNode<DefaultAddressTraits> содержит weight, root_offset, avl_height, node_type (12 байт).
- *  - Для свободных блоков FreeBlockData доступна из BlockStateBase API.
- *  - Для занятых блоков FreeBlockData перекрывается пользовательскими данными.
+ *  - FreeBlockData расположена в области данных свободного блока по адресу Block + 32.
+ *  - Для занятых блоков область данных начинается с Block + 32.
  *  - Allocate/Deallocate работают корректно с новой архитектурой.
- *  - Фрагментация и слияние (coalesce) работают корректно.
- *  - Накладные расходы на выделенный блок уменьшились на 16 байт (1 гранулу).
+ *  - Coalesce работает в O(1) (не требует сканирования).
  *
  * @see include/pmm/free_block_data.h — FreeBlockData<A>
- * @see include/pmm/block.h — Block<A> (16 байт)
- * @see include/pmm/linked_list_node.h — LinkedListNode<A> (только next_offset)
+ * @see include/pmm/block.h — Block<A> (32 байта)
+ * @see include/pmm/linked_list_node.h — LinkedListNode<A> (prev_offset + next_offset)
  * @see include/pmm/tree_node.h — TreeNode<A> (без left/right/parent)
- * @version 0.1 (Issue #136)
+ * @version 0.2 (Issue #136 — prev_offset in header for O(1) coalescing)
  */
 
 #include "pmm_single_threaded_heap.h"
@@ -68,41 +68,42 @@ template <std::size_t Id> using TestMgr = pmm::PersistMemoryManager<pmm::CacheMa
 // I136-A: Размеры структур (Issue #136)
 // =============================================================================
 
-/// @brief Block<DefaultAddressTraits> == 16 байт (Issue #136: уменьшен с 32 до 16).
-static bool test_i136_block_size_is_16_bytes()
+/// @brief Block<DefaultAddressTraits> == 32 байта (2 гранулы, Issue #136).
+static bool test_i136_block_size_is_32_bytes()
 {
     using A     = pmm::DefaultAddressTraits;
     using Block = pmm::Block<A>;
 
-    // Issue #136: Block header reduced from 32 bytes (2 granules) to 16 bytes (1 granule)
-    static_assert( sizeof( Block ) == 16, "Block<DefaultAddressTraits> must be 16 bytes (Issue #136)" );
-    static_assert( sizeof( Block ) == pmm::kGranuleSize,
-                   "Block<DefaultAddressTraits> must equal one granule (Issue #136)" );
+    // Issue #136: Block header = LinkedListNode (8) + TreeNode (12) + padding (12) = 32 bytes
+    static_assert( sizeof( Block ) == 32, "Block<DefaultAddressTraits> must be 32 bytes (Issue #136)" );
+    static_assert( sizeof( Block ) == 2 * pmm::kGranuleSize,
+                   "Block<DefaultAddressTraits> must equal two granules (Issue #136)" );
 
     return true;
 }
 
-/// @brief FreeBlockData<DefaultAddressTraits> == 16 байт (Issue #136).
-static bool test_i136_free_block_data_size_is_16_bytes()
+/// @brief FreeBlockData<DefaultAddressTraits> == 12 байт (3 поля: left/right/parent, Issue #136).
+static bool test_i136_free_block_data_size_is_12_bytes()
 {
     using A      = pmm::DefaultAddressTraits;
     using FBData = pmm::FreeBlockData<A>;
 
-    static_assert( sizeof( FBData ) == 16, "FreeBlockData<DefaultAddressTraits> must be 16 bytes (Issue #136)" );
-    static_assert( sizeof( FBData ) == pmm::kGranuleSize,
-                   "FreeBlockData<DefaultAddressTraits> must equal one granule (Issue #136)" );
+    // Issue #136: FreeBlockData only has left/right/parent (prev_offset is in block header)
+    static_assert( sizeof( FBData ) == 12, "FreeBlockData<DefaultAddressTraits> must be 12 bytes (Issue #136)" );
+    static_assert( sizeof( FBData ) == 3 * sizeof( std::uint32_t ),
+                   "FreeBlockData<DefaultAddressTraits> must be 3 x uint32_t (Issue #136)" );
 
     return true;
 }
 
-/// @brief LinkedListNode<DefaultAddressTraits> == 4 байта (только next_offset, Issue #136).
-static bool test_i136_linked_list_node_size_is_4_bytes()
+/// @brief LinkedListNode<DefaultAddressTraits> == 8 байт (prev_offset + next_offset, Issue #136).
+static bool test_i136_linked_list_node_size_is_8_bytes()
 {
     using A      = pmm::DefaultAddressTraits;
     using LLNode = pmm::LinkedListNode<A>;
 
-    // Issue #136: LinkedListNode now contains only next_offset (prev_offset moved to FreeBlockData)
-    static_assert( sizeof( LLNode ) == 4, "LinkedListNode<DefaultAddressTraits> must be 4 bytes (Issue #136)" );
+    // Issue #136: LinkedListNode contains prev_offset + next_offset (kept for O(1) coalescing)
+    static_assert( sizeof( LLNode ) == 8, "LinkedListNode<DefaultAddressTraits> must be 8 bytes (Issue #136)" );
 
     return true;
 }
@@ -120,20 +121,6 @@ static bool test_i136_tree_node_size_is_12_bytes()
     return true;
 }
 
-/// @brief Block<A> + FreeBlockData<A> == 32 байта (то же что раньше было sizeof(Block<A>)).
-static bool test_i136_block_plus_free_data_equals_old_block_size()
-{
-    using A      = pmm::DefaultAddressTraits;
-    using Block  = pmm::Block<A>;
-    using FBData = pmm::FreeBlockData<A>;
-
-    // The combined size of Block<A> header + FreeBlockData<A> equals the previous Block<A> size (32 bytes)
-    static_assert( sizeof( Block ) + sizeof( FBData ) == 32,
-                   "Block<A> + FreeBlockData<A> must be 32 bytes (same as old Block<A>)" );
-
-    return true;
-}
-
 // =============================================================================
 // I136-B: Раскладка полей BlockStateBase (Issue #136)
 // =============================================================================
@@ -143,17 +130,20 @@ static bool test_i136_block_header_layout_offsets()
 {
     using BlockState = pmm::BlockStateBase<pmm::DefaultAddressTraits>;
 
-    // Issue #136: compact header layout
-    // [0..3]  next_offset (LinkedListNode::next_offset)
-    // [4..7]  weight (TreeNode::weight)
-    // [8..11] root_offset (TreeNode::root_offset)
-    // [12..13] avl_height (TreeNode::avl_height)
-    // [14..15] node_type (TreeNode::node_type)
-    static_assert( BlockState::kOffsetNextOffset == 0, "next_offset must be at byte 0 (Issue #136)" );
-    static_assert( BlockState::kOffsetWeight == 4, "weight must be at byte 4 (Issue #136)" );
-    static_assert( BlockState::kOffsetRootOffset == 8, "root_offset must be at byte 8 (Issue #136)" );
-    static_assert( BlockState::kOffsetAvlHeight == 12, "avl_height must be at byte 12 (Issue #136)" );
-    static_assert( BlockState::kOffsetNodeType == 14, "node_type must be at byte 14 (Issue #136)" );
+    // Issue #136: block header layout (32 bytes)
+    // [0..3]   prev_offset (LinkedListNode::prev_offset)
+    // [4..7]   next_offset (LinkedListNode::next_offset)
+    // [8..11]  weight (TreeNode::weight)
+    // [12..15] root_offset (TreeNode::root_offset)
+    // [16..17] avl_height (TreeNode::avl_height)
+    // [18..19] node_type (TreeNode::node_type)
+    // [20..31] padding
+    static_assert( BlockState::kOffsetPrevOffset == 0, "prev_offset must be at byte 0 (Issue #136)" );
+    static_assert( BlockState::kOffsetNextOffset == 4, "next_offset must be at byte 4 (Issue #136)" );
+    static_assert( BlockState::kOffsetWeight == 8, "weight must be at byte 8 (Issue #136)" );
+    static_assert( BlockState::kOffsetRootOffset == 12, "root_offset must be at byte 12 (Issue #136)" );
+    static_assert( BlockState::kOffsetAvlHeight == 16, "avl_height must be at byte 16 (Issue #136)" );
+    static_assert( BlockState::kOffsetNodeType == 18, "node_type must be at byte 18 (Issue #136)" );
 
     return true;
 }
@@ -163,15 +153,13 @@ static bool test_i136_free_block_data_offsets()
 {
     using BlockState = pmm::BlockStateBase<pmm::DefaultAddressTraits>;
 
-    // FreeBlockData is at offset sizeof(Block<A>) = 16 from block start
-    // [16..19] prev_offset
-    // [20..23] left_offset
-    // [24..27] right_offset
-    // [28..31] parent_offset
-    static_assert( BlockState::kOffsetPrevOffset == 16, "prev_offset must be at byte 16 (Issue #136)" );
-    static_assert( BlockState::kOffsetLeftOffset == 20, "left_offset must be at byte 20 (Issue #136)" );
-    static_assert( BlockState::kOffsetRightOffset == 24, "right_offset must be at byte 24 (Issue #136)" );
-    static_assert( BlockState::kOffsetParentOffset == 28, "parent_offset must be at byte 28 (Issue #136)" );
+    // FreeBlockData is at offset sizeof(Block<A>) = 32 from block start
+    // [32..35] left_offset
+    // [36..39] right_offset
+    // [40..43] parent_offset
+    static_assert( BlockState::kOffsetLeftOffset == 32, "left_offset must be at byte 32 (Issue #136)" );
+    static_assert( BlockState::kOffsetRightOffset == 36, "right_offset must be at byte 36 (Issue #136)" );
+    static_assert( BlockState::kOffsetParentOffset == 40, "parent_offset must be at byte 40 (Issue #136)" );
 
     return true;
 }
@@ -197,14 +185,14 @@ static bool test_i136_init_fields_free_block()
                              /*weight*/ 0,
                              /*root_offset*/ 0 );
 
-    // Header fields
+    // Header fields (including prev_offset in LinkedListNode)
+    PMM_TEST( BlockState::get_prev_offset( buf ) == A::no_block );
     PMM_TEST( BlockState::get_next_offset( buf ) == A::no_block );
     PMM_TEST( BlockState::get_weight( buf ) == 0 );
     PMM_TEST( BlockState::get_root_offset( buf ) == 0 );
     PMM_TEST( BlockState::get_avl_height( buf ) == 1 );
 
-    // FreeBlockData fields (in data area)
-    PMM_TEST( BlockState::get_prev_offset( buf ) == A::no_block );
+    // FreeBlockData fields (in data area — only AVL refs)
     PMM_TEST( BlockState::get_left_offset( buf ) == A::no_block );
     PMM_TEST( BlockState::get_right_offset( buf ) == A::no_block );
     PMM_TEST( BlockState::get_parent_offset( buf ) == A::no_block );
@@ -254,20 +242,20 @@ static bool test_i136_block_state_api_setters_getters()
     return true;
 }
 
-/// @brief Для занятых блоков prev_offset недоступен (возвращает no_block, Issue #136).
-static bool test_i136_allocated_block_has_no_prev_offset()
+/// @brief Для занятых блоков prev_offset доступен из заголовка (Issue #136: O(1) coalescing).
+static bool test_i136_allocated_block_has_prev_offset_in_header()
 {
     using A          = pmm::DefaultAddressTraits;
     using BlockState = pmm::BlockStateBase<A>;
 
     alignas( pmm::Block<A> ) std::uint8_t buf[sizeof( pmm::Block<A> ) + sizeof( pmm::FreeBlockData<A> )] = {};
 
-    // Initialize as allocated block (weight > 0)
-    BlockState::init_fields( buf, A::no_block, 10u, 0, 5u, 2u ); // weight=5, root=2
+    // Initialize as allocated block (weight > 0) with a known prev_offset
+    BlockState::init_fields( buf, 7u, 10u, 0, 5u, 2u ); // prev=7, next=10, weight=5, root=2
 
-    // For allocated blocks (weight != 0), get_prev_offset returns no_block
+    // For allocated blocks, prev_offset is in the header — accessible in O(1)
     PMM_TEST( BlockState::get_weight( buf ) == 5u );
-    PMM_TEST( BlockState::get_prev_offset( buf ) == A::no_block );
+    PMM_TEST( BlockState::get_prev_offset( buf ) == 7u );
 
     return true;
 }
@@ -308,21 +296,21 @@ static bool test_i136_allocate_deallocate_basic()
     return true;
 }
 
-/// @brief Минимальный блок после Issue #136 — 1 грануля заголовка + 1+ грануля данных.
-static bool test_i136_header_size_is_one_granule()
+/// @brief Block header is 2 granules (32 bytes, Issue #136).
+static bool test_i136_header_size_is_two_granules()
 {
     using A     = pmm::DefaultAddressTraits;
     using Block = pmm::Block<A>;
 
-    // Block header is exactly 1 granule
-    PMM_TEST( sizeof( Block ) == pmm::kGranuleSize );
-    PMM_TEST( sizeof( Block ) == 16u );
+    // Block header is exactly 2 granules
+    PMM_TEST( sizeof( Block ) == 2 * pmm::kGranuleSize );
+    PMM_TEST( sizeof( Block ) == 32u );
 
-    // FreeBlockData is also 1 granule (stored in data area of free blocks)
-    PMM_TEST( sizeof( pmm::FreeBlockData<A> ) == pmm::kGranuleSize );
+    // FreeBlockData (12 bytes) fits within 1 granule
+    PMM_TEST( sizeof( pmm::FreeBlockData<A> ) < pmm::kGranuleSize );
 
-    // Combined = 2 granules (minimum size for a free block)
-    PMM_TEST( sizeof( Block ) + sizeof( pmm::FreeBlockData<A> ) == 2 * pmm::kGranuleSize );
+    // kBlockHeaderGranules should be 2
+    PMM_TEST( pmm::detail::kBlockHeaderGranules == 2u );
 
     return true;
 }
@@ -410,23 +398,6 @@ static bool test_i136_pptr_works()
     return true;
 }
 
-/// @brief Накладные расходы на выделенный блок == 1 грануля (Issue #136: было 2 гранулы).
-static bool test_i136_overhead_is_one_granule_per_allocated_block()
-{
-    using A     = pmm::DefaultAddressTraits;
-    using Block = pmm::Block<A>;
-
-    // Old overhead per allocated block = 32 bytes = 2 granules
-    // New overhead per allocated block = 16 bytes = 1 granule
-    PMM_TEST( sizeof( Block ) == pmm::kGranuleSize );
-    PMM_TEST( sizeof( Block ) == 16u );
-
-    // Verify via pmm::detail constants
-    PMM_TEST( pmm::detail::kBlockHeaderGranules == 1u );
-
-    return true;
-}
-
 /// @brief FreeBlockData хранится по адресу Block + sizeof(Block) (Issue #136).
 static bool test_i136_free_block_data_address()
 {
@@ -440,17 +411,15 @@ static bool test_i136_free_block_data_address()
     BlkT*   blk  = reinterpret_cast<BlkT*>( buf );
     FBData* data = reinterpret_cast<FBData*>( buf + sizeof( BlkT ) );
 
-    // FreeBlockData should be right after the Block header
+    // FreeBlockData should be right after the Block header (at offset 32)
     PMM_TEST( reinterpret_cast<std::uint8_t*>( data ) == reinterpret_cast<std::uint8_t*>( blk ) + sizeof( BlkT ) );
-    PMM_TEST( reinterpret_cast<std::uint8_t*>( data ) == buf + 16 );
+    PMM_TEST( reinterpret_cast<std::uint8_t*>( data ) == buf + 32 );
 
-    // Verify FreeBlockData fields are accessible via Block::free_data()
-    data->prev_offset   = 5u;
+    // Verify FreeBlockData fields are accessible via Block::free_data() (AVL-only fields)
     data->left_offset   = 10u;
     data->right_offset  = 15u;
     data->parent_offset = 20u;
 
-    PMM_TEST( blk->free_data().prev_offset == 5u );
     PMM_TEST( blk->free_data().left_offset == 10u );
     PMM_TEST( blk->free_data().right_offset == 15u );
     PMM_TEST( blk->free_data().parent_offset == 20u );
@@ -483,41 +452,39 @@ static bool test_i136_persistence_works()
 
 int main()
 {
-    std::cout << "=== test_issue136_embedded_list_node (Issue #136: embedded linked list node) ===\n\n";
+    std::cout << "=== test_issue136_embedded_list_node (Issue #136: AVL refs in free block data) ===\n\n";
     bool all_passed = true;
 
     std::cout << "--- I136-A: Structure sizes ---\n";
-    PMM_RUN( "I136-A1: Block<Default> == 16 bytes (1 granule, Issue #136)", test_i136_block_size_is_16_bytes );
-    PMM_RUN( "I136-A2: FreeBlockData<Default> == 16 bytes (1 granule, Issue #136)",
-             test_i136_free_block_data_size_is_16_bytes );
-    PMM_RUN( "I136-A3: LinkedListNode<Default> == 4 bytes (next_offset only, Issue #136)",
-             test_i136_linked_list_node_size_is_4_bytes );
+    PMM_RUN( "I136-A1: Block<Default> == 32 bytes (2 granules, Issue #136)", test_i136_block_size_is_32_bytes );
+    PMM_RUN( "I136-A2: FreeBlockData<Default> == 12 bytes (3 AVL fields, Issue #136)",
+             test_i136_free_block_data_size_is_12_bytes );
+    PMM_RUN( "I136-A3: LinkedListNode<Default> == 8 bytes (prev+next, Issue #136)",
+             test_i136_linked_list_node_size_is_8_bytes );
     PMM_RUN( "I136-A4: TreeNode<Default> == 12 bytes (no left/right/parent, Issue #136)",
              test_i136_tree_node_size_is_12_bytes );
-    PMM_RUN( "I136-A5: Block<A> + FreeBlockData<A> == 32 bytes (same as old Block<A>)",
-             test_i136_block_plus_free_data_equals_old_block_size );
 
     std::cout << "\n--- I136-B: Layout offsets ---\n";
     PMM_RUN( "I136-B1: Block header layout offsets (Issue #136)", test_i136_block_header_layout_offsets );
-    PMM_RUN( "I136-B2: FreeBlockData offsets in data area (Issue #136)", test_i136_free_block_data_offsets );
+    PMM_RUN( "I136-B2: FreeBlockData offsets in data area at +32 (Issue #136)", test_i136_free_block_data_offsets );
 
     std::cout << "\n--- I136-C: BlockStateBase API ---\n";
     PMM_RUN( "I136-C1: init_fields initializes header + FreeBlockData for free blocks",
              test_i136_init_fields_free_block );
     PMM_RUN( "I136-C2: BlockStateBase setters/getters for all fields", test_i136_block_state_api_setters_getters );
-    PMM_RUN( "I136-C3: Allocated block prev_offset returns no_block (in user data area)",
-             test_i136_allocated_block_has_no_prev_offset );
+    PMM_RUN( "I136-C3: Allocated block prev_offset accessible in O(1) from header",
+             test_i136_allocated_block_has_prev_offset_in_header );
 
     std::cout << "\n--- I136-D: Functional tests ---\n";
     PMM_RUN( "I136-D1: Allocate/deallocate basic functionality", test_i136_allocate_deallocate_basic );
-    PMM_RUN( "I136-D2: Block header is 1 granule (16 bytes)", test_i136_header_size_is_one_granule );
+    PMM_RUN( "I136-D2: Block header is 2 granules (32 bytes), kBlockHeaderGranules == 2",
+             test_i136_header_size_is_two_granules );
     PMM_RUN( "I136-D3: Coalesce works with new architecture", test_i136_coalesce_works );
     PMM_RUN( "I136-D4: Allocate many blocks, verify data isolation", test_i136_allocate_many_blocks );
     PMM_RUN( "I136-D5: pptr works with new architecture", test_i136_pptr_works );
-    PMM_RUN( "I136-D6: Overhead is 1 granule per allocated block (was 2 granules)",
-             test_i136_overhead_is_one_granule_per_allocated_block );
-    PMM_RUN( "I136-D7: FreeBlockData stored at Block + sizeof(Block)", test_i136_free_block_data_address );
-    PMM_RUN( "I136-D8: Persistence works with new architecture", test_i136_persistence_works );
+    PMM_RUN( "I136-D6: FreeBlockData stored at Block + sizeof(Block) = Block + 32",
+             test_i136_free_block_data_address );
+    PMM_RUN( "I136-D7: Persistence works with new architecture", test_i136_persistence_works );
 
     std::cout << "\n" << ( all_passed ? "All tests PASSED\n" : "Some tests FAILED\n" );
     return all_passed ? 0 : 1;

@@ -17,22 +17,24 @@
  *   - SplittingBlock         — блок в процессе разбиения
  *   - CoalescingBlock        — блок в процессе слияния
  *
- * Issue #136: Архитектура блока изменена — заголовок Block<A> уменьшен с 32 до 16 байт.
- *   Поля prev_offset, left_offset, right_offset, parent_offset перемещены в FreeBlockData<A>,
- *   хранящуюся в области данных свободного блока (по адресу base + blk_idx*gran + sizeof(Block<A>)).
+ * Issue #136: Архитектура блока изменена — поля left_offset, right_offset, parent_offset
+ *   перемещены из заголовка Block<A> в FreeBlockData<A>, хранящуюся в области данных
+ *   свободного блока (по адресу base + blk_idx*gran + sizeof(Block<A>)).
+ *   Поле prev_offset остаётся в заголовке Block<A> для O(1) доступа при слиянии блоков.
  *
- *   Новый заголовок Block<A> (16 байт):
- *     [0..3]   next_offset (4)
- *     [4..7]   weight (4)
- *     [8..11]  root_offset (4)
- *     [12..13] avl_height (2)
- *     [14..15] node_type (2)
+ *   Заголовок Block<A> (32 байта = 2 гранулы):
+ *     [0..3]   prev_offset (4)
+ *     [4..7]   next_offset (4)
+ *     [8..11]  weight (4)
+ *     [12..15] root_offset (4)
+ *     [16..17] avl_height (2)
+ *     [18..19] node_type (2)
+ *     [20..31] padding (reserved)
  *
- *   FreeBlockData<A> в области данных (16 байт, только для свободных блоков):
- *     [16..19] prev_offset (4)
- *     [20..23] left_offset (4)
- *     [24..27] right_offset (4)
- *     [28..31] parent_offset (4)
+ *   FreeBlockData<A> в области данных (12 байт, только для свободных блоков):
+ *     [32..35] left_offset (4)
+ *     [36..39] right_offset (4)
+ *     [40..43] parent_offset (4)
  *
  * Гарантии:
  *   1. Типобезопасность: компилятор запрещает вызов недоступных методов
@@ -48,7 +50,7 @@
  *
  * @see docs/atomic_writes.md «Граф состояний блока»
  * @see plan_issue87.md §5 «Фаза 9: BlockState machine»
- * @version 0.4 (Issue #136 — block header reduced to 16 bytes, FreeBlockData in data area)
+ * @version 0.5 (Issue #136 — AVL refs moved to FreeBlockData; prev_offset kept in header for O(1) coalescing)
  */
 
 #pragma once
@@ -80,15 +82,18 @@ template <typename AddressTraitsT> class CoalescingBlock;
  * Наследует Block<A> (LinkedListNode<A> + TreeNode<A>).
  * Все поля приватные для потомков. Доступ только через методы состояний.
  *
- * Issue #136: Layout Block<A> (16 bytes при DefaultAddressTraits):
- *   [0..3]   LinkedListNode<A>: next_offset (4)
- *   [4..15]  TreeNode<A>:       weight (4), root_offset (4), avl_height (2), node_type (2)
+ * Issue #136: Layout Block<A> (32 bytes при DefaultAddressTraits):
+ *   [0..3]   LinkedListNode<A>: prev_offset (4)
+ *   [4..7]   LinkedListNode<A>: next_offset (4)
+ *   [8..19]  TreeNode<A>:       weight (4), root_offset (4), avl_height (2), node_type (2)
+ *   [20..23] Block<A>:          user_left_offset (4)   — для пользовательских AVL-деревьев
+ *   [24..27] Block<A>:          user_right_offset (4)  — для пользовательских AVL-деревьев
+ *   [28..31] Block<A>:          user_parent_offset (4) — для пользовательских AVL-деревьев
  *
  * FreeBlockData<A> в области данных свободного блока (только для свободных блоков):
- *   [16..19] prev_offset (4)
- *   [20..23] left_offset (4)
- *   [24..27] right_offset (4)
- *   [28..31] parent_offset (4)
+ *   [32..35] left_offset (4)   — AVL-ссылки менеджера памяти
+ *   [36..39] right_offset (4)  — AVL-ссылки менеджера памяти
+ *   [40..43] parent_offset (4) — AVL-ссылки менеджера памяти
  *
  * @tparam AddressTraitsT  Traits адресного пространства.
  */
@@ -104,14 +109,16 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
     using index_type     = typename AddressTraitsT::index_type;
     using BaseBlock      = Block<AddressTraitsT>;
 
-    // ─── Compile-time layout offsets (Issue #136: new compact layout) ───────────
+    // ─── Compile-time layout offsets (Issue #136: AVL refs in FreeBlockData) ────
     // Note: offsetof cannot be used on protected members from outside the class body.
     // These offsets are derived from sizeof base types and the assumption of standard layout.
     // The struct layout is verified by static_assert in linked_list_node.h and tree_node.h.
 
-    /// Byte offset of next_offset within Block<A> layout (first field of LinkedListNode, Issue #136).
-    static constexpr std::size_t kOffsetNextOffset = 0;
-    /// Byte offset of weight within Block<A> layout (first field of TreeNode, follows next_offset).
+    /// Byte offset of prev_offset within Block<A> layout (first field of LinkedListNode).
+    static constexpr std::size_t kOffsetPrevOffset = 0;
+    /// Byte offset of next_offset within Block<A> layout (second field of LinkedListNode).
+    static constexpr std::size_t kOffsetNextOffset = sizeof( index_type );
+    /// Byte offset of weight within Block<A> layout (first field of TreeNode, follows LinkedListNode).
     static constexpr std::size_t kOffsetWeight = sizeof( LLNode );
     /// Byte offset of root_offset within Block<A> layout (second field of TreeNode).
     static constexpr std::size_t kOffsetRootOffset = sizeof( LLNode ) + sizeof( index_type );
@@ -120,15 +127,25 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
     /// Byte offset of node_type within Block<A> layout (after avl_height = 2 bytes, Issue #126).
     static constexpr std::size_t kOffsetNodeType = sizeof( LLNode ) + 2 * sizeof( index_type ) + 2;
 
+    // User AVL-tree offsets (in block header, bytes [20..31])
+    // Issue #136: These fields store user AVL-tree pointers for allocated blocks.
+    // For free blocks, these fields are unused (manager uses FreeBlockData at +32 instead).
+    /// Byte offset of user_left_offset in Block<A> header (for user AVL-trees, Issue #136).
+    static constexpr std::size_t kOffsetUserLeft = sizeof( LLNode ) + sizeof( TNode ) + 0;
+    /// Byte offset of user_right_offset in Block<A> header (for user AVL-trees, Issue #136).
+    static constexpr std::size_t kOffsetUserRight = sizeof( LLNode ) + sizeof( TNode ) + sizeof( index_type );
+    /// Byte offset of user_parent_offset in Block<A> header (for user AVL-trees, Issue #136).
+    static constexpr std::size_t kOffsetUserParent = sizeof( LLNode ) + sizeof( TNode ) + 2 * sizeof( index_type );
+
     // FreeBlockData offsets (relative to start of Block<A>, i.e., in data area at +sizeof(Block<A>))
-    /// Byte offset of prev_offset in FreeBlockData (relative to Block<A> start).
-    static constexpr std::size_t kOffsetPrevOffset = sizeof( BaseBlock ) + 0;
+    // Issue #136: These store manager's internal free-block AVL tree links.
+    // Only valid for FREE blocks (weight == 0). For allocated blocks, this area is user data.
     /// Byte offset of left_offset in FreeBlockData (relative to Block<A> start).
-    static constexpr std::size_t kOffsetLeftOffset = sizeof( BaseBlock ) + sizeof( index_type );
+    static constexpr std::size_t kOffsetLeftOffset = sizeof( BaseBlock ) + 0;
     /// Byte offset of right_offset in FreeBlockData (relative to Block<A> start).
-    static constexpr std::size_t kOffsetRightOffset = sizeof( BaseBlock ) + 2 * sizeof( index_type );
+    static constexpr std::size_t kOffsetRightOffset = sizeof( BaseBlock ) + sizeof( index_type );
     /// Byte offset of parent_offset in FreeBlockData (relative to Block<A> start).
-    static constexpr std::size_t kOffsetParentOffset = sizeof( BaseBlock ) + 3 * sizeof( index_type );
+    static constexpr std::size_t kOffsetParentOffset = sizeof( BaseBlock ) + 2 * sizeof( index_type );
 
     // Прямое создание запрещено — используйте cast_from_raw()
     BlockStateBase() = delete;
@@ -139,8 +156,8 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
     // Read-only доступ к next_offset (в заголовке блока)
     index_type next_offset() const noexcept { return LLNode::next_offset; }
 
-    // Read-only доступ к prev_offset (в FreeBlockData области данных свободного блока)
-    index_type prev_offset() const noexcept { return get_free_data().prev_offset; }
+    // Read-only доступ к prev_offset (в заголовке блока, Issue #136: остаётся в LinkedListNode для O(1))
+    index_type prev_offset() const noexcept { return LLNode::prev_offset; }
 
     // Read-only доступ к AVL-полям (в FreeBlockData, только для свободных блоков)
     index_type   left_offset() const noexcept { return get_free_data().left_offset; }
@@ -215,10 +232,8 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
     /**
      * @brief Восстановить prev_offset блока (при repair_linked_list).
      *
-     * Issue #136: prev_offset хранится в FreeBlockData (области данных свободного блока).
+     * Issue #136: prev_offset хранится в заголовке LinkedListNode для O(1) доступа.
      * При repair_linked_list все блоки (включая занятые) получают корректный prev_offset.
-     * Для занятых блоков первые байты области данных принадлежат пользователю,
-     * поэтому repair_linked_list вызывается только для свободных блоков.
      *
      * @param raw_blk   Указатель на блок.
      * @param prev_idx  Гранульный индекс предыдущего блока (или no_block).
@@ -226,17 +241,14 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
     static void repair_prev_offset( void* raw_blk, index_type prev_idx ) noexcept
     {
         auto* blk = reinterpret_cast<BlockStateBase*>( raw_blk );
-        // Issue #136: prev_offset хранится только для свободных блоков в FreeBlockData.
-        // Для занятых блоков prev_offset не хранится (не нужен при работе с занятыми блоками).
-        if ( blk->weight() == 0 )
-            blk->get_free_data_mut().prev_offset = prev_idx;
+        blk->set_prev_offset( prev_idx );
     }
 
     /**
      * @brief Прочитать prev_offset блока (read-only, без перехода состояний).
      *
-     * Issue #136: prev_offset хранится в FreeBlockData (только для свободных блоков).
-     * Возвращает no_block для занятых блоков.
+     * Issue #136: prev_offset хранится в заголовке LinkedListNode для O(1) доступа.
+     * Доступен для всех блоков (свободных и занятых).
      *
      * @param raw_blk  Указатель на блок.
      * @return Гранульный индекс предыдущего блока (или no_block).
@@ -244,9 +256,7 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
     static index_type get_prev_offset( const void* raw_blk ) noexcept
     {
         const auto* blk = reinterpret_cast<const BlockStateBase*>( raw_blk );
-        if ( blk->weight() != 0 )
-            return AddressTraitsT::no_block; // занятый блок — нет prev в заголовке
-        return blk->get_free_data().prev_offset;
+        return blk->prev_offset();
     }
 
     /**
@@ -290,15 +300,19 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
                              index_type weight_val, index_type root_offset_val ) noexcept
     {
         auto* blk = reinterpret_cast<BlockStateBase*>( raw_blk );
+        blk->set_prev_offset( prev_idx );
         blk->set_next_offset( next_idx );
         blk->set_avl_height( avl_height_val );
         blk->set_weight( weight_val );
         blk->set_root_offset( root_offset_val );
-        // Issue #136: prev_offset и AVL-ссылки в FreeBlockData (только для свободных блоков)
+        // Issue #136: User AVL-tree pointers (in block header [20..31]) — always initialize.
+        blk->BaseBlock::user_left_offset   = AddressTraitsT::no_block;
+        blk->BaseBlock::user_right_offset  = AddressTraitsT::no_block;
+        blk->BaseBlock::user_parent_offset = AddressTraitsT::no_block;
+        // Issue #136: Manager's free-block AVL-ссылки в FreeBlockData (только для свободных блоков)
         if ( weight_val == 0 )
         {
             auto& fd         = blk->get_free_data_mut();
-            fd.prev_offset   = prev_idx;
             fd.left_offset   = AddressTraitsT::no_block;
             fd.right_offset  = AddressTraitsT::no_block;
             fd.parent_offset = AddressTraitsT::no_block;
@@ -392,12 +406,12 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
         return reinterpret_cast<const BlockStateBase*>( raw_blk )->root_offset();
     }
     /**
-     * @brief Установить prev_offset блока (только для свободных блоков).
-     * Issue #136: prev_offset хранится в FreeBlockData.
+     * @brief Установить prev_offset блока (в заголовке LinkedListNode, Issue #136).
+     * Issue #136: prev_offset хранится в заголовке для O(1) доступа при coalescing.
      */
     static void set_prev_offset_of( void* raw_blk, index_type v ) noexcept
     {
-        reinterpret_cast<BlockStateBase*>( raw_blk )->get_free_data_mut().prev_offset = v;
+        reinterpret_cast<BlockStateBase*>( raw_blk )->set_prev_offset( v );
     }
     /**
      * @brief Установить weight блока.
@@ -428,9 +442,59 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
         reinterpret_cast<BlockStateBase*>( raw_blk )->set_node_type( v );
     }
 
+    // ─── Статические утилиты для пользовательского AVL-дерева (Issue #136) ──
+
+    /**
+     * @brief Прочитать user_left_offset блока (для пользовательских AVL-деревьев, Issue #136).
+     * Хранится в заголовке блока (байты [20..23]), доступен для занятых блоков.
+     */
+    static index_type get_user_left_offset( const void* raw_blk ) noexcept
+    {
+        const auto* blk = reinterpret_cast<const BlockStateBase*>( raw_blk );
+        return blk->BaseBlock::user_left_offset;
+    }
+    /**
+     * @brief Прочитать user_right_offset блока (для пользовательских AVL-деревьев, Issue #136).
+     */
+    static index_type get_user_right_offset( const void* raw_blk ) noexcept
+    {
+        const auto* blk = reinterpret_cast<const BlockStateBase*>( raw_blk );
+        return blk->BaseBlock::user_right_offset;
+    }
+    /**
+     * @brief Прочитать user_parent_offset блока (для пользовательских AVL-деревьев, Issue #136).
+     */
+    static index_type get_user_parent_offset( const void* raw_blk ) noexcept
+    {
+        const auto* blk = reinterpret_cast<const BlockStateBase*>( raw_blk );
+        return blk->BaseBlock::user_parent_offset;
+    }
+    /**
+     * @brief Установить user_left_offset блока (для пользовательских AVL-деревьев, Issue #136).
+     */
+    static void set_user_left_offset_of( void* raw_blk, index_type v ) noexcept
+    {
+        reinterpret_cast<BlockStateBase*>( raw_blk )->BaseBlock::user_left_offset = v;
+    }
+    /**
+     * @brief Установить user_right_offset блока (для пользовательских AVL-деревьев, Issue #136).
+     */
+    static void set_user_right_offset_of( void* raw_blk, index_type v ) noexcept
+    {
+        reinterpret_cast<BlockStateBase*>( raw_blk )->BaseBlock::user_right_offset = v;
+    }
+    /**
+     * @brief Установить user_parent_offset блока (для пользовательских AVL-деревьев, Issue #136).
+     */
+    static void set_user_parent_offset_of( void* raw_blk, index_type v ) noexcept
+    {
+        reinterpret_cast<BlockStateBase*>( raw_blk )->BaseBlock::user_parent_offset = v;
+    }
+
   protected:
     // Внутренние сеттеры для наследников
     void set_weight( index_type v ) noexcept { TNode::weight = v; }
+    void set_prev_offset( index_type v ) noexcept { LLNode::prev_offset = v; }
     void set_next_offset( index_type v ) noexcept { LLNode::next_offset = v; }
     void set_avl_height( std::int16_t v ) noexcept { TNode::avl_height = v; }
     void set_root_offset( index_type v ) noexcept { TNode::root_offset = v; }
@@ -460,8 +524,8 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
 // Проверка бинарной совместимости с Block<A>
 static_assert( sizeof( BlockStateBase<DefaultAddressTraits> ) == sizeof( Block<DefaultAddressTraits> ),
                "BlockStateBase<A> must have same size as Block<A> (Issue #93)" );
-static_assert( sizeof( BlockStateBase<DefaultAddressTraits> ) == 16,
-               "BlockStateBase<DefaultAddressTraits> must be 16 bytes (Issue #136)" );
+static_assert( sizeof( BlockStateBase<DefaultAddressTraits> ) == 32,
+               "BlockStateBase<DefaultAddressTraits> must be 32 bytes (Issue #136)" );
 
 /**
  * @brief FreeBlock — свободный блок в корректном состоянии.
@@ -619,14 +683,14 @@ template <typename AddressTraitsT> class SplittingBlock : public BlockStateBase<
         std::memset( new_blk_ptr, 0, sizeof( Block<AddressTraitsT> ) + sizeof( FreeBlockData<AddressTraitsT> ) );
         // Инициализация через SplittingBlock<A> — все поля доступны через state machine методы
         auto* new_blk = reinterpret_cast<SplittingBlock<AddressTraitsT>*>( new_blk_ptr );
-        // Issue #136: next_offset в заголовке, prev_offset в FreeBlockData
+        // Issue #136: prev_offset в заголовке (LinkedListNode), next_offset тоже в заголовке
+        new_blk->set_prev_offset( own_idx );
         new_blk->set_next_offset( Base::next_offset() );
         new_blk->set_avl_height( 1 ); // Будет вставлен в AVL
         new_blk->set_weight( 0 );
         new_blk->set_root_offset( 0 );
-        // FreeBlockData для нового свободного блока
+        // FreeBlockData для нового свободного блока (только AVL-ссылки)
         auto& fd         = new_blk->get_free_data_mut();
-        fd.prev_offset   = own_idx;
         fd.left_offset   = AddressTraitsT::no_block;
         fd.right_offset  = AddressTraitsT::no_block;
         fd.parent_offset = AddressTraitsT::no_block;
@@ -642,14 +706,9 @@ template <typename AddressTraitsT> class SplittingBlock : public BlockStateBase<
     {
         if ( old_next_blk != nullptr )
         {
-            // Старый следующий блок — может быть занятым или свободным.
-            // Issue #136: prev_offset хранится только в FreeBlockData свободных блоков.
-            // Для занятых блоков prev_offset недоступен (находится в пользовательских данных).
-            // Однако при split: old_next мог быть свободным или занятым.
-            // Мы обновляем prev только для свободных блоков.
+            // Issue #136: prev_offset хранится в заголовке для всех блоков (свободных и занятых).
             auto* old_next_state = reinterpret_cast<SplittingBlock<AddressTraitsT>*>( old_next_blk );
-            if ( old_next_state->weight() == 0 )
-                old_next_state->get_free_data_mut().prev_offset = new_idx;
+            old_next_state->set_prev_offset( new_idx );
         }
         Base::set_next_offset( new_idx );
     }
@@ -721,8 +780,8 @@ template <typename AddressTraitsT> class AllocatedBlock : public BlockStateBase<
      * @brief Пометить блок как свободный (первый шаг deallocate).
      *
      * Issue #136: При переходе в свободное состояние, область данных становится
-     * FreeBlockData. prev_offset устанавливается в no_block — будет восстановлен
-     * при следующей операции coalesce или repair_linked_list.
+     * FreeBlockData (AVL-ссылки). prev_offset уже хранится в заголовке LinkedListNode
+     * и остаётся корректным после mark_as_free (O(1) доступ при coalescing).
      *
      * @return Указатель на блок в состоянии FreeBlockNotInAVL.
      */
@@ -730,9 +789,9 @@ template <typename AddressTraitsT> class AllocatedBlock : public BlockStateBase<
     {
         Base::set_weight( 0 );
         Base::set_root_offset( 0 );
-        // Issue #136: инициализируем FreeBlockData в области данных
+        // Issue #136: инициализируем AVL-ссылки в FreeBlockData
+        // prev_offset уже корректен в заголовке LinkedListNode
         auto& fd         = Base::get_free_data_mut();
-        fd.prev_offset   = AddressTraitsT::no_block; // Восстанавливается при coalesce
         fd.left_offset   = AddressTraitsT::no_block;
         fd.right_offset  = AddressTraitsT::no_block;
         fd.parent_offset = AddressTraitsT::no_block;
@@ -827,13 +886,11 @@ template <typename AddressTraitsT> class CoalescingBlock : public BlockStateBase
 
         // Обновляем связный список: берём next_offset правого соседа
         Base::set_next_offset( nxt->next_offset() );
-        // Issue #136: prev_offset следующего за поглощённым блоком обновляем только
-        // если он свободный (prev_offset хранится в FreeBlockData).
+        // Issue #136: prev_offset в заголовке для всех блоков (свободных и занятых).
         if ( next_next_blk != nullptr )
         {
             auto* nxt_nxt = reinterpret_cast<CoalescingBlock<AddressTraitsT>*>( next_next_blk );
-            if ( nxt_nxt->weight() == 0 )
-                nxt_nxt->get_free_data_mut().prev_offset = own_idx;
+            nxt_nxt->set_prev_offset( own_idx );
         }
 
         // Обнуляем поглощённый блок (заголовок + FreeBlockData)
@@ -855,12 +912,11 @@ template <typename AddressTraitsT> class CoalescingBlock : public BlockStateBase
         auto* prv = reinterpret_cast<CoalescingBlock<AddressTraitsT>*>( prev_blk );
         prv->set_next_offset( Base::next_offset() );
 
-        // Issue #136: обновляем prev в FreeBlockData следующего блока (если он свободный).
+        // Issue #136: prev_offset в заголовке для всех блоков (свободных и занятых).
         if ( next_blk != nullptr )
         {
             auto* nxt = reinterpret_cast<CoalescingBlock<AddressTraitsT>*>( next_blk );
-            if ( nxt->weight() == 0 )
-                nxt->get_free_data_mut().prev_offset = prev_idx;
+            nxt->set_prev_offset( prev_idx );
         }
 
         // Обнуляем текущий блок (поглощён) — заголовок + FreeBlockData
@@ -938,8 +994,8 @@ template <typename AddressTraitsT> void reset_block_avl_fields( void* raw_blk ) 
 /**
  * @brief Восстановить prev_offset блока (при repair_linked_list).
  *
- * Issue #136: prev_offset хранится в FreeBlockData (только для свободных блоков).
- * Для занятых блоков prev_offset не хранится.
+ * Issue #136: prev_offset хранится в заголовке LinkedListNode для O(1) доступа.
+ * Доступен для всех блоков (свободных и занятых).
  *
  * @tparam AddressTraitsT Traits адресного пространства.
  * @param raw_blk   Указатель на блок.

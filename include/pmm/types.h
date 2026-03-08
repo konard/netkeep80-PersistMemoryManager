@@ -6,7 +6,7 @@
  * BlockView, FreeBlockView and utility functions for byte/granule conversion.
  *
  * Sizes of structures are protected by static_assert (Issue #59, #73 FR-03):
- *   Block<DefaultAddressTraits> == 16 bytes (Issue #136: reduced from 32 bytes)
+ *   Block<DefaultAddressTraits> == 32 bytes (Issue #136: AVL refs moved to FreeBlockData)
  *   ManagerHeader               == 64 bytes
  *
  * Issue #95: Moved from persist_memory_types.h to pmm/types.h as part of
@@ -14,10 +14,10 @@
  *
  * Issue #106: Block<A>* utilities replace legacy BlockHeader* ones.
  * Issue #112: BlockHeader struct removed — Block<DefaultAddressTraits> is the sole block type.
- * Issue #136: Block<A> reduced from 32 to 16 bytes — prev_offset, left_offset, right_offset,
- *             parent_offset moved to FreeBlockData<A> in the free block data area.
+ * Issue #136: Block<A> — left_offset, right_offset, parent_offset moved to FreeBlockData<A>
+ *             in the free block data area. prev_offset kept in header for O(1) coalescing.
  *
- * @version 2.3 (Issue #136 — Block<A> reduced to 16 bytes, FreeBlockData in data area)
+ * @version 2.4 (Issue #136 — AVL refs in FreeBlockData, prev_offset in header)
  */
 
 #pragma once
@@ -108,21 +108,21 @@ namespace detail
 // Issue #112: BlockHeader struct removed — Block<DefaultAddressTraits> is the sole block type.
 // All block metadata is stored in Block<AddressTraitsT> (LinkedListNode + TreeNode).
 
-// Issue #136: Block<DefaultAddressTraits> reduced from 32 to 16 bytes.
-// FreeBlockData<A> (16 bytes) is stored in the data area of free blocks.
-static_assert( sizeof( pmm::Block<pmm::DefaultAddressTraits> ) == 16,
-               "Block<DefaultAddressTraits> must be 16 bytes (Issue #136)" );
+// Issue #136: Block<DefaultAddressTraits> = LinkedListNode (8) + TreeNode (12) + padding (12) = 32 bytes.
+// FreeBlockData<A> (12 bytes) stored in data area of free blocks (AVL-only: left/right/parent).
+static_assert( sizeof( pmm::Block<pmm::DefaultAddressTraits> ) == 32,
+               "Block<DefaultAddressTraits> must be 32 bytes (Issue #136)" );
 static_assert( sizeof( pmm::Block<pmm::DefaultAddressTraits> ) % kGranuleSize == 0,
                "Block<DefaultAddressTraits> must be granule-aligned (Issue #59, #73 FR-03)" );
 
-// Issue #136: FreeBlockData<DefaultAddressTraits>: prev + left + right + parent (16 bytes).
-static_assert( sizeof( pmm::FreeBlockData<pmm::DefaultAddressTraits> ) == 4 * sizeof( std::uint32_t ),
-               "FreeBlockData<DefaultAddressTraits> must be 16 bytes (Issue #136)" );
+// Issue #136: FreeBlockData<DefaultAddressTraits>: left + right + parent (12 bytes = 3 fields).
+static_assert( sizeof( pmm::FreeBlockData<pmm::DefaultAddressTraits> ) == 3 * sizeof( std::uint32_t ),
+               "FreeBlockData<DefaultAddressTraits> must be 12 bytes (Issue #136)" );
 // Issue #87 Phase 2: verify LinkedListNode<DefaultAddressTraits> layout.
-// Issue #136: LinkedListNode now contains only next_offset (4 bytes).
+// Issue #136: LinkedListNode contains prev_offset + next_offset (8 bytes).
 // Note: offsetof checks on protected fields are in linked_list_node.h and tree_node.h (Issue #120).
-static_assert( sizeof( pmm::LinkedListNode<pmm::DefaultAddressTraits> ) == sizeof( std::uint32_t ),
-               "LinkedListNode<DefaultAddressTraits> must be 4 bytes (Issue #136)" );
+static_assert( sizeof( pmm::LinkedListNode<pmm::DefaultAddressTraits> ) == 2 * sizeof( std::uint32_t ),
+               "LinkedListNode<DefaultAddressTraits> must be 8 bytes (Issue #136)" );
 // Issue #136: TreeNode<DefaultAddressTraits>: weight + root_offset + avl_height + node_type (12 bytes).
 // left_offset, right_offset, parent_offset moved to FreeBlockData<A>.
 static_assert( sizeof( pmm::TreeNode<pmm::DefaultAddressTraits> ) == 2 * sizeof( std::uint32_t ) + 4,
@@ -165,11 +165,11 @@ static_assert( sizeof( ManagerHeader ) % kGranuleSize == 0,
 /// @brief Number of granules in ManagerHeader
 inline constexpr std::uint32_t kManagerHeaderGranules = sizeof( ManagerHeader ) / kGranuleSize;
 
-/// @brief Issue #83/#136: Minimum block size = Block header + FreeBlockData + at least alignment.
-/// Issue #136: Free blocks store FreeBlockData<A> in their data area. The minimum free block must
-/// be large enough to hold FreeBlockData (16 bytes = 1 granule). This means:
-///   min free block = sizeof(Block<A>) + sizeof(FreeBlockData<A>) = 16 + 16 = 32 bytes (2 granules).
-///   min allocated block = sizeof(Block<A>) + 1 granule = 16 + 16 = 32 bytes (2 granules).
+/// @brief Issue #83/#136: Minimum block size = Block header + at least 1 data granule.
+/// Issue #136: Block<A> is 32 bytes (2 granules). Free blocks store FreeBlockData<A> (12 bytes)
+/// in data area — fits within 1 granule (16 bytes). This means:
+///   min free block = sizeof(Block<A>) + 1 granule = 32 + 16 = 48 bytes (3 granules).
+///   min allocated block = sizeof(Block<A>) + 1 granule = 32 + 16 = 48 bytes (3 granules).
 /// For splitting: both resulting blocks must meet their minimum size requirements.
 inline constexpr std::size_t kFreeBlockDataSize = sizeof( pmm::FreeBlockData<pmm::DefaultAddressTraits> );
 inline constexpr std::size_t kMinBlockSize      = sizeof( pmm::Block<pmm::DefaultAddressTraits> ) +
@@ -255,7 +255,7 @@ inline std::uint32_t block_total_granules( const std::uint8_t* base, const Manag
 }
 
 /// @brief Issue #69/#106/#112/#136: Structural block validity using Block<A> layout.
-/// Issue #136: prev_offset and AVL refs are in FreeBlockData (only accessible for free blocks).
+/// Issue #136: prev_offset is in block header (LinkedListNode); AVL refs in FreeBlockData (free blocks only).
 /// Invariants: weight<total_gran, next_off>idx, avl_height<32, distinct AVL refs (free blocks only).
 inline bool is_valid_block( const std::uint8_t* base, const ManagerHeader* hdr, std::uint32_t idx )
 {
@@ -276,8 +276,11 @@ inline bool is_valid_block( const std::uint8_t* base, const ManagerHeader* hdr, 
         return false;
     if ( BlockState::get_avl_height( blk ) >= 32 )
         return false;
-    // Issue #136: AVL refs (left/right/parent) and prev_offset are in FreeBlockData.
-    // Validate them only for free blocks (weight == 0) that have sufficient space.
+    // Issue #136: prev_offset is in header for all blocks — validate for all.
+    auto prev_off = BlockState::get_prev_offset( blk );
+    if ( prev_off != kNoBlock && prev_off >= idx )
+        return false;
+    // Issue #136: AVL refs (left/right/parent) are in FreeBlockData — validate for free blocks only.
     if ( BlockState::get_weight( blk ) == 0 )
     {
         // Free block: validate FreeBlockData if there is enough space for it
@@ -293,9 +296,6 @@ inline bool is_valid_block( const std::uint8_t* base, const ManagerHeader* hdr, 
             const bool p          = ( parent_off != kNoBlock );
             if ( ( l || r || p ) && ( ( l && r && left_off == right_off ) || ( l && p && left_off == parent_off ) ||
                                       ( r && p && right_off == parent_off ) ) )
-                return false;
-            auto prev_off = BlockState::get_prev_offset( blk );
-            if ( prev_off != kNoBlock && prev_off >= idx )
                 return false;
         }
     }
@@ -337,9 +337,9 @@ inline pmm::Block<pmm::DefaultAddressTraits>* header_from_ptr( std::uint8_t* bas
 }
 
 /// @brief Minimum block granules for user_bytes (header + data, minimum 1 data granule).
-/// Issue #136: Block header is now 1 granule (16 bytes). Minimum data is also 1 granule.
-/// Note: When splitting, the remainder block must hold FreeBlockData (16 bytes = 1 granule),
-/// so the split remainder is always at least 2 granules (header + FreeBlockData).
+/// Issue #136: Block header is 2 granules (32 bytes). Minimum data is 1 granule (16 bytes).
+/// Note: When splitting, the remainder block must hold FreeBlockData (12 bytes < 1 granule),
+/// so the split remainder is always at least 1 data granule (header + 1 granule data).
 /// This is handled in AllocatorPolicy::allocate_from_block() via kBlockHeaderGranules + 1.
 inline std::uint32_t required_block_granules( std::size_t user_bytes )
 {
