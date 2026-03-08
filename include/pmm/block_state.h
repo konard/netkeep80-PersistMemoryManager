@@ -38,7 +38,6 @@
 
 #include "pmm/address_traits.h"
 #include "pmm/block.h"
-#include "pmm/linked_list_node.h"
 #include "pmm/tree_node.h"
 
 #include <cstdint>
@@ -59,21 +58,20 @@ template <typename AddressTraitsT> class CoalescingBlock;
 /**
  * @brief Базовый класс блока для state machine.
  *
- * Наследует Block<A> (LinkedListNode<A> + TreeNode<A>).
+ * Наследует Block<A> (с полями prev_offset/next_offset і TreeNode<A>).
  * Все поля приватные для потомков. Доступ только через методы состояний.
  *
  * Layout Block<A> (32 bytes при DefaultAddressTraits):
- *   [0..7]   LinkedListNode<A>: prev_offset (4), next_offset (4)
- *   [8..31]  TreeNode<A>:       weight (4), left_offset (4), right_offset (4),
- *                               parent_offset (4), root_offset (4),
- *                               avl_height (2), node_type (2)
+ *   [0..23]  TreeNode<A>: weight (4), left_offset (4), right_offset (4),
+ *                         parent_offset (4), root_offset (4),
+ *                         avl_height (2), node_type (2)
+ *   [24..31] Block<A>:    prev_offset (4), next_offset (4)
  *
  * @tparam AddressTraitsT  Traits адресного пространства.
  */
 template <typename AddressTraitsT> class BlockStateBase : private Block<AddressTraitsT>
 {
   private:
-    using LLNode = LinkedListNode<AddressTraitsT>;
     using TNode  = TreeNode<AddressTraitsT>;
 
   public:
@@ -84,26 +82,26 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
     // ─── Compile-time layout offsets (Issue #120: derived from sizes + struct layout) ──
     // Note: offsetof cannot be used on protected members from outside the class body.
     // These offsets are derived from sizeof base types and the assumption of standard layout.
-    // The struct layout is verified by static_assert in linked_list_node.h and tree_node.h.
+    // The struct layout is verified by static_assert in block.h and tree_node.h.
 
-    /// Byte offset of prev_offset within Block<A> layout (first field of LinkedListNode).
-    static constexpr std::size_t kOffsetPrevOffset = 0;
-    /// Byte offset of next_offset within Block<A> layout (second field of LinkedListNode).
-    static constexpr std::size_t kOffsetNextOffset = sizeof( index_type );
-    /// Byte offset of weight within Block<A> layout (first field of TreeNode, Issue #126).
-    static constexpr std::size_t kOffsetWeight = sizeof( LLNode );
+    /// Byte offset of prev_offset within Block<A> layout (first direct field of Block, after TreeNode).
+    static constexpr std::size_t kOffsetPrevOffset = sizeof( TNode );
+    /// Byte offset of next_offset within Block<A> layout (second direct field of Block, after prev_offset).
+    static constexpr std::size_t kOffsetNextOffset = sizeof( TNode ) + sizeof( index_type );
+    /// Byte offset of weight within Block<A> layout (first field of TreeNode, Issue #126, #138).
+    static constexpr std::size_t kOffsetWeight = 0;
     /// Byte offset of left_offset within Block<A> layout (second field of TreeNode, follows weight).
-    static constexpr std::size_t kOffsetLeftOffset = sizeof( LLNode ) + sizeof( index_type );
+    static constexpr std::size_t kOffsetLeftOffset = sizeof( index_type );
     /// Byte offset of right_offset within Block<A> layout.
-    static constexpr std::size_t kOffsetRightOffset = sizeof( LLNode ) + 2 * sizeof( index_type );
+    static constexpr std::size_t kOffsetRightOffset = 2 * sizeof( index_type );
     /// Byte offset of parent_offset within Block<A> layout.
-    static constexpr std::size_t kOffsetParentOffset = sizeof( LLNode ) + 3 * sizeof( index_type );
+    static constexpr std::size_t kOffsetParentOffset = 3 * sizeof( index_type );
     /// Byte offset of root_offset within Block<A> layout.
-    static constexpr std::size_t kOffsetRootOffset = sizeof( LLNode ) + 4 * sizeof( index_type );
+    static constexpr std::size_t kOffsetRootOffset = 4 * sizeof( index_type );
     /// Byte offset of avl_height within Block<A> layout (after weight+left+right+parent+root = 5 index_type fields).
-    static constexpr std::size_t kOffsetAvlHeight = sizeof( LLNode ) + 5 * sizeof( index_type );
-    /// Byte offset of node_type within Block<A> layout (after avl_height(2) = 2 bytes, Issue #126).
-    static constexpr std::size_t kOffsetNodeType = sizeof( LLNode ) + 5 * sizeof( index_type ) + 2;
+    static constexpr std::size_t kOffsetAvlHeight = 5 * sizeof( index_type );
+    /// Byte offset of node_type within Block<A> layout (after avl_height(2) = 2 bytes, Issue #126, #138).
+    static constexpr std::size_t kOffsetNodeType = 5 * sizeof( index_type ) + 2;
 
     // Прямое создание запрещено — используйте cast_from_raw()
     BlockStateBase() = delete;
@@ -112,8 +110,8 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
     index_type weight() const noexcept { return TNode::weight; }
 
     // Read-only доступ к полям связного списка (не критичны для состояния)
-    index_type prev_offset() const noexcept { return LLNode::prev_offset; }
-    index_type next_offset() const noexcept { return LLNode::next_offset; }
+    index_type prev_offset() const noexcept { return Block<AddressTraitsT>::prev_offset; }
+    index_type next_offset() const noexcept { return Block<AddressTraitsT>::next_offset; }
 
     // Read-only доступ к AVL-полям (для диагностики)
     index_type   left_offset() const noexcept { return TNode::left_offset; }
@@ -372,8 +370,8 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
   protected:
     // Внутренние сеттеры для наследников
     void set_weight( index_type v ) noexcept { TNode::weight = v; }
-    void set_prev_offset( index_type v ) noexcept { LLNode::prev_offset = v; }
-    void set_next_offset( index_type v ) noexcept { LLNode::next_offset = v; }
+    void set_prev_offset( index_type v ) noexcept { Block<AddressTraitsT>::prev_offset = v; }
+    void set_next_offset( index_type v ) noexcept { Block<AddressTraitsT>::next_offset = v; }
     void set_left_offset( index_type v ) noexcept { TNode::left_offset = v; }
     void set_right_offset( index_type v ) noexcept { TNode::right_offset = v; }
     void set_parent_offset( index_type v ) noexcept { TNode::parent_offset = v; }

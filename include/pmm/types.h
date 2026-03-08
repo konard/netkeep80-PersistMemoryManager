@@ -23,7 +23,6 @@
 #include "pmm/address_traits.h"
 #include "pmm/block.h"
 #include "pmm/block_state.h"
-#include "pmm/linked_list_node.h"
 #include "pmm/tree_node.h"
 
 #include <algorithm>
@@ -45,7 +44,7 @@ static_assert( ( kGranuleSize & ( kGranuleSize - 1 ) ) == 0, "kGranuleSize must 
 static_assert( kGranuleSize == pmm::DefaultAddressTraits::granule_size,
                "kGranuleSize must match DefaultAddressTraits::granule_size (Issue #87)" );
 
-inline constexpr std::uint64_t kMagic = 0x504D4D5F56303833ULL; ///< "PMM_V083" (Issue #83: granule_size in header)
+inline constexpr std::uint64_t kMagic = 0x504D4D5F56303938ULL; ///< "PMM_V098" (Issue #138: block layout changed — prev/next now after TreeNode fields)
 
 // ─── Public data structures ────────────────────────────────────────────────────
 
@@ -103,7 +102,7 @@ namespace detail
 {
 
 // Issue #112: BlockHeader struct removed — Block<DefaultAddressTraits> is the sole block type.
-// All block metadata is stored in Block<AddressTraitsT> (LinkedListNode + TreeNode).
+// All block metadata is stored in Block<AddressTraitsT> (prev/next + TreeNode, Issue #138).
 
 // Issue #87: Verify Block<DefaultAddressTraits> layout and size constraints.
 static_assert( sizeof( pmm::Block<pmm::DefaultAddressTraits> ) == 32,
@@ -111,10 +110,11 @@ static_assert( sizeof( pmm::Block<pmm::DefaultAddressTraits> ) == 32,
 static_assert( sizeof( pmm::Block<pmm::DefaultAddressTraits> ) % kGranuleSize == 0,
                "Block<DefaultAddressTraits> must be granule-aligned (Issue #59, #73 FR-03)" );
 
-// Issue #87 Phase 2: verify LinkedListNode<DefaultAddressTraits> layout.
-// Note: offsetof checks on protected fields are in linked_list_node.h and tree_node.h (Issue #120).
-static_assert( sizeof( pmm::LinkedListNode<pmm::DefaultAddressTraits> ) == 2 * sizeof( std::uint32_t ),
-               "LinkedListNode<DefaultAddressTraits> must be 8 bytes (Issue #87)" );
+// Issue #87 Phase 2, #138: verify Block linked list fields occupy 2 index_type fields.
+// LinkedListNode was merged into Block (Issue #138). Layout verified via block.h.
+static_assert( sizeof( pmm::Block<pmm::DefaultAddressTraits> ) ==
+                   sizeof( pmm::TreeNode<pmm::DefaultAddressTraits> ) + 2 * sizeof( std::uint32_t ),
+               "Block<DefaultAddressTraits> must have TreeNode + 2 index_type list fields (Issue #87, #138)" );
 // TreeNode<DefaultAddressTraits>: weight + left/right/parent + root_offset + avl_height/node_type (24 bytes).
 // Issue #126: weight moved to first field, avl_height/node_type (renamed from _pad) moved to end.
 static_assert( sizeof( pmm::TreeNode<pmm::DefaultAddressTraits> ) == 5 * sizeof( std::uint32_t ) + 4,
