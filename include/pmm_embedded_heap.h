@@ -633,8 +633,7 @@ namespace pmm
  *     parent_offset                           — через FreeBlockData<A>
  *                                               (только для свободных блоков, менеджер памяти)
  */
-template <typename AddressTraitsT>
-struct Block : LinkedListNode<AddressTraitsT>, TreeNode<AddressTraitsT>
+template <typename AddressTraitsT> struct Block : LinkedListNode<AddressTraitsT>, TreeNode<AddressTraitsT>
 {
     using address_traits = AddressTraitsT;
     using index_type     = typename AddressTraitsT::index_type;
@@ -644,9 +643,9 @@ struct Block : LinkedListNode<AddressTraitsT>, TreeNode<AddressTraitsT>
     // For allocated blocks: these fields hold user tree pointers (left/right/parent of user's tree).
     // For free blocks: these fields are unused (manager uses FreeBlockData at +32 instead).
     // LinkedListNode<A> (8) + TreeNode<A> (12) = 20 bytes. Pad to 32 bytes with user tree fields.
-    index_type user_left_offset;    ///< User AVL-tree: left child (or no_block if null)
-    index_type user_right_offset;   ///< User AVL-tree: right child (or no_block if null)
-    index_type user_parent_offset;  ///< User AVL-tree: parent (or no_block if null)
+    index_type user_left_offset;   ///< User AVL-tree: left child (or no_block if null)
+    index_type user_right_offset;  ///< User AVL-tree: right child (or no_block if null)
+    index_type user_parent_offset; ///< User AVL-tree: parent (or no_block if null)
 
   public:
     /**
@@ -3779,8 +3778,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( p.is_null() || !_initialized )
             return;
         std::uint8_t* base    = _backend.base_ptr();
-        void*      blk_raw = base + detail::idx_to_byte_off( p.offset() ) - sizeof( Block<address_traits> );
-        index_type v       = ( left == 0 ) ? address_traits::no_block : left;
+        void*         blk_raw = base + detail::idx_to_byte_off( p.offset() ) - sizeof( Block<address_traits> );
+        index_type    v       = ( left == 0 ) ? address_traits::no_block : left;
         // Issue #136: user AVL-tree pointers stored in block header [20..31] (not in FreeBlockData)
         BlockStateBase<address_traits>::set_user_left_offset_of( blk_raw, v );
     }
@@ -3800,8 +3799,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( p.is_null() || !_initialized )
             return;
         std::uint8_t* base    = _backend.base_ptr();
-        void*      blk_raw = base + detail::idx_to_byte_off( p.offset() ) - sizeof( Block<address_traits> );
-        index_type v       = ( right == 0 ) ? address_traits::no_block : right;
+        void*         blk_raw = base + detail::idx_to_byte_off( p.offset() ) - sizeof( Block<address_traits> );
+        index_type    v       = ( right == 0 ) ? address_traits::no_block : right;
         // Issue #136: user AVL-tree pointers stored in block header [20..31] (not in FreeBlockData)
         BlockStateBase<address_traits>::set_user_right_offset_of( blk_raw, v );
     }
@@ -3821,8 +3820,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( p.is_null() || !_initialized )
             return;
         std::uint8_t* base    = _backend.base_ptr();
-        void*      blk_raw = base + detail::idx_to_byte_off( p.offset() ) - sizeof( Block<address_traits> );
-        index_type v       = ( parent == 0 ) ? address_traits::no_block : parent;
+        void*         blk_raw = base + detail::idx_to_byte_off( p.offset() ) - sizeof( Block<address_traits> );
+        index_type    v       = ( parent == 0 ) ? address_traits::no_block : parent;
         // Issue #136: user AVL-tree pointers stored in block header [20..31] (not in FreeBlockData)
         BlockStateBase<address_traits>::set_user_parent_offset_of( blk_raw, v );
     }

@@ -84,8 +84,7 @@ namespace pmm
  *     parent_offset                           — через FreeBlockData<A>
  *                                               (только для свободных блоков, менеджер памяти)
  */
-template <typename AddressTraitsT>
-struct Block : LinkedListNode<AddressTraitsT>, TreeNode<AddressTraitsT>
+template <typename AddressTraitsT> struct Block : LinkedListNode<AddressTraitsT>, TreeNode<AddressTraitsT>
 {
     using address_traits = AddressTraitsT;
     using index_type     = typename AddressTraitsT::index_type;
@@ -95,9 +94,9 @@ struct Block : LinkedListNode<AddressTraitsT>, TreeNode<AddressTraitsT>
     // For allocated blocks: these fields hold user tree pointers (left/right/parent of user's tree).
     // For free blocks: these fields are unused (manager uses FreeBlockData at +32 instead).
     // LinkedListNode<A> (8) + TreeNode<A> (12) = 20 bytes. Pad to 32 bytes with user tree fields.
-    index_type user_left_offset;    ///< User AVL-tree: left child (or no_block if null)
-    index_type user_right_offset;   ///< User AVL-tree: right child (or no_block if null)
-    index_type user_parent_offset;  ///< User AVL-tree: parent (or no_block if null)
+    index_type user_left_offset;   ///< User AVL-tree: left child (or no_block if null)
+    index_type user_right_offset;  ///< User AVL-tree: right child (or no_block if null)
+    index_type user_parent_offset; ///< User AVL-tree: parent (or no_block if null)
 
   public:
     /**

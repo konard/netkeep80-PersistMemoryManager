@@ -480,8 +480,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( p.is_null() || !_initialized )
             return;
         std::uint8_t* base    = _backend.base_ptr();
-        void*      blk_raw = base + detail::idx_to_byte_off( p.offset() ) - sizeof( Block<address_traits> );
-        index_type v       = ( left == 0 ) ? address_traits::no_block : left;
+        void*         blk_raw = base + detail::idx_to_byte_off( p.offset() ) - sizeof( Block<address_traits> );
+        index_type    v       = ( left == 0 ) ? address_traits::no_block : left;
         // Issue #136: user AVL-tree pointers stored in block header [20..31] (not in FreeBlockData)
         BlockStateBase<address_traits>::set_user_left_offset_of( blk_raw, v );
     }
@@ -501,8 +501,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( p.is_null() || !_initialized )
             return;
         std::uint8_t* base    = _backend.base_ptr();
-        void*      blk_raw = base + detail::idx_to_byte_off( p.offset() ) - sizeof( Block<address_traits> );
-        index_type v       = ( right == 0 ) ? address_traits::no_block : right;
+        void*         blk_raw = base + detail::idx_to_byte_off( p.offset() ) - sizeof( Block<address_traits> );
+        index_type    v       = ( right == 0 ) ? address_traits::no_block : right;
         // Issue #136: user AVL-tree pointers stored in block header [20..31] (not in FreeBlockData)
         BlockStateBase<address_traits>::set_user_right_offset_of( blk_raw, v );
     }
@@ -522,8 +522,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( p.is_null() || !_initialized )
             return;
         std::uint8_t* base    = _backend.base_ptr();
-        void*      blk_raw = base + detail::idx_to_byte_off( p.offset() ) - sizeof( Block<address_traits> );
-        index_type v       = ( parent == 0 ) ? address_traits::no_block : parent;
+        void*         blk_raw = base + detail::idx_to_byte_off( p.offset() ) - sizeof( Block<address_traits> );
+        index_type    v       = ( parent == 0 ) ? address_traits::no_block : parent;
         // Issue #136: user AVL-tree pointers stored in block header [20..31] (not in FreeBlockData)
         BlockStateBase<address_traits>::set_user_parent_offset_of( blk_raw, v );
     }

@@ -82,8 +82,7 @@ static bool test_p9_all_states_same_size()
     // FreeBlockData (left/right/parent) is at block+32 in memory; prev_offset is in header.
     static_assert( sizeof( pmm::FreeBlock<A> ) == 32, "FreeBlock must be 32 bytes (Issue #136)" );
     static_assert( sizeof( pmm::AllocatedBlock<A> ) == 32, "AllocatedBlock must be 32 bytes (Issue #136)" );
-    static_assert( sizeof( pmm::FreeBlockRemovedAVL<A> ) == 32,
-                   "FreeBlockRemovedAVL must be 32 bytes (Issue #136)" );
+    static_assert( sizeof( pmm::FreeBlockRemovedAVL<A> ) == 32, "FreeBlockRemovedAVL must be 32 bytes (Issue #136)" );
     static_assert( sizeof( pmm::FreeBlockNotInAVL<A> ) == 32, "FreeBlockNotInAVL must be 32 bytes (Issue #136)" );
     static_assert( sizeof( pmm::SplittingBlock<A> ) == 32, "SplittingBlock must be 32 bytes (Issue #136)" );
     static_assert( sizeof( pmm::CoalescingBlock<A> ) == 32, "CoalescingBlock must be 32 bytes (Issue #136)" );
@@ -401,8 +400,7 @@ static bool test_p9_coalesce_with_next()
 
     // coalesce_with_next zeroes next_blk for sizeof(Block)+sizeof(FreeBlockData)=44 bytes.
     // buffer_next must hold at least that many bytes to avoid stack overflow.
-    static constexpr std::size_t kCoalesceBlockBufSize =
-        sizeof( pmm::Block<A> ) + sizeof( pmm::FreeBlockData<A> );
+    static constexpr std::size_t kCoalesceBlockBufSize = sizeof( pmm::Block<A> ) + sizeof( pmm::FreeBlockData<A> );
 
     // Три блока: текущий (idx=6), следующий (idx=10), следующий следующего (idx=20)
     alignas( 16 ) std::uint8_t buffer_curr[32];
@@ -446,8 +444,7 @@ static bool test_p9_coalesce_with_prev()
     using BlockState = pmm::BlockStateBase<A>;
 
     // coalesce_with_prev zeroes 'this' (buffer_curr) for sizeof(Block)+sizeof(FreeBlockData)=44 bytes.
-    static constexpr std::size_t kCoalesceBlockBufSize2 =
-        sizeof( pmm::Block<A> ) + sizeof( pmm::FreeBlockData<A> );
+    static constexpr std::size_t kCoalesceBlockBufSize2 = sizeof( pmm::Block<A> ) + sizeof( pmm::FreeBlockData<A> );
 
     // Три блока: предыдущий (idx=4), текущий (idx=10), следующий (idx=20)
     alignas( 16 ) std::uint8_t buffer_prev[32];

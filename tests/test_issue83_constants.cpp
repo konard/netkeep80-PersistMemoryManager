@@ -86,7 +86,7 @@ static bool test_min_block_size_computed()
     // A free block must be large enough to hold the block header + at least 1 granule of data.
     // FreeBlockData<A>(12) < kGranuleSize(16), so minimum data area = 1 granule = 16 bytes.
     PMM_TEST( pmm::detail::kMinBlockSize == 48 );
-    using Block = pmm::Block<pmm::DefaultAddressTraits>;
+    using Block                    = pmm::Block<pmm::DefaultAddressTraits>;
     constexpr std::size_t fbd_size = sizeof( pmm::FreeBlockData<pmm::DefaultAddressTraits> );
     constexpr std::size_t expected = sizeof( Block ) + ( fbd_size > pmm::kGranuleSize ? fbd_size : pmm::kGranuleSize );
     PMM_TEST( pmm::detail::kMinBlockSize == expected );

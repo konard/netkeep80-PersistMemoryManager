@@ -482,8 +482,7 @@ int main()
     PMM_RUN( "I136-D3: Coalesce works with new architecture", test_i136_coalesce_works );
     PMM_RUN( "I136-D4: Allocate many blocks, verify data isolation", test_i136_allocate_many_blocks );
     PMM_RUN( "I136-D5: pptr works with new architecture", test_i136_pptr_works );
-    PMM_RUN( "I136-D6: FreeBlockData stored at Block + sizeof(Block) = Block + 32",
-             test_i136_free_block_data_address );
+    PMM_RUN( "I136-D6: FreeBlockData stored at Block + sizeof(Block) = Block + 32", test_i136_free_block_data_address );
     PMM_RUN( "I136-D7: Persistence works with new architecture", test_i136_persistence_works );
 
     std::cout << "\n" << ( all_passed ? "All tests PASSED\n" : "Some tests FAILED\n" );
