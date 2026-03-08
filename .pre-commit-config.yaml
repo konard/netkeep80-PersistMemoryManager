@@ -30,7 +30,7 @@ repos:
         language: system
         types: [c++]
         files: '\.(cpp|h)$'
-        exclude: ^third_party/
+        exclude: ^(third_party/|include/pmm_.*\.h$)
 
   # ─── File size limit (1500 lines max) ────────────────────────────────────────
   - repo: local
@@ -41,7 +41,7 @@ repos:
         language: system
         types: [c++]
         files: '\.(cpp|h)$'
-        exclude: ^third_party/
+        exclude: ^(third_party/|include/pmm_.*\.h$)
 
   # ─── Static analysis (cppcheck) ──────────────────────────────────────────────
   - repo: local

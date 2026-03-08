@@ -103,3 +103,18 @@ pmm_add_test(test_issue106_block_state_integration test_issue106_block_state_int
 
 # ─── Тесты статической модели менеджера (Issue #108) ─────────────────────────
 pmm_add_test(test_issue108_static_model test_issue108_static_model.cpp)
+
+# ─── Тесты новых пресетов: EmbeddedHeap, IndustrialDBHeap (Issue #123) ────────
+pmm_add_test(test_issue123_presets test_issue123_presets.cpp)
+
+# ─── Тесты самодостаточности single-header файлов (Issue #123) ───────────────
+# Каждый single-header файл тестируется отдельным исполняемым файлом.
+# Это гарантирует автономность: каждый файл компилируется без include/pmm/*.
+foreach(preset single_threaded multi_threaded embedded industrial_db)
+    set(target test_issue123_sh_${preset})
+    add_executable(${target} test_issue123_sh_${preset}.cpp)
+    target_include_directories(${target} PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_compile_features(${target} PRIVATE cxx_std_20)
+    target_link_libraries(${target} PRIVATE Threads::Threads)
+    add_test(NAME ${target} COMMAND ${target})
+endforeach()
