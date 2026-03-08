@@ -230,9 +230,9 @@ inline std::uint32_t block_idx( const std::uint8_t* base, const pmm::Block<pmm::
 inline std::uint32_t block_total_granules( const std::uint8_t* base, const ManagerHeader* hdr,
                                            const pmm::Block<pmm::DefaultAddressTraits>* blk )
 {
-    using BlockState = pmm::BlockStateBase<pmm::DefaultAddressTraits>;
-    std::uint32_t this_idx   = block_idx( base, blk );
-    auto          next_off   = BlockState::get_next_offset( blk );
+    using BlockState       = pmm::BlockStateBase<pmm::DefaultAddressTraits>;
+    std::uint32_t this_idx = block_idx( base, blk );
+    auto          next_off = BlockState::get_next_offset( blk );
     if ( next_off != kNoBlock )
         return next_off - this_idx;
     return byte_off_to_idx( static_cast<std::size_t>( hdr->total_size ) ) - this_idx;
@@ -268,8 +268,7 @@ inline bool is_valid_block( const std::uint8_t* base, const ManagerHeader* hdr, 
     const bool l          = ( left_off != kNoBlock );
     const bool r          = ( right_off != kNoBlock );
     const bool p          = ( parent_off != kNoBlock );
-    if ( ( l || r || p ) && ( ( l && r && left_off == right_off ) ||
-                              ( l && p && left_off == parent_off ) ||
+    if ( ( l || r || p ) && ( ( l && r && left_off == right_off ) || ( l && p && left_off == parent_off ) ||
                               ( r && p && right_off == parent_off ) ) )
         return false;
     return true;

@@ -148,20 +148,18 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree
         // Issue #59: cache total_gran once; compute blk size in granules before the traversal loop
         std::uint32_t total_gran = detail::byte_off_to_idx( hdr->total_size );
         index_type    blk_next   = BlockState::get_next_offset( blk );
-        std::uint32_t blk_gran =
-            ( blk_next != detail::kNoBlock ) ? ( blk_next - blk_idx ) : ( total_gran - blk_idx );
+        std::uint32_t blk_gran   = ( blk_next != detail::kNoBlock ) ? ( blk_next - blk_idx ) : ( total_gran - blk_idx );
         std::uint32_t cur = hdr->free_tree_root, parent = detail::kNoBlock;
         bool          go_left = false;
         while ( cur != detail::kNoBlock )
         {
-            parent            = cur;
-            const void*   n   = blk_at( base, cur );
-            index_type    n_next = BlockState::get_next_offset( n );
-            std::uint32_t n_gran =
-                ( n_next != detail::kNoBlock ) ? ( n_next - cur ) : ( total_gran - cur );
-            bool smaller = ( blk_gran < n_gran ) || ( blk_gran == n_gran && blk_idx < cur );
-            go_left      = smaller;
-            cur          = smaller ? BlockState::get_left_offset( n ) : BlockState::get_right_offset( n );
+            parent                = cur;
+            const void*   n       = blk_at( base, cur );
+            index_type    n_next  = BlockState::get_next_offset( n );
+            std::uint32_t n_gran  = ( n_next != detail::kNoBlock ) ? ( n_next - cur ) : ( total_gran - cur );
+            bool          smaller = ( blk_gran < n_gran ) || ( blk_gran == n_gran && blk_idx < cur );
+            go_left               = smaller;
+            cur                   = smaller ? BlockState::get_left_offset( n ) : BlockState::get_right_offset( n );
         }
         BlockState::set_parent_offset_of( blk, parent );
         if ( go_left )
@@ -233,10 +231,9 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree
         std::uint32_t cur = hdr->free_tree_root, result = detail::kNoBlock;
         while ( cur != detail::kNoBlock )
         {
-            const void*   node     = blk_at( base, cur );
+            const void*   node      = blk_at( base, cur );
             index_type    node_next = BlockState::get_next_offset( node );
-            std::uint32_t cur_gran =
-                ( node_next != detail::kNoBlock ) ? ( node_next - cur ) : ( total_gran - cur );
+            std::uint32_t cur_gran  = ( node_next != detail::kNoBlock ) ? ( node_next - cur ) : ( total_gran - cur );
             if ( cur_gran >= needed_granules )
             {
                 result = cur;
@@ -253,14 +250,16 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree
   private:
     static std::int32_t height( std::uint8_t* base, std::uint32_t idx )
     {
-        return ( idx == detail::kNoBlock ) ? 0 : static_cast<std::int32_t>( BlockState::get_avl_height( blk_at( base, idx ) ) );
+        return ( idx == detail::kNoBlock )
+                   ? 0
+                   : static_cast<std::int32_t>( BlockState::get_avl_height( blk_at( base, idx ) ) );
     }
 
     static void update_height( std::uint8_t* base, std::uint32_t node_idx )
     {
         void*        node = blk_at( base, node_idx );
         std::int32_t h    = 1 + ( std::max )( height( base, BlockState::get_left_offset( node ) ),
-                                               height( base, BlockState::get_right_offset( node ) ) );
+                                           height( base, BlockState::get_right_offset( node ) ) );
         assert( h <= std::numeric_limits<std::int16_t>::max() ); // tree height must fit in int16_t
         BlockState::set_avl_height_of( node, static_cast<std::int16_t>( h ) );
     }
@@ -268,7 +267,8 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree
     static std::int32_t balance_factor( std::uint8_t* base, std::uint32_t node_idx )
     {
         const void* node = blk_at( base, node_idx );
-        return height( base, BlockState::get_left_offset( node ) ) - height( base, BlockState::get_right_offset( node ) );
+        return height( base, BlockState::get_left_offset( node ) ) -
+               height( base, BlockState::get_right_offset( node ) );
     }
 
     /// @brief Update parent → child link in tree.
@@ -334,8 +334,8 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree
             std::int32_t bf = balance_factor( base, cur );
             if ( bf > 1 )
             {
-                void*         node      = blk_at( base, cur );
-                std::uint32_t left_idx  = BlockState::get_left_offset( node );
+                void*         node     = blk_at( base, cur );
+                std::uint32_t left_idx = BlockState::get_left_offset( node );
                 if ( balance_factor( base, left_idx ) < 0 )
                     rotate_left( base, hdr, left_idx );
                 cur = rotate_right( base, hdr, cur );

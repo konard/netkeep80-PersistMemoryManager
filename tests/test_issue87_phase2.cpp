@@ -143,8 +143,7 @@ static bool test_p2_list_node_blockheader_compat()
 
     // В Block<A> LinkedListNode идёт первым — prev_offset и next_offset с offset 0 и 4
     static_assert( BlockState::kOffsetPrevOffset == 0, "Block::prev_offset must be at offset 0" );
-    static_assert( BlockState::kOffsetNextOffset == sizeof( std::uint32_t ),
-                   "Block::next_offset must be at offset 4" );
+    static_assert( BlockState::kOffsetNextOffset == sizeof( std::uint32_t ), "Block::next_offset must be at offset 4" );
 
     return true;
 }
@@ -377,7 +376,8 @@ int main()
 
     std::cout << "\n--- P2-C: Runtime initialization via state machine (Issue #120) ---\n";
     PMM_RUN( "P2-C1: LinkedListNode runtime init via state machine", test_p2_list_node_runtime_init );
-    PMM_RUN( "P2-C2: TreeNode runtime init via state machine (incl. weight+root_offset)", test_p2_tree_node_runtime_init );
+    PMM_RUN( "P2-C2: TreeNode runtime init via state machine (incl. weight+root_offset)",
+             test_p2_tree_node_runtime_init );
     PMM_RUN( "P2-C3: TinyAddressTraits nodes (8-bit indices) via state machine", test_p2_tiny_traits_nodes );
 
     std::cout << "\n" << ( all_passed ? "All tests PASSED\n" : "Some tests FAILED\n" );

@@ -270,7 +270,7 @@ static bool test_p9_splitting_full_flow()
     // 2. Связываем новый блок
     splitting->link_new_block( buffer_old_next, 8 );
 
-    PMM_TEST( splitting->next_offset() == 8 );              // Текущий → новый
+    PMM_TEST( splitting->next_offset() == 8 );                       // Текущий → новый
     PMM_TEST( BlockState::get_prev_offset( buffer_old_next ) == 8 ); // Старый следующий ← новый
 
     // 3. Финализируем split
@@ -295,7 +295,7 @@ static bool test_p9_allocated_block_cast_and_verify()
     std::memset( buffer, 0, sizeof( buffer ) );
 
     // Initialize via BlockStateBase static API (Issue #120)
-    BlockState::set_weight_of( buffer, 2u ); // 2 гранулы данных
+    BlockState::set_weight_of( buffer, 2u );      // 2 гранулы данных
     BlockState::set_root_offset_of( buffer, 0u ); // idx=0
 
     auto* alloc = pmm::AllocatedBlock<A>::cast_from_raw( buffer );
@@ -400,8 +400,8 @@ static bool test_p9_coalesce_with_next()
     coalescing->coalesce_with_next( buffer_next, buffer_nxt_nxt, 6 );
 
     // Проверяем результат
-    PMM_TEST( coalescing->next_offset() == 20 );                       // Текущий → следующий следующего
-    PMM_TEST( BlockState::get_prev_offset( buffer_nxt_nxt ) == 6 );   // Следующий следующего ← текущий
+    PMM_TEST( coalescing->next_offset() == 20 ); // Текущий → следующий следующего
+    PMM_TEST( BlockState::get_prev_offset( buffer_nxt_nxt ) == 6 ); // Следующий следующего ← текущий
 
     // Следующий блок должен быть обнулён
     for ( size_t i = 0; i < sizeof( buffer_next ); ++i )
@@ -442,7 +442,7 @@ static bool test_p9_coalesce_with_prev()
 
     // Результат — предыдущий блок
     PMM_TEST( reinterpret_cast<void*>( result ) == reinterpret_cast<void*>( buffer_prev ) );
-    PMM_TEST( result->next_offset() == 20 );                      // Предыдущий → следующий
+    PMM_TEST( result->next_offset() == 20 );                     // Предыдущий → следующий
     PMM_TEST( BlockState::get_prev_offset( buffer_next ) == 4 ); // Следующий ← предыдущий
 
     // Текущий блок должен быть обнулён

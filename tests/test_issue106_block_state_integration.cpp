@@ -389,8 +389,8 @@ static bool test_i106_split_creates_valid_free_remainder()
     if ( BlockState::get_next_offset( blk ) != pmm::detail::kNoBlock )
     {
         std::uint8_t*  base = pmm.backend().base_ptr();
-        pmm::Block<A>* rem =
-            reinterpret_cast<pmm::Block<A>*>( base + pmm::detail::idx_to_byte_off( BlockState::get_next_offset( blk ) ) );
+        pmm::Block<A>* rem  = reinterpret_cast<pmm::Block<A>*>(
+            base + pmm::detail::idx_to_byte_off( BlockState::get_next_offset( blk ) ) );
         PMM_TEST( BlockState::get_weight( rem ) == 0 );      // FreeBlock: weight == 0
         PMM_TEST( BlockState::get_root_offset( rem ) == 0 ); // FreeBlock: root_offset == 0
     }

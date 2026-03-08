@@ -86,21 +86,21 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
     // The struct layout is verified by static_assert in linked_list_node.h and tree_node.h.
 
     /// Byte offset of prev_offset within Block<A> layout (first field of LinkedListNode).
-    static constexpr std::size_t kOffsetPrevOffset   = 0;
+    static constexpr std::size_t kOffsetPrevOffset = 0;
     /// Byte offset of next_offset within Block<A> layout (second field of LinkedListNode).
-    static constexpr std::size_t kOffsetNextOffset   = sizeof( index_type );
+    static constexpr std::size_t kOffsetNextOffset = sizeof( index_type );
     /// Byte offset of left_offset within Block<A> layout (first field of TreeNode, follows LinkedListNode).
-    static constexpr std::size_t kOffsetLeftOffset   = sizeof( LLNode );
+    static constexpr std::size_t kOffsetLeftOffset = sizeof( LLNode );
     /// Byte offset of right_offset within Block<A> layout.
-    static constexpr std::size_t kOffsetRightOffset  = sizeof( LLNode ) + sizeof( index_type );
+    static constexpr std::size_t kOffsetRightOffset = sizeof( LLNode ) + sizeof( index_type );
     /// Byte offset of parent_offset within Block<A> layout.
     static constexpr std::size_t kOffsetParentOffset = sizeof( LLNode ) + 2 * sizeof( index_type );
     /// Byte offset of avl_height within Block<A> layout.
-    static constexpr std::size_t kOffsetAvlHeight    = sizeof( LLNode ) + 3 * sizeof( index_type );
+    static constexpr std::size_t kOffsetAvlHeight = sizeof( LLNode ) + 3 * sizeof( index_type );
     /// Byte offset of weight within Block<A> layout (after avl_height(2) + _pad(2) = 4 bytes).
-    static constexpr std::size_t kOffsetWeight       = sizeof( LLNode ) + 3 * sizeof( index_type ) + 4;
+    static constexpr std::size_t kOffsetWeight = sizeof( LLNode ) + 3 * sizeof( index_type ) + 4;
     /// Byte offset of root_offset within Block<A> layout.
-    static constexpr std::size_t kOffsetRootOffset   = sizeof( LLNode ) + 4 * sizeof( index_type ) + 4;
+    static constexpr std::size_t kOffsetRootOffset = sizeof( LLNode ) + 4 * sizeof( index_type ) + 4;
 
     // Прямое создание запрещено — используйте cast_from_raw()
     BlockStateBase() = delete;
@@ -230,9 +230,8 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
      * @param weight_val       Начальный вес (0 = свободный).
      * @param root_offset_val  Начальный root_offset (0 = свободный, own_idx = занятый).
      */
-    static void init_fields( void* raw_blk, index_type prev_idx, index_type next_idx,
-                              std::int16_t avl_height_val, index_type weight_val,
-                              index_type root_offset_val ) noexcept
+    static void init_fields( void* raw_blk, index_type prev_idx, index_type next_idx, std::int16_t avl_height_val,
+                             index_type weight_val, index_type root_offset_val ) noexcept
     {
         auto* blk = reinterpret_cast<BlockStateBase*>( raw_blk );
         blk->set_prev_offset( prev_idx );
