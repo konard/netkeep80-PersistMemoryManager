@@ -214,25 +214,29 @@ static bool test_phase1_address_traits()
 #include "pmm/linked_list_node.h"
 #include "pmm/tree_node.h"
 
+// Issue #118: LinkedListNode and TreeNode fields are protected — access via Block<A>
+// which re-publishes all inherited fields through using-declarations.
 static bool test_phase2_list_and_tree_nodes()
 {
-    using A = pmm::DefaultAddressTraits;
+    using A     = pmm::DefaultAddressTraits;
+    using Block = pmm::Block<A>; // re-publishes protected fields from both bases
 
-    static_assert( std::is_same<decltype( pmm::LinkedListNode<A>::prev_offset ), typename A::index_type>::value,
+    static_assert( std::is_same<decltype( Block::prev_offset ), typename A::index_type>::value,
                    "prev_offset must be index_type" );
-    static_assert( std::is_same<decltype( pmm::LinkedListNode<A>::next_offset ), typename A::index_type>::value,
+    static_assert( std::is_same<decltype( Block::next_offset ), typename A::index_type>::value,
                    "next_offset must be index_type" );
 
-    static_assert( std::is_same<decltype( pmm::TreeNode<A>::left_offset ), typename A::index_type>::value,
+    static_assert( std::is_same<decltype( Block::left_offset ), typename A::index_type>::value,
                    "left_offset must be index_type" );
-    static_assert( std::is_same<decltype( pmm::TreeNode<A>::right_offset ), typename A::index_type>::value,
+    static_assert( std::is_same<decltype( Block::right_offset ), typename A::index_type>::value,
                    "right_offset must be index_type" );
-    static_assert( std::is_same<decltype( pmm::TreeNode<A>::parent_offset ), typename A::index_type>::value,
+    static_assert( std::is_same<decltype( Block::parent_offset ), typename A::index_type>::value,
                    "parent_offset must be index_type" );
 
-    using A8 = pmm::TinyAddressTraits;
-    static_assert( std::is_same<decltype( pmm::LinkedListNode<A8>::prev_offset ), std::uint8_t>::value );
-    static_assert( std::is_same<decltype( pmm::TreeNode<A8>::left_offset ), std::uint8_t>::value );
+    using A8     = pmm::TinyAddressTraits;
+    using Block8 = pmm::Block<A8>; // re-publishes protected fields for 8-bit traits
+    static_assert( std::is_same<decltype( Block8::prev_offset ), std::uint8_t>::value );
+    static_assert( std::is_same<decltype( Block8::left_offset ), std::uint8_t>::value );
 
     return true;
 }
