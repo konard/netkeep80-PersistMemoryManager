@@ -694,7 +694,7 @@ class PersistenceCycle final : public Scenario
                 DemoMgr::pptr<uint8_t> ptr = mgr->allocate_typed<uint8_t>( size_dist( rng ) );
                 if ( !ptr.is_null() )
                 {
-                    uint8_t* raw = ptr.resolve( *mgr );
+                    uint8_t* raw = ptr.resolve();
                     if ( raw )
                         std::memset( raw, static_cast<int>( i + 1 ), p.min_block_size );
                     live.push_back( ptr );
@@ -712,7 +712,7 @@ class PersistenceCycle final : public Scenario
             {
                 mgr = g_pmm.load();
                 if ( mgr )
-                    pmm::save_manager( *mgr, "pmm_demo.bin" );
+                    pmm::save_manager<DemoMgr>( "pmm_demo.bin" );
                 ops.fetch_add( 1, std::memory_order_relaxed );
             }
 
@@ -801,7 +801,7 @@ class ReallocateTyped final : public Scenario
                 live                   = mgr->allocate_typed<uint8_t>( init_count );
                 if ( !live.is_null() )
                 {
-                    uint8_t* raw = live.resolve( *mgr );
+                    uint8_t* raw = live.resolve();
                     if ( raw )
                         std::memset( raw, static_cast<int>( fill_byte ), init_count );
                     live_count = init_count;
@@ -816,8 +816,8 @@ class ReallocateTyped final : public Scenario
                 if ( !new_live.is_null() )
                 {
                     // Copy old data to new block
-                    uint8_t* old_raw = live.resolve( *mgr );
-                    uint8_t* new_raw = new_live.resolve( *mgr );
+                    uint8_t* old_raw = live.resolve();
+                    uint8_t* new_raw = new_live.resolve();
                     if ( old_raw && new_raw )
                     {
                         std::memcpy( new_raw, old_raw, live_count );
