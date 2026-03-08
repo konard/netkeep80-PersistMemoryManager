@@ -73,6 +73,7 @@ template <typename AddressTraitsT> struct Block : LinkedListNode<AddressTraitsT>
     using TreeNode<AddressTraitsT>::right_offset;
     using TreeNode<AddressTraitsT>::parent_offset;
     using TreeNode<AddressTraitsT>::avl_height;
+    using TreeNode<AddressTraitsT>::_pad;
     using TreeNode<AddressTraitsT>::weight;
     using TreeNode<AddressTraitsT>::root_offset;
 };
