@@ -25,7 +25,8 @@ int main()
     using STH = pmm::presets::SingleThreadedHeap;
 
     assert( !STH::is_initialized() );
-    assert( STH::create( 16 * 1024 ) );
+    bool created = STH::create( 16 * 1024 );
+    assert( created );
     assert( STH::is_initialized() );
     assert( STH::total_size() >= 16 * 1024 );
 

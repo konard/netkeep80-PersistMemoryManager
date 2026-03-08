@@ -25,7 +25,8 @@ int main()
     using MTH = pmm::presets::MultiThreadedHeap;
 
     assert( !MTH::is_initialized() );
-    assert( MTH::create( 16 * 1024 ) );
+    bool created = MTH::create( 16 * 1024 );
+    assert( created );
     assert( MTH::is_initialized() );
     assert( MTH::total_size() >= 16 * 1024 );
 

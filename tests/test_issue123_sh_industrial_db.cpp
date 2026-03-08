@@ -25,7 +25,8 @@ int main()
     using IDB = pmm::presets::IndustrialDBHeap;
 
     assert( !IDB::is_initialized() );
-    assert( IDB::create( 32 * 1024 ) );
+    bool created = IDB::create( 32 * 1024 );
+    assert( created );
     assert( IDB::is_initialized() );
     assert( IDB::total_size() >= 32 * 1024 );
 

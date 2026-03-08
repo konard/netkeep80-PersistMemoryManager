@@ -25,7 +25,8 @@ int main()
     using EMB = pmm::presets::EmbeddedHeap;
 
     assert( !EMB::is_initialized() );
-    assert( EMB::create( 16 * 1024 ) );
+    bool created = EMB::create( 16 * 1024 );
+    assert( created );
     assert( EMB::is_initialized() );
     assert( EMB::total_size() >= 16 * 1024 );
 
