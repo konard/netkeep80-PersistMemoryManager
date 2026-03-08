@@ -26,7 +26,9 @@ jobs:
       - name: Check formatting
         run: |
           find . \( -name '*.cpp' -o -name '*.h' \) \
-            ! -path './third_party/*' -print0 \
+            ! -path './third_party/*' \
+            ! -path './include/pmm_*.h' \
+            -print0 \
             | xargs -0 clang-format --dry-run --Werror
 
   # ─── Static analysis ─────────────────────────────────────────────────────────
@@ -70,7 +72,9 @@ jobs:
               FAILED=1
             fi
           done < <(find . \( -name '*.cpp' -o -name '*.h' \) \
-            ! -path './third_party/*' -print0)
+            ! -path './third_party/*' \
+            ! -path './include/pmm_*.h' \
+            -print0)
           exit $FAILED
 
   # ─── Build and test ──────────────────────────────────────────────────────────
@@ -156,6 +160,36 @@ jobs:
         with:
           files: coverage.info
           fail_ci_if_error: false
+
+  # ─── Single-header freshness check ──────────────────────────────────────────
+  single-headers:
+    name: Single-header presets up-to-date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install quom
+        run: pip install quom
+
+      - name: Regenerate single-header presets
+        run: bash scripts/generate-single-headers.sh --output-dir /tmp/generated
+
+      - name: Check generated files match committed files
+        run: |
+          FAILED=0
+          for preset in pmm_single_threaded_heap pmm_multi_threaded_heap \
+                        pmm_embedded_heap pmm_industrial_db_heap; do
+            committed="include/${preset}.h"
+            generated="/tmp/generated/${preset}.h"
+            if ! diff -q "$committed" "$generated" > /dev/null 2>&1; then
+              echo "FAIL: $committed is out of date — run scripts/generate-single-headers.sh"
+              diff "$committed" "$generated" || true
+              FAILED=1
+            else
+              echo "OK: $committed is up to date"
+            fi
+          done
+          exit $FAILED
 
   # ─── Changelog fragment check ────────────────────────────────────────────────
   changelog:

@@ -65,10 +65,18 @@ jobs:
           echo "new_version=$new_version" >> "$GITHUB_OUTPUT"
           echo "New version: $new_version"
 
-      - name: Commit version bump and changelog
+      - name: Install quom
+        if: steps.check.outputs.should_release == 'true'
+        run: pip install quom
+
+      - name: Regenerate single-header presets
+        if: steps.check.outputs.should_release == 'true'
+        run: bash scripts/generate-single-headers.sh
+
+      - name: Commit version bump, changelog and single-header presets
         if: steps.check.outputs.should_release == 'true'
         run: |
-          git add CMakeLists.txt CHANGELOG.md changelog.d/
+          git add CMakeLists.txt CHANGELOG.md changelog.d/ include/pmm_*.h
           git commit -m "chore: release v${{ steps.release.outputs.new_version }}"
           git push
 
@@ -125,9 +133,15 @@ jobs:
           echo "new_version=$new_version" >> "$GITHUB_OUTPUT"
           echo "New version: $new_version"
 
-      - name: Commit version bump and changelog
+      - name: Install quom
+        run: pip install quom
+
+      - name: Regenerate single-header presets
+        run: bash scripts/generate-single-headers.sh
+
+      - name: Commit version bump, changelog and single-header presets
         run: |
-          git add CMakeLists.txt CHANGELOG.md changelog.d/
+          git add CMakeLists.txt CHANGELOG.md changelog.d/ include/pmm_*.h
           git commit -m "chore: release v${{ steps.release.outputs.new_version }}"
           git push
 
