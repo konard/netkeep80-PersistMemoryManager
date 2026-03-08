@@ -1,20 +1,26 @@
 /**
  * @file pmm/pmm_presets.h
- * @brief pmm_presets — готовые инстанции PersistMemoryManager (Issue #87 Phase 8, #110, #123).
+ * @brief pmm_presets — готовые инстанции PersistMemoryManager (Issue #87 Phase 8, #110, #123, #146).
  *
  * Предоставляет набор готовых псевдонимов для наиболее распространённых
  * конфигураций менеджера персистентной памяти:
  *
- *   - `SingleThreadedHeap`  — 32-bit, NoLock, HeapStorage (однопоточные приложения)
- *   - `MultiThreadedHeap`   — 32-bit, SharedMutexLock, HeapStorage (многопоточные)
- *   - `EmbeddedHeap`        — 32-bit, NoLock, HeapStorage, рост 50% (встраиваемые системы)
- *   - `IndustrialDBHeap`    — 32-bit, SharedMutexLock, HeapStorage, рост 100% (промышленные БД)
+ *   --- Embedded (статические, однопоточные) ---
+ *   - `EmbeddedStaticHeap<N>`   — 32-bit, NoLock, StaticStorage<N> (без heap, фиксированный пул)
+ *   - `EmbeddedHeap`            — 32-bit, NoLock, HeapStorage, рост 50% (embedded с heap)
+ *
+ *   --- Desktop (динамические, однопоточные/многопоточные) ---
+ *   - `SingleThreadedHeap`      — 32-bit/16B, NoLock, HeapStorage, рост 25%
+ *   - `MultiThreadedHeap`       — 32-bit/16B, SharedMutexLock, HeapStorage, рост 25%
+ *
+ *   --- Industrial DB (высоконагруженные, многопоточные) ---
+ *   - `IndustrialDBHeap`        — 32-bit/16B, SharedMutexLock, HeapStorage, рост 100%
  *
  * Использует унифицированный `PersistMemoryManager<ConfigT, InstanceId>` (Issue #110).
  *
  * @see persist_memory_manager.h — PersistMemoryManager (Issue #110)
  * @see manager_configs.h — готовые конфигурации менеджеров
- * @version 0.3 (Issue #123 — добавлены EmbeddedHeap и IndustrialDBHeap)
+ * @version 0.4 (Issue #146 — новые архитектурные пресеты и правила: EmbeddedStaticHeap)
  */
 
 #pragma once
@@ -26,6 +32,51 @@ namespace pmm
 {
 namespace presets
 {
+
+// ─── Embedded пресеты ─────────────────────────────────────────────────────────
+
+/**
+ * @brief Embedded-менеджер с фиксированным статическим буфером (без heap).
+ *
+ * - 32-bit адресация (DefaultAddressTraits), 16-байтная гранула
+ * - StaticStorage<BufferSize> — фиксированный буфер в BSS/глобальной области, нет malloc
+ * - Без блокировок (для однопоточных embedded-систем без heap)
+ * - Не расширяется (expand() всегда false)
+ * - InstanceId=0 (по умолчанию)
+ *
+ * @tparam BufferSize Размер статического буфера в байтах (кратно 16).
+ *                    По умолчанию 4096 байт (4 КБ).
+ *
+ * Использование:
+ * @code
+ *   using MyEmbMgr = pmm::presets::EmbeddedStaticHeap<8192>; // 8 KiB статический пул
+ *   MyEmbMgr::create(8192);
+ *   void* ptr = MyEmbMgr::allocate(64);
+ *   MyEmbMgr::deallocate(ptr);
+ * @endcode
+ */
+template <std::size_t BufferSize = 4096>
+using EmbeddedStaticHeap = PersistMemoryManager<EmbeddedStaticConfig<BufferSize>, 0>;
+
+/**
+ * @brief Стандартный embedded-менеджер с динамической памятью.
+ *
+ * - 32-bit адресация, 16-байтная гранула
+ * - Динамическая память через HeapStorage
+ * - Без блокировок (однопоточный доступ)
+ * - Консервативный коэффициент роста 3/2 (50%) для экономии памяти
+ * - InstanceId=0 (по умолчанию)
+ *
+ * Использование:
+ * @code
+ *   pmm::presets::EmbeddedHeap::create(4 * 1024); // 4 KiB начальный размер
+ *   void* ptr = pmm::presets::EmbeddedHeap::allocate(64);
+ *   pmm::presets::EmbeddedHeap::deallocate(ptr);
+ * @endcode
+ */
+using EmbeddedHeap = PersistMemoryManager<EmbeddedManagerConfig, 0>;
+
+// ─── Desktop пресеты ──────────────────────────────────────────────────────────
 
 /**
  * @brief Стандартный однопоточный динамический менеджер.
@@ -63,23 +114,7 @@ using SingleThreadedHeap = PersistMemoryManager<CacheManagerConfig, 0>;
  */
 using MultiThreadedHeap = PersistMemoryManager<PersistentDataConfig, 0>;
 
-/**
- * @brief Менеджер для встраиваемых систем с ограниченными ресурсами.
- *
- * - 32-bit адресация, 16-байтная гранула
- * - Динамическая память через HeapStorage
- * - Без блокировок (однопоточный доступ)
- * - Консервативный коэффициент роста 3/2 (50%) для экономии памяти
- * - InstanceId=0 (по умолчанию)
- *
- * Использование:
- * @code
- *   pmm::presets::EmbeddedHeap::create(4 * 1024); // 4 KiB начальный размер
- *   void* ptr = pmm::presets::EmbeddedHeap::allocate(64);
- *   pmm::presets::EmbeddedHeap::deallocate(ptr);
- * @endcode
- */
-using EmbeddedHeap = PersistMemoryManager<EmbeddedManagerConfig, 0>;
+// ─── Industrial DB пресеты ────────────────────────────────────────────────────
 
 /**
  * @brief Менеджер для промышленных баз данных с высокой нагрузкой.
