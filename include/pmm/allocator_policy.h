@@ -136,9 +136,9 @@ class AllocatorPolicy
             // Capture old_next before initialize_new_block modifies splitting->next_offset()
             // Issue #146: compare against AddressTraitsT::no_block (correct sentinel for index_type).
             index_type curr_next = splitting->next_offset();
-            BlockT*    old_next =
-                ( curr_next != AddressTraitsT::no_block ) ? detail::block_at<AddressTraitsT>( base, curr_next )
-                                                          : nullptr;
+            BlockT*    old_next  = ( curr_next != AddressTraitsT::no_block )
+                                       ? detail::block_at<AddressTraitsT>( base, curr_next )
+                                       : nullptr;
 
             // SplittingBlock::initialize_new_block — инициализировать новый (remainder) блок
             splitting->initialize_new_block( new_blk_ptr, new_idx, blk_idx );
@@ -212,11 +212,11 @@ class AllocatorPolicy
                 detail::block_at<AddressTraitsT>( base, curr_next ) );
             if ( nxt_state->weight() == 0 ) // free block
             {
-                std::uint32_t nxt_idx  = static_cast<std::uint32_t>( curr_next );
-                index_type    nxt_next = nxt_state->next_offset();
-                BlockT*       nxt_nxt_blk =
-                    ( nxt_next != AddressTraitsT::no_block ) ? detail::block_at<AddressTraitsT>( base, nxt_next )
-                                                             : nullptr;
+                std::uint32_t nxt_idx     = static_cast<std::uint32_t>( curr_next );
+                index_type    nxt_next    = nxt_state->next_offset();
+                BlockT*       nxt_nxt_blk = ( nxt_next != AddressTraitsT::no_block )
+                                                ? detail::block_at<AddressTraitsT>( base, nxt_next )
+                                                : nullptr;
 
                 FreeBlockTreeT::remove( base, hdr, nxt_idx );
 
@@ -244,9 +244,9 @@ class AllocatorPolicy
             {
                 std::uint32_t prv_idx  = static_cast<std::uint32_t>( curr_prev );
                 index_type    blk_next = coalescing->next_offset();
-                BlockT*       next_blk =
-                    ( blk_next != AddressTraitsT::no_block ) ? detail::block_at<AddressTraitsT>( base, blk_next )
-                                                             : nullptr;
+                BlockT*       next_blk = ( blk_next != AddressTraitsT::no_block )
+                                             ? detail::block_at<AddressTraitsT>( base, blk_next )
+                                             : nullptr;
 
                 FreeBlockTreeT::remove( base, hdr, prv_idx );
 
@@ -324,9 +324,9 @@ class AllocatorPolicy
      */
     static void repair_linked_list( std::uint8_t* base, detail::ManagerHeader* hdr )
     {
-        std::uint32_t idx  = hdr->first_block_offset;
+        std::uint32_t idx = hdr->first_block_offset;
         // Issue #146: use AddressTraitsT::no_block for correct sentinel value.
-        index_type    prev = AddressTraitsT::no_block;
+        index_type prev = AddressTraitsT::no_block;
         while ( idx != detail::kNoBlock )
         {
             // Issue #146: use AddressTraitsT::granule_size for correct size check.
@@ -368,7 +368,7 @@ class AllocatorPolicy
             block_count++;
             used_gran += kBlkHdrGran;
             index_type w = read_block_weight<AddressTraitsT>( blk_ptr ); // Issue #114
-            if ( w > 0 )                                                  // allocated block
+            if ( w > 0 )                                                 // allocated block
             {
                 alloc_count++;
                 used_gran += static_cast<std::uint32_t>( w );

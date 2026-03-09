@@ -90,9 +90,9 @@ static bool test_i146_small_config_granule_size()
                    "SmallEmbeddedStaticConfig: granule_size must be 16" );
     static_assert( pmm::SmallEmbeddedStaticConfig<1024>::granule_size >= pmm::kMinGranuleSize,
                    "SmallEmbeddedStaticConfig: granule_size must be >= kMinGranuleSize" );
-    static_assert(
-        ( pmm::SmallEmbeddedStaticConfig<1024>::granule_size & ( pmm::SmallEmbeddedStaticConfig<1024>::granule_size - 1 ) ) == 0,
-        "SmallEmbeddedStaticConfig: granule_size must be a power of 2" );
+    static_assert( ( pmm::SmallEmbeddedStaticConfig<1024>::granule_size &
+                     ( pmm::SmallEmbeddedStaticConfig<1024>::granule_size - 1 ) ) == 0,
+                   "SmallEmbeddedStaticConfig: granule_size must be a power of 2" );
     return true;
 }
 
@@ -335,9 +335,9 @@ static bool test_i146_large_heap_auto_grow()
 /// @brief Размеры pptr пропорциональны размеру index_type.
 static bool test_i146_pptr_size_comparison()
 {
-    using Small32 = pmm::presets::EmbeddedStaticHeap<4096>;       // 32-bit → 4 байта
-    using Small16 = pmm::presets::SmallEmbeddedStaticHeap<1024>;  // 16-bit → 2 байта
-    using Large64 = pmm::presets::LargeDBHeap;                    // 64-bit → 8 байт
+    using Small32 = pmm::presets::EmbeddedStaticHeap<4096>;      // 32-bit → 4 байта
+    using Small16 = pmm::presets::SmallEmbeddedStaticHeap<1024>; // 16-bit → 2 байта
+    using Large64 = pmm::presets::LargeDBHeap;                   // 64-bit → 8 байт
 
     static_assert( sizeof( Small32::pptr<int> ) == 4, "32-bit pptr must be 4 bytes" );
     static_assert( sizeof( Small16::pptr<int> ) == 2, "16-bit pptr must be 2 bytes" );

@@ -130,7 +130,7 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
             return false;
         // Issue #146: use address_traits::granule_size instead of hardcoded kGranuleSize.
         static constexpr std::size_t kGranSzCreate = address_traits::granule_size;
-        std::size_t aligned = ( ( initial_size + kGranSzCreate - 1 ) / kGranSzCreate ) * kGranSzCreate;
+        std::size_t                  aligned = ( ( initial_size + kGranSzCreate - 1 ) / kGranSzCreate ) * kGranSzCreate;
         if ( _backend.base_ptr() == nullptr || _backend.total_size() < aligned )
         {
             // Либо буфера нет, либо он меньше требуемого — расширяем
@@ -217,14 +217,14 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( !_initialized || user_size == 0 )
             return nullptr;
 
-        std::uint8_t*          base   = _backend.base_ptr();
-        detail::ManagerHeader* hdr    = get_header( base );
+        std::uint8_t*          base = _backend.base_ptr();
+        detail::ManagerHeader* hdr  = get_header( base );
         // Issue #146: use AddressTraits-specific granule size for required granule computation.
         std::uint32_t data_gran = detail::bytes_to_granules_t<address_traits>( user_size );
         if ( data_gran == 0 )
             data_gran = 1;
-        std::uint32_t          needed = kBlockHdrGranules + data_gran;
-        std::uint32_t          idx    = free_block_tree::find_best_fit( base, hdr, needed );
+        std::uint32_t needed = kBlockHdrGranules + data_gran;
+        std::uint32_t idx    = free_block_tree::find_best_fit( base, hdr, needed );
 
         if ( idx != detail::kNoBlock )
             return allocator::allocate_from_block( base, hdr, idx, user_size );
@@ -375,7 +375,7 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( p.is_null() || !_initialized )
             return;
         std::uint8_t* base = _backend.base_ptr();
-        void* raw = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size;
+        void*         raw  = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size;
         deallocate( raw );
     }
 
@@ -433,8 +433,9 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( p.is_null() || !_initialized )
             return 0;
         const std::uint8_t* base    = _backend.base_ptr();
-        const void*         blk_raw = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size - sizeof( Block<address_traits> );
-        index_type          left    = BlockStateBase<address_traits>::get_left_offset( blk_raw );
+        const void*         blk_raw = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size -
+                              sizeof( Block<address_traits> );
+        index_type left = BlockStateBase<address_traits>::get_left_offset( blk_raw );
         return ( left == address_traits::no_block ) ? static_cast<index_type>( 0 ) : left;
     }
 
@@ -452,8 +453,9 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( p.is_null() || !_initialized )
             return 0;
         const std::uint8_t* base    = _backend.base_ptr();
-        const void*         blk_raw = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size - sizeof( Block<address_traits> );
-        index_type          right   = BlockStateBase<address_traits>::get_right_offset( blk_raw );
+        const void*         blk_raw = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size -
+                              sizeof( Block<address_traits> );
+        index_type right = BlockStateBase<address_traits>::get_right_offset( blk_raw );
         return ( right == address_traits::no_block ) ? static_cast<index_type>( 0 ) : right;
     }
 
@@ -471,8 +473,9 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( p.is_null() || !_initialized )
             return 0;
         const std::uint8_t* base    = _backend.base_ptr();
-        const void*         blk_raw = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size - sizeof( Block<address_traits> );
-        index_type          parent  = BlockStateBase<address_traits>::get_parent_offset( blk_raw );
+        const void*         blk_raw = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size -
+                              sizeof( Block<address_traits> );
+        index_type parent = BlockStateBase<address_traits>::get_parent_offset( blk_raw );
         return ( parent == address_traits::no_block ) ? static_cast<index_type>( 0 ) : parent;
     }
 
@@ -491,8 +494,9 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( p.is_null() || !_initialized )
             return;
         std::uint8_t* base    = _backend.base_ptr();
-        void*         blk_raw = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size - sizeof( Block<address_traits> );
-        index_type    v       = ( left == 0 ) ? address_traits::no_block : left;
+        void*         blk_raw = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size -
+                        sizeof( Block<address_traits> );
+        index_type v = ( left == 0 ) ? address_traits::no_block : left;
         BlockStateBase<address_traits>::set_left_offset_of( blk_raw, v );
     }
 
@@ -511,8 +515,9 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( p.is_null() || !_initialized )
             return;
         std::uint8_t* base    = _backend.base_ptr();
-        void*         blk_raw = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size - sizeof( Block<address_traits> );
-        index_type    v       = ( right == 0 ) ? address_traits::no_block : right;
+        void*         blk_raw = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size -
+                        sizeof( Block<address_traits> );
+        index_type v = ( right == 0 ) ? address_traits::no_block : right;
         BlockStateBase<address_traits>::set_right_offset_of( blk_raw, v );
     }
 
@@ -531,8 +536,9 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( p.is_null() || !_initialized )
             return;
         std::uint8_t* base    = _backend.base_ptr();
-        void*         blk_raw = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size - sizeof( Block<address_traits> );
-        index_type    v       = ( parent == 0 ) ? address_traits::no_block : parent;
+        void*         blk_raw = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size -
+                        sizeof( Block<address_traits> );
+        index_type v = ( parent == 0 ) ? address_traits::no_block : parent;
         BlockStateBase<address_traits>::set_parent_offset_of( blk_raw, v );
     }
 
@@ -553,7 +559,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( p.is_null() || !_initialized )
             return 0;
         const std::uint8_t* base    = _backend.base_ptr();
-        const void*         blk_raw = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size - sizeof( Block<address_traits> );
+        const void*         blk_raw = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size -
+                              sizeof( Block<address_traits> );
         return BlockStateBase<address_traits>::get_weight( blk_raw );
     }
 
@@ -576,7 +583,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( p.is_null() || !_initialized )
             return;
         std::uint8_t* base    = _backend.base_ptr();
-        void*         blk_raw = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size - sizeof( Block<address_traits> );
+        void*         blk_raw = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size -
+                        sizeof( Block<address_traits> );
         BlockStateBase<address_traits>::set_weight_of( blk_raw, w );
     }
 
@@ -593,7 +601,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( p.is_null() || !_initialized )
             return 0;
         const std::uint8_t* base    = _backend.base_ptr();
-        const void*         blk_raw = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size - sizeof( Block<address_traits> );
+        const void*         blk_raw = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size -
+                              sizeof( Block<address_traits> );
         return BlockStateBase<address_traits>::get_avl_height( blk_raw );
     }
 
@@ -610,7 +619,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( p.is_null() || !_initialized )
             return;
         std::uint8_t* base    = _backend.base_ptr();
-        void*         blk_raw = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size - sizeof( Block<address_traits> );
+        void*         blk_raw = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size -
+                        sizeof( Block<address_traits> );
         BlockStateBase<address_traits>::set_avl_height_of( blk_raw, h );
     }
 
@@ -638,7 +648,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     template <typename T> static TreeNode<address_traits>& tree_node( pptr<T> p ) noexcept
     {
         std::uint8_t* base    = _backend.base_ptr();
-        void*         blk_raw = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size - sizeof( Block<address_traits> );
+        void*         blk_raw = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size -
+                        sizeof( Block<address_traits> );
         return *reinterpret_cast<TreeNode<address_traits>*>( blk_raw );
     }
 
@@ -800,21 +811,20 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         // Visit current node
         std::uint32_t total_gran = detail::block_total_granules( base, hdr, blk );
         FreeBlockView view;
-        view.offset     = static_cast<std::ptrdiff_t>( static_cast<std::size_t>( node_idx ) * kGranSz );
-        view.total_size = static_cast<std::size_t>( total_gran ) * kGranSz;
-        view.free_size  = static_cast<std::size_t>( total_gran - kBlockHdrGranules ) * kGranSz;
-        view.left_offset =
-            ( left_off != detail::kNoBlock )
-                ? static_cast<std::ptrdiff_t>( static_cast<std::size_t>( left_off ) * kGranSz )
-                : -1;
-        view.right_offset = ( right_off != detail::kNoBlock )
-                                ? static_cast<std::ptrdiff_t>( static_cast<std::size_t>( right_off ) * kGranSz )
-                                : -1;
+        view.offset        = static_cast<std::ptrdiff_t>( static_cast<std::size_t>( node_idx ) * kGranSz );
+        view.total_size    = static_cast<std::size_t>( total_gran ) * kGranSz;
+        view.free_size     = static_cast<std::size_t>( total_gran - kBlockHdrGranules ) * kGranSz;
+        view.left_offset   = ( left_off != detail::kNoBlock )
+                                 ? static_cast<std::ptrdiff_t>( static_cast<std::size_t>( left_off ) * kGranSz )
+                                 : -1;
+        view.right_offset  = ( right_off != detail::kNoBlock )
+                                 ? static_cast<std::ptrdiff_t>( static_cast<std::size_t>( right_off ) * kGranSz )
+                                 : -1;
         view.parent_offset = ( parent_off != detail::kNoBlock )
                                  ? static_cast<std::ptrdiff_t>( static_cast<std::size_t>( parent_off ) * kGranSz )
                                  : -1;
-        view.avl_height = BlockState::get_avl_height( blk_raw );
-        view.avl_depth  = depth;
+        view.avl_height    = BlockState::get_avl_height( blk_raw );
+        view.avl_depth     = depth;
         callback( view );
 
         // Visit right subtree (larger blocks)
@@ -828,8 +838,7 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     /// @brief Byte offset of ManagerHeader from base: rounds sizeof(Block<A>) up to granule boundary.
     /// For DefaultAddressTraits: 32 bytes. For SmallAddressTraits: roundup(18,16) = 32. For Large: 64.
     static constexpr std::size_t kBlockHdrByteSize =
-        ( ( sizeof( Block<address_traits> ) + address_traits::granule_size - 1 ) /
-          address_traits::granule_size ) *
+        ( ( sizeof( Block<address_traits> ) + address_traits::granule_size - 1 ) / address_traits::granule_size ) *
         address_traits::granule_size;
 
     /// @brief Number of granules occupied by Block_0 (includes alignment padding).
@@ -863,8 +872,7 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
 
         // Minimum size check: Block_0 + ManagerHeader + Block_1 + at least 1 data granule
         static constexpr std::size_t kMinBlockDataSize = kGranSz; // 1 data granule
-        if ( static_cast<std::size_t>( kFreeBlkIdx ) * kGranSz +
-                 sizeof( Block<address_traits> ) + kMinBlockDataSize >
+        if ( static_cast<std::size_t>( kFreeBlkIdx ) * kGranSz + sizeof( Block<address_traits> ) + kMinBlockDataSize >
              size )
             return false;
 
@@ -918,12 +926,13 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         std::size_t            old_size = hdr->total_size;
 
         // Issue #146: use AddressTraitsT-specific granule size for all computations.
-        static constexpr std::size_t kGranSz = address_traits::granule_size;
-        std::uint32_t data_gran_need = detail::bytes_to_granules_t<address_traits>( user_size );
+        static constexpr std::size_t kGranSz        = address_traits::granule_size;
+        std::uint32_t                data_gran_need = detail::bytes_to_granules_t<address_traits>( user_size );
         if ( data_gran_need == 0 )
             data_gran_need = 1;
         // min_need = block_header + data + another block_header (for the new expand block)
-        std::size_t min_need = static_cast<std::size_t>( kBlockHdrGranules + data_gran_need + kBlockHdrGranules ) * kGranSz;
+        std::size_t min_need =
+            static_cast<std::size_t>( kBlockHdrGranules + data_gran_need + kBlockHdrGranules ) * kGranSz;
         std::size_t growth = old_size / 4;
         if ( growth < min_need )
             growth = min_need;
@@ -942,10 +951,10 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         std::uint32_t extra_idx  = detail::byte_off_to_idx_t<address_traits>( old_size );
         std::size_t   extra_size = new_size - old_size;
 
-        void* last_blk_raw = ( hdr->last_block_offset != detail::kNoBlock )
-                                 ? static_cast<void*>( new_base +
-                                                       static_cast<std::size_t>( hdr->last_block_offset ) * kGranSz )
-                                 : nullptr;
+        void* last_blk_raw =
+            ( hdr->last_block_offset != detail::kNoBlock )
+                ? static_cast<void*>( new_base + static_cast<std::size_t>( hdr->last_block_offset ) * kGranSz )
+                : nullptr;
 
         if ( last_blk_raw != nullptr && BlockState::get_weight( last_blk_raw ) == 0 )
         {
