@@ -25,14 +25,14 @@
  *   Mgr::create(64 * 1024);
  *
  *   // Интернировать строку (найти существующую или создать новую)
- *   Mgr::pptr<pmm::pstringview<Mgr>> p = pmm::pstringview<Mgr>("hello");
+ *   Mgr::pptr<Mgr::pstringview> p = Mgr::pstringview("hello");
  *   if (p) {
  *       const char* s = p->c_str();   // "hello"
  *       std::size_t n = p->size();    // 5
  *   }
  *
  *   // Повторное интернирование возвращает тот же pptr
- *   Mgr::pptr<pmm::pstringview<Mgr>> p2 = pmm::pstringview<Mgr>("hello");
+ *   Mgr::pptr<Mgr::pstringview> p2 = Mgr::pstringview("hello");
  *   assert(p == p2);  // одинаковый granule index
  *
  *   Mgr::destroy();
@@ -41,7 +41,7 @@
  * @see persist_memory_manager.h — PersistMemoryManager (статическая модель, Issue #110)
  * @see pptr.h — pptr<T, ManagerT> (персистентный указатель)
  * @see tree_node.h — TreeNode<AT> (встроенные AVL-поля каждого блока, Issue #87, #138)
- * @version 0.3 (Issue #151 — упрощённый API: pstringview<Mgr>("hello"))
+ * @version 0.4 (Issue #151 — краткий API: Mgr::pstringview("hello"))
  */
 
 #pragma once
@@ -68,8 +68,8 @@ template <typename ManagerT> struct pstringview;
  * Простой API (рекомендуемый способ):
  * @code
  *   // Конструктор-хелпер: создаёт временный объект, возвращает pptr через implicit conversion
- *   Mgr::pptr<pmm::pstringview<Mgr>> p = pmm::pstringview<Mgr>("hello");
- *   Mgr::pptr<pmm::pstringview<Mgr>> p2 = pmm::pstringview<Mgr>("hello");
+ *   Mgr::pptr<Mgr::pstringview> p = Mgr::pstringview("hello");
+ *   Mgr::pptr<Mgr::pstringview> p2 = Mgr::pstringview("hello");
  *   assert(p == p2);  // true — дедупликация
  * @endcode
  *
@@ -101,7 +101,7 @@ template <typename ManagerT> struct pstringview
      * Создаёт временный объект на стеке, содержащий pptr на интернированный pstringview.
      * Используется через implicit conversion к psview_pptr:
      * @code
-     *   Mgr::pptr<pmm::pstringview<Mgr>> p = pmm::pstringview<Mgr>("hello");
+     *   Mgr::pptr<Mgr::pstringview> p = Mgr::pstringview("hello");
      * @endcode
      *
      * @param s C-строка для интернирования (nullptr обрабатывается как "").
@@ -111,8 +111,8 @@ template <typename ManagerT> struct pstringview
     /**
      * @brief Implicit conversion к pptr<pstringview<ManagerT>>.
      *
-     * Позволяет использовать выражение pmm::pstringview<Mgr>("hello")
-     * в позиции, где ожидается Mgr::pptr<pmm::pstringview<Mgr>>.
+     * Позволяет использовать выражение Mgr::pstringview("hello")
+     * в позиции, где ожидается Mgr::pptr<Mgr::pstringview>.
      */
     operator psview_pptr() const noexcept { return _interned; }
 
