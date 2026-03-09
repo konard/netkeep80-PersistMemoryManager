@@ -298,7 +298,7 @@ static bool test_i151_avl_tree_structure()
 
     // Re-interning returns the same pptr (deduplication via AVL tree search).
     PMM_TEST( pmm::pstringview_manager<TestMgr>::intern( "alpha" ) == p_a );
-    PMM_TEST( pmm::pstringview_manager<TestMgr>::intern( "beta" )  == p_b );
+    PMM_TEST( pmm::pstringview_manager<TestMgr>::intern( "beta" ) == p_b );
     PMM_TEST( pmm::pstringview_manager<TestMgr>::intern( "gamma" ) == p_c );
 
     TestMgr::destroy();

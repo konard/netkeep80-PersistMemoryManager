@@ -312,9 +312,9 @@ template <typename ManagerT> struct pstringview_manager
      */
     static psview_pptr _rotate_right( psview_pptr y ) noexcept
     {
-        psview_pptr x      = psview_pptr( y.get_tree_left().offset() );
-        psview_pptr b      = psview_pptr( x.get_tree_right().offset() );
-        psview_pptr y_par  = psview_pptr( y.get_tree_parent().offset() );
+        psview_pptr x     = psview_pptr( y.get_tree_left().offset() );
+        psview_pptr b     = psview_pptr( x.get_tree_right().offset() );
+        psview_pptr y_par = psview_pptr( y.get_tree_parent().offset() );
 
         // x.right = y; y.parent = x
         x.set_tree_right( y );
@@ -347,9 +347,9 @@ template <typename ManagerT> struct pstringview_manager
      */
     static psview_pptr _rotate_left( psview_pptr x ) noexcept
     {
-        psview_pptr y      = psview_pptr( x.get_tree_right().offset() );
-        psview_pptr b      = psview_pptr( y.get_tree_left().offset() );
-        psview_pptr x_par  = psview_pptr( x.get_tree_parent().offset() );
+        psview_pptr y     = psview_pptr( x.get_tree_right().offset() );
+        psview_pptr b     = psview_pptr( y.get_tree_left().offset() );
+        psview_pptr x_par = psview_pptr( x.get_tree_parent().offset() );
 
         // y.left = x; x.parent = y
         y.set_tree_left( x );
@@ -457,9 +457,9 @@ template <typename ManagerT> struct pstringview_manager
             psview_type* obj = ManagerT::template resolve<psview_type>( cur );
             if ( obj == nullptr )
                 break;
-            parent   = cur;
-            int cmp  = std::strcmp( new_str, obj->c_str() );
-            go_left  = ( cmp < 0 );
+            parent  = cur;
+            int cmp = std::strcmp( new_str, obj->c_str() );
+            go_left = ( cmp < 0 );
             if ( go_left )
                 cur = psview_pptr( cur.get_tree_left().offset() );
             else
