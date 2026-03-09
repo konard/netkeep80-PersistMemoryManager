@@ -106,10 +106,7 @@ template <typename ManagerT> struct pstringview
      *
      * @param s C-строка для интернирования (nullptr обрабатывается как "").
      */
-    explicit pstringview( const char* s ) noexcept : chars_idx( 0 ), length( 0 )
-    {
-        _interned = _intern( s );
-    }
+    explicit pstringview( const char* s ) noexcept : chars_idx( 0 ), length( 0 ) { _interned = _intern( s ); }
 
     /**
      * @brief Implicit conversion к pptr<pstringview<ManagerT>>.

@@ -4560,7 +4560,10 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
  * @version 0.3 (Issue #151 — упрощённый API: pstringview<Mgr>("hello"))
  */
 
-
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <type_traits>
 
 namespace pmm
 {
@@ -4617,10 +4620,7 @@ template <typename ManagerT> struct pstringview
      *
      * @param s C-строка для интернирования (nullptr обрабатывается как "").
      */
-    explicit pstringview( const char* s ) noexcept : chars_idx( 0 ), length( 0 )
-    {
-        _interned = _intern( s );
-    }
+    explicit pstringview( const char* s ) noexcept : chars_idx( 0 ), length( 0 ) { _interned = _intern( s ); }
 
     /**
      * @brief Implicit conversion к pptr<pstringview<ManagerT>>.
@@ -5011,7 +5011,6 @@ template <typename ManagerT> struct pstringview
 // Объявлено как static inline в теле структуры — определение не требуется вне класса.
 
 } // namespace pmm
-
 
 /**
  * @file pmm/io.h

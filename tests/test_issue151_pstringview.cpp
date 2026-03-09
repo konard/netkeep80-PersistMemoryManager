@@ -510,8 +510,8 @@ static bool test_i151_stdstring_basic()
     TestPsv::reset();
     PMM_TEST( TestMgr::create( 64 * 1024 ) );
 
-    std::string        s = "hello_stdstring";
-    TestMgr_pptr_psv   p = pmm::pstringview<TestMgr>( s.c_str() );
+    std::string      s = "hello_stdstring";
+    TestMgr_pptr_psv p = pmm::pstringview<TestMgr>( s.c_str() );
     PMM_TEST( !p.is_null() );
 
     const TestPsv* psv = p.resolve();
@@ -631,8 +631,8 @@ static bool test_i151_stdstring_multiple()
     TestPsv::reset();
     PMM_TEST( TestMgr::create( 256 * 1024 ) );
 
-    std::vector<std::string> strings = { "first", "second", "third", "fourth", "fifth",
-                                         "sixth", "seventh", "eighth", "ninth", "tenth" };
+    std::vector<std::string> strings = { "first", "second",  "third",  "fourth", "fifth",
+                                         "sixth", "seventh", "eighth", "ninth",  "tenth" };
 
     std::vector<TestMgr_pptr_psv> ptrs;
     for ( const auto& s : strings )
@@ -675,9 +675,9 @@ static bool test_i151_stdstring_comparison()
     TestPsv::reset();
     PMM_TEST( TestMgr::create( 64 * 1024 ) );
 
-    std::string      sa = "apple";
-    std::string      sb = "banana";
-    std::string      sc = "cherry";
+    std::string sa = "apple";
+    std::string sb = "banana";
+    std::string sc = "cherry";
 
     TestMgr_pptr_psv pa = pmm::pstringview<TestMgr>( sa.c_str() );
     TestMgr_pptr_psv pb = pmm::pstringview<TestMgr>( sb.c_str() );
@@ -723,9 +723,9 @@ static bool test_i151_stdstring_runtime_built()
     TestPsv::reset();
     PMM_TEST( TestMgr::create( 64 * 1024 ) );
 
-    std::string      prefix = "key_";
-    std::string      suffix = "value";
-    std::string      s      = prefix + suffix; // "key_value" — built at runtime
+    std::string prefix = "key_";
+    std::string suffix = "value";
+    std::string s      = prefix + suffix; // "key_value" — built at runtime
 
     TestMgr_pptr_psv p1 = pmm::pstringview<TestMgr>( s.c_str() );
     PMM_TEST( !p1.is_null() );
@@ -790,13 +790,13 @@ static bool test_i151_stdstring_mixed_with_cstr()
     PMM_TEST( !p_cstr.is_null() );
 
     // Intern same value via std::string — must return same pptr
-    std::string      str    = "mixed";
-    TestMgr_pptr_psv p_str  = pmm::pstringview<TestMgr>( str.c_str() );
+    std::string      str   = "mixed";
+    TestMgr_pptr_psv p_str = pmm::pstringview<TestMgr>( str.c_str() );
     PMM_TEST( !p_str.is_null() );
     PMM_TEST( p_cstr == p_str );
 
     // Intern a different value via std::string
-    std::string       other  = "other_value";
+    std::string      other   = "other_value";
     TestMgr_pptr_psv p_other = pmm::pstringview<TestMgr>( other.c_str() );
     PMM_TEST( !p_other.is_null() );
     PMM_TEST( p_cstr != p_other );
