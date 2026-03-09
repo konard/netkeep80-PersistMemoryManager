@@ -3679,8 +3679,8 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
             node_type* obj = ManagerT::template resolve<node_type>( cur );
             if ( obj == nullptr )
                 break;
-            parent   = cur;
-            go_left  = ( new_obj->key < obj->key );
+            parent  = cur;
+            go_left = ( new_obj->key < obj->key );
             if ( go_left )
                 cur = node_pptr( cur.get_tree_left().offset() );
             else
