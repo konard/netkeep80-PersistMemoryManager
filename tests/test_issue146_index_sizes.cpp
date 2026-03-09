@@ -14,6 +14,9 @@
  */
 
 #include "pmm_single_threaded_heap.h"
+#include "pmm_embedded_static_heap.h"
+#include "pmm_small_embedded_static_heap.h"
+#include "pmm_large_db_heap.h"
 
 #include <cassert>
 #include <cstddef>

@@ -179,8 +179,21 @@ jobs:
       - name: Check generated files match committed files
         run: |
           FAILED=0
+          # Check pmm.h (the full library without preset specializations)
+          committed="single_include/pmm/pmm.h"
+          generated="/tmp/generated/pmm.h"
+          if ! diff -q "$committed" "$generated" > /dev/null 2>&1; then
+            echo "FAIL: $committed is out of date — run scripts/generate-single-headers.sh"
+            diff "$committed" "$generated" || true
+            FAILED=1
+          else
+            echo "OK: $committed is up to date"
+          fi
+          # Check all thin preset specialization files
           for preset in pmm_single_threaded_heap pmm_multi_threaded_heap \
-                        pmm_embedded_heap pmm_industrial_db_heap; do
+                        pmm_embedded_heap pmm_industrial_db_heap \
+                        pmm_embedded_static_heap pmm_small_embedded_static_heap \
+                        pmm_large_db_heap; do
             committed="single_include/pmm/${preset}.h"
             generated="/tmp/generated/${preset}.h"
             if ! diff -q "$committed" "$generated" > /dev/null 2>&1; then
