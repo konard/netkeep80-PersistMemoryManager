@@ -16,6 +16,7 @@
  */
 
 #include "pmm_single_threaded_heap.h"
+#include "pmm_multi_threaded_heap.h"
 
 #include <atomic>
 #include <cassert>
