@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [0.19.3] - 2026-03-10
+
+### Changed
+- Removed the non-templated `header_from_ptr()` overload hardcoded for `DefaultAddressTraits` from `types.h` (Issue #179). The templated `header_from_ptr_t<AddressTraitsT>()` already covers all address-trait configurations generically, eliminating the duplicate code.
+
+
 ## [0.19.2] - 2026-03-10
 
 ### Changed
