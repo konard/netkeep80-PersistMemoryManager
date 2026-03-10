@@ -51,8 +51,13 @@
 #pragma once
 
 // Issue #172: require C++20 — this library uses concepts, std::atomic, and other C++20 features.
-#if __cplusplus < 202002L
-#error "pmm.h requires C++20 or later. Please compile with -std=c++20 (or /std:c++20 on MSVC)."
+// Note: On MSVC, __cplusplus is always 199711L unless /Zc:__cplusplus is set; use _MSVC_LANG instead.
+#if defined(_MSVC_LANG)
+#  if _MSVC_LANG < 202002L
+#    error "pmm.h requires C++20 or later. Please compile with /std:c++20 on MSVC."
+#  endif
+#elif __cplusplus < 202002L
+#  error "pmm.h requires C++20 or later. Please compile with -std=c++20."
 #endif
 
 #include "pmm/allocator_policy.h"
