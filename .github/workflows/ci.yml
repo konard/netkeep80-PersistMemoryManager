@@ -174,7 +174,7 @@ jobs:
         run: pip install quom
 
       - name: Regenerate single-header presets
-        run: bash scripts/generate-single-headers.sh --output-dir /tmp/generated
+        run: bash scripts/generate-single-headers.sh --strip-comments --output-dir /tmp/generated
 
       - name: Check generated files match committed files
         run: |
@@ -184,6 +184,16 @@ jobs:
           generated="/tmp/generated/pmm.h"
           if ! diff -q "$committed" "$generated" > /dev/null 2>&1; then
             echo "FAIL: $committed is out of date — run scripts/generate-single-headers.sh"
+            diff "$committed" "$generated" || true
+            FAILED=1
+          else
+            echo "OK: $committed is up to date"
+          fi
+          # Check pmm_no_comments.h (comment-stripped variant)
+          committed="single_include/pmm/pmm_no_comments.h"
+          generated="/tmp/generated/pmm_no_comments.h"
+          if ! diff -q "$committed" "$generated" > /dev/null 2>&1; then
+            echo "FAIL: $committed is out of date — run scripts/generate-single-headers.sh --strip-comments"
             diff "$committed" "$generated" || true
             FAILED=1
           else
