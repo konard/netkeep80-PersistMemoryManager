@@ -123,7 +123,8 @@
  *
  * @see persist_memory_manager.h — PersistMemoryManager (Issue #110)
  * @see config.h — базовые политики блокировок (NoLock, SharedMutexLock)
- * @version 0.6 (Issue #166 — removed redundant ValidPmmAddressTraits static_asserts in SmallEmbeddedStaticConfig/EmbeddedStaticConfig)
+ * @version 0.6 (Issue #166 — removed redundant ValidPmmAddressTraits static_asserts in
+ * SmallEmbeddedStaticConfig/EmbeddedStaticConfig)
  */
 
 /**
@@ -1952,8 +1953,7 @@ inline std::uint32_t required_block_granules( std::size_t user_bytes )
 /// @brief Issue #166: Templated variant of required_block_granules for any AddressTraitsT.
 /// Minimum block granules for user_bytes = header_granules + max(1, ceil(user_bytes / granule_size)).
 /// Uses AddressTraitsT::granule_size and kBlockHeaderGranules_t<AT> for correct per-AT computation.
-template <typename AddressTraitsT>
-inline std::uint32_t required_block_granules_t( std::size_t user_bytes )
+template <typename AddressTraitsT> inline std::uint32_t required_block_granules_t( std::size_t user_bytes )
 {
     std::uint32_t data_granules = bytes_to_granules_t<AddressTraitsT>( user_bytes );
     if ( data_granules == 0 )
@@ -4942,9 +4942,9 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     {
         if ( !_initialized )
             return 0;
-        const detail::ManagerHeader* hdr  = get_header_c( _backend.base_ptr() );
+        const detail::ManagerHeader* hdr = get_header_c( _backend.base_ptr() );
         // Issue #166: use address_traits::granules_to_bytes() instead of deprecated detail::granules_to_bytes().
-        std::size_t                  used = address_traits::granules_to_bytes( hdr->used_size );
+        std::size_t used = address_traits::granules_to_bytes( hdr->used_size );
         return ( hdr->total_size > used ) ? ( hdr->total_size - used ) : 0;
     }
 
