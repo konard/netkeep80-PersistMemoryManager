@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [0.18.1] - 2026-03-10
+
+### Removed
+- `prev_owns_memory` (bool) and `prev_base_ptr` (void*) fields removed from `ManagerHeader`
+  (Issue #176). These runtime-only fields were obsolete and unused. Their bytes are now
+  occupied by reserved padding (`_pad` and `_reserved[8]`) to maintain the 64-byte struct layout.
+
+
 ## [0.18.0] - 2026-03-10
 
 ### Added
