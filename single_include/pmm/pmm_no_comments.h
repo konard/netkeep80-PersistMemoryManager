@@ -749,10 +749,10 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct ManagerHeader
     index_type    last_block_offset;  
     index_type    free_tree_root;     
     bool          owns_memory;        
-    bool          prev_owns_memory;   
+    std::uint8_t  _pad;               
     std::uint16_t granule_size;       
     std::uint64_t prev_total_size;    
-    void*         prev_base_ptr;      
+    std::uint8_t  _reserved[8];       
 };
 
 static_assert( sizeof( ManagerHeader<DefaultAddressTraits> ) == 64,
@@ -2428,9 +2428,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         
         if ( hdr->granule_size != static_cast<std::uint16_t>( address_traits::granule_size ) )
             return false;
-        hdr->owns_memory = hdr->prev_owns_memory = false;
-        hdr->prev_total_size                     = 0;
-        hdr->prev_base_ptr                       = nullptr;
+        hdr->owns_memory     = false;
+        hdr->prev_total_size = 0;
         allocator::repair_linked_list( base, hdr );
         allocator::recompute_counters( base, hdr );
         allocator::rebuild_free_tree( base, hdr );

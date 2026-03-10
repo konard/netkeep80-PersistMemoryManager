@@ -1568,14 +1568,13 @@ inline constexpr typename AddressTraitsT::index_type kNoBlock_v = AddressTraitsT
 /// @brief Manager header parameterized on AddressTraitsT (Issue #175: 64-bit index support).
 /// All _offset and counter fields use index_type, so LargeDBConfig uses uint64_t indices
 /// and DefaultAddressTraits keeps uint32_t with exactly 64 bytes as before.
-/// prev_base_ptr / prev_total_size are runtime-only (nulled by load() — not persisted).
+/// prev_total_size is runtime-only (zeroed by load() — not persisted).
+/// Issue #176: removed prev_owns_memory and prev_base_ptr (obsolete runtime-only fields).
 ///
-/// Layout preserves the original field order for backward compatibility with DefaultAddressTraits:
-///   magic (8) + total_size (8) + 7×index_type + owns_memory(1) + prev_owns_memory(1) +
-///   granule_size(2) + prev_total_size(8) + prev_base_ptr(8)
-///
-/// For DefaultAddressTraits (uint32_t): sizeof = 16 + 28 + 4 + 16 = 64 bytes
-/// For LargeAddressTraits (uint64_t):   sizeof = 16 + 56 + 4*(+4 padding) + 16 = 96 bytes
+/// Layout for DefaultAddressTraits (uint32_t):
+///   magic (8) + total_size (8) + 7×uint32_t + owns_memory(1) + _pad(1) +
+///   granule_size(2) + prev_total_size(8) + _reserved[8] = 64 bytes
+/// For LargeAddressTraits (uint64_t): sizeof = 16 + 56 + 4*(+4 padding) + 16 = 96 bytes
 ///   → occupies ceil(96/64) = 2 granules = 128 bytes via kManagerHeaderGranules_t<AT>
 template <typename AddressTraitsT = DefaultAddressTraits> struct ManagerHeader
 {
@@ -1591,10 +1590,10 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct ManagerHeader
     index_type    last_block_offset;  ///< [Issue #57 opt 4] Last block (granule index)
     index_type    free_tree_root;     ///< Root of AVL tree of free blocks (granule index)
     bool          owns_memory;        ///< Manager owns buffer (runtime-only)
-    bool          prev_owns_memory;   ///< prev_base_ptr was allocated by manager (runtime-only)
+    std::uint8_t  _pad;               ///< Reserved padding byte (Issue #176: was prev_owns_memory)
     std::uint16_t granule_size;       ///< Issue #83: kGranuleSize at creation time; validated on load
     std::uint64_t prev_total_size;    ///< Previous buffer size in bytes (runtime-only)
-    void*         prev_base_ptr;      ///< Pointer to previous buffer (runtime-only; nulled on load)
+    std::uint8_t  _reserved[8];       ///< Reserved bytes (Issue #176: was prev_base_ptr)
 };
 
 static_assert( sizeof( ManagerHeader<DefaultAddressTraits> ) == 64,
@@ -4446,9 +4445,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         // Issue #146: compare stored granule size against address_traits::granule_size.
         if ( hdr->granule_size != static_cast<std::uint16_t>( address_traits::granule_size ) )
             return false;
-        hdr->owns_memory = hdr->prev_owns_memory = false;
-        hdr->prev_total_size                     = 0;
-        hdr->prev_base_ptr                       = nullptr;
+        hdr->owns_memory     = false;
+        hdr->prev_total_size = 0;
         allocator::repair_linked_list( base, hdr );
         allocator::recompute_counters( base, hdr );
         allocator::rebuild_free_tree( base, hdr );
