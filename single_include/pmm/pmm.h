@@ -2624,8 +2624,8 @@ static_assert( ValidPmmAddressTraits<LargeAddressTraits>, "LargeAddressTraits mu
  * @endcode
  */
 template <typename AddressTraitsT = DefaultAddressTraits, typename LockPolicyT = config::NoLock,
-          std::size_t GrowNum = config::kDefaultGrowNumerator,
-          std::size_t GrowDen = config::kDefaultGrowDenominator, std::size_t MaxMemoryGB = 64>
+          std::size_t GrowNum = config::kDefaultGrowNumerator, std::size_t GrowDen = config::kDefaultGrowDenominator,
+          std::size_t MaxMemoryGB = 64>
 struct BasicConfig
 {
     static_assert( ValidPmmAddressTraits<AddressTraitsT>,
@@ -2757,8 +2757,8 @@ using CacheManagerConfig = BasicConfig<DefaultAddressTraits, config::NoLock, con
  *
  * Типичный сценарий: долговременное хранение данных, файловые менеджеры.
  */
-using PersistentDataConfig = BasicConfig<DefaultAddressTraits, config::SharedMutexLock,
-                                         config::kDefaultGrowNumerator, config::kDefaultGrowDenominator, 64>;
+using PersistentDataConfig = BasicConfig<DefaultAddressTraits, config::SharedMutexLock, config::kDefaultGrowNumerator,
+                                         config::kDefaultGrowDenominator, 64>;
 
 /**
  * @brief Конфигурация embedded-менеджера с динамическим хранилищем.
