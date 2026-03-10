@@ -615,15 +615,19 @@ static_assert( sizeof( pmm::Block<pmm::DefaultAddressTraits> ) == 32,
  *   3. Атомарность: каждый метод выполняет один атомарный шаг
  *   4. Завершаемость: цепочка вызовов приводит к корректному состоянию
  *
- * Issue #114: Добавлены утилиты для recovery-операций в AllocatorPolicy:
- *   - reset_block_avl_fields()      — сброс AVL-полей перед rebuild_free_tree
- *   - repair_block_prev_offset()    — восстановление prev_offset при repair_linked_list
- *   - read_block_next_offset()      — чтение next_offset в recovery-методах
- *   - read_block_weight()           — чтение weight в recovery-методах
+ * Issue #114: Добавлены статические методы в BlockStateBase для recovery-операций:
+ *   - reset_avl_fields_of()     — сброс AVL-полей перед rebuild_free_tree
+ *   - repair_prev_offset()      — восстановление prev_offset при repair_linked_list
+ *   - get_next_offset()         — чтение next_offset в recovery-методах
+ *   - get_weight()              — чтение weight в recovery-методах
+ *
+ * Issue #168: Удалены избыточные функции-обёртки reset_block_avl_fields(),
+ *   repair_block_prev_offset(), read_block_next_offset(), read_block_weight() —
+ *   AllocatorPolicy вызывает BlockStateBase<AT>::* напрямую.
  *
  * @see docs/atomic_writes.md «Граф состояний блока»
  * @see plan_issue87.md §5 «Фаза 9: BlockState machine»
- * @version 0.3 (Issue #114 — recovery utilities for AllocatorPolicy encapsulation)
+ * @version 0.4 (Issue #168 — удалены дублирующие функции-обёртки)
  */
 
 #include <cstdint>
@@ -1429,67 +1433,6 @@ void recover_block_state( void* raw_blk, typename AddressTraitsT::index_type own
     BlockStateBase<AddressTraitsT>::recover_state( raw_blk, own_idx );
 }
 
-/**
- * @brief Сбросить AVL-поля блока перед перестройкой дерева (при rebuild_free_tree).
- *
- * Устанавливает left_offset, right_offset, parent_offset в no_block, avl_height в 0.
- * Используется в AllocatorPolicy::rebuild_free_tree() перед повторной вставкой блоков.
- *
- * @tparam AddressTraitsT Traits адресного пространства.
- * @param raw_blk  Указатель на блок.
- */
-template <typename AddressTraitsT> void reset_block_avl_fields( void* raw_blk ) noexcept
-{
-    BlockStateBase<AddressTraitsT>::reset_avl_fields_of( raw_blk );
-}
-
-/**
- * @brief Восстановить prev_offset блока (при repair_linked_list).
- *
- * Используется в AllocatorPolicy::repair_linked_list() для восстановления
- * двухсвязного списка блоков после загрузки из персистентного хранилища.
- *
- * @tparam AddressTraitsT Traits адресного пространства.
- * @param raw_blk   Указатель на блок.
- * @param prev_idx  Гранульный индекс предыдущего блока (или no_block).
- */
-template <typename AddressTraitsT>
-void repair_block_prev_offset( void* raw_blk, typename AddressTraitsT::index_type prev_idx ) noexcept
-{
-    BlockStateBase<AddressTraitsT>::repair_prev_offset( raw_blk, prev_idx );
-}
-
-/**
- * @brief Прочитать next_offset блока (read-only, без перехода состояний).
- *
- * Вспомогательная функция для итерации по блокам в recovery-методах,
- * когда состояние блока неизвестно заранее.
- *
- * @tparam AddressTraitsT Traits адресного пространства.
- * @param raw_blk  Указатель на блок.
- * @return Гранульный индекс следующего блока.
- */
-template <typename AddressTraitsT>
-typename AddressTraitsT::index_type read_block_next_offset( const void* raw_blk ) noexcept
-{
-    return BlockStateBase<AddressTraitsT>::get_next_offset( raw_blk );
-}
-
-/**
- * @brief Прочитать weight блока (read-only, без перехода состояний).
- *
- * Вспомогательная функция для проверки состояния блока в recovery-методах,
- * когда состояние блока неизвестно заранее.
- *
- * @tparam AddressTraitsT Traits адресного пространства.
- * @param raw_blk  Указатель на блок.
- * @return Значение поля weight (0 = свободный, >0 = занятый).
- */
-template <typename AddressTraitsT> typename AddressTraitsT::index_type read_block_weight( const void* raw_blk ) noexcept
-{
-    return BlockStateBase<AddressTraitsT>::get_weight( raw_blk );
-}
-
 } // namespace pmm
 
 /**
@@ -1609,6 +1552,8 @@ static_assert( sizeof( pmm::TreeNode<pmm::DefaultAddressTraits> ) == 5 * sizeof(
                "TreeNode<DefaultAddressTraits> must be 24 bytes (Issue #87, #126)" );
 
 /// @brief Number of granules per block header (2 granules = 32 bytes, Issue #112)
+/// @deprecated Use kBlockHeaderGranules_t<DefaultAddressTraits> for new code (Issue #168).
+/// For DefaultAddressTraits this is equivalent; use the templated form for non-default AT.
 inline constexpr std::uint32_t kBlockHeaderGranules = sizeof( pmm::Block<pmm::DefaultAddressTraits> ) / kGranuleSize;
 
 // kBlockMagic removed (Issue #69): block validity now uses is_valid_block() structural invariants.
@@ -1792,6 +1737,10 @@ inline typename AddressTraitsT::index_type block_idx_t( const std::uint8_t*     
 template <typename AddressTraitsT>
 inline constexpr std::uint32_t kBlockHeaderGranules_t = static_cast<std::uint32_t>(
     ( sizeof( pmm::Block<AddressTraitsT> ) + AddressTraitsT::granule_size - 1 ) / AddressTraitsT::granule_size );
+
+// Issue #168: verify non-templated kBlockHeaderGranules matches the templated version for DefaultAddressTraits.
+static_assert( kBlockHeaderGranules == kBlockHeaderGranules_t<pmm::DefaultAddressTraits>,
+               "kBlockHeaderGranules must match kBlockHeaderGranules_t<DefaultAddressTraits> (Issue #168)" );
 
 /// @brief Manager header size in granules for AddressTraitsT (Issue #146).
 /// For 16B granule: 64/16 = 4. For 64B granule: 64/64 = 1.
@@ -2908,8 +2857,11 @@ using LargeDBConfig = BasicConfig<LargeAddressTraits, config::SharedMutexLock, 2
  * используются методы SplittingBlock (initialize_new_block, link_new_block,
  * finalize_split). В coalesce() соседние блоки проверяются через BlockStateBase.
  * В recovery-методах (rebuild_free_tree, repair_linked_list, recompute_counters)
- * используются утилиты из block_state.h (reset_block_avl_fields,
- * repair_block_prev_offset, read_block_next_offset, read_block_weight).
+ * напрямую используются статические методы BlockStateBase<AT>:
+ *   - reset_avl_fields_of()  — вместо удалённой reset_block_avl_fields() (Issue #168)
+ *   - repair_prev_offset()   — вместо удалённой repair_block_prev_offset() (Issue #168)
+ *   - get_next_offset()      — вместо удалённой read_block_next_offset() (Issue #168)
+ *   - get_weight()           — вместо удалённой read_block_weight() (Issue #168)
  *
  * Граф состояний блока во время allocate_from_block():
  *   FreeBlock → remove_from_avl → FreeBlockRemovedAVL
@@ -2923,9 +2875,9 @@ using LargeDBConfig = BasicConfig<LargeAddressTraits, config::SharedMutexLock, 2
  *     → finalize_coalesce → FreeBlock (вставка в AVL)
  *
  * @see plan_issue87.md §5 «Фаза 6: AllocatorPolicy»
- * @see block_state.h — автомат состояний блока (Issue #93, #106, #114)
+ * @see block_state.h — автомат состояний блока (Issue #93, #106, #114, #168)
  * @see free_block_tree.h — концепт FreeBlockTree
- * @version 0.4 (Issue #114 — устранение нарушений инкапсуляции Block<A>)
+ * @version 0.5 (Issue #168 — устранение дублирующих функций-обёрток)
  */
 
 #include <cassert>
@@ -2955,6 +2907,7 @@ class AllocatorPolicy
     using free_block_tree = FreeBlockTreeT;
     using index_type      = typename AddressTraitsT::index_type;
     using BlockT          = Block<AddressTraitsT>;
+    using BlockState      = BlockStateBase<AddressTraitsT>;
 
     AllocatorPolicy()                                    = delete;
     AllocatorPolicy( const AllocatorPolicy& )            = delete;
@@ -3159,7 +3112,7 @@ class AllocatorPolicy
      *
      * Сбрасывает все AVL-ссылки в блоках и заново вставляет свободные блоки.
      * Вызывается при `load()` после восстановления менеджера из файла.
-     * Также вызывает recover_block_state для каждого блока (Issue #106).
+     * Также вызывает BlockState::recover_state для каждого блока (Issue #106).
      *
      * @param base  Базовый указатель управляемой области.
      * @param hdr   Заголовок менеджера.
@@ -3173,16 +3126,16 @@ class AllocatorPolicy
         {
             void* blk_ptr = detail::block_at<AddressTraitsT>( base, idx );
 
-            // Reset AVL fields via state machine utility (Issue #114)
-            reset_block_avl_fields<AddressTraitsT>( blk_ptr );
+            // Reset AVL fields via BlockStateBase (Issue #114, #168)
+            BlockState::reset_avl_fields_of( blk_ptr );
 
-            // Issue #106: recover_block_state — исправить некорректные переходные состояния
-            recover_block_state<AddressTraitsT>( blk_ptr, static_cast<index_type>( idx ) );
+            // Issue #106: recover state — fix incorrect transitional states
+            BlockState::recover_state( blk_ptr, static_cast<index_type>( idx ) );
 
-            if ( read_block_weight<AddressTraitsT>( blk_ptr ) == 0 ) // free block
+            if ( BlockState::get_weight( blk_ptr ) == 0 ) // free block
                 FreeBlockTreeT::insert( base, hdr, idx );
             // Issue #146: use AddressTraitsT::no_block for correct sentinel check.
-            index_type next_idx = read_block_next_offset<AddressTraitsT>( blk_ptr );
+            index_type next_idx = BlockState::get_next_offset( blk_ptr );
             if ( next_idx == AddressTraitsT::no_block )
                 hdr->last_block_offset = idx;
             idx = detail::to_u32_idx<AddressTraitsT>( next_idx );
@@ -3209,9 +3162,9 @@ class AllocatorPolicy
             if ( static_cast<std::size_t>( idx ) * AddressTraitsT::granule_size + sizeof( BlockT ) > hdr->total_size )
                 break;
             void* blk_ptr = detail::block_at<AddressTraitsT>( base, idx );
-            repair_block_prev_offset<AddressTraitsT>( blk_ptr, prev ); // Issue #114
+            BlockState::repair_prev_offset( blk_ptr, prev ); // Issue #114, #168
             prev                   = static_cast<index_type>( idx );
-            index_type next_offset = read_block_next_offset<AddressTraitsT>( blk_ptr );
+            index_type next_offset = BlockState::get_next_offset( blk_ptr );
             // Issue #146: use sentinel-aware translation to convert index_type back to uint32_t.
             idx = detail::to_u32_idx<AddressTraitsT>( next_offset );
         }
@@ -3243,8 +3196,8 @@ class AllocatorPolicy
             const void* blk_ptr = detail::block_at<AddressTraitsT>( base, idx );
             block_count++;
             used_gran += kBlkHdrGran;
-            index_type w = read_block_weight<AddressTraitsT>( blk_ptr ); // Issue #114
-            if ( w > 0 )                                                 // allocated block
+            index_type w = BlockState::get_weight( blk_ptr ); // Issue #114, #168
+            if ( w > 0 )                                      // allocated block
             {
                 alloc_count++;
                 used_gran += static_cast<std::uint32_t>( w );
@@ -3254,7 +3207,7 @@ class AllocatorPolicy
                 free_count++;
             }
             // Issue #146: use sentinel-aware translation to convert index_type back to uint32_t.
-            idx = detail::to_u32_idx<AddressTraitsT>( read_block_next_offset<AddressTraitsT>( blk_ptr ) );
+            idx = detail::to_u32_idx<AddressTraitsT>( BlockState::get_next_offset( blk_ptr ) );
         }
         hdr->block_count = block_count;
         hdr->free_count  = free_count;

@@ -122,6 +122,8 @@ static_assert( sizeof( pmm::TreeNode<pmm::DefaultAddressTraits> ) == 5 * sizeof(
                "TreeNode<DefaultAddressTraits> must be 24 bytes (Issue #87, #126)" );
 
 /// @brief Number of granules per block header (2 granules = 32 bytes, Issue #112)
+/// @deprecated Use kBlockHeaderGranules_t<DefaultAddressTraits> for new code (Issue #168).
+/// For DefaultAddressTraits this is equivalent; use the templated form for non-default AT.
 inline constexpr std::uint32_t kBlockHeaderGranules = sizeof( pmm::Block<pmm::DefaultAddressTraits> ) / kGranuleSize;
 
 // kBlockMagic removed (Issue #69): block validity now uses is_valid_block() structural invariants.
@@ -305,6 +307,10 @@ inline typename AddressTraitsT::index_type block_idx_t( const std::uint8_t*     
 template <typename AddressTraitsT>
 inline constexpr std::uint32_t kBlockHeaderGranules_t = static_cast<std::uint32_t>(
     ( sizeof( pmm::Block<AddressTraitsT> ) + AddressTraitsT::granule_size - 1 ) / AddressTraitsT::granule_size );
+
+// Issue #168: verify non-templated kBlockHeaderGranules matches the templated version for DefaultAddressTraits.
+static_assert( kBlockHeaderGranules == kBlockHeaderGranules_t<pmm::DefaultAddressTraits>,
+               "kBlockHeaderGranules must match kBlockHeaderGranules_t<DefaultAddressTraits> (Issue #168)" );
 
 /// @brief Manager header size in granules for AddressTraitsT (Issue #146).
 /// For 16B granule: 64/16 = 4. For 64B granule: 64/64 = 1.
