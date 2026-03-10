@@ -289,8 +289,8 @@ static bool test_i179_allocate_typed_count_pptr_resolves_correctly()
 {
     TestMgr::create( 64 * 1024 );
 
-    const std::size_t     count = 4;
-    TestMgr::pptr<int>    p     = TestMgr::allocate_typed<int>( count );
+    const std::size_t  count = 4;
+    TestMgr::pptr<int> p     = TestMgr::allocate_typed<int>( count );
     PMM_TEST( !p.is_null() );
 
     int* arr = TestMgr::resolve( p );
@@ -300,7 +300,8 @@ static bool test_i179_allocate_typed_count_pptr_resolves_correctly()
         arr[i] = static_cast<int>( i * 10 );
 
     for ( std::size_t i = 0; i < count; ++i )
-        PMM_TEST( TestMgr::resolve_at( p, i ) != nullptr && *TestMgr::resolve_at( p, i ) == static_cast<int>( i * 10 ) );
+        PMM_TEST( TestMgr::resolve_at( p, i ) != nullptr &&
+                  *TestMgr::resolve_at( p, i ) == static_cast<int>( i * 10 ) );
 
     TestMgr::deallocate_typed( p );
     TestMgr::destroy();
@@ -404,8 +405,7 @@ int main()
              test_i179_create_typed_pptr_resolves_with_constructed_value );
 
     std::cout << "\n--- I179-F: find_block_from_user_ptr helper (via lock API) ---\n";
-    PMM_RUN( "I179-F1: lock_block_permanent and is_permanently_locked via helper",
-             test_i179_lock_permanent_and_query );
+    PMM_RUN( "I179-F1: lock_block_permanent and is_permanently_locked via helper", test_i179_lock_permanent_and_query );
     PMM_RUN( "I179-F2: null and invalid ptrs handled safely", test_i179_find_block_null_and_invalid_ptr );
 
     std::cout << "\n" << ( all_passed ? "All tests PASSED\n" : "Some tests FAILED\n" );
