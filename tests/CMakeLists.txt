@@ -171,3 +171,11 @@ target_include_directories(${target} PRIVATE ${CMAKE_SOURCE_DIR}/single_include 
 target_compile_features(${target} PRIVATE cxx_std_20)
 target_link_libraries(${target} PRIVATE Threads::Threads)
 add_test(NAME ${target} COMMAND ${target})
+
+# ─── Тест самодостаточности pmm_no_comments.h — версии без комментариев (Issue #170) ─
+set(target test_issue170_sh_no_comments)
+add_executable(${target} test_issue170_sh_no_comments.cpp)
+target_include_directories(${target} PRIVATE ${CMAKE_SOURCE_DIR}/single_include ${CMAKE_SOURCE_DIR}/single_include/pmm)
+target_compile_features(${target} PRIVATE cxx_std_20)
+target_link_libraries(${target} PRIVATE Threads::Threads)
+add_test(NAME ${target} COMMAND ${target})
