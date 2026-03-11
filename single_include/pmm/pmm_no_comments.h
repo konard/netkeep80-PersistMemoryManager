@@ -2181,6 +2181,197 @@ class pptr
 
 #include <cstddef>
 #include <cstdint>
+#include <type_traits>
+
+namespace pmm
+{
+
+template <typename T, typename ManagerT> struct pvector;
+
+template <typename T> struct pvector_node
+{
+    T value; 
+};
+
+template <typename T, typename ManagerT> struct pvector
+{
+    using manager_type = ManagerT;
+    using index_type   = typename ManagerT::index_type;
+    using node_type    = pvector_node<T>;
+    using node_pptr    = typename ManagerT::template pptr<node_type>;
+
+    index_type _head_idx;
+
+    index_type _tail_idx;
+
+    index_type _size;
+
+    pvector() noexcept
+        : _head_idx( static_cast<index_type>( 0 ) ), _tail_idx( static_cast<index_type>( 0 ) ),
+          _size( static_cast<index_type>( 0 ) )
+    {
+    }
+
+    bool empty() const noexcept { return _head_idx == static_cast<index_type>( 0 ); }
+
+    std::size_t size() const noexcept { return static_cast<std::size_t>( _size ); }
+
+    node_pptr push_back( const T& val ) noexcept
+    {
+        
+        node_pptr new_node = ManagerT::template allocate_typed<node_type>();
+        if ( new_node.is_null() )
+            return node_pptr();
+
+        node_type* obj = ManagerT::template resolve<node_type>( new_node );
+        if ( obj == nullptr )
+            return node_pptr();
+
+        obj->value = val;
+
+        auto& tn = new_node.tree_node();
+        tn.set_left( _tail_idx );                            
+        tn.set_right( static_cast<index_type>( 0 ) );        
+        tn.set_parent( static_cast<index_type>( 0 ) );       
+        tn.set_height( static_cast<std::int16_t>( 0 ) );     
+
+        if ( _tail_idx != static_cast<index_type>( 0 ) )
+        {
+            node_pptr tail_ptr( _tail_idx );
+            auto&     tail_tn = tail_ptr.tree_node();
+            tail_tn.set_right( new_node.offset() );  
+        }
+        else
+        {
+            
+            _head_idx = new_node.offset();
+        }
+
+        _tail_idx = new_node.offset();
+        ++_size;
+
+        return new_node;
+    }
+
+    node_pptr at( std::size_t index ) const noexcept
+    {
+        if ( index >= static_cast<std::size_t>( _size ) )
+            return node_pptr();
+
+        index_type current_idx = _head_idx;
+        for ( std::size_t i = 0; i < index && current_idx != static_cast<index_type>( 0 ); ++i )
+        {
+            node_pptr current_ptr( current_idx );
+            auto&     tn = current_ptr.tree_node();
+            current_idx  = tn.get_right();  
+        }
+
+        if ( current_idx == static_cast<index_type>( 0 ) )
+            return node_pptr();
+
+        return node_pptr( current_idx );
+    }
+
+    node_pptr front() const noexcept
+    {
+        if ( _head_idx == static_cast<index_type>( 0 ) )
+            return node_pptr();
+        return node_pptr( _head_idx );
+    }
+
+    node_pptr back() const noexcept
+    {
+        if ( _tail_idx == static_cast<index_type>( 0 ) )
+            return node_pptr();
+        return node_pptr( _tail_idx );
+    }
+
+    bool pop_back() noexcept
+    {
+        if ( _tail_idx == static_cast<index_type>( 0 ) )
+            return false;
+
+        node_pptr tail_ptr( _tail_idx );
+        auto&     tail_tn     = tail_ptr.tree_node();
+        index_type prev_idx   = tail_tn.get_left();  
+
+        ManagerT::template deallocate_typed<node_type>( tail_ptr );
+
+        _tail_idx = prev_idx;
+        --_size;
+
+        if ( prev_idx != static_cast<index_type>( 0 ) )
+        {
+            
+            node_pptr prev_ptr( prev_idx );
+            auto&     prev_tn = prev_ptr.tree_node();
+            prev_tn.set_right( static_cast<index_type>( 0 ) );
+        }
+        else
+        {
+            
+            _head_idx = static_cast<index_type>( 0 );
+        }
+
+        return true;
+    }
+
+    void clear() noexcept
+    {
+        while ( !empty() )
+        {
+            pop_back();
+        }
+    }
+
+    void reset() noexcept
+    {
+        _head_idx = static_cast<index_type>( 0 );
+        _tail_idx = static_cast<index_type>( 0 );
+        _size     = static_cast<index_type>( 0 );
+    }
+
+    struct iterator
+    {
+        using value_type = node_type;
+        using pointer    = node_pptr;
+
+        index_type _current_idx;
+
+        iterator() noexcept : _current_idx( static_cast<index_type>( 0 ) ) {}
+        explicit iterator( index_type idx ) noexcept : _current_idx( idx ) {}
+
+        bool operator==( const iterator& other ) const noexcept { return _current_idx == other._current_idx; }
+        bool operator!=( const iterator& other ) const noexcept { return _current_idx != other._current_idx; }
+
+        node_pptr operator*() const noexcept
+        {
+            if ( _current_idx == static_cast<index_type>( 0 ) )
+                return node_pptr();
+            return node_pptr( _current_idx );
+        }
+
+        iterator& operator++() noexcept
+        {
+            if ( _current_idx != static_cast<index_type>( 0 ) )
+            {
+                node_pptr current_ptr( _current_idx );
+                auto&     tn    = current_ptr.tree_node();
+                _current_idx    = tn.get_right();  
+            }
+            return *this;
+        }
+    };
+
+    iterator begin() const noexcept { return iterator( _head_idx ); }
+
+    iterator end() const noexcept { return iterator( static_cast<index_type>( 0 ) ); }
+};
+
+} 
+
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <type_traits>
 
@@ -2341,6 +2532,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     using pstringview = pmm::pstringview<manager_type>;
 
     template <typename _K, typename _V> using pmap = pmm::pmap<_K, _V, manager_type>;
+
+    template <typename T> using pvector = pmm::pvector<T, manager_type>;
 
     static bool create( std::size_t initial_size ) noexcept
     {
