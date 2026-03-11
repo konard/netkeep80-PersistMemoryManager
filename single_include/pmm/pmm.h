@@ -4178,17 +4178,17 @@ template <typename T, typename ManagerT> struct pvector
         // Инициализируем поля связного списка нового узла.
         // Используем TreeNode: left = prev, right = next
         auto& tn = new_node.tree_node();
-        tn.set_left( _tail_idx );                            // prev = текущий tail
-        tn.set_right( static_cast<index_type>( 0 ) );        // next = null (это новый tail)
-        tn.set_parent( static_cast<index_type>( 0 ) );       // не используется
-        tn.set_height( static_cast<std::int16_t>( 0 ) );     // не используется
+        tn.set_left( _tail_idx );                        // prev = текущий tail
+        tn.set_right( static_cast<index_type>( 0 ) );    // next = null (это новый tail)
+        tn.set_parent( static_cast<index_type>( 0 ) );   // не используется
+        tn.set_height( static_cast<std::int16_t>( 0 ) ); // не используется
 
         // Связываем новый узел со старым tail.
         if ( _tail_idx != static_cast<index_type>( 0 ) )
         {
             node_pptr tail_ptr( _tail_idx );
             auto&     tail_tn = tail_ptr.tree_node();
-            tail_tn.set_right( new_node.offset() );  // old_tail.next = new_node
+            tail_tn.set_right( new_node.offset() ); // old_tail.next = new_node
         }
         else
         {
@@ -4220,7 +4220,7 @@ template <typename T, typename ManagerT> struct pvector
         {
             node_pptr current_ptr( current_idx );
             auto&     tn = current_ptr.tree_node();
-            current_idx  = tn.get_right();  // next
+            current_idx  = tn.get_right(); // next
         }
 
         if ( current_idx == static_cast<index_type>( 0 ) )
@@ -4265,9 +4265,9 @@ template <typename T, typename ManagerT> struct pvector
         if ( _tail_idx == static_cast<index_type>( 0 ) )
             return false;
 
-        node_pptr tail_ptr( _tail_idx );
-        auto&     tail_tn     = tail_ptr.tree_node();
-        index_type prev_idx   = tail_tn.get_left();  // prev
+        node_pptr  tail_ptr( _tail_idx );
+        auto&      tail_tn  = tail_ptr.tree_node();
+        index_type prev_idx = tail_tn.get_left(); // prev
 
         // Освобождаем узел.
         ManagerT::template deallocate_typed<node_type>( tail_ptr );
@@ -4349,8 +4349,8 @@ template <typename T, typename ManagerT> struct pvector
             if ( _current_idx != static_cast<index_type>( 0 ) )
             {
                 node_pptr current_ptr( _current_idx );
-                auto&     tn    = current_ptr.tree_node();
-                _current_idx    = tn.get_right();  // next
+                auto&     tn = current_ptr.tree_node();
+                _current_idx = tn.get_right(); // next
             }
             return *this;
         }

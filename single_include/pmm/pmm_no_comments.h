@@ -2230,16 +2230,16 @@ template <typename T, typename ManagerT> struct pvector
         obj->value = val;
 
         auto& tn = new_node.tree_node();
-        tn.set_left( _tail_idx );                            
-        tn.set_right( static_cast<index_type>( 0 ) );        
-        tn.set_parent( static_cast<index_type>( 0 ) );       
-        tn.set_height( static_cast<std::int16_t>( 0 ) );     
+        tn.set_left( _tail_idx );                        
+        tn.set_right( static_cast<index_type>( 0 ) );    
+        tn.set_parent( static_cast<index_type>( 0 ) );   
+        tn.set_height( static_cast<std::int16_t>( 0 ) ); 
 
         if ( _tail_idx != static_cast<index_type>( 0 ) )
         {
             node_pptr tail_ptr( _tail_idx );
             auto&     tail_tn = tail_ptr.tree_node();
-            tail_tn.set_right( new_node.offset() );  
+            tail_tn.set_right( new_node.offset() ); 
         }
         else
         {
@@ -2263,7 +2263,7 @@ template <typename T, typename ManagerT> struct pvector
         {
             node_pptr current_ptr( current_idx );
             auto&     tn = current_ptr.tree_node();
-            current_idx  = tn.get_right();  
+            current_idx  = tn.get_right(); 
         }
 
         if ( current_idx == static_cast<index_type>( 0 ) )
@@ -2291,9 +2291,9 @@ template <typename T, typename ManagerT> struct pvector
         if ( _tail_idx == static_cast<index_type>( 0 ) )
             return false;
 
-        node_pptr tail_ptr( _tail_idx );
-        auto&     tail_tn     = tail_ptr.tree_node();
-        index_type prev_idx   = tail_tn.get_left();  
+        node_pptr  tail_ptr( _tail_idx );
+        auto&      tail_tn  = tail_ptr.tree_node();
+        index_type prev_idx = tail_tn.get_left(); 
 
         ManagerT::template deallocate_typed<node_type>( tail_ptr );
 
@@ -2356,8 +2356,8 @@ template <typename T, typename ManagerT> struct pvector
             if ( _current_idx != static_cast<index_type>( 0 ) )
             {
                 node_pptr current_ptr( _current_idx );
-                auto&     tn    = current_ptr.tree_node();
-                _current_idx    = tn.get_right();  
+                auto&     tn = current_ptr.tree_node();
+                _current_idx = tn.get_right(); 
             }
             return *this;
         }
