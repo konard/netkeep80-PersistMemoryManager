@@ -458,7 +458,7 @@ static bool test_i186_stress_many_elements()
 // I186-M: pvector with struct type
 // =============================================================================
 
-struct Point
+struct Point186
 {
     int x;
     int y;
@@ -470,11 +470,11 @@ static bool test_i186_struct_type()
     TestMgr::destroy();
     PMM_TEST( TestMgr::create( 64 * 1024 ) );
 
-    TestMgr::pvector<Point> vec;
+    TestMgr::pvector<Point186> vec;
 
-    Point p1 = { 1, 2 };
-    Point p2 = { 3, 4 };
-    Point p3 = { 5, 6 };
+    Point186 p1 = { 1, 2 };
+    Point186 p2 = { 3, 4 };
+    Point186 p3 = { 5, 6 };
 
     vec.push_back( p1 );
     vec.push_back( p2 );
