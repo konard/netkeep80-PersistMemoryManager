@@ -92,7 +92,8 @@
  *
  * @see persist_memory_manager.h — PersistMemoryManager (Issue #110)
  * @see config.h — базовые политики блокировок (NoLock, SharedMutexLock)
- * @see address_traits.h — AddressTraits и стандартные алиасы (SmallAddressTraits, DefaultAddressTraits, LargeAddressTraits)
+ * @see address_traits.h — AddressTraits и стандартные алиасы (SmallAddressTraits, DefaultAddressTraits,
+ * LargeAddressTraits)
  * @version 0.7 (Issue #146 — updated valid index sizes, granule rules, removed TinyAddressTraits references)
  */
 
