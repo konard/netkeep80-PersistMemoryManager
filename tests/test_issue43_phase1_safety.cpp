@@ -69,8 +69,7 @@ struct NoexceptType
 /// Compile-time checks that the static_assert constraints are correct.
 static_assert( std::is_nothrow_constructible_v<NoexceptType, int>,
                "NoexceptType must be nothrow-constructible from int" );
-static_assert( std::is_nothrow_destructible_v<NoexceptType>,
-               "NoexceptType must be nothrow-destructible" );
+static_assert( std::is_nothrow_destructible_v<NoexceptType>, "NoexceptType must be nothrow-destructible" );
 
 /// Test that create_typed works with noexcept types.
 static bool test_i43_create_typed_noexcept_type()

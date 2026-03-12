@@ -2976,8 +2976,7 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     template <typename T> static void destroy_typed( pptr<T> p ) noexcept
     {
         
-        static_assert( std::is_nothrow_destructible_v<T>,
-                       "destroy_typed<T>: T must be nothrow-destructible." );
+        static_assert( std::is_nothrow_destructible_v<T>, "destroy_typed<T>: T must be nothrow-destructible." );
 
         if ( p.is_null() || !_initialized )
             return;
@@ -2994,8 +2993,7 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         std::uint8_t* base = _backend.base_ptr();
         
         std::size_t byte_off = static_cast<std::size_t>( p.offset() ) * address_traits::granule_size;
-        assert( byte_off + sizeof( T ) <= _backend.total_size() &&
-                "resolve(): pptr offset out of bounds" );
+        assert( byte_off + sizeof( T ) <= _backend.total_size() && "resolve(): pptr offset out of bounds" );
         return reinterpret_cast<T*>( base + byte_off );
     }
 
