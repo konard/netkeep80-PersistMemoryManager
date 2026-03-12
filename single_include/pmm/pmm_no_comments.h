@@ -2200,25 +2200,24 @@ template <typename T, typename ManagerT> struct pvector
     using node_type    = pvector_node<T>;
     using node_pptr    = typename ManagerT::template pptr<node_type>;
 
-    index_type _head_idx;
+    static constexpr index_type no_block = ManagerT::address_traits::no_block;
 
-    index_type _tail_idx;
+    index_type _root_idx;
 
-    index_type _size;
+    pvector() noexcept : _root_idx( static_cast<index_type>( 0 ) ) {}
 
-    pvector() noexcept
-        : _head_idx( static_cast<index_type>( 0 ) ), _tail_idx( static_cast<index_type>( 0 ) ),
-          _size( static_cast<index_type>( 0 ) )
+    bool empty() const noexcept { return _root_idx == static_cast<index_type>( 0 ); }
+
+    std::size_t size() const noexcept
     {
+        if ( _root_idx == static_cast<index_type>( 0 ) )
+            return 0;
+        node_pptr root( _root_idx );
+        return static_cast<std::size_t>( root.tree_node().get_weight() );
     }
-
-    bool empty() const noexcept { return _head_idx == static_cast<index_type>( 0 ); }
-
-    std::size_t size() const noexcept { return static_cast<std::size_t>( _size ); }
 
     node_pptr push_back( const T& val ) noexcept
     {
-        
         node_pptr new_node = ManagerT::template allocate_typed<node_type>();
         if ( new_node.is_null() )
             return node_pptr();
@@ -2230,89 +2229,77 @@ template <typename T, typename ManagerT> struct pvector
         obj->value = val;
 
         auto& tn = new_node.tree_node();
-        tn.set_left( _tail_idx );                        
-        tn.set_right( static_cast<index_type>( 0 ) );    
-        tn.set_parent( static_cast<index_type>( 0 ) );   
-        tn.set_height( static_cast<std::int16_t>( 0 ) ); 
+        tn.set_left( no_block );
+        tn.set_right( no_block );
+        tn.set_parent( no_block );
+        tn.set_height( static_cast<std::int16_t>( 1 ) );
+        tn.set_weight( static_cast<index_type>( 1 ) ); 
 
-        if ( _tail_idx != static_cast<index_type>( 0 ) )
-        {
-            node_pptr tail_ptr( _tail_idx );
-            auto&     tail_tn = tail_ptr.tree_node();
-            tail_tn.set_right( new_node.offset() ); 
-        }
-        else
-        {
-            
-            _head_idx = new_node.offset();
-        }
-
-        _tail_idx = new_node.offset();
-        ++_size;
+        _avl_insert_rightmost( new_node );
 
         return new_node;
     }
 
     node_pptr at( std::size_t index ) const noexcept
     {
-        if ( index >= static_cast<std::size_t>( _size ) )
+        if ( _root_idx == static_cast<index_type>( 0 ) )
             return node_pptr();
 
-        index_type current_idx = _head_idx;
-        for ( std::size_t i = 0; i < index && current_idx != static_cast<index_type>( 0 ); ++i )
-        {
-            node_pptr current_ptr( current_idx );
-            auto&     tn = current_ptr.tree_node();
-            current_idx  = tn.get_right(); 
-        }
-
-        if ( current_idx == static_cast<index_type>( 0 ) )
+        node_pptr root( _root_idx );
+        if ( index >= static_cast<std::size_t>( root.tree_node().get_weight() ) )
             return node_pptr();
 
-        return node_pptr( current_idx );
+        return _avl_find_by_index( node_pptr( _root_idx ), index );
     }
 
     node_pptr front() const noexcept
     {
-        if ( _head_idx == static_cast<index_type>( 0 ) )
+        if ( _root_idx == static_cast<index_type>( 0 ) )
             return node_pptr();
-        return node_pptr( _head_idx );
+        
+        node_pptr cur( _root_idx );
+        while ( true )
+        {
+            auto left_idx = cur.tree_node().get_left();
+            if ( left_idx == no_block )
+                break;
+            cur = node_pptr( left_idx );
+        }
+        return cur;
     }
 
     node_pptr back() const noexcept
     {
-        if ( _tail_idx == static_cast<index_type>( 0 ) )
+        if ( _root_idx == static_cast<index_type>( 0 ) )
             return node_pptr();
-        return node_pptr( _tail_idx );
+        
+        node_pptr cur( _root_idx );
+        while ( true )
+        {
+            auto right_idx = cur.tree_node().get_right();
+            if ( right_idx == no_block )
+                break;
+            cur = node_pptr( right_idx );
+        }
+        return cur;
     }
 
     bool pop_back() noexcept
     {
-        if ( _tail_idx == static_cast<index_type>( 0 ) )
+        if ( _root_idx == static_cast<index_type>( 0 ) )
             return false;
 
-        node_pptr  tail_ptr( _tail_idx );
-        auto&      tail_tn  = tail_ptr.tree_node();
-        index_type prev_idx = tail_tn.get_left(); 
-
-        ManagerT::template deallocate_typed<node_type>( tail_ptr );
-
-        _tail_idx = prev_idx;
-        --_size;
-
-        if ( prev_idx != static_cast<index_type>( 0 ) )
+        node_pptr target( _root_idx );
+        while ( true )
         {
-            
-            node_pptr prev_ptr( prev_idx );
-            auto&     prev_tn = prev_ptr.tree_node();
-            prev_tn.set_right( static_cast<index_type>( 0 ) );
-        }
-        else
-        {
-            
-            _head_idx = static_cast<index_type>( 0 );
+            auto right_idx = target.tree_node().get_right();
+            if ( right_idx == no_block )
+                break;
+            target = node_pptr( right_idx );
         }
 
+        _avl_remove( target );
+        ManagerT::template deallocate_typed<node_type>( target );
         return true;
     }
 
@@ -2324,19 +2311,14 @@ template <typename T, typename ManagerT> struct pvector
         }
     }
 
-    void reset() noexcept
-    {
-        _head_idx = static_cast<index_type>( 0 );
-        _tail_idx = static_cast<index_type>( 0 );
-        _size     = static_cast<index_type>( 0 );
-    }
+    void reset() noexcept { _root_idx = static_cast<index_type>( 0 ); }
 
     struct iterator
     {
         using value_type = node_type;
         using pointer    = node_pptr;
 
-        index_type _current_idx;
+        index_type _current_idx; 
 
         iterator() noexcept : _current_idx( static_cast<index_type>( 0 ) ) {}
         explicit iterator( index_type idx ) noexcept : _current_idx( idx ) {}
@@ -2346,26 +2328,394 @@ template <typename T, typename ManagerT> struct pvector
 
         node_pptr operator*() const noexcept
         {
-            if ( _current_idx == static_cast<index_type>( 0 ) )
+            if ( _current_idx == static_cast<index_type>( 0 ) || _current_idx == no_block )
                 return node_pptr();
             return node_pptr( _current_idx );
         }
 
         iterator& operator++() noexcept
         {
-            if ( _current_idx != static_cast<index_type>( 0 ) )
+            if ( _current_idx == static_cast<index_type>( 0 ) || _current_idx == no_block )
+                return *this;
+
+            node_pptr cur( _current_idx );
+
+            auto right_idx = cur.tree_node().get_right();
+            if ( right_idx != no_block )
             {
-                node_pptr current_ptr( _current_idx );
-                auto&     tn = current_ptr.tree_node();
-                _current_idx = tn.get_right(); 
+                node_pptr right( right_idx );
+                while ( true )
+                {
+                    auto left_idx = right.tree_node().get_left();
+                    if ( left_idx == no_block )
+                        break;
+                    right = node_pptr( left_idx );
+                }
+                _current_idx = right.offset();
+                return *this;
             }
-            return *this;
+
+            while ( true )
+            {
+                auto parent_idx = cur.tree_node().get_parent();
+                if ( parent_idx == no_block )
+                {
+                    
+                    _current_idx = static_cast<index_type>( 0 );
+                    return *this;
+                }
+                node_pptr parent( parent_idx );
+                auto      parent_left = parent.tree_node().get_left();
+                if ( parent_left == cur.offset() )
+                {
+                    
+                    _current_idx = parent_idx;
+                    return *this;
+                }
+                cur = parent;
+            }
         }
     };
 
-    iterator begin() const noexcept { return iterator( _head_idx ); }
+    iterator begin() const noexcept
+    {
+        if ( _root_idx == static_cast<index_type>( 0 ) )
+            return iterator();
+        
+        node_pptr cur( _root_idx );
+        while ( true )
+        {
+            auto left_idx = cur.tree_node().get_left();
+            if ( left_idx == no_block )
+                break;
+            cur = node_pptr( left_idx );
+        }
+        return iterator( cur.offset() );
+    }
 
     iterator end() const noexcept { return iterator( static_cast<index_type>( 0 ) ); }
+
+  private:
+    
+    static index_type _subtree_size( node_pptr p ) noexcept
+    {
+        if ( p.is_null() )
+            return static_cast<index_type>( 0 );
+        auto idx = p.offset();
+        if ( idx == no_block )
+            return static_cast<index_type>( 0 );
+        return p.tree_node().get_weight();
+    }
+
+    static std::int16_t _height( node_pptr p ) noexcept
+    {
+        if ( p.is_null() )
+            return 0;
+        auto idx = p.offset();
+        if ( idx == no_block )
+            return 0;
+        return p.tree_node().get_height();
+    }
+
+    static void _update_node( node_pptr p ) noexcept
+    {
+        if ( p.is_null() )
+            return;
+        auto& tn = p.tree_node();
+
+        auto left_idx  = tn.get_left();
+        auto right_idx = tn.get_right();
+
+        node_pptr left_p  = ( left_idx != no_block ) ? node_pptr( left_idx ) : node_pptr();
+        node_pptr right_p = ( right_idx != no_block ) ? node_pptr( right_idx ) : node_pptr();
+
+        std::int16_t lh = _height( left_p );
+        std::int16_t rh = _height( right_p );
+        tn.set_height( static_cast<std::int16_t>( 1 + ( lh > rh ? lh : rh ) ) );
+
+        index_type lw = _subtree_size( left_p );
+        index_type rw = _subtree_size( right_p );
+        tn.set_weight( static_cast<index_type>( 1 + lw + rw ) );
+    }
+
+    void _set_child( node_pptr parent, node_pptr old_child, node_pptr new_child ) noexcept
+    {
+        if ( parent.is_null() )
+        {
+            _root_idx = new_child.offset();
+            return;
+        }
+        auto& ptn      = parent.tree_node();
+        auto  left_idx = ptn.get_left();
+        if ( left_idx == old_child.offset() )
+            ptn.set_left( new_child.is_null() ? no_block : new_child.offset() );
+        else
+            ptn.set_right( new_child.is_null() ? no_block : new_child.offset() );
+    }
+
+    void _rotate_right( node_pptr y ) noexcept
+    {
+        auto& y_tn    = y.tree_node();
+        auto  x_idx   = y_tn.get_left();
+        auto  y_par   = y_tn.get_parent();
+        auto  y_p_idx = y_par;
+
+        node_pptr x( x_idx );
+        node_pptr y_par_p = ( y_p_idx != no_block ) ? node_pptr( y_p_idx ) : node_pptr();
+
+        auto& x_tn  = x.tree_node();
+        auto  b_idx = x_tn.get_right();
+
+        x_tn.set_right( y.offset() );
+        y_tn.set_parent( x_idx );
+
+        y_tn.set_left( b_idx );
+        if ( b_idx != no_block )
+            node_pptr( b_idx ).tree_node().set_parent( y.offset() );
+
+        x_tn.set_parent( y_p_idx );
+
+        _set_child( y_par_p, y, x );
+
+        _update_node( y );
+        _update_node( x );
+    }
+
+    void _rotate_left( node_pptr x ) noexcept
+    {
+        auto& x_tn    = x.tree_node();
+        auto  y_idx   = x_tn.get_right();
+        auto  x_p_idx = x_tn.get_parent();
+
+        node_pptr y( y_idx );
+        node_pptr x_par_p = ( x_p_idx != no_block ) ? node_pptr( x_p_idx ) : node_pptr();
+
+        auto& y_tn  = y.tree_node();
+        auto  b_idx = y_tn.get_left();
+
+        y_tn.set_left( x.offset() );
+        x_tn.set_parent( y_idx );
+
+        x_tn.set_right( b_idx );
+        if ( b_idx != no_block )
+            node_pptr( b_idx ).tree_node().set_parent( x.offset() );
+
+        y_tn.set_parent( x_p_idx );
+
+        _set_child( x_par_p, x, y );
+
+        _update_node( x );
+        _update_node( y );
+    }
+
+    void _rebalance_up( node_pptr p ) noexcept
+    {
+        while ( !p.is_null() )
+        {
+            _update_node( p );
+
+            auto& tn = p.tree_node();
+
+            auto left_idx  = tn.get_left();
+            auto right_idx = tn.get_right();
+
+            node_pptr left_p  = ( left_idx != no_block ) ? node_pptr( left_idx ) : node_pptr();
+            node_pptr right_p = ( right_idx != no_block ) ? node_pptr( right_idx ) : node_pptr();
+
+            std::int16_t bf = static_cast<std::int16_t>( _height( left_p ) - _height( right_p ) );
+
+            if ( bf > 1 )
+            {
+                
+                auto ll_idx = left_p.tree_node().get_left();
+                auto lr_idx = left_p.tree_node().get_right();
+                auto ll_h   = ( ll_idx != no_block ) ? _height( node_pptr( ll_idx ) ) : std::int16_t( 0 );
+                auto lr_h   = ( lr_idx != no_block ) ? _height( node_pptr( lr_idx ) ) : std::int16_t( 0 );
+                if ( lr_h > ll_h )
+                    _rotate_left( left_p );
+                _rotate_right( p );
+                
+                auto p_par = p.tree_node().get_parent();
+                p          = ( p_par != no_block ) ? node_pptr( p_par ) : node_pptr();
+            }
+            else if ( bf < -1 )
+            {
+                
+                auto rl_idx = right_p.tree_node().get_left();
+                auto rr_idx = right_p.tree_node().get_right();
+                auto rl_h   = ( rl_idx != no_block ) ? _height( node_pptr( rl_idx ) ) : std::int16_t( 0 );
+                auto rr_h   = ( rr_idx != no_block ) ? _height( node_pptr( rr_idx ) ) : std::int16_t( 0 );
+                if ( rl_h > rr_h )
+                    _rotate_right( right_p );
+                _rotate_left( p );
+                auto p_par = p.tree_node().get_parent();
+                p          = ( p_par != no_block ) ? node_pptr( p_par ) : node_pptr();
+            }
+            else
+            {
+                auto p_par = tn.get_parent();
+                p          = ( p_par != no_block ) ? node_pptr( p_par ) : node_pptr();
+            }
+        }
+    }
+
+    void _avl_insert_rightmost( node_pptr new_node ) noexcept
+    {
+        if ( _root_idx == static_cast<index_type>( 0 ) )
+        {
+            _root_idx = new_node.offset();
+            return;
+        }
+
+        node_pptr cur( _root_idx );
+        while ( true )
+        {
+            auto right_idx = cur.tree_node().get_right();
+            if ( right_idx == no_block )
+                break;
+            cur = node_pptr( right_idx );
+        }
+
+        cur.tree_node().set_right( new_node.offset() );
+        new_node.tree_node().set_parent( cur.offset() );
+
+        _rebalance_up( cur );
+    }
+
+    static node_pptr _avl_find_by_index( node_pptr p, std::size_t index ) noexcept
+    {
+        while ( !p.is_null() )
+        {
+            auto& tn       = p.tree_node();
+            auto  left_idx = tn.get_left();
+
+            index_type left_size = ( left_idx != no_block ) ? node_pptr( left_idx ).tree_node().get_weight()
+                                                            : static_cast<index_type>( 0 );
+
+            if ( index < static_cast<std::size_t>( left_size ) )
+            {
+                
+                p = node_pptr( left_idx );
+            }
+            else if ( index == static_cast<std::size_t>( left_size ) )
+            {
+                
+                return p;
+            }
+            else
+            {
+                
+                index -= static_cast<std::size_t>( left_size ) + 1;
+                auto right_idx = tn.get_right();
+                if ( right_idx == no_block )
+                    return node_pptr();
+                p = node_pptr( right_idx );
+            }
+        }
+        return node_pptr();
+    }
+
+    void _avl_remove( node_pptr target ) noexcept
+    {
+        auto& tn        = target.tree_node();
+        auto  left_idx  = tn.get_left();
+        auto  right_idx = tn.get_right();
+        auto  par_idx   = tn.get_parent();
+
+        node_pptr par_p = ( par_idx != no_block ) ? node_pptr( par_idx ) : node_pptr();
+
+        if ( left_idx == no_block && right_idx == no_block )
+        {
+            
+            _set_child( par_p, target, node_pptr() );
+            if ( !par_p.is_null() )
+                _rebalance_up( par_p );
+        }
+        else if ( left_idx == no_block )
+        {
+            
+            node_pptr right_p( right_idx );
+            right_p.tree_node().set_parent( par_idx );
+            _set_child( par_p, target, right_p );
+            if ( !par_p.is_null() )
+                _rebalance_up( par_p );
+            else
+                _update_node( right_p );
+        }
+        else if ( right_idx == no_block )
+        {
+            
+            node_pptr left_p( left_idx );
+            left_p.tree_node().set_parent( par_idx );
+            _set_child( par_p, target, left_p );
+            if ( !par_p.is_null() )
+                _rebalance_up( par_p );
+            else
+                _update_node( left_p );
+        }
+        else
+        {
+            
+            node_pptr successor( right_idx );
+            while ( true )
+            {
+                auto sl = successor.tree_node().get_left();
+                if ( sl == no_block )
+                    break;
+                successor = node_pptr( sl );
+            }
+
+            auto  succ_par_idx = successor.tree_node().get_parent();
+            auto  succ_rgt_idx = successor.tree_node().get_right();
+            auto& succ_tn      = successor.tree_node();
+
+            node_pptr succ_par_p = ( succ_par_idx != static_cast<index_type>( target.offset() ) )
+                                       ? node_pptr( succ_par_idx )
+                                       : node_pptr();
+
+            if ( succ_par_idx == target.offset() )
+            {
+                
+            }
+            else
+            {
+                
+                node_pptr succ_parent( succ_par_idx );
+                if ( succ_rgt_idx != no_block )
+                {
+                    node_pptr succ_rgt( succ_rgt_idx );
+                    succ_rgt.tree_node().set_parent( succ_par_idx );
+                    succ_parent.tree_node().set_left( succ_rgt_idx );
+                }
+                else
+                {
+                    succ_parent.tree_node().set_left( no_block );
+                }
+            }
+
+            succ_tn.set_left( left_idx );
+            node_pptr( left_idx ).tree_node().set_parent( successor.offset() );
+
+            if ( succ_par_idx == target.offset() )
+            {
+                
+                succ_tn.set_right( succ_rgt_idx );
+                if ( succ_rgt_idx != no_block )
+                    node_pptr( succ_rgt_idx ).tree_node().set_parent( successor.offset() );
+            }
+            else
+            {
+                succ_tn.set_right( right_idx );
+                node_pptr( right_idx ).tree_node().set_parent( successor.offset() );
+            }
+
+            succ_tn.set_parent( par_idx );
+            _set_child( par_p, target, successor );
+
+            node_pptr rebalance_start = ( succ_par_idx == target.offset() ) ? successor : node_pptr( succ_par_idx );
+            _rebalance_up( rebalance_start );
+        }
+    }
 };
 
 } 
