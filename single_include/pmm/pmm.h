@@ -3730,7 +3730,7 @@ static PPtr avl_find( IndexType root_idx, CompareThreeWayFn&& compare_three_way,
 template <typename PPtr, typename IndexType, typename GoLeftFn, typename ResolveFn,
           typename NodeUpdateFn = AvlUpdateHeightOnly>
 static void avl_insert( PPtr new_node, IndexType& root_idx, GoLeftFn&& go_left, ResolveFn&& resolve,
-                         NodeUpdateFn update_node = {} ) noexcept
+                        NodeUpdateFn update_node = {} ) noexcept
 {
     if ( new_node.is_null() )
         return;
@@ -4570,12 +4570,12 @@ template <typename T, typename ManagerT> struct pvector
             // Update weight (subtree size) = 1 + left_weight + right_weight.
             auto& tn = p.tree_node();
 
-            auto       left_idx = tn.get_left();
+            auto       left_idx  = tn.get_left();
             auto       right_idx = tn.get_right();
-            node_pptr  left_p  = ( left_idx != no_block ) ? node_pptr( left_idx ) : node_pptr();
-            node_pptr  right_p = ( right_idx != no_block ) ? node_pptr( right_idx ) : node_pptr();
-            index_type lw      = _subtree_size( left_p );
-            index_type rw      = _subtree_size( right_p );
+            node_pptr  left_p    = ( left_idx != no_block ) ? node_pptr( left_idx ) : node_pptr();
+            node_pptr  right_p   = ( right_idx != no_block ) ? node_pptr( right_idx ) : node_pptr();
+            index_type lw        = _subtree_size( left_p );
+            index_type rw        = _subtree_size( right_p );
             tn.set_weight( static_cast<index_type>( 1 + lw + rw ) );
         }
     };
@@ -4585,8 +4585,7 @@ template <typename T, typename ManagerT> struct pvector
     {
         // Use shared avl_insert with "always go right" comparator (Issue #188).
         detail::avl_insert(
-            new_node, _root_idx,
-            []( node_pptr ) -> bool { return false; }, // never go left — always rightmost
+            new_node, _root_idx, []( node_pptr ) -> bool { return false; }, // never go left — always rightmost
             []( node_pptr p ) -> node_type* { return manager_type::template resolve<node_type>( p ); },
             _WeightUpdateFn{} );
     }
@@ -4635,10 +4634,7 @@ template <typename T, typename ManagerT> struct pvector
 
     /// @brief Удалить узел target из AVL-дерева и перебалансировать (Issue #188).
     /// Delegates to detail::avl_remove with _WeightUpdateFn.
-    void _avl_remove( node_pptr target ) noexcept
-    {
-        detail::avl_remove( target, _root_idx, _WeightUpdateFn{} );
-    }
+    void _avl_remove( node_pptr target ) noexcept { detail::avl_remove( target, _root_idx, _WeightUpdateFn{} ); }
 };
 
 } // namespace pmm
