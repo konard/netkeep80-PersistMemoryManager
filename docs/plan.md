@@ -77,7 +77,9 @@ if ( data_gran > std::numeric_limits<index_type>::max() - kBlkHdrGran )
 
 ---
 
-## Фаза 2: Персистентность и надёжность (приоритет: высокий)
+## Фаза 2: Персистентность и надёжность (приоритет: высокий) ✅ ВЫПОЛНЕНО
+
+> Реализовано в Issue #43. Подробности: [docs/phase2_persistence.md](phase2_persistence.md)
 
 ### 2.1 Контрольная сумма (CRC/checksum) для сохраняемых данных
 

@@ -154,6 +154,9 @@ pmm_add_test(test_issue188_deduplication test_issue188_deduplication.cpp)
 # ─── Тесты безопасности и устойчивости Phase 1 (Issue #43) ──────────────────
 pmm_add_test(test_issue43_phase1_safety test_issue43_phase1_safety.cpp)
 
+# ─── Тесты персистентности и надёжности Phase 2 (Issue #43) ─────────────────
+pmm_add_test(test_issue43_phase2_persistence test_issue43_phase2_persistence.cpp)
+
 # ─── Тесты поддержки 64-bit индексов через ManagerHeader<AT> (Issue #175) ────
 add_executable(test_issue175_64bit_indexes test_issue175_64bit_indexes.cpp)
 target_link_libraries(test_issue175_64bit_indexes PRIVATE pmm Threads::Threads)
