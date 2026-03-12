@@ -1045,18 +1045,11 @@ template <typename AddressTraitsT> class FreeBlock : public BlockStateBase<Addre
      * @brief Интерпретировать сырые байты как FreeBlock.
      *
      * @param raw Указатель на Block<A>.
-     * @return Указатель на FreeBlock.
-     *
-     * @warning Вызывающий код должен гарантировать, что блок действительно свободен.
-     *
-     * @note В debug-режиме (NDEBUG не определён) проверяет инварианты FreeBlock
-     *       через assert: weight==0 и root_offset==0.
-     */
-    /**
-     * @brief Интерпретировать сырые байты как FreeBlock.
+     * @return Указатель на FreeBlock, или nullptr если raw==nullptr или блок не свободен.
      *
      * Issue #43 Phase 1.4: runtime check — returns nullptr in Release builds
      * if block is not in FreeBlock state, instead of relying on assert only.
+     * В debug-режиме дополнительно срабатывает assert для диагностики.
      */
     static FreeBlock* cast_from_raw( void* raw ) noexcept
     {
@@ -1260,15 +1253,12 @@ template <typename AddressTraitsT> class AllocatedBlock : public BlockStateBase<
     /**
      * @brief Интерпретировать сырые байты как AllocatedBlock.
      *
-     * @note В debug-режиме (NDEBUG не определён) проверяет, что weight > 0
-     *       (минимальное условие AllocatedBlock). Полная проверка (root_offset == own_idx)
-     *       доступна через verify_invariants(own_idx).
-     */
-    /**
-     * @brief Интерпретировать сырые байты как AllocatedBlock.
+     * @return Указатель на AllocatedBlock, или nullptr если raw==nullptr или weight==0.
      *
      * Issue #43 Phase 1.4: runtime check — returns nullptr in Release builds
      * if block is not allocated, instead of relying on assert only.
+     * В debug-режиме дополнительно срабатывает assert для диагностики.
+     * Полная проверка (root_offset == own_idx) доступна через verify_invariants(own_idx).
      */
     static AllocatedBlock* cast_from_raw( void* raw ) noexcept
     {
