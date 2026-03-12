@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [0.22.0] - 2026-03-12
+
+### Added
+- New persistent container `pvector<T>` — a sequential container (vector) for the persistent address space (Issue #186)
+  - O(1) `push_back()`, `front()`, `back()`, `pop_back()` operations with tail pointer
+  - O(n) `at(i)` access via linear traversal from head
+  - Iterator support via `begin()`/`end()` for range-based for loops
+  - `clear()` method to remove all elements and free memory
+  - Nodes are NOT permanently locked — can be freed via `pop_back()` or `clear()`
+- `Mgr::pvector<T>` type alias in PersistMemoryManager for convenient access
+- Comprehensive test suite for pvector (test_issue186_pvector.cpp)
+- Documentation for pvector in README.md and docs/api_reference.md
+
+
 ## [0.21.0] - 2026-03-11
 
 ### Changed
