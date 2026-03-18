@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [0.26.0] - 2026-03-18
+
+### Added
+- `is_valid_ptr(pptr<T>)` method for explicit runtime pointer validation (Phase 1.2)
+- Integer overflow protection in `allocate()` and `allocate_from_block()` (Phase 1.3)
+
+### Changed
+- `create_typed<T>()` now enforces `std::is_nothrow_constructible_v<T, Args...>` via `static_assert` (Phase 1.1)
+- `destroy_typed<T>()` now enforces `std::is_nothrow_destructible_v<T>` via `static_assert` (Phase 1.1)
+- `resolve()` now includes a debug-mode bounds check via `assert` (Phase 1.2)
+- `FreeBlock::cast_from_raw()` and `AllocatedBlock::cast_from_raw()` now return `nullptr` in Release builds for invalid input instead of relying on `assert` only (Phase 1.4)
+
+### Added
+- CRC32 checksum for persisted images — `save_manager()` computes and stores CRC32, `load_manager_from_file()` verifies it (Phase 2.1)
+- Atomic save via write-then-rename pattern — `save_manager()` writes to temporary file, then atomically renames (Phase 2.2)
+- `MMapStorage::expand()` — dynamic file growth with remap on POSIX and Windows (Phase 2.3)
+- `compute_crc32()` and `compute_image_crc32()` utility functions in `pmm::detail` (Phase 2.1)
+
+### Changed
+- `ManagerHeader._reserved[8]` split into `crc32` (4 bytes) + `_reserved[4]` — struct size unchanged (Phase 2.1)
+- `save_manager()` now computes CRC32 before writing and uses atomic rename (Phase 2.1, 2.2)
+- `load_manager_from_file()` now verifies CRC32 before calling `load()` (Phase 2.1)
+
+
 ## [0.24.0] - 2026-03-12
 
 ### Changed
