@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [0.38.0] - 2026-03-19
+
+### Added
+- `pptr<T>::byte_offset()` method for converting granular index to byte offset (Issue #211, Phase 4.4)
+- `PersistMemoryManager::pptr_from_byte_offset<T>(size_t)` for creating pptr from byte offset (Issue #211, Phase 4.4)
+- 12 tests in `tests/test_issue211_byte_offset.cpp` covering round-trip conversion, error handling, and all AddressTraits variants
+
+
 ## [0.36.0] - 2026-03-19
 
 ### Added
