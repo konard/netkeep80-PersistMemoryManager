@@ -47,7 +47,6 @@
 
 // ─── Test macros ──────────────────────────────────────────────────────────────
 
-
 // ─── Manager type alias for tests ────────────────────────────────────────────
 
 using TestMgr = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 186>;
@@ -88,8 +87,8 @@ TEST_CASE( "    push_back multiple elements", "[test_issue186_pvector]" )
     auto                  p2 = vec.push_back( 20 );
     auto                  p3 = vec.push_back( 30 );
 
-    REQUIRE( (!p1.is_null() && !p2.is_null() && !p3.is_null()) );
-    REQUIRE( (p1 != p2 && p2 != p3 && p1 != p3) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() && !p3.is_null() ) );
+    REQUIRE( ( p1 != p2 && p2 != p3 && p1 != p3 ) );
 
     // Check values via at()
     REQUIRE( vec.at( 0 )->value == 10 );
@@ -446,10 +445,10 @@ TEST_CASE( "    pvector works with struct types", "[test_issue186_pvector]" )
     auto n1 = vec.at( 1 );
     auto n2 = vec.at( 2 );
 
-    REQUIRE( (!n0.is_null() && !n1.is_null() && !n2.is_null()) );
-    REQUIRE( (n0->value.x == 1 && n0->value.y == 2) );
-    REQUIRE( (n1->value.x == 3 && n1->value.y == 4) );
-    REQUIRE( (n2->value.x == 5 && n2->value.y == 6) );
+    REQUIRE( ( !n0.is_null() && !n1.is_null() && !n2.is_null() ) );
+    REQUIRE( ( n0->value.x == 1 && n0->value.y == 2 ) );
+    REQUIRE( ( n1->value.x == 3 && n1->value.y == 4 ) );
+    REQUIRE( ( n2->value.x == 5 && n2->value.y == 6 ) );
 
     TestMgr::destroy();
 }

@@ -16,7 +16,6 @@
 
 #include <vector>
 
-
 using Mgr = pmm::presets::SingleThreadedHeap;
 
 // Manual realloc helper: allocate new block, copy old data, free old block.

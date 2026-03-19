@@ -39,7 +39,6 @@
 
 // ─── Test macros ──────────────────────────────────────────────────────────────
 
-
 // ─── Manager type alias for tests ────────────────────────────────────────────
 
 using TestMgr          = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 151>;
@@ -169,12 +168,12 @@ TEST_CASE( "    equality via interning guarantee", "[test_issue151_pstringview]"
     TestMgr_pptr_psv pb = TestMgr::pstringview( "key" );
     TestMgr_pptr_psv pc = TestMgr::pstringview( "other" );
 
-    REQUIRE( (!pa.is_null() && !pb.is_null() && !pc.is_null()) );
+    REQUIRE( ( !pa.is_null() && !pb.is_null() && !pc.is_null() ) );
 
     const TestPsv* a = pa.resolve();
     const TestPsv* b = pb.resolve();
     const TestPsv* c = pc.resolve();
-    REQUIRE( (a != nullptr && b != nullptr && c != nullptr) );
+    REQUIRE( ( a != nullptr && b != nullptr && c != nullptr ) );
 
     // Interning: same string → same block → equal (Issue #184: address comparison)
     REQUIRE( *a == *b );
@@ -269,7 +268,7 @@ TEST_CASE( "    AVL tree via built-in TreeNode fields", "[test_issue151_pstringv
     TestMgr_pptr_psv p_b = TestMgr::pstringview( "beta" );
     TestMgr_pptr_psv p_c = TestMgr::pstringview( "gamma" );
 
-    REQUIRE( (!p_a.is_null() && !p_b.is_null() && !p_c.is_null()) );
+    REQUIRE( ( !p_a.is_null() && !p_b.is_null() && !p_c.is_null() ) );
 
     // All nodes accessible via the AVL tree root.
     REQUIRE( TestPsv::_root_idx != static_cast<TestMgr::index_type>( 0 ) );
@@ -398,12 +397,12 @@ TEST_CASE( "    operator< lexicographic ordering", "[test_issue151_pstringview]"
     TestMgr_pptr_psv p_b = TestMgr::pstringview( "banana" );
     TestMgr_pptr_psv p_c = TestMgr::pstringview( "cherry" );
 
-    REQUIRE( (!p_a.is_null() && !p_b.is_null() && !p_c.is_null()) );
+    REQUIRE( ( !p_a.is_null() && !p_b.is_null() && !p_c.is_null() ) );
 
     const TestPsv* a = p_a.resolve();
     const TestPsv* b = p_b.resolve();
     const TestPsv* c = p_c.resolve();
-    REQUIRE( (a != nullptr && b != nullptr && c != nullptr) );
+    REQUIRE( ( a != nullptr && b != nullptr && c != nullptr ) );
 
     // Lexicographic ordering
     REQUIRE( *a < *b );
@@ -503,7 +502,7 @@ TEST_CASE( "    intern std::string deduplication", "[test_issue151_pstringview]"
     TestMgr_pptr_psv p1 = TestMgr::pstringview( s1.c_str() );
     TestMgr_pptr_psv p2 = TestMgr::pstringview( s2.c_str() );
 
-    REQUIRE( (!p1.is_null() && !p2.is_null()) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() ) );
     REQUIRE( p1 == p2 ); // Same pptr — deduplication works
 
     TestMgr::destroy();
@@ -642,12 +641,12 @@ TEST_CASE( "    compare pstringview with std::string", "[test_issue151_pstringvi
     TestMgr_pptr_psv pb = TestMgr::pstringview( sb.c_str() );
     TestMgr_pptr_psv pc = TestMgr::pstringview( sc.c_str() );
 
-    REQUIRE( (!pa.is_null() && !pb.is_null() && !pc.is_null()) );
+    REQUIRE( ( !pa.is_null() && !pb.is_null() && !pc.is_null() ) );
 
     const TestPsv* a = pa.resolve();
     const TestPsv* b = pb.resolve();
     const TestPsv* c = pc.resolve();
-    REQUIRE( (a != nullptr && b != nullptr && c != nullptr) );
+    REQUIRE( ( a != nullptr && b != nullptr && c != nullptr ) );
 
     // operator== with std::string via c_str()
     REQUIRE( *a == sa.c_str() );

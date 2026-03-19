@@ -12,7 +12,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <cstring>
 
-
 using Mgr = pmm::presets::SingleThreadedHeap;
 
 TEST_CASE( "coalesce_with_next", "[test_coalesce]" )
@@ -22,7 +21,7 @@ TEST_CASE( "coalesce_with_next", "[test_coalesce]" )
     Mgr::pptr<std::uint8_t> p1 = Mgr::allocate_typed<std::uint8_t>( 256 );
     Mgr::pptr<std::uint8_t> p2 = Mgr::allocate_typed<std::uint8_t>( 256 );
     Mgr::pptr<std::uint8_t> p3 = Mgr::allocate_typed<std::uint8_t>( 256 );
-    REQUIRE( (!p1.is_null() && !p2.is_null() && !p3.is_null()) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() && !p3.is_null() ) );
 
     std::size_t blocks_before = Mgr::block_count();
 
@@ -49,7 +48,7 @@ TEST_CASE( "coalesce_with_prev", "[test_coalesce]" )
     Mgr::pptr<std::uint8_t> p1 = Mgr::allocate_typed<std::uint8_t>( 256 );
     Mgr::pptr<std::uint8_t> p2 = Mgr::allocate_typed<std::uint8_t>( 256 );
     Mgr::pptr<std::uint8_t> p3 = Mgr::allocate_typed<std::uint8_t>( 256 );
-    REQUIRE( (!p1.is_null() && !p2.is_null() && !p3.is_null()) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() && !p3.is_null() ) );
 
     std::size_t blocks_before = Mgr::block_count();
 
@@ -77,7 +76,7 @@ TEST_CASE( "coalesce_both_neighbors", "[test_coalesce]" )
     Mgr::pptr<std::uint8_t> p2 = Mgr::allocate_typed<std::uint8_t>( 256 );
     Mgr::pptr<std::uint8_t> p3 = Mgr::allocate_typed<std::uint8_t>( 256 );
     Mgr::pptr<std::uint8_t> p4 = Mgr::allocate_typed<std::uint8_t>( 256 );
-    REQUIRE( (!p1.is_null() && !p2.is_null() && !p3.is_null() && !p4.is_null()) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() && !p3.is_null() && !p4.is_null() ) );
 
     Mgr::deallocate_typed( p1 );
     Mgr::deallocate_typed( p3 );
@@ -105,7 +104,7 @@ TEST_CASE( "coalesce_no_merge_when_neighbors_used", "[test_coalesce]" )
     Mgr::pptr<std::uint8_t> p1 = Mgr::allocate_typed<std::uint8_t>( 128 );
     Mgr::pptr<std::uint8_t> p2 = Mgr::allocate_typed<std::uint8_t>( 128 );
     Mgr::pptr<std::uint8_t> p3 = Mgr::allocate_typed<std::uint8_t>( 128 );
-    REQUIRE( (!p1.is_null() && !p2.is_null() && !p3.is_null()) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() && !p3.is_null() ) );
 
     std::size_t blocks_before = Mgr::block_count();
     std::size_t free_before   = Mgr::free_block_count();
@@ -126,7 +125,7 @@ TEST_CASE( "coalesce_first_block_no_next_free", "[test_coalesce]" )
 
     Mgr::pptr<std::uint8_t> p1 = Mgr::allocate_typed<std::uint8_t>( 256 );
     Mgr::pptr<std::uint8_t> p2 = Mgr::allocate_typed<std::uint8_t>( 256 );
-    REQUIRE( (!p1.is_null() && !p2.is_null()) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() ) );
 
     std::size_t blocks_before = Mgr::block_count();
     std::size_t free_before   = Mgr::free_block_count();
@@ -216,7 +215,7 @@ TEST_CASE( "coalesce_large_allocation_after_merge", "[test_coalesce]" )
     Mgr::pptr<std::uint8_t> p1 = Mgr::allocate_typed<std::uint8_t>( 256 );
     Mgr::pptr<std::uint8_t> p2 = Mgr::allocate_typed<std::uint8_t>( 256 );
     Mgr::pptr<std::uint8_t> p3 = Mgr::allocate_typed<std::uint8_t>( 256 );
-    REQUIRE( (!p1.is_null() && !p2.is_null() && !p3.is_null()) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() && !p3.is_null() ) );
 
     Mgr::pptr<std::uint8_t> probe = Mgr::allocate_typed<std::uint8_t>( 700 );
     if ( !probe.is_null() )

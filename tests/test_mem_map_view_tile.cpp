@@ -25,7 +25,6 @@
 #include <iostream>
 #include <vector>
 
-
 // ─── PMM fixture helpers ───────────────────────────────────────────────────────
 
 static void make_pmm( std::size_t sz )

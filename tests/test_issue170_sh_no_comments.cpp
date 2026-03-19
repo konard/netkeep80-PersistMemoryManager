@@ -15,7 +15,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <cstring>
 
-
 TEST_CASE( "test_issue170_sh_no_comments", "[test_issue170_sh_no_comments]" )
 {
     using MyHeap = pmm::PersistMemoryManager<pmm::CacheManagerConfig>;

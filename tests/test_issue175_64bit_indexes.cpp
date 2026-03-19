@@ -32,7 +32,6 @@
 
 #include <type_traits>
 
-
 // =============================================================================
 // Section A: ManagerHeader<AT> is a template — field types follow index_type
 // =============================================================================
@@ -176,7 +175,8 @@ TEST_CASE( "I175-B4: kBlockHeaderGranules_t<AT> returns AT::index_type for all A
 // =============================================================================
 
 /// @brief AvlFreeTree<SmallAddressTraits> satisfies FreeBlockTreePolicyForTraitsConcept (Issue #175).
-TEST_CASE( "I175-C1: AvlFreeTree<SmallAT> satisfies FreeBlockTreePolicyForTraitsConcept<P, SmallAT>", "[test_issue175_64bit_indexes]" )
+TEST_CASE( "I175-C1: AvlFreeTree<SmallAT> satisfies FreeBlockTreePolicyForTraitsConcept<P, SmallAT>",
+           "[test_issue175_64bit_indexes]" )
 {
     using AT     = pmm::SmallAddressTraits;
     using Policy = pmm::AvlFreeTree<AT>;
@@ -186,7 +186,8 @@ TEST_CASE( "I175-C1: AvlFreeTree<SmallAT> satisfies FreeBlockTreePolicyForTraits
 }
 
 /// @brief AvlFreeTree<LargeAddressTraits> satisfies FreeBlockTreePolicyForTraitsConcept (Issue #175).
-TEST_CASE( "I175-C2: AvlFreeTree<LargeAT> satisfies FreeBlockTreePolicyForTraitsConcept<P, LargeAT>", "[test_issue175_64bit_indexes]" )
+TEST_CASE( "I175-C2: AvlFreeTree<LargeAT> satisfies FreeBlockTreePolicyForTraitsConcept<P, LargeAT>",
+           "[test_issue175_64bit_indexes]" )
 {
     using AT     = pmm::LargeAddressTraits;
     using Policy = pmm::AvlFreeTree<AT>;
@@ -196,7 +197,8 @@ TEST_CASE( "I175-C2: AvlFreeTree<LargeAT> satisfies FreeBlockTreePolicyForTraits
 }
 
 /// @brief AvlFreeTree<DefaultAddressTraits> does NOT satisfy FreeBlockTreePolicyForTraitsConcept<P, SmallAT>.
-TEST_CASE( "I175-C3: AvlFreeTree<DefaultAT> does NOT satisfy FreeBlockTreePolicyForTraitsConcept<P, SmallAT>", "[test_issue175_64bit_indexes]" )
+TEST_CASE( "I175-C3: AvlFreeTree<DefaultAT> does NOT satisfy FreeBlockTreePolicyForTraitsConcept<P, SmallAT>",
+           "[test_issue175_64bit_indexes]" )
 {
     using DefaultPolicy = pmm::AvlFreeTree<pmm::DefaultAddressTraits>;
     using SmallAT       = pmm::SmallAddressTraits;
@@ -211,7 +213,8 @@ TEST_CASE( "I175-C3: AvlFreeTree<DefaultAT> does NOT satisfy FreeBlockTreePolicy
 // =============================================================================
 
 /// @brief SmallEmbeddedStaticHeap: correct sentinel (no_block = 0xFFFF, not 0xFFFFFFFF).
-TEST_CASE( "I175-D1: SmallAddressTraits::no_block == 0xFFFF (correct 16-bit sentinel)", "[test_issue175_64bit_indexes]" )
+TEST_CASE( "I175-D1: SmallAddressTraits::no_block == 0xFFFF (correct 16-bit sentinel)",
+           "[test_issue175_64bit_indexes]" )
 {
     using AT = pmm::SmallAddressTraits;
 
@@ -274,7 +277,8 @@ TEST_CASE( "I175-D3: SmallEmbeddedStaticHeap alloc/dealloc counter correctness",
 }
 
 /// @brief SmallEmbeddedStaticHeap: typed alloc with pptr<T> works with uint16_t indexes.
-TEST_CASE( "I175-D4: SmallEmbeddedStaticHeap typed pptr<T> with uint16_t index (2-byte pptr)", "[test_issue175_64bit_indexes]" )
+TEST_CASE( "I175-D4: SmallEmbeddedStaticHeap typed pptr<T> with uint16_t index (2-byte pptr)",
+           "[test_issue175_64bit_indexes]" )
 {
     using SESH = pmm::PersistMemoryManager<pmm::SmallEmbeddedStaticConfig<512>, 17512>;
 
@@ -297,7 +301,8 @@ TEST_CASE( "I175-D4: SmallEmbeddedStaticHeap typed pptr<T> with uint16_t index (
 // =============================================================================
 
 /// @brief LargeAddressTraits no_block sentinel is 0xFFFFFFFFFFFFFFFF.
-TEST_CASE( "I175-E1: LargeAddressTraits::no_block == 0xFFFFFFFFFFFFFFFF (correct 64-bit sentinel)", "[test_issue175_64bit_indexes]" )
+TEST_CASE( "I175-E1: LargeAddressTraits::no_block == 0xFFFFFFFFFFFFFFFF (correct 64-bit sentinel)",
+           "[test_issue175_64bit_indexes]" )
 {
     using AT = pmm::LargeAddressTraits;
 

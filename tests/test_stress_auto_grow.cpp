@@ -16,7 +16,6 @@
 #include <iostream>
 #include <vector>
 
-
 static auto now()
 {
     return std::chrono::high_resolution_clock::now();

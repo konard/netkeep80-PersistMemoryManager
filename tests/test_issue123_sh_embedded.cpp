@@ -17,7 +17,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <cstring>
 
-
 TEST_CASE( "test_issue123_sh_embedded", "[test_issue123_sh_embedded]" )
 {
     using EMB = pmm::presets::EmbeddedHeap;

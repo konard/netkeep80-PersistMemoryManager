@@ -25,7 +25,6 @@
 
 // ─── Test macros ──────────────────────────────────────────────────────────────
 
-
 // ─── Helper: temp file cleanup ───────────────────────────────────────────────
 
 static const char* TEST_FILE = "test_phase2.dat";

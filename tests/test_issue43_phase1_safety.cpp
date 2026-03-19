@@ -24,7 +24,6 @@
 
 // ─── Test macros ──────────────────────────────────────────────────────────────
 
-
 // ─── Manager alias for tests ──────────────────────────────────────────────────
 
 using M = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 43>;
@@ -211,7 +210,7 @@ TEST_CASE( "full allocation cycle", "[test_issue43_phase1_safety]" )
     auto p1 = M::create_typed<NoexceptType>( 10 );
     auto p2 = M::create_typed<NoexceptType>( 20 );
     auto p3 = M::create_typed<NoexceptType>( 30 );
-    REQUIRE( (!p1.is_null() && !p2.is_null() && !p3.is_null()) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() && !p3.is_null() ) );
 
     // Verify values
     REQUIRE( M::resolve( p1 )->value == 10 );

@@ -30,7 +30,6 @@
 
 // ─── Макросы тестирования ─────────────────────────────────────────────────────
 
-
 // =============================================================================
 // P97-B: SingleThreadedHeap — динамическая память с auto-expand
 // =============================================================================
@@ -109,7 +108,7 @@ TEST_CASE( "P97-B3: SingleThreadedHeap save_manager/load_manager_from_file", "[t
 
     void* ptr1 = STH1::allocate( 64 );
     void* ptr2 = STH1::allocate( 128 );
-    REQUIRE( (ptr1 != nullptr && ptr2 != nullptr) );
+    REQUIRE( ( ptr1 != nullptr && ptr2 != nullptr ) );
 
     // Записываем данные
     std::memset( ptr1, 0xDE, 64 );

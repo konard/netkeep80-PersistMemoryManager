@@ -21,7 +21,6 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-
 // ─── PMM fixture helpers ───────────────────────────────────────────────────────
 
 static void make_pmm( std::size_t sz )

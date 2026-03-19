@@ -30,7 +30,6 @@
 
 // ─── Test macros ─────────────────────────────────────────────────────────────
 
-
 using Mgr = pmm::presets::SingleThreadedHeap;
 using A   = pmm::DefaultAddressTraits;
 
@@ -143,7 +142,7 @@ TEST_CASE( "    Block freed via mark_as_free()", "[test_issue106_block_state_int
     // Allocate two blocks to prevent coalescing of block under test
     void* raw1 = pmm.allocate( 64 );
     void* raw2 = pmm.allocate( 64 );
-    REQUIRE( (raw1 != nullptr && raw2 != nullptr) );
+    REQUIRE( ( raw1 != nullptr && raw2 != nullptr ) );
 
     pmm::Block<A>* blk1 = block_of( pmm, raw1 );
     std::uint32_t  idx1 = blk_idx_of( pmm, blk1 );
@@ -176,7 +175,7 @@ TEST_CASE( "    Coalesce with right neighbour", "[test_issue106_block_state_inte
     // Allocate two adjacent blocks of 64 bytes
     void* raw1 = pmm.allocate( 64 );
     void* raw2 = pmm.allocate( 64 );
-    REQUIRE( (raw1 != nullptr && raw2 != nullptr) );
+    REQUIRE( ( raw1 != nullptr && raw2 != nullptr ) );
 
     std::size_t blk_before = pmm.block_count();
 
@@ -202,7 +201,7 @@ TEST_CASE( "    Bidirectional coalescing", "[test_issue106_block_state_integrati
     void* raw1 = pmm.allocate( 64 );
     void* raw2 = pmm.allocate( 64 );
     void* raw3 = pmm.allocate( 64 );
-    REQUIRE( (raw1 != nullptr && raw2 != nullptr && raw3 != nullptr) );
+    REQUIRE( ( raw1 != nullptr && raw2 != nullptr && raw3 != nullptr ) );
 
     std::size_t initial_block_count = pmm.block_count();
 

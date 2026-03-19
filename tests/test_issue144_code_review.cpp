@@ -28,7 +28,6 @@
 
 // ─── Test macros ──────────────────────────────────────────────────────────────
 
-
 // =============================================================================
 // I144-A: FreeBlock::cast_from_raw validates invariants in debug mode
 // =============================================================================
@@ -359,7 +358,7 @@ TEST_CASE( "    for_each_free_block", "[test_issue144_code_review]" )
     void* p1 = TestMgr::allocate( 64 );
     void* p2 = TestMgr::allocate( 128 );
     void* p3 = TestMgr::allocate( 32 );
-    REQUIRE( (p1 != nullptr && p2 != nullptr && p3 != nullptr) );
+    REQUIRE( ( p1 != nullptr && p2 != nullptr && p3 != nullptr ) );
 
     TestMgr::deallocate( p2 ); // Create a free block in the middle
 

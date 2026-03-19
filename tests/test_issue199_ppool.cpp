@@ -33,7 +33,6 @@
 #include <type_traits>
 #include <vector>
 
-
 // --- Manager type alias for tests --------------------------------------------
 
 using TestMgr = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 199>;
@@ -330,8 +329,8 @@ TEST_CASE( "I199-H: struct type", "[test_issue199_ppool]" )
     b->y = 20;
     b->z = 30;
 
-    REQUIRE( (a->x == 1 && a->y == 2 && a->z == 3) );
-    REQUIRE( (b->x == 10 && b->y == 20 && b->z == 30) );
+    REQUIRE( ( a->x == 1 && a->y == 2 && a->z == 3 ) );
+    REQUIRE( ( b->x == 10 && b->y == 20 && b->z == 30 ) );
 
     pool->deallocate( a );
     pool->deallocate( b );

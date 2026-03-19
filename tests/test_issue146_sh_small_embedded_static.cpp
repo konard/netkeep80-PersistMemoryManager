@@ -18,7 +18,6 @@
 #include <cstdint>
 #include <cstring>
 
-
 TEST_CASE( "test_issue146_sh_small_embedded_static", "[test_issue146_sh_small_embedded_static]" )
 {
     // SmallEmbeddedStaticHeap uses InstanceId=0 with default 1024-byte buffer.

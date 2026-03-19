@@ -31,7 +31,6 @@
 
 // ─── Макросы тестирования ─────────────────────────────────────────────────────
 
-
 // =============================================================================
 // Issue #168 Tests Section A: kBlockHeaderGranules_t<AT> correctness
 // =============================================================================
@@ -248,7 +247,8 @@ TEST_CASE( "I168-C3: recompute_counters() works after wrapper removal", "[test_i
 // =============================================================================
 
 /// @brief BlockStateBase<SmallAddressTraits>::reset_avl_fields_of() uses correct no_block value.
-TEST_CASE( "I168-D1: BlockStateBase<SmallAddressTraits>::reset_avl_fields_of() uses 0xFFFF no_block", "[test_issue168_deduplication]" )
+TEST_CASE( "I168-D1: BlockStateBase<SmallAddressTraits>::reset_avl_fields_of() uses 0xFFFF no_block",
+           "[test_issue168_deduplication]" )
 {
     using A          = pmm::SmallAddressTraits;
     using BlockState = pmm::BlockStateBase<A>;
@@ -275,7 +275,8 @@ TEST_CASE( "I168-D1: BlockStateBase<SmallAddressTraits>::reset_avl_fields_of() u
 }
 
 /// @brief BlockStateBase<SmallAddressTraits>::get_weight() and get_next_offset() work correctly.
-TEST_CASE( "I168-D2: BlockStateBase<SmallAddressTraits>::get_weight/next_offset correct", "[test_issue168_deduplication]" )
+TEST_CASE( "I168-D2: BlockStateBase<SmallAddressTraits>::get_weight/next_offset correct",
+           "[test_issue168_deduplication]" )
 {
     using A          = pmm::SmallAddressTraits;
     using BlockState = pmm::BlockStateBase<A>;

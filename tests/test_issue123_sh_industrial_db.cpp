@@ -17,7 +17,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <cstring>
 
-
 TEST_CASE( "test_issue123_sh_industrial_db", "[test_issue123_sh_industrial_db]" )
 {
     using IDB = pmm::presets::IndustrialDBHeap;

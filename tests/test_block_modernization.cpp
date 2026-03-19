@@ -12,7 +12,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <cstring>
 
-
 using Mgr = pmm::presets::SingleThreadedHeap;
 
 // ─── Test 1: Block<A> structural sizes ────────────────────────────────────────
@@ -66,7 +65,7 @@ TEST_CASE( "save_load_new_format", "[test_block_modernization]" )
     auto p1 = pmm1.allocate_typed<std::uint8_t>( 100 );
     auto p2 = pmm1.allocate_typed<std::uint8_t>( 200 );
     auto p3 = pmm1.allocate_typed<std::uint8_t>( 300 );
-    REQUIRE( (!p1.is_null() && !p2.is_null() && !p3.is_null()) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() && !p3.is_null() ) );
 
     std::memset( p1.resolve(), 0x11, 100 );
     std::memset( p2.resolve(), 0x22, 200 );
@@ -120,7 +119,7 @@ TEST_CASE( "coalesced_leaves_one_free_block", "[test_block_modernization]" )
     // Allocate two adjacent blocks
     auto p1 = pmm.allocate_typed<std::uint8_t>( 64 );
     auto p2 = pmm.allocate_typed<std::uint8_t>( 64 );
-    REQUIRE( (!p1.is_null() && !p2.is_null()) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() ) );
 
     // Free both — they should coalesce with each other and the original free block
     pmm.deallocate_typed( p1 );

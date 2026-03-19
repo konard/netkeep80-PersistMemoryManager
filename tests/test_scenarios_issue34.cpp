@@ -24,7 +24,6 @@
 #include <iostream>
 #include <vector>
 
-
 using Mgr = pmm::presets::SingleThreadedHeap;
 
 static auto now()

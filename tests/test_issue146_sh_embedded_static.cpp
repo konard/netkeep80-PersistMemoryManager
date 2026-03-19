@@ -17,7 +17,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <cstring>
 
-
 TEST_CASE( "test_issue146_sh_embedded_static", "[test_issue146_sh_embedded_static]" )
 {
     // EmbeddedStaticHeap uses InstanceId=0 with default 4096-byte buffer.

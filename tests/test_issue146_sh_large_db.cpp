@@ -18,7 +18,6 @@
 #include <cstdint>
 #include <cstring>
 
-
 TEST_CASE( "test_issue146_sh_large_db", "[test_issue146_sh_large_db]" )
 {
     // LargeDBHeap uses InstanceId=0.

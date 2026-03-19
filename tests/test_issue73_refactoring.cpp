@@ -20,7 +20,6 @@
 
 #include <type_traits>
 
-
 using Mgr = pmm::presets::SingleThreadedHeap;
 
 // ─── FR-03: Binary-compatibility static_assert checks ────────────────────────
@@ -44,7 +43,7 @@ TEST_CASE( "FR-02/AR-03: avl_tree_standalone", "[test_issue73_refactoring]" )
     Mgr::pptr<std::uint8_t> p1 = Mgr::allocate_typed<std::uint8_t>( 256 );
     Mgr::pptr<std::uint8_t> p2 = Mgr::allocate_typed<std::uint8_t>( 512 );
     Mgr::pptr<std::uint8_t> p3 = Mgr::allocate_typed<std::uint8_t>( 128 );
-    REQUIRE( (!p1.is_null() && !p2.is_null() && !p3.is_null()) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() && !p3.is_null() ) );
     Mgr::deallocate_typed( p1 );
 
     REQUIRE( Mgr::is_initialized() );

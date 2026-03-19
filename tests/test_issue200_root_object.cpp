@@ -29,7 +29,6 @@
 #include <cstdint>
 #include <cstdio>
 
-
 // --- Manager type aliases for tests -----------------------------------------
 
 using TestMgr  = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 200>;

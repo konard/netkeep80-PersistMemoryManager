@@ -16,7 +16,6 @@
 #include <thread>
 #include <vector>
 
-
 using Mgr = pmm::presets::MultiThreadedHeap;
 
 /**

@@ -23,7 +23,6 @@ static constexpr int kPhase1Iters = 50000;
 static constexpr int kPhase2Iters = 50000;
 #endif
 
-
 using Mgr = pmm::presets::SingleThreadedHeap;
 
 static auto now()

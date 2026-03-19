@@ -35,7 +35,6 @@
 
 #include <limits>
 
-
 // --- Manager aliases ---------------------------------------------------------
 
 using Mgr = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 201>;

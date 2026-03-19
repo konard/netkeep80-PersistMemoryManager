@@ -14,7 +14,6 @@
 
 #include <vector>
 
-
 using Mgr = pmm::presets::SingleThreadedHeap;
 
 /// After fresh create(), there should be exactly 1 free block and 1 alloc block
@@ -46,7 +45,7 @@ TEST_CASE( "best_fit_selection", "[test_avl_allocator]" )
     p[1] = pmm.allocate_typed<std::uint8_t>( 1024 );
     p[2] = pmm.allocate_typed<std::uint8_t>( 2048 );
     p[3] = pmm.allocate_typed<std::uint8_t>( 4096 );
-    REQUIRE( (!p[0].is_null() && !p[1].is_null() && !p[2].is_null() && !p[3].is_null()) );
+    REQUIRE( ( !p[0].is_null() && !p[1].is_null() && !p[2].is_null() && !p[3].is_null() ) );
     REQUIRE( pmm.is_initialized() );
 
     // Free all — coalesce should merge adjacent blocks
@@ -120,7 +119,7 @@ TEST_CASE( "coalesce_three_way", "[test_avl_allocator]" )
     Mgr::pptr<std::uint8_t> p2 = pmm.allocate_typed<std::uint8_t>( 512 );
     Mgr::pptr<std::uint8_t> p3 = pmm.allocate_typed<std::uint8_t>( 512 );
     Mgr::pptr<std::uint8_t> p4 = pmm.allocate_typed<std::uint8_t>( 512 ); // barrier
-    REQUIRE( (!p1.is_null() && !p2.is_null() && !p3.is_null() && !p4.is_null()) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() && !p3.is_null() && !p4.is_null() ) );
 
     // Free p1 and p3 (non-adjacent free blocks)
     pmm.deallocate_typed( p1 );
@@ -155,7 +154,7 @@ TEST_CASE( "block_count_consistency", "[test_avl_allocator]" )
 
     Mgr::pptr<std::uint8_t> p1 = pmm.allocate_typed<std::uint8_t>( 256 );
     Mgr::pptr<std::uint8_t> p2 = pmm.allocate_typed<std::uint8_t>( 512 );
-    REQUIRE( (!p1.is_null() && !p2.is_null()) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() ) );
 
     // block_count = alloc_count + free_count
     REQUIRE( pmm.block_count() == pmm.alloc_block_count() + pmm.free_block_count() );
@@ -184,7 +183,7 @@ TEST_CASE( "avl_survives_save_load", "[test_avl_allocator]" )
 
     Mgr::pptr<std::uint8_t> p1 = pmm1.allocate_typed<std::uint8_t>( 256 );
     Mgr::pptr<std::uint8_t> p2 = pmm1.allocate_typed<std::uint8_t>( 512 );
-    REQUIRE( (!p1.is_null() && !p2.is_null()) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() ) );
     pmm1.deallocate_typed( p1 ); // create fragmentation
     REQUIRE( pmm1.is_initialized() );
 
@@ -234,8 +233,8 @@ TEST_CASE( "best_fit_chooses_smallest_fitting", "[test_avl_allocator]" )
     gap[3]     = pmm.allocate_typed<std::uint8_t>( 1024 );
     barrier[3] = pmm.allocate_typed<std::uint8_t>( 64 );
     barrier[4] = pmm.allocate_typed<std::uint8_t>( 128 ); // keep allocated at end
-    REQUIRE( (!gap[0].is_null() && !barrier[0].is_null() && !gap[1].is_null() && !barrier[1].is_null()) );
-    REQUIRE( (!gap[2].is_null() && !barrier[2].is_null() && !gap[3].is_null() && !barrier[3].is_null()) );
+    REQUIRE( ( !gap[0].is_null() && !barrier[0].is_null() && !gap[1].is_null() && !barrier[1].is_null() ) );
+    REQUIRE( ( !gap[2].is_null() && !barrier[2].is_null() && !gap[3].is_null() && !barrier[3].is_null() ) );
     REQUIRE( !barrier[4].is_null() );
 
     // Free gaps — create fragmentation

@@ -19,7 +19,6 @@
 #include <limits>
 #include <type_traits>
 
-
 using Mgr = pmm::presets::SingleThreadedHeap;
 
 // =============================================================================
@@ -216,7 +215,7 @@ TEST_CASE( "C1: full lifecycle allocate/deallocate", "[test_issue87_abstraction]
     auto p1 = pmm.allocate_typed<std::uint8_t>( 16 );
     auto p2 = pmm.allocate_typed<std::uint32_t>( 32 );
     auto p3 = pmm.allocate_typed<double>( 8 );
-    REQUIRE( (!p1.is_null() && !p2.is_null() && !p3.is_null()) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() && !p3.is_null() ) );
 
     pmm.deallocate_typed( p2 );
     pmm.deallocate_typed( p1 );

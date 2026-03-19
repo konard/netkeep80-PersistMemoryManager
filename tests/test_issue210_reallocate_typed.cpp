@@ -32,7 +32,6 @@
 
 #include <limits>
 
-
 // --- Manager aliases ---------------------------------------------------------
 
 using Mgr      = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 210>;
@@ -105,7 +104,7 @@ TEST_CASE( "inplace_expansion", "[test_issue210_reallocate_typed]" )
     // Allocate two blocks, then free the second one to create adjacent free space
     MgrInpl::pptr<std::uint8_t> p1 = MgrInpl::allocate_typed<std::uint8_t>( 64 );
     MgrInpl::pptr<std::uint8_t> p2 = MgrInpl::allocate_typed<std::uint8_t>( 256 );
-    REQUIRE( (!p1.is_null() && !p2.is_null()) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() ) );
 
     for ( std::size_t i = 0; i < 64; ++i )
         MgrInpl::resolve( p1 )[i] = static_cast<std::uint8_t>( 0xAA );
@@ -136,7 +135,7 @@ TEST_CASE( "fallback_allocation", "[test_issue210_reallocate_typed]" )
 
     MgrFall::pptr<std::uint8_t> p1 = MgrFall::allocate_typed<std::uint8_t>( 64 );
     MgrFall::pptr<std::uint8_t> p2 = MgrFall::allocate_typed<std::uint8_t>( 64 );
-    REQUIRE( (!p1.is_null() && !p2.is_null()) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() ) );
 
     for ( std::size_t i = 0; i < 64; ++i )
         MgrFall::resolve( p1 )[i] = static_cast<std::uint8_t>( 0xBB );

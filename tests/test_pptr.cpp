@@ -16,7 +16,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <cstring>
 
-
 using Mgr = pmm::presets::SingleThreadedHeap;
 
 TEST_CASE( "pptr_sizeof", "[test_pptr]" )
@@ -121,7 +120,7 @@ TEST_CASE( "pptr_null_resolve", "[test_pptr]" )
     REQUIRE( pmm.create( size ) );
 
     Mgr::pptr<int> p; // null by default
-    REQUIRE( !p );   // null pptr evaluates to false
+    REQUIRE( !p );    // null pptr evaluates to false
 
     pmm.destroy();
 }

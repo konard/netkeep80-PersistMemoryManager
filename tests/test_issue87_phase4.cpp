@@ -19,7 +19,6 @@
 
 #include <type_traits>
 
-
 using Mgr = pmm::presets::SingleThreadedHeap;
 
 // =============================================================================

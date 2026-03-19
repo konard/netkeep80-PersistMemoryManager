@@ -13,7 +13,6 @@
 #include <cstdint>
 #include <cstring>
 
-
 using Mgr = pmm::presets::SingleThreadedHeap;
 
 TEST_CASE( "deallocate_null", "[test_deallocate]" )

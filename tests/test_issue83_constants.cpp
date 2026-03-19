@@ -19,7 +19,6 @@
 
 #include <type_traits>
 
-
 // ─── #83-R1: Single granularity constant is a power of 2 ─────────────────────
 
 static_assert( ( pmm::kGranuleSize & ( pmm::kGranuleSize - 1 ) ) == 0, "#83-R1: kGranuleSize must be a power of 2" );

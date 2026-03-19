@@ -14,7 +14,6 @@
 #include <cstdio>
 #include <cstring>
 
-
 using Config = pmm::CacheManagerConfig;
 
 static const char* TEST_FILE = "test_heap.dat";
@@ -109,7 +108,7 @@ TEST_CASE( "persistence_multiple_blocks", "[test_persistence]" )
     Mgr1::pptr<std::uint8_t> p2 = Mgr1::allocate_typed<std::uint8_t>( 256 );
     Mgr1::pptr<std::uint8_t> p3 = Mgr1::allocate_typed<std::uint8_t>( 512 );
     Mgr1::pptr<std::uint8_t> p4 = Mgr1::allocate_typed<std::uint8_t>( 64 );
-    REQUIRE( (!p1.is_null() && !p2.is_null() && !p3.is_null() && !p4.is_null()) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() && !p3.is_null() && !p4.is_null() ) );
 
     Mgr1::deallocate_typed( p2 );
     Mgr1::deallocate_typed( p4 );
@@ -251,7 +250,7 @@ TEST_CASE( "persistence_double_save_load", "[test_persistence]" )
 
     Mgr1::pptr<std::uint8_t> p1 = Mgr1::allocate_typed<std::uint8_t>( 128 );
     Mgr1::pptr<std::uint8_t> p2 = Mgr1::allocate_typed<std::uint8_t>( 256 );
-    REQUIRE( (!p1.is_null() && !p2.is_null()) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() ) );
     std::memset( p1.resolve(), 0xAA, 128 );
     std::memset( p2.resolve(), 0xBB, 256 );
 
@@ -323,7 +322,7 @@ TEST_CASE( "persistence_deallocate_after_load", "[test_persistence]" )
 
     Mgr1::pptr<std::uint8_t> p1 = Mgr1::allocate_typed<std::uint8_t>( 256 );
     Mgr1::pptr<std::uint8_t> p2 = Mgr1::allocate_typed<std::uint8_t>( 512 );
-    REQUIRE( (!p1.is_null() && !p2.is_null()) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() ) );
 
     std::uint32_t off1 = p1.offset();
     std::uint32_t off2 = p2.offset();

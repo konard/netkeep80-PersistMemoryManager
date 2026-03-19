@@ -28,7 +28,6 @@
 #include <unordered_map>
 #include <vector>
 
-
 // ─── PMM fixture helpers ───────────────────────────────────────────────────────
 
 static void make_pmm( std::size_t sz )
@@ -215,7 +214,7 @@ TEST_CASE( "avl_tree_has_one_root", "[test_avl_tree_view]" )
     }
 
     // A valid AVL tree must have exactly one root when it has any nodes.
-    REQUIRE( (blocks.empty() || root_count == 1) );
+    REQUIRE( ( blocks.empty() || root_count == 1 ) );
 
     // Free remaining allocations.
     for ( std::size_t i = 1; i < ptrs.size(); i += 2 )

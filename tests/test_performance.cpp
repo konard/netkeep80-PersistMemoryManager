@@ -13,7 +13,6 @@
 
 #include <vector>
 
-
 using Mgr = pmm::presets::SingleThreadedHeap;
 
 static auto now()
@@ -186,7 +185,7 @@ TEST_CASE( "free list after load", "[test_performance]" )
     Mgr::pptr<std::uint8_t> p1 = pmm1.allocate_typed<std::uint8_t>( 64 );
     Mgr::pptr<std::uint8_t> p2 = pmm1.allocate_typed<std::uint8_t>( 128 );
     Mgr::pptr<std::uint8_t> p3 = pmm1.allocate_typed<std::uint8_t>( 64 );
-    REQUIRE( (!p1.is_null() && !p2.is_null() && !p3.is_null()) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() && !p3.is_null() ) );
 
     pmm1.deallocate_typed( p2 );
     REQUIRE( pmm1.is_initialized() );

@@ -36,7 +36,6 @@
 #include <thread>
 #include <vector>
 
-
 // ─── PMM fixture helpers ───────────────────────────────────────────────────────
 
 static constexpr std::size_t kDefaultPmmSize = 16 * 1024 * 1024;

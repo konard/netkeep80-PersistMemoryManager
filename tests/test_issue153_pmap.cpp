@@ -48,7 +48,6 @@
 
 // ─── Test macros ──────────────────────────────────────────────────────────────
 
-
 // ─── Manager type alias for tests ────────────────────────────────────────────
 
 using TestMgr = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 153>;
@@ -90,8 +89,8 @@ TEST_CASE( "    insert multiple distinct keys", "[test_issue153_pmap]" )
     auto                    p2 = map.insert( 20, 2 );
     auto                    p3 = map.insert( 30, 3 );
 
-    REQUIRE( (!p1.is_null() && !p2.is_null() && !p3.is_null()) );
-    REQUIRE( (p1 != p2 && p2 != p3 && p1 != p3) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() && !p3.is_null() ) );
+    REQUIRE( ( p1 != p2 && p2 != p3 && p1 != p3 ) );
 
     // Check values
     REQUIRE( map.find( 10 )->value == 1 );
@@ -215,7 +214,7 @@ TEST_CASE( "    AVL tree via built-in TreeNode fields", "[test_issue153_pmap]" )
     auto p2 = map.insert( 2, 20 );
     auto p3 = map.insert( 3, 30 );
 
-    REQUIRE( (!p1.is_null() && !p2.is_null() && !p3.is_null()) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() && !p3.is_null() ) );
 
     // AVL root must be non-null
     REQUIRE( map._root_idx != static_cast<TestMgr::index_type>( 0 ) );
@@ -342,7 +341,7 @@ TEST_CASE( "    pmap<pptr<pstringview>, int> for named persistent objects", "[te
     auto pk2 = static_cast<TestMgr::pptr<TestMgr::pstringview>>( TestMgr::pstringview( "beta" ) );
     auto pk3 = static_cast<TestMgr::pptr<TestMgr::pstringview>>( TestMgr::pstringview( "gamma" ) );
 
-    REQUIRE( (!pk1.is_null() && !pk2.is_null() && !pk3.is_null()) );
+    REQUIRE( ( !pk1.is_null() && !pk2.is_null() && !pk3.is_null() ) );
 
     // Use pptr<pstringview> as key type (Issue #184)
     TestMgr::pmap<TestMgr::pptr<TestMgr::pstringview>, int> map;
@@ -355,7 +354,7 @@ TEST_CASE( "    pmap<pptr<pstringview>, int> for named persistent objects", "[te
     auto found2 = map.find( pk2 );
     auto found3 = map.find( pk3 );
 
-    REQUIRE( (!found1.is_null() && !found2.is_null() && !found3.is_null()) );
+    REQUIRE( ( !found1.is_null() && !found2.is_null() && !found3.is_null() ) );
     REQUIRE( found1->value == 1 );
     REQUIRE( found2->value == 2 );
     REQUIRE( found3->value == 3 );

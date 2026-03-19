@@ -32,7 +32,6 @@
 
 // ─── Макросы тестирования ─────────────────────────────────────────────────────
 
-
 // =============================================================================
 // Phase 2 tests: Block prev/next fields (Issue #138: LinkedListNode merged into Block)
 // =============================================================================
@@ -84,7 +83,8 @@ TEST_CASE( "P2-A2: Block prev/next with various AddressTraits (8/16/32/64-bit, I
 /// @brief Смещения полей prev/next в Block<DefaultAddressTraits> (Issue #138).
 /// Issue #120: поля protected, смещения проверяются через BlockStateBase::kOffset*.
 /// Issue #138: prev/next come AFTER TreeNode fields (TreeNode is base class, fields come first).
-TEST_CASE( "P2-A3: Block<Default> prev/next offsets (via BlockStateBase::kOffset*, Issue #138)", "[test_issue87_phase2]" )
+TEST_CASE( "P2-A3: Block<Default> prev/next offsets (via BlockStateBase::kOffset*, Issue #138)",
+           "[test_issue87_phase2]" )
 {
     using BlockState = pmm::BlockStateBase<pmm::DefaultAddressTraits>;
 

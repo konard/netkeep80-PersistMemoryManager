@@ -28,7 +28,6 @@
 
 // ─── Макросы тестирования ─────────────────────────────────────────────────────
 
-
 // =============================================================================
 // Issue #166 Tests Section A: kNoBlock_v<AT> template alias
 // =============================================================================
@@ -86,7 +85,8 @@ TEST_CASE( "I166-A4: kNoBlock_v<AT> has correct index_type", "[test_issue166_ded
 // =============================================================================
 
 /// @brief required_block_granules_t<DefaultAddressTraits>() == required_block_granules() for DefaultAddressTraits.
-TEST_CASE( "I166-B1: required_block_granules_t<DefaultAddressTraits> matches non-templated", "[test_issue166_deduplication]" )
+TEST_CASE( "I166-B1: required_block_granules_t<DefaultAddressTraits> matches non-templated",
+           "[test_issue166_deduplication]" )
 {
     using AT = pmm::DefaultAddressTraits;
 
@@ -99,7 +99,8 @@ TEST_CASE( "I166-B1: required_block_granules_t<DefaultAddressTraits> matches non
 }
 
 /// @brief required_block_granules_t<SmallAddressTraits>() uses SmallAddressTraits header granules.
-TEST_CASE( "I166-B2: required_block_granules_t<SmallAddressTraits> uses correct granule", "[test_issue166_deduplication]" )
+TEST_CASE( "I166-B2: required_block_granules_t<SmallAddressTraits> uses correct granule",
+           "[test_issue166_deduplication]" )
 {
     using AT = pmm::SmallAddressTraits;
 
@@ -123,7 +124,8 @@ TEST_CASE( "I166-B2: required_block_granules_t<SmallAddressTraits> uses correct 
 }
 
 /// @brief required_block_granules_t<LargeAddressTraits>() uses 64-byte granule.
-TEST_CASE( "I166-B3: required_block_granules_t<LargeAddressTraits> uses 64-byte granule", "[test_issue166_deduplication]" )
+TEST_CASE( "I166-B3: required_block_granules_t<LargeAddressTraits> uses 64-byte granule",
+           "[test_issue166_deduplication]" )
 {
     using AT = pmm::LargeAddressTraits;
 

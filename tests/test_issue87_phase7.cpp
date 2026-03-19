@@ -29,7 +29,6 @@
 
 // ─── Макросы тестирования ─────────────────────────────────────────────────────
 
-
 // =============================================================================
 // Конфигурации для тестов
 // =============================================================================
@@ -96,7 +95,7 @@ TEST_CASE( "P7-B1: create(size) with HeapStorage", "[test_issue87_phase7]" )
 TEST_CASE( "P7-B2: create(1) fails (too small)", "[test_issue87_phase7]" )
 {
     using PMM = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 101>;
-    PMM::destroy();                // ensure clean state
+    PMM::destroy();               // ensure clean state
     REQUIRE( !PMM::create( 1 ) ); // слишком маленький буфер
     REQUIRE( !PMM::is_initialized() );
 }

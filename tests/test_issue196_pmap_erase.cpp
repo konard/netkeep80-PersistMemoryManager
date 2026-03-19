@@ -26,7 +26,6 @@
 
 // ─── Test macros ──────────────────────────────────────────────────────────────
 
-
 // ─── Manager type alias for tests ────────────────────────────────────────────
 
 using TestMgr = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 196>;

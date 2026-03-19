@@ -34,7 +34,6 @@
 #include <cstdio>
 #include <cstring>
 
-
 // --- Custom logging policy for testing ---------------------------------------
 
 /// @brief Counters for hook invocations — used to verify hooks are called.

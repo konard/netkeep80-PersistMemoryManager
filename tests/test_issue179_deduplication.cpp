@@ -26,9 +26,7 @@
 #include <cstddef>
 #include <cstdint>
 
-
 // ─── Macros ───────────────────────────────────────────────────────────────────
-
 
 // =============================================================================
 // Manager types for tests
@@ -266,8 +264,8 @@ TEST_CASE( "I179-E2: allocate_typed<T>(count) pptr resolves correctly", "[test_i
         arr[i] = static_cast<int>( i * 10 );
 
     for ( std::size_t i = 0; i < count; ++i )
-        REQUIRE( (TestMgr::resolve_at( p, i ) != nullptr &&
-                  *TestMgr::resolve_at( p, i ) == static_cast<int>( i * 10 )) );
+        REQUIRE(
+            ( TestMgr::resolve_at( p, i ) != nullptr && *TestMgr::resolve_at( p, i ) == static_cast<int>( i * 10 ) ) );
 
     TestMgr::deallocate_typed( p );
     TestMgr::destroy();

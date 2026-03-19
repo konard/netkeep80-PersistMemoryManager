@@ -23,7 +23,6 @@
 
 // ─── Test macros ──────────────────────────────────────────────────────────────
 
-
 // ─── #176-R1: prev_owns_memory and prev_base_ptr removed ─────────────────────
 
 // Verify at compile time that the removed fields no longer exist in ManagerHeader.

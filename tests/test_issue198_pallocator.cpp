@@ -36,7 +36,6 @@
 #include <type_traits>
 #include <vector>
 
-
 // --- Manager type alias for tests --------------------------------------------
 
 using TestMgr   = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 198>;
@@ -490,9 +489,9 @@ TEST_CASE( "I198-R: struct type", "[test_issue198_pallocator]" )
         vec.push_back( { 5, 6 } );
 
         REQUIRE( vec.size() == 3 );
-        REQUIRE( (vec[0].x == 1 && vec[0].y == 2) );
-        REQUIRE( (vec[1].x == 3 && vec[1].y == 4) );
-        REQUIRE( (vec[2].x == 5 && vec[2].y == 6) );
+        REQUIRE( ( vec[0].x == 1 && vec[0].y == 2 ) );
+        REQUIRE( ( vec[1].x == 3 && vec[1].y == 4 ) );
+        REQUIRE( ( vec[2].x == 5 && vec[2].y == 6 ) );
     }
 
     TestMgr::destroy();

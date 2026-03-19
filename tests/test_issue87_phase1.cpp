@@ -23,7 +23,6 @@
 
 // ─── Макросы тестирования ─────────────────────────────────────────────────────
 
-
 // =============================================================================
 // Phase 1 tests: AddressTraits
 // =============================================================================
@@ -206,7 +205,7 @@ TEST_CASE( "P1-E: DefaultAddressTraits matches current constants", "[test_issue8
     {
         REQUIRE( A::bytes_to_granules( bytes ) == pmm::detail::bytes_to_granules( bytes ) );
         REQUIRE( A::granules_to_bytes( static_cast<std::uint32_t>( bytes / 16 ) ) ==
-                  pmm::detail::granules_to_bytes( static_cast<std::uint32_t>( bytes / 16 ) ) );
+                 pmm::detail::granules_to_bytes( static_cast<std::uint32_t>( bytes / 16 ) ) );
     }
 }
 

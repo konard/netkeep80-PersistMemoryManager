@@ -22,7 +22,6 @@
 
 #include <type_traits>
 
-
 using Mgr = pmm::presets::SingleThreadedHeap;
 
 // =============================================================================
@@ -82,7 +81,7 @@ TEST_CASE( "P6-B2: repair_linked_list() (via save/load)", "[test_issue87_phase6]
     REQUIRE( pmm1.create( 8192 ) );
     auto p1 = pmm1.allocate_typed<std::uint32_t>( 10 );
     auto p2 = pmm1.allocate_typed<std::uint32_t>( 20 );
-    REQUIRE( (!p1.is_null() && !p2.is_null()) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() ) );
 
     std::uint32_t alloc_before = pmm1.alloc_block_count();
 
@@ -137,7 +136,7 @@ TEST_CASE( "P6-B4: coalesce() merges adjacent free blocks", "[test_issue87_phase
     // Allocate two blocks side-by-side
     auto p1 = pmm.allocate_typed<std::uint8_t>( 32 );
     auto p2 = pmm.allocate_typed<std::uint8_t>( 32 );
-    REQUIRE( (!p1.is_null() && !p2.is_null()) );
+    REQUIRE( ( !p1.is_null() && !p2.is_null() ) );
 
     std::uint32_t block_count_before = pmm.block_count();
 
