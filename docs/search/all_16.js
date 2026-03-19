@@ -3,5 +3,6 @@ var searchData=
   ['_7eheapstorage_0',['~HeapStorage',['../classpmm_1_1HeapStorage.html#a902dc3ebfd8cedf98349e41c245ebe73',1,'pmm::HeapStorage']]],
   ['_7emmapstorage_1',['~MMapStorage',['../classpmm_1_1MMapStorage.html#ae4a31c8ab07f0fa07cb507d16b069aa8',1,'pmm::MMapStorage']]],
   ['_7epptr_2',['~pptr',['../classpmm_1_1pptr.html#a946d3791d40a99ffdc39ef2447a590c3',1,'pmm::pptr']]],
-  ['_7epstringview_3',['~pstringview',['../structpmm_1_1pstringview.html#a9e9ac0f34f5a0b742224c5f965233b9e',1,'pmm::pstringview']]]
+  ['_7epstring_3',['~pstring',['../structpmm_1_1pstring.html#ab1042e9ebb1a8c9f5ad009c1b48ea71b',1,'pmm::pstring']]],
+  ['_7epstringview_4',['~pstringview',['../structpmm_1_1pstringview.html#a9e9ac0f34f5a0b742224c5f965233b9e',1,'pmm::pstringview']]]
 ];

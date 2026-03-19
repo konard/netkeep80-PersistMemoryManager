@@ -23,13 +23,15 @@ var searchData=
   ['pptr_20',['pptr',['../classpmm_1_1pptr.html#a35e3db741baf51802d94c81ae1775572',1,'pmm::pptr::pptr()'],['../classpmm_1_1pptr.html',1,'pmm::pptr&lt; T, ManagerT &gt;'],['../classpmm_1_1pptr.html#a8519630774e174fac16a6b29c980de96',1,'pmm::pptr::pptr(const pptr &amp;) noexcept=default'],['../classpmm_1_1pptr.html#a1ab91add33a9ad65c34852f74c392907',1,'pmm::pptr::pptr() noexcept'],['../classpmm_1_1PersistMemoryManager.html#a9c3a9c4378e72b57955abc41a466d4c3',1,'pmm::PersistMemoryManager::pptr']]],
   ['pptr_2eh_21',['pptr.h',['../pptr_8h.html',1,'']]],
   ['pptr_3c_20pstringview_20_3e_22',['pptr&lt; pstringview &gt;',['../classpmm_1_1pptr.html',1,'pmm']]],
-  ['prev_5foffset_23',['prev_offset',['../structpmm_1_1Block.html#a42b51fd0b4915c641a541a86e267603c',1,'pmm::Block::prev_offset'],['../classpmm_1_1BlockStateBase.html#a3612911563039d14f840c0cb0f9973e9',1,'pmm::BlockStateBase::prev_offset()']]],
+  ['prev_5foffset_23',['prev_offset',['../classpmm_1_1BlockStateBase.html#a3612911563039d14f840c0cb0f9973e9',1,'pmm::BlockStateBase::prev_offset()'],['../structpmm_1_1Block.html#a42b51fd0b4915c641a541a86e267603c',1,'pmm::Block::prev_offset']]],
   ['prev_5ftotal_5fsize_24',['prev_total_size',['../structpmm_1_1detail_1_1ManagerHeader.html#a73648a0a9110ff96d9880d8fa8a24878',1,'pmm::detail::ManagerHeader']]],
-  ['pstringview_25',['pstringview',['../structpmm_1_1pstringview.html',1,'pmm::pstringview&lt; ManagerT &gt;'],['../classpmm_1_1PersistMemoryManager.html#a3ffaacff7d4795badd3889736bb2f063',1,'pmm::PersistMemoryManager::pstringview'],['../structpmm_1_1pstringview.html#a6629fc56fa5e179e935f611475f0f53a',1,'pmm::pstringview::pstringview()']]],
-  ['pstringview_2eh_26',['pstringview.h',['../pstringview_8h.html',1,'']]],
-  ['psview_5fpptr_27',['psview_pptr',['../structpmm_1_1pstringview.html#a9c83b90b16bea5f9a82f99e00eeb2fe1',1,'pmm::pstringview']]],
-  ['push_5fback_28',['push_back',['../structpmm_1_1pvector.html#a954ba4a3cc4e98d1f607f80cf6cdbeaa',1,'pmm::pvector']]],
-  ['pvector_29',['pvector',['../structpmm_1_1pvector.html',1,'pmm::pvector&lt; T, ManagerT &gt;'],['../classpmm_1_1PersistMemoryManager.html#aab265177939578aeb5b90ee56ecbe079',1,'pmm::PersistMemoryManager::pvector'],['../structpmm_1_1pvector.html#a1b57fbb5e23ffa1973a99cb47faa59d7',1,'pmm::pvector::pvector()']]],
-  ['pvector_2eh_30',['pvector.h',['../pvector_8h.html',1,'']]],
-  ['pvector_5fnode_31',['pvector_node',['../structpmm_1_1pvector__node.html',1,'pmm']]]
+  ['pstring_25',['pstring',['../classpmm_1_1PersistMemoryManager.html#ad3a667ca3868eeb1a6ae0075c5bbfd42',1,'pmm::PersistMemoryManager::pstring'],['../structpmm_1_1pstring.html#a18dc35f768f3c1ab2b5d530785db353a',1,'pmm::pstring::pstring()'],['../structpmm_1_1pstring.html',1,'pmm::pstring&lt; ManagerT &gt;']]],
+  ['pstring_2eh_26',['pstring.h',['../pstring_8h.html',1,'']]],
+  ['pstringview_27',['pstringview',['../structpmm_1_1pstringview.html',1,'pmm::pstringview&lt; ManagerT &gt;'],['../classpmm_1_1PersistMemoryManager.html#a3ffaacff7d4795badd3889736bb2f063',1,'pmm::PersistMemoryManager::pstringview'],['../structpmm_1_1pstringview.html#a6629fc56fa5e179e935f611475f0f53a',1,'pmm::pstringview::pstringview()']]],
+  ['pstringview_2eh_28',['pstringview.h',['../pstringview_8h.html',1,'']]],
+  ['psview_5fpptr_29',['psview_pptr',['../structpmm_1_1pstringview.html#a9c83b90b16bea5f9a82f99e00eeb2fe1',1,'pmm::pstringview']]],
+  ['push_5fback_30',['push_back',['../structpmm_1_1pvector.html#a954ba4a3cc4e98d1f607f80cf6cdbeaa',1,'pmm::pvector']]],
+  ['pvector_31',['pvector',['../structpmm_1_1pvector.html',1,'pmm::pvector&lt; T, ManagerT &gt;'],['../classpmm_1_1PersistMemoryManager.html#aab265177939578aeb5b90ee56ecbe079',1,'pmm::PersistMemoryManager::pvector'],['../structpmm_1_1pvector.html#a1b57fbb5e23ffa1973a99cb47faa59d7',1,'pmm::pvector::pvector()']]],
+  ['pvector_2eh_32',['pvector.h',['../pvector_8h.html',1,'']]],
+  ['pvector_5fnode_33',['pvector_node',['../structpmm_1_1pvector__node.html',1,'pmm']]]
 ];
