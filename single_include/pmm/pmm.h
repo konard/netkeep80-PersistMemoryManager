@@ -3708,8 +3708,8 @@ template <typename T, typename ManagerT> struct parray
         if ( _data_idx == static_cast<index_type>( 0 ) )
             return nullptr;
         std::uint8_t* base = ManagerT::backend().base_ptr();
-        return reinterpret_cast<T*>( base + static_cast<std::size_t>( _data_idx ) *
-                                                ManagerT::address_traits::granule_size );
+        return reinterpret_cast<T*>( base +
+                                     static_cast<std::size_t>( _data_idx ) * ManagerT::address_traits::granule_size );
     }
 
     /**
