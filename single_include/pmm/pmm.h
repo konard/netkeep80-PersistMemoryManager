@@ -4921,11 +4921,8 @@ template <typename T, typename ManagerT> struct ppool
 
     /// @brief Default constructor — empty pool with default chunk size.
     ppool() noexcept
-        : _free_head_idx( static_cast<index_type>( 0 ) ),
-          _chunk_head_idx( static_cast<index_type>( 0 ) ),
-          _objects_per_chunk( default_objects_per_chunk ),
-          _total_allocated( 0 ),
-          _total_capacity( 0 )
+        : _free_head_idx( static_cast<index_type>( 0 ) ), _chunk_head_idx( static_cast<index_type>( 0 ) ),
+          _objects_per_chunk( default_objects_per_chunk ), _total_allocated( 0 ), _total_capacity( 0 )
     {
     }
 
@@ -5104,7 +5101,7 @@ template <typename T, typename ManagerT> struct ppool
 
         for ( std::size_t i = 0; i < n_objects; ++i )
         {
-            std::uint8_t* slot         = slots_start + i * slot_bytes;
+            std::uint8_t* slot          = slots_start + i * slot_bytes;
             std::size_t   slot_byte_off = static_cast<std::size_t>( slot - base );
             index_type    slot_idx      = static_cast<index_type>( slot_byte_off / granule_size );
 
