@@ -6994,7 +6994,7 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( !_initialized )
             return;
         detail::ManagerHeader<address_traits>* hdr = get_header( _backend.base_ptr() );
-        hdr->root_offset = p.is_null() ? address_traits::no_block : p.offset();
+        hdr->root_offset                           = p.is_null() ? address_traits::no_block : p.offset();
     }
 
     /**
