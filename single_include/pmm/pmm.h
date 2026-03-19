@@ -3510,10 +3510,7 @@ template <typename T, typename ManagerT> struct pallocator
      *
      * @return Upper bound on allocation size.
      */
-    std::size_t max_size() const noexcept
-    {
-        return ( std::numeric_limits<std::size_t>::max )() / sizeof( T );
-    }
+    std::size_t max_size() const noexcept { return ( std::numeric_limits<std::size_t>::max )() / sizeof( T ); }
 
     // --- Comparison (all pallocators with the same ManagerT are equal) ---
 

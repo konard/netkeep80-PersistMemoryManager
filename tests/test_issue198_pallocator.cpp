@@ -520,7 +520,7 @@ static bool test_i198_small_type()
 // I198-R: pallocator with struct type
 // =============================================================================
 
-struct Point
+struct Point198
 {
     int x;
     int y;
@@ -533,7 +533,7 @@ static bool test_i198_struct_type()
     PMM_TEST( TestMgr::create( 64 * 1024 ) );
 
     {
-        std::vector<Point, TestMgr::pallocator<Point>> vec;
+        std::vector<Point198, TestMgr::pallocator<Point198>> vec;
         vec.push_back( { 1, 2 } );
         vec.push_back( { 3, 4 } );
         vec.push_back( { 5, 6 } );
