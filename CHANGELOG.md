@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [0.31.0] - 2026-03-19
+
+### Added
+- `pallocator<T, ManagerT>` — STL-compatible allocator for persistent address space (Issue #198, Phase 3.5). Allows using STL containers like `std::vector<T, Mgr::pallocator<T>>` with persistent memory managed by PersistMemoryManager.
+
+
 ## [0.30.0] - 2026-03-19
 
 ### Added
