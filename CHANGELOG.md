@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [0.40.0] - 2026-03-19
+
+### Changed
+- Migrated all 73 test files from custom `PMM_TEST()`/`PMM_RUN()` macros to Catch2 v3.7.1 framework (Issue #212, Phase 5.1)
+- Test executables now use `Catch2::Catch2WithMain` for automatic `main()` — no manual test harness needed
+- Removed ~4200 lines of duplicated macro definitions and boilerplate `main()` logic
+
+### Added
+- Catch2 v3.7.1 dependency via CMake FetchContent
+- `docs/phase5_testing.md` — documentation for Phase 5 testing improvements
+- `scripts/migrate_to_catch2.py` — migration script for reference
+
+
 ## [0.38.0] - 2026-03-19
 
 ### Added
