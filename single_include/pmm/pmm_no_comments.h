@@ -3038,6 +3038,11 @@ class pptr
 
     constexpr index_type offset() const noexcept { return _idx; }
 
+    constexpr std::size_t byte_offset() const noexcept
+    {
+        return static_cast<std::size_t>( _idx ) * ManagerT::address_traits::granule_size;
+    }
+
     constexpr bool operator==( const pptr& other ) const noexcept { return _idx == other._idx; }
     constexpr bool operator!=( const pptr& other ) const noexcept { return _idx != other._idx; }
 
@@ -4171,6 +4176,24 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     {
         T* base_elem = resolve( p );
         return ( base_elem == nullptr ) ? nullptr : base_elem + i;
+    }
+
+    template <typename T> static pptr<T> pptr_from_byte_offset( std::size_t byte_off ) noexcept
+    {
+        if ( byte_off == 0 )
+            return pptr<T>(); 
+        if ( byte_off % address_traits::granule_size != 0 )
+        {
+            _last_error = PmmError::InvalidPointer;
+            return pptr<T>();
+        }
+        std::size_t idx = byte_off / address_traits::granule_size;
+        if ( idx > static_cast<std::size_t>( std::numeric_limits<index_type>::max() ) )
+        {
+            _last_error = PmmError::Overflow;
+            return pptr<T>();
+        }
+        return pptr<T>( static_cast<index_type>( idx ) );
     }
 
     template <typename T> static bool is_valid_ptr( pptr<T> p ) noexcept

@@ -5361,7 +5361,7 @@ template <typename T, typename ManagerT> struct ppool
  *
  * @see persist_memory_manager.h — PersistMemoryManager (статическая модель, Issue #110)
  * @see tree_node.h — TreeNode<A> с публичными методами (Issue #138)
- * @version 0.8 (Issue #164 — удалены избыточные методы tree_node)
+ * @version 0.9 (Issue #211 — Phase 4.4: byte_offset() for pptr ↔ byte offset conversion)
  */
 
 #include <cstddef>
@@ -5448,6 +5448,17 @@ class pptr
 
     /// @brief Получить гранульный индекс (для сохранения/восстановления).
     constexpr index_type offset() const noexcept { return _idx; }
+
+    /// @brief Получить байтовое смещение из гранульного индекса (Issue #211, Phase 4.4).
+    ///
+    /// Возвращает `offset() * granule_size`. Упрощает интеграцию с внешними системами,
+    /// работающими с байтовыми адресами (например, BinDiffSynchronizer pam_adapter).
+    ///
+    /// @return Байтовое смещение в управляемой области. Для null pptr возвращает 0.
+    constexpr std::size_t byte_offset() const noexcept
+    {
+        return static_cast<std::size_t>( _idx ) * ManagerT::address_traits::granule_size;
+    }
 
     /// @brief Сравнение персистентных указателей одного типа по индексу.
     constexpr bool operator==( const pptr& other ) const noexcept { return _idx == other._idx; }
@@ -7389,6 +7400,28 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         return ( base_elem == nullptr ) ? nullptr : base_elem + i;
     }
 
+    /// @brief Создать pptr<T> из байтового смещения (Issue #211, Phase 4.4).
+    /// Обратная операция к pptr::byte_offset(). Смещение должно быть кратно granule_size.
+    /// @tparam T Тип данных.  @param byte_off Байтовое смещение.
+    /// @return pptr<T> или пустой pptr при ошибке (InvalidPointer / Overflow).
+    template <typename T> static pptr<T> pptr_from_byte_offset( std::size_t byte_off ) noexcept
+    {
+        if ( byte_off == 0 )
+            return pptr<T>(); // 0 byte offset → null pptr
+        if ( byte_off % address_traits::granule_size != 0 )
+        {
+            _last_error = PmmError::InvalidPointer;
+            return pptr<T>();
+        }
+        std::size_t idx = byte_off / address_traits::granule_size;
+        if ( idx > static_cast<std::size_t>( std::numeric_limits<index_type>::max() ) )
+        {
+            _last_error = PmmError::Overflow;
+            return pptr<T>();
+        }
+        return pptr<T>( static_cast<index_type>( idx ) );
+    }
+
     /**
      * @brief Проверить, что pptr указывает на валидную область внутри кучи (Issue #43 Phase 1.2).
      *
@@ -7408,22 +7441,9 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     }
 
     // ─── Root object API (Issue #200, Phase 3.7) ──────────────────────────────
-    //
-    // A single root pointer stored in ManagerHeader. The user can store a pptr<T>
-    // to any object (e.g. pmap<pstringview, pptr<void>>) and retrieve it later,
-    // including after save/load cycles. This enables object discovery by name
-    // without external bookkeeping.
 
-    /**
-     * @brief Установить корневой объект в ManagerHeader.
-     *
-     * Корневой объект — единственный именованный указатель, сохраняемый в заголовке
-     * менеджера. Через него пользователь может хранить реестр (например,
-     * `pmap<pstringview, pptr<void>>`) и находить объекты по имени после загрузки.
-     *
-     * @tparam T Тип объекта.
-     * @param p Персистентный указатель на корневой объект. Пустой pptr сбрасывает корень.
-     */
+    /// @brief Установить корневой объект в ManagerHeader (Issue #200, Phase 3.7).
+    /// @tparam T Тип объекта.  @param p Персистентный указатель; пустой pptr сбрасывает корень.
     template <typename T> static void set_root( pptr<T> p ) noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
@@ -7451,17 +7471,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     }
 
     // ─── Методы доступа к полям AVL-узла блока (Issue #125) ─────────────────
-    //
-    // Note (Issue #141): These 10 get_tree_*/set_tree_* methods are intentional
-    // safe-wrappers over BlockStateBase<address_traits>::get_*/set_* utilities.
-    // They add manager-level guards (null-check, _initialized-check) and translate
-    // between the public pptr<T> API and the raw void* block interface used internally.
-    // The delegation is not duplication — it is the adapter layer between the public
-    // persistent-pointer API and the internal block-state machine.
-    //
-    // Note (Issue #179): The repeated blk_raw computation was extracted into two private
-    // helpers: block_raw_ptr_from_pptr() (const) and block_raw_mut_ptr_from_pptr() (mutable).
-    // Each public method now checks the guards and delegates to the helper + BlockStateBase.
+    // Note (#141): safe-wrappers over BlockStateBase get_*/set_* with manager-level guards.
+    // Note (#179): blk_raw computation extracted into block_raw_[mut_]ptr_from_pptr() helpers.
 
     /**
      * @brief Получить смещение левого дочернего узла AVL-дерева для блока,
@@ -7835,12 +7846,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     // ─── Вспомогательные методы ────────────────────────────────────────────────
 
     // ─── Issue #179: find_block helpers ───────────────────────────────────────
-    // Locate and validate the Block header for a user pointer. Called from
-    // deallocate(), lock_block_permanent(), and is_permanently_locked() after
-    // the lock is already held and _initialized / ptr are confirmed non-null.
 
-    /// @brief Find the mutable block header for a user-data pointer.
-    /// Returns nullptr if ptr is out of range or the block header is invalid.
+    /// @brief Find the mutable block header for a user-data pointer (or nullptr).
     static pmm::Block<address_traits>* find_block_from_user_ptr( void* ptr ) noexcept
     {
         std::uint8_t*                          base = _backend.base_ptr();
@@ -7870,10 +7877,7 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     }
 
     // ─── Issue #179: blk_raw helpers ──────────────────────────────────────────
-    // Compute the raw block-header pointer from a pptr<T>.
-    // Formula: base + offset * granule_size - sizeof(Block<AT>) points to the
-    // Block header that immediately precedes the user-data area.
-    // Callers must check p.is_null() && _initialized before calling these.
+    // base + offset * granule_size - sizeof(Block<AT>) → block header before user data.
 
     /// @brief Return a const pointer to the block header for the given pptr.
     template <typename T> static const void* block_raw_ptr_from_pptr( pptr<T> p ) noexcept

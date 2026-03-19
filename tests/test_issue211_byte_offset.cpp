@@ -232,8 +232,8 @@ static bool test_overflow_protection()
     // For DefaultAddressTraits (uint32_t, granule=16), max valid byte offset is
     // (2^32 - 2) * 16. Anything beyond should overflow index_type.
     // Use a byte offset that would exceed uint32_t max when divided by granule_size.
-    std::size_t huge = static_cast<std::size_t>( std::numeric_limits<std::uint32_t>::max() ) *
-                       pmm::DefaultAddressTraits::granule_size;
+    std::size_t huge =
+        static_cast<std::size_t>( std::numeric_limits<std::uint32_t>::max() ) * pmm::DefaultAddressTraits::granule_size;
     // Add one more granule to overflow
     std::size_t overflow_off = huge + pmm::DefaultAddressTraits::granule_size;
 
