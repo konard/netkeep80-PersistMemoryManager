@@ -175,7 +175,7 @@ STL-контейнеров с ПАП.
 - Хуки: `on_allocation_failure()`, `on_expand()`, `on_corruption_detected()`, `on_create()`, `on_destroy()`, `on_load()`
 - Обратная совместимость: SFINAE-детекция `logging_policy` в конфигурации
 
-### 4.3 Метод `reallocate_typed<T>()`
+### 4.3 Метод `reallocate_typed<T>()` ✅ ВЫПОЛНЕНО (#210)
 
 **Проблема:** Нет нативного перераспределения. Пользователь должен вручную выделить,
 скопировать, освободить.
