@@ -3072,52 +3072,12 @@ using LargeDBConfig = BasicConfig<LargeAddressTraits, config::SharedMutexLock, 2
 
 /**
  * @file pmm/persist_memory_manager.h
- * @brief PersistMemoryManager — унифицированный статический менеджер ПАП (Issue #110).
+ * @brief PersistMemoryManager — unified static persistent memory manager (Issue #110).
  *
- * Заменяет пару AbstractPersistMemoryManager + StaticMemoryManager единым
- * полностью статическим классом, поддерживающим мультитон через InstanceId.
+ * All-static class with multiton support via InstanceId. Configuration via ConfigT:
+ * address_traits, storage_backend, free_block_tree, lock_policy.
  *
- * Ключевые особенности:
- *   - Все члены (`_backend`, `_initialized`, `_mutex`) объявлены `static inline` (C++17)
- *   - Все методы объявлены `static` — не нужно создавать экземпляры
- *   - Конфигурация полностью задаётся через `ConfigT`:
- *       - `address_traits`  — тип адресного пространства
- *       - `storage_backend` — бэкенд хранилища (HeapStorage, StaticStorage, MMapStorage)
- *       - `free_block_tree` — политика дерева свободных блоков (AvlFreeTree)
- *       - `lock_policy`     — политика многопоточности (NoLock, SharedMutexLock)
- *   - Параметр `InstanceId` позволяет создавать несколько независимых
- *     экземпляров одной конфигурации (мультитон по ID)
- *   - `pptr<T, PersistMemoryManager<...>>::resolve()` не требует аргументов —
- *     он обращается к `PersistMemoryManager::resolve<T>(p)` напрямую
- *
- * Пример использования:
- * @code
- *   // Определяем два независимых менеджера одной конфигурации
- *   using Cache   = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 0>;
- *   using Buffer  = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 1>;
- *
- *   Cache::create(64 * 1024);
- *   Buffer::create(32 * 1024);
- *
- *   // allocate_typed<T>() — сырое выделение без конструктора.
- *   // create_typed<T>(args...) — выделение + placement new (Issue #172).
- *   Cache::pptr<int> cp = Cache::create_typed<int>(42);  // конструктор int(42)
- *   Buffer::pptr<int> bp = Buffer::create_typed<int>();  // default init
- *
- *   // Разыменование без аргументов — используется operator* и operator->
- *   *cp = 42;
- *   *bp = 100;
- *
- *   Cache::destroy_typed(cp);   // деструктор + освобождение (Issue #172)
- *   Buffer::destroy_typed(bp);
- *   Cache::destroy();
- *   Buffer::destroy();
- * @endcode
- *
- * @see manager_configs.h — готовые конфигурации менеджеров
- * @see pmm_presets.h — готовые псевдонимы для типичных сценариев
- * @see pptr.h — pptr<T, ManagerT> (с поддержкой статического resolve())
- * @version 0.1 (Issue #110 — унификация архитектуры)
+ * @see manager_configs.h, pmm_presets.h, pptr.h
  */
 
 // Issue #172: require C++20 — this library uses concepts, std::atomic, and other C++20 features.
@@ -3522,6 +3482,93 @@ class AllocatorPolicy
         hdr->free_count  = free_count;
         hdr->alloc_count = alloc_count;
         hdr->used_size   = used_gran;
+    }
+
+    // ─── Issue #210: reallocate_typed helpers ─────────────────────────────────
+
+    /// @brief In-place shrink: update weight, split remainder into free block + coalesce.
+    static void realloc_shrink( std::uint8_t* base, detail::ManagerHeader<AddressTraitsT>* hdr, index_type blk_idx,
+                                void* blk_raw, index_type old_data_gran, index_type new_data_gran ) noexcept
+    {
+        static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AddressTraitsT>;
+        index_type                  remainder   = old_data_gran - new_data_gran;
+        if ( remainder >= kBlkHdrGran + 1 )
+        {
+            index_type new_free_idx = blk_idx + kBlkHdrGran + new_data_gran;
+            void*      new_free_blk = detail::block_at<AddressTraitsT>( base, new_free_idx );
+            index_type old_next     = BlockState::get_next_offset( blk_raw );
+            auto*      old_next_blk =
+                ( old_next != AddressTraitsT::no_block ) ? detail::block_at<AddressTraitsT>( base, old_next ) : nullptr;
+            std::memset( new_free_blk, 0, sizeof( BlockT ) );
+            BlockState::init_fields( new_free_blk, blk_idx, old_next, 1, 0, 0 );
+            BlockState::set_next_offset_of( blk_raw, new_free_idx );
+            if ( old_next_blk != nullptr )
+                BlockState::set_prev_offset_of( old_next_blk, new_free_idx );
+            else
+                hdr->last_block_offset = new_free_idx;
+            BlockState::set_weight_of( blk_raw, new_data_gran );
+            hdr->block_count++;
+            hdr->free_count++;
+            hdr->used_size += kBlkHdrGran;
+            hdr->used_size -= ( old_data_gran - new_data_gran );
+            coalesce( base, hdr, new_free_idx );
+        }
+        else
+        {
+            BlockState::set_weight_of( blk_raw, new_data_gran );
+            hdr->used_size -= ( old_data_gran - new_data_gran );
+        }
+    }
+
+    /// @brief Try in-place grow by absorbing adjacent free block. Returns true on success.
+    static bool realloc_grow( std::uint8_t* base, detail::ManagerHeader<AddressTraitsT>* hdr, index_type blk_idx,
+                              void* blk_raw, index_type old_data_gran, index_type new_data_gran ) noexcept
+    {
+        static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AddressTraitsT>;
+        index_type                  next_idx    = BlockState::get_next_offset( blk_raw );
+        if ( next_idx == AddressTraitsT::no_block )
+            return false;
+        void* next_blk = detail::block_at<AddressTraitsT>( base, next_idx );
+        if ( BlockState::get_weight( next_blk ) != 0 )
+            return false;
+        index_type next_total =
+            detail::block_total_granules( base, hdr, detail::block_at<AddressTraitsT>( base, next_idx ) );
+        index_type available = old_data_gran + next_total;
+        if ( available < new_data_gran )
+            return false;
+        FreeBlockTreeT::remove( base, hdr, next_idx );
+        index_type next_next = BlockState::get_next_offset( next_blk );
+        BlockState::set_next_offset_of( blk_raw, next_next );
+        if ( next_next != AddressTraitsT::no_block )
+            BlockState::set_prev_offset_of( detail::block_at<AddressTraitsT>( base, next_next ), blk_idx );
+        else
+            hdr->last_block_offset = blk_idx;
+        std::memset( next_blk, 0, sizeof( BlockT ) );
+        hdr->block_count--;
+        hdr->free_count--;
+        if ( hdr->used_size >= kBlkHdrGran )
+            hdr->used_size -= kBlkHdrGran;
+        index_type rem = available - new_data_gran;
+        if ( rem >= kBlkHdrGran + 1 )
+        {
+            index_type rem_idx      = blk_idx + kBlkHdrGran + new_data_gran;
+            void*      rem_blk      = detail::block_at<AddressTraitsT>( base, rem_idx );
+            index_type blk_new_next = BlockState::get_next_offset( blk_raw );
+            std::memset( rem_blk, 0, sizeof( BlockT ) );
+            BlockState::init_fields( rem_blk, blk_idx, blk_new_next, 1, 0, 0 );
+            BlockState::set_next_offset_of( blk_raw, rem_idx );
+            if ( blk_new_next != AddressTraitsT::no_block )
+                BlockState::set_prev_offset_of( detail::block_at<AddressTraitsT>( base, blk_new_next ), rem_idx );
+            else
+                hdr->last_block_offset = rem_idx;
+            hdr->block_count++;
+            hdr->free_count++;
+            hdr->used_size += kBlkHdrGran;
+            FreeBlockTreeT::insert( base, hdr, rem_idx );
+        }
+        BlockState::set_weight_of( blk_raw, new_data_gran );
+        hdr->used_size += ( new_data_gran - old_data_gran );
+        return true;
     }
 };
 
@@ -7119,6 +7166,134 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         std::uint8_t* base = _backend.base_ptr();
         void*         raw  = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size;
         deallocate( raw );
+    }
+
+    // ─── Нативное перераспределение (Issue #210, Phase 4.3) ────────────────────
+
+    /// @brief Перераспределить массив из old_count объектов T до new_count.
+    /// T должен быть trivially copyable. При неудаче старый блок сохраняется.
+    /// @see docs/phase4_api.md §4.3
+    template <typename T>
+    static pptr<T> reallocate_typed( pptr<T> p, std::size_t old_count, std::size_t new_count ) noexcept
+    {
+        static_assert( std::is_trivially_copyable_v<T>,
+                       "reallocate_typed<T>: T must be trivially copyable for safe memcpy reallocation." );
+        if ( new_count == 0 )
+        {
+            _last_error = PmmError::InvalidSize;
+            return pptr<T>();
+        }
+        if ( p.is_null() )
+            return allocate_typed<T>( new_count );
+        if ( sizeof( T ) > 0 && new_count > ( std::numeric_limits<std::size_t>::max )() / sizeof( T ) )
+        {
+            _last_error = PmmError::Overflow;
+            return pptr<T>();
+        }
+        std::size_t                              new_user_size = sizeof( T ) * new_count;
+        typename thread_policy::unique_lock_type lock( _mutex );
+        if ( !_initialized )
+        {
+            _last_error = PmmError::NotInitialized;
+            return pptr<T>();
+        }
+        std::uint8_t*                          base = _backend.base_ptr();
+        detail::ManagerHeader<address_traits>* hdr  = get_header( base );
+        // blk_idx = pptr.offset - floor(sizeof(Block) / granule)
+        static constexpr index_type kBlkHdrFloorGran =
+            static_cast<index_type>( sizeof( Block<address_traits> ) / address_traits::granule_size );
+        index_type blk_idx       = static_cast<index_type>( p.offset() - kBlkHdrFloorGran );
+        void*      blk_raw       = detail::block_at<address_traits>( base, blk_idx );
+        index_type old_data_gran = BlockStateBase<address_traits>::get_weight( blk_raw );
+        index_type new_data_gran = detail::bytes_to_granules_t<address_traits>( new_user_size );
+        if ( new_data_gran == 0 )
+            new_data_gran = 1;
+        if ( new_data_gran == old_data_gran )
+        {
+            _last_error = PmmError::Ok;
+            return p;
+        }
+        // Skip in-place paths when resolve() overlaps block header (SmallAT).
+        static constexpr bool kBlockAligned = ( sizeof( Block<address_traits> ) % address_traits::granule_size == 0 );
+
+        if constexpr ( kBlockAligned )
+        {
+            if ( new_data_gran < old_data_gran )
+            {
+                allocator::realloc_shrink( base, hdr, blk_idx, blk_raw, old_data_gran, new_data_gran );
+                _last_error = PmmError::Ok;
+                return p;
+            }
+            if ( new_data_gran > old_data_gran )
+            {
+                if ( allocator::realloc_grow( base, hdr, blk_idx, blk_raw, old_data_gran, new_data_gran ) )
+                {
+                    _last_error = PmmError::Ok;
+                    return p;
+                }
+            }
+        }
+        // Fallback: allocate new + memmove + free old (under same lock).
+        static constexpr index_type kBlkHdrFloorGranFb =
+            static_cast<index_type>( sizeof( Block<address_traits> ) / address_traits::granule_size );
+        index_type new_data_gran_alloc = detail::bytes_to_granules_t<address_traits>( new_user_size );
+        if ( new_data_gran_alloc == 0 )
+            new_data_gran_alloc = 1;
+        if ( new_data_gran_alloc > std::numeric_limits<index_type>::max() - kBlockHdrGranules )
+        {
+            _last_error = PmmError::Overflow;
+            return pptr<T>();
+        }
+        index_type needed  = kBlockHdrGranules + new_data_gran_alloc;
+        index_type new_idx = free_block_tree::find_best_fit( base, hdr, needed );
+        if ( new_idx == address_traits::no_block )
+        {
+            if ( !do_expand( new_user_size ) )
+            {
+                _last_error = PmmError::OutOfMemory;
+                logging_policy::on_allocation_failure( new_user_size, PmmError::OutOfMemory );
+                return pptr<T>();
+            }
+            base    = _backend.base_ptr();
+            hdr     = get_header( base );
+            new_idx = free_block_tree::find_best_fit( base, hdr, needed );
+            if ( new_idx == address_traits::no_block )
+            {
+                _last_error = PmmError::OutOfMemory;
+                logging_policy::on_allocation_failure( new_user_size, PmmError::OutOfMemory );
+                return pptr<T>();
+            }
+        }
+        void* new_raw = allocator::allocate_from_block( base, hdr, new_idx, new_user_size );
+        if ( new_raw == nullptr )
+        {
+            _last_error = PmmError::OutOfMemory;
+            return pptr<T>();
+        }
+        pptr<T>     new_p   = make_pptr_from_raw<T>( new_raw );
+        void*       new_dst = base + static_cast<std::size_t>( new_p.offset() ) * address_traits::granule_size;
+        void*       old_src = base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size;
+        std::size_t copy_sz = ( new_count < old_count ? new_count : old_count ) * sizeof( T );
+        std::memmove( new_dst, old_src, copy_sz );
+        // Free old block
+        index_type old_blk_idx = static_cast<index_type>( p.offset() - kBlkHdrFloorGranFb );
+        void*      old_blk_raw = detail::block_at<address_traits>( base, old_blk_idx );
+        index_type freed_w     = BlockStateBase<address_traits>::get_weight( old_blk_raw );
+        if ( BlockStateBase<address_traits>::get_node_type( old_blk_raw ) != pmm::kNodeReadOnly )
+        {
+            auto* old_alloc = AllocatedBlock<address_traits>::cast_from_raw( old_blk_raw );
+            if ( old_alloc != nullptr )
+            {
+                old_alloc->mark_as_free();
+                hdr->alloc_count--;
+                hdr->free_count++;
+                if ( hdr->used_size >= freed_w )
+                    hdr->used_size -= freed_w;
+                allocator::coalesce( base, hdr, old_blk_idx );
+            }
+        }
+        _last_error = PmmError::Ok;
+        return new_p;
     }
 
     // ─── Типизированный API с вызовом конструктора/деструктора (Issue #172) ───
