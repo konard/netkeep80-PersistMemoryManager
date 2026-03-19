@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [0.32.0] - 2026-03-19
+
+### Added
+- `ppool<T, ManagerT>` — persistent object pool with O(1) allocate/deallocate via embedded free-list (Issue #199, Phase 3.6)
+- `Mgr::ppool<T>` type alias in `PersistMemoryManager`
+- 18 tests for ppool in `tests/test_issue199_ppool.cpp`
+
+
 ## [0.31.0] - 2026-03-19
 
 ### Added
