@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [0.30.0] - 2026-03-19
+
+### Added
+- `pvector::erase(index)` — O(log n) removal by index with AVL tree rebalancing (#197, Phase 3.4)
+
+
 ## [0.29.0] - 2026-03-19
 
 ### Added
