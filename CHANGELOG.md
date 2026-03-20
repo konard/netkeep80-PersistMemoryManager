@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [0.42.0] - 2026-03-20
+
+### Added
+- Google Benchmark v1.9.1 integration for performance benchmarks (Issue #214, Phase 5.3):
+  - 18 benchmarks covering allocator, pmap, pvector, parray, ppool, pstring, pstringview, and multi-threaded operations
+  - Comparison with malloc/free baseline
+  - Optional build via `PMM_BUILD_BENCHMARKS=ON`
+  - `benchmarks/bench_allocator.cpp` — single benchmark file
+- `docs/phase5_testing.md` updated with Phase 5.3 documentation
+
+
 ## [0.41.0] - 2026-03-19
 
 ### Added
