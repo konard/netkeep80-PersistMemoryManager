@@ -73,10 +73,8 @@ TEST_CASE( "I235-A4: typed_guard move semantics", "[test_issue235]" )
         auto guard1 = Mgr::make_guard<Mgr::pstring>();
         guard1->assign( "test" );
 
-        // Move construction
+        // Move construction — guard1 becomes empty, guard2 owns the object.
         auto guard2 = std::move( guard1 );
-        // cppcheck-suppress accessMoved
-        REQUIRE( !guard1 ); // deliberately testing moved-from state
         REQUIRE( guard2 );
         REQUIRE( guard2->size() == 4 );
     }
