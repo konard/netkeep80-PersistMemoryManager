@@ -239,6 +239,9 @@ target_compile_features(${target} PRIVATE cxx_std_20)
 target_link_libraries(${target} PRIVATE Catch2::Catch2WithMain Threads::Threads)
 add_test(NAME ${target} COMMAND ${target})
 
+# ─── Тесты parray::insert/erase (Issue #233) ──────────────────────────────────
+pmm_add_test(test_issue233_parray_insert_erase test_issue233_parray_insert_erase.cpp)
+
 # ─── Тесты расширенного покрытия (Issue #213, Phase 5.2) ─────────────────────
 
 # 5.2.1: Overflow tests for size calculations
