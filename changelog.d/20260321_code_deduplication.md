@@ -10,4 +10,6 @@ bump: minor
   - Deduplicate pvector `front()`/`back()`/`pop_back()`/`begin()` using shared `avl_min_node`/`avl_max_node`
   - Unify pstringview AVL node initialization to use shared `avl_init_node` with correct `no_block` sentinel
   - Extract `StaticConfig` base template in `manager_configs.h` — eliminates duplicated struct bodies for `SmallEmbeddedStaticConfig` and `EmbeddedStaticConfig`
+  - Introduce `BlockPPtr` adapter in `avl_tree_mixin.h` — enables `AvlFreeTree` to reuse shared AVL rotation, rebalancing, and min_node via the same generic functions, eliminating ~120 lines of duplicate code from `free_block_tree.h`
+  - Extract `AvlInorderIterator` template in `avl_tree_mixin.h` — eliminates identical in-order iterator structs from pmap and pvector (~35 lines each)
   - Regenerate `single_include/` headers

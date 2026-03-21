@@ -283,45 +283,9 @@ template <typename T, typename ManagerT> struct pvector
 
     // ─── Итератор ─────────────────────────────────────────────────────────────
 
-    /**
-     * @brief Простой итератор для обхода вектора в порядке индексов (in-order).
-     *
-     * Реализует in-order обход AVL-дерева (левый → корень → правый),
-     * что соответствует порядку элементов вектора.
-     */
-    struct iterator
-    {
-        using value_type = node_type;
-        using pointer    = node_pptr;
-
-        index_type _current_idx; ///< Текущий узел (no_block/0 = конец).
-
-        iterator() noexcept : _current_idx( static_cast<index_type>( 0 ) ) {}
-        explicit iterator( index_type idx ) noexcept : _current_idx( idx ) {}
-
-        bool operator==( const iterator& other ) const noexcept { return _current_idx == other._current_idx; }
-        bool operator!=( const iterator& other ) const noexcept { return _current_idx != other._current_idx; }
-
-        /// @brief Разыменование — возвращает pptr на текущий узел.
-        node_pptr operator*() const noexcept
-        {
-            if ( _current_idx == static_cast<index_type>( 0 ) || _current_idx == no_block )
-                return node_pptr();
-            return node_pptr( _current_idx );
-        }
-
-        /// @brief Переход к следующему элементу (in-order successor).
-        /// Issue #188: delegates to shared avl_inorder_successor.
-        iterator& operator++() noexcept
-        {
-            if ( _current_idx == static_cast<index_type>( 0 ) || _current_idx == no_block )
-                return *this;
-
-            node_pptr next = detail::avl_inorder_successor( node_pptr( _current_idx ) );
-            _current_idx   = next.is_null() ? static_cast<index_type>( 0 ) : next.offset();
-            return *this;
-        }
-    };
+    /// @brief Простой итератор для обхода вектора в порядке индексов (in-order).
+    /// Issue #188: uses shared AvlInorderIterator template to eliminate duplication.
+    using iterator = detail::AvlInorderIterator<node_pptr>;
 
     /// @brief Начало итерации (самый левый узел = первый элемент).
     /// Issue #188: delegates to shared avl_min_node.
