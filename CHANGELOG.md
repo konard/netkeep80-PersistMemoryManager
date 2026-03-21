@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [0.44.0] - 2026-03-21
+
+### Added
+- `parray<T>::insert(index, value)` — insert element at arbitrary position with O(n) shift (#233)
+- `parray<T>::erase(index)` — remove element at arbitrary position with O(n) shift (#233)
+- Tests for `parray::insert` and `parray::erase` (13 test cases, 296 assertions)
+
+
 ## [0.43.0] - 2026-03-21
 
 ### Added
