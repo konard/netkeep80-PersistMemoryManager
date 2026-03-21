@@ -2571,8 +2571,7 @@ template <typename T, typename ManagerT> struct parray
             return false;
         
         if ( index + 1 < static_cast<std::size_t>( _size ) )
-            std::memmove( d + index, d + index + 1,
-                          ( static_cast<std::size_t>( _size ) - index - 1 ) * sizeof( T ) );
+            std::memmove( d + index, d + index + 1, ( static_cast<std::size_t>( _size ) - index - 1 ) * sizeof( T ) );
         --_size;
         return true;
     }
