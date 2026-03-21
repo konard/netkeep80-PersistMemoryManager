@@ -2545,6 +2545,38 @@ template <typename T, typename ManagerT> struct parray
         return true;
     }
 
+    bool insert( std::size_t index, const T& value ) noexcept
+    {
+        if ( index > static_cast<std::size_t>( _size ) )
+            return false;
+        if ( !ensure_capacity( _size + 1 ) )
+            return false;
+        T* d = resolve_data();
+        if ( d == nullptr )
+            return false;
+        
+        if ( index < static_cast<std::size_t>( _size ) )
+            std::memmove( d + index + 1, d + index, ( static_cast<std::size_t>( _size ) - index ) * sizeof( T ) );
+        d[index] = value;
+        ++_size;
+        return true;
+    }
+
+    bool erase( std::size_t index ) noexcept
+    {
+        if ( index >= static_cast<std::size_t>( _size ) )
+            return false;
+        T* d = resolve_data();
+        if ( d == nullptr )
+            return false;
+        
+        if ( index + 1 < static_cast<std::size_t>( _size ) )
+            std::memmove( d + index, d + index + 1,
+                          ( static_cast<std::size_t>( _size ) - index - 1 ) * sizeof( T ) );
+        --_size;
+        return true;
+    }
+
     void clear() noexcept { _size = 0; }
 
     void free_data() noexcept
