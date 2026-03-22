@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [0.47.0] - 2026-03-22
+
+### Removed
+- Remove `pvector<T, ManagerT>` type, fully replaced by `parray<T>` with O(1) random access (#224)
+- Delete `pvector_node<T>` and `Mgr::pvector<T>` type alias
+- Delete `tests/test_issue186_pvector.cpp` and `tests/test_issue197_pvector_erase.cpp` test files
+- Remove pvector benchmarks (`BM_PvectorPushBack`, `BM_PvectorAt`) from `bench_allocator.cpp`
+- Clean all pvector references from documentation
+
+
 ## [0.46.0] - 2026-03-22
 
 ### Removed
