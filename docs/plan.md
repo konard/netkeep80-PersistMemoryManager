@@ -302,7 +302,39 @@ STL-контейнеров с ПАП.
 
 ### 7.4 Сжатие и шифрование образов
 
-- Опциональное сжатие (LZ4/zstd) и шифрование (AES-256) при save/load
+> Проработка вариантов: [docs/phase7_4_encryption_compression.md](phase7_4_encryption_compression.md)
+
+**Проблема:** Образы ПАП записываются на диск в открытом виде. Нет защиты конфиденциальности.
+Нет сжатия для уменьшения размера файла.
+
+**Проработанные варианты:**
+
+- **Вариант A — Полное сжатие/шифрование:** весь образ обрабатывается как blob.
+  Максимальная конфиденциальность, но полная перезапись при любом изменении.
+  Несовместимо с частичным обновлением, MMapStorage, BinDiffSynchronizer.
+
+- **Вариант B — Частичное шифрование данных блоков (рекомендуемый):** шифрование только
+  содержимого блоков данных (гранулы после заголовка Block\<AT\>). Структура леса AVL-деревьев
+  остаётся открытой. Обеспечивает частичное обновление, совместимость с MMapStorage и
+  BinDiffSynchronizer. Утечка метаданных (количество блоков, размеры) — низкий риск
+  для типичных сценариев.
+
+- **Вариант C — Гибрид (сжатие + шифрование блоков):** сжатие данных блоков (LZ4/zstd)
+  перед шифрованием. Максимальная сложность реализации.
+
+**Рекомендуемое решение (вариант B):**
+- Шаблонная политика `EncryptionPolicyT` (аналогично `LockPolicyT`, `LoggingPolicyT`)
+- Политики: `encryption::NoEncryption` (по умолчанию, zero overhead), `encryption::Aes256CtrEncryption`
+- Per-block encryption: IV = f(master_key, block_granule_index)
+- Обратная совместимость: SFINAE-детекция `encryption_policy` в конфигурации
+- Поле `encryption_algo` в `ManagerHeader` для идентификации алгоритма при загрузке
+- Вариант A доступен как отдельные функции `save_manager_full_encrypted()` / `load_manager_full_encrypted()`
+  для offline-бэкапов
+
+**Сжатие (отдельная политика):**
+- LZ4 (default, ~5 GB/s decode) или zstd (optional, лучший ratio)
+- Сжатие целого образа — для offline-бэкапов
+- Сжатие отдельных блоков — для online-работы (вариант C)
 
 ---
 
@@ -336,8 +368,8 @@ STL-контейнеров с ПАП.
 | 24 | Транзакции | 7.1 | Низкий | Высокая | |
 | 25 | Сборщик мусора | 7.2 | Низкий | Высокая | |
 | 26 | Shared memory IPC | 7.3 | Низкий | Высокая | |
-| 27 | Сжатие/шифрование | 7.4 | Низкий | Средняя | |
+| 27 | Сжатие/шифрование | 7.4 | Низкий | Средняя | Проработано #239 |
 
 ---
 
-*Документ обновлён 2026-03-21. Phase 3.1 (pstring) реализована в Issue #45. Phase 3.2 (parray) реализована в Issue #195. Phase 3.3 (pmap erase/size/iterator/clear) реализована в Issue #196. Phase 3.4 (pvector) удалена — pvector заменён parray (Issue #224). Phase 3.5 (pallocator) реализована в Issue #198. Phase 3.6 (ppool) реализована в Issue #199. Phase 3.7 (root object) реализована в Issue #200. Фаза 3 полностью завершена. Phase 4.1 (error codes) реализована в Issue #201. Phase 4.2 (logging hooks) реализована в Issue #202. Phase 4.3 (reallocate_typed) реализована в Issue #210. Phase 4.4 (pptr byte offset conversion) реализована в Issue #211. Фаза 4 полностью завершена. Phase 5.1 (Catch2 migration) реализована в Issue #212. Phase 5.2 (extended test coverage) реализована в Issue #213. Phase 5.3 (Google Benchmark) реализована в Issue #214. Фаза 5 полностью завершена. Phase 6.1 (thread safety documentation) реализована в Issue #215. Phase 6.2 (recovery documentation) реализована в Issue #216. Phase 6.3 (code deduplication via template metaprogramming) реализована в Issue #188.*
+*Документ обновлён 2026-03-30. Phase 3.1 (pstring) реализована в Issue #45. Phase 3.2 (parray) реализована в Issue #195. Phase 3.3 (pmap erase/size/iterator/clear) реализована в Issue #196. Phase 3.4 (pvector) удалена — pvector заменён parray (Issue #224). Phase 3.5 (pallocator) реализована в Issue #198. Phase 3.6 (ppool) реализована в Issue #199. Phase 3.7 (root object) реализована в Issue #200. Фаза 3 полностью завершена. Phase 4.1 (error codes) реализована в Issue #201. Phase 4.2 (logging hooks) реализована в Issue #202. Phase 4.3 (reallocate_typed) реализована в Issue #210. Phase 4.4 (pptr byte offset conversion) реализована в Issue #211. Фаза 4 полностью завершена. Phase 5.1 (Catch2 migration) реализована в Issue #212. Phase 5.2 (extended test coverage) реализована в Issue #213. Phase 5.3 (Google Benchmark) реализована в Issue #214. Фаза 5 полностью завершена. Phase 6.1 (thread safety documentation) реализована в Issue #215. Phase 6.2 (recovery documentation) реализована в Issue #216. Phase 6.3 (code deduplication via template metaprogramming) реализована в Issue #188. Phase 7.4 (сжатие/шифрование) проработана в Issue #239 — рекомендован вариант частичного шифрования данных блоков.*
