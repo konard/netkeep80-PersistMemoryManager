@@ -1,8 +1,11 @@
 # PMM AVL-Forest Concept
 
+> Основной архитектурный документ по этой теме: [pmm_avl_forest.md](pmm_avl_forest.md).
+> Этот файл сохраняет более широкую концептуальную и target-state записку.
+
 ## Назначение документа
 
-Этот документ фиксирует **каноническую прикладную модель `AVL-forest` для `PersistMemoryManager`** как
+Этот документ описывает **расширенную концептуальную модель `AVL-forest` для `PersistMemoryManager`** как
 основы глобального проекта:
 
 - `PMM` как persistent address space manager;
@@ -494,4 +497,3 @@
 2. Вывести из него gap-analysis между текущим кодом и целевой моделью.
 3. После этого разложить gaps в приоритетный backlog issue.
 4. Уже затем переходить к уточнению persistent layout для `pjson_db`.
-

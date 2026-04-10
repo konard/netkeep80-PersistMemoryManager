@@ -2,7 +2,7 @@
 
 ## Overview
 
-`PersistMemoryManager` is a header-only C++20 library for persistent heap memory management.
+`PersistMemoryManager` is a header-only C++20 library for persistent address space management.
 All metadata is stored inside the managed memory region, which allows saving and restoring
 a memory image from a file or shared memory. Interaction with data is done through
 persistent typed pointers `pptr<T, ManagerT>`.
@@ -10,6 +10,10 @@ persistent typed pointers `pptr<T, ManagerT>`.
 The library is fully static: there are no instances, and all API is accessed through static
 methods on the manager type. Multiple independent managers with the same configuration can
 coexist through the `InstanceId` template parameter (multiton pattern).
+
+The canonical high-level model of PMM as a linear persistent address space plus an intrusive
+AVL-forest is documented in [pmm_avl_forest.md](pmm_avl_forest.md). This document focuses on
+the low-level layout, invariants, and algorithms.
 
 ---
 
