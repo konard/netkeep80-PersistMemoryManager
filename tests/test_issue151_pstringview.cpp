@@ -255,7 +255,7 @@ TEST_CASE( "    pstringview block permanently locked", "[test_issue151_pstringvi
 ///
 /// Verified by checking that:
 ///  1. pstringview<Mgr>() creates pstringview objects that reference each other via tree_node() fields.
-///  2. The AVL tree root is tracked only by a static index (no extra PAP allocation for table).
+///  2. The AVL tree root is tracked by the persistent `system/symbols` domain root.
 ///  3. pstringview nodes themselves form the BST structure via their block's TreeNode fields.
 TEST_CASE( "    AVL tree via built-in TreeNode fields", "[test_issue151_pstringview]" )
 {
@@ -271,7 +271,7 @@ TEST_CASE( "    AVL tree via built-in TreeNode fields", "[test_issue151_pstringv
     REQUIRE( ( !p_a.is_null() && !p_b.is_null() && !p_c.is_null() ) );
 
     // All nodes accessible via the AVL tree root.
-    REQUIRE( TestPsv::_root_idx != static_cast<TestMgr::index_type>( 0 ) );
+    REQUIRE( TestPsv::root_index() != static_cast<TestMgr::index_type>( 0 ) );
 
     // Re-interning returns the same pptr (deduplication via AVL tree search).
     REQUIRE( static_cast<TestMgr_pptr_psv>( TestMgr::pstringview( "alpha" ) ) == p_a );
@@ -282,24 +282,24 @@ TEST_CASE( "    AVL tree via built-in TreeNode fields", "[test_issue151_pstringv
     TestPsv::reset();
 }
 
-/// @brief The AVL tree root index is reset by reset() without leaking PAP state.
-TEST_CASE( "    AVL root tracked by static index only", "[test_issue151_pstringview]" )
+/// @brief The AVL tree root is a persistent domain binding and reset() clears that binding.
+TEST_CASE( "    AVL root tracked by persistent symbol domain", "[test_issue151_pstringview]" )
 {
     TestMgr::destroy();
     TestPsv::reset();
     REQUIRE( TestMgr::create( 64 * 1024 ) );
 
     // Before any intern — root is null.
-    REQUIRE( TestPsv::_root_idx == static_cast<TestMgr::index_type>( 0 ) );
+    REQUIRE( TestPsv::root_index() == static_cast<TestMgr::index_type>( 0 ) );
 
     TestMgr::pstringview( "test_root" );
 
     // After intern — root is non-null.
-    REQUIRE( TestPsv::_root_idx != static_cast<TestMgr::index_type>( 0 ) );
+    REQUIRE( TestPsv::root_index() != static_cast<TestMgr::index_type>( 0 ) );
 
     // After reset — root is null again.
     TestPsv::reset();
-    REQUIRE( TestPsv::_root_idx == static_cast<TestMgr::index_type>( 0 ) );
+    REQUIRE( TestPsv::root_index() == static_cast<TestMgr::index_type>( 0 ) );
 
     TestMgr::destroy();
     TestPsv::reset();

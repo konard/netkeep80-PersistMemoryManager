@@ -258,3 +258,6 @@ set_tests_properties(test_issue213_fuzz PROPERTIES TIMEOUT 120)
 # Build manually: clang++ -std=c++20 -fsanitize=fuzzer,address -O2 \
 #   -I include -I single_include -I single_include/pmm \
 #   tests/fuzz_allocator.cpp -o fuzz_allocator
+
+# Persistent forest/domain registry coverage
+pmm_add_test(test_forest_registry test_forest_registry.cpp)

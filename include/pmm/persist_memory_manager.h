@@ -23,6 +23,7 @@
 #include "pmm/allocator_policy.h"
 #include "pmm/block.h"
 #include "pmm/block_state.h"
+#include "pmm/forest_registry.h"
 #include "pmm/logging_policy.h"
 #include "pmm/manager_configs.h"
 #include "pmm/pallocator.h"
@@ -94,9 +95,13 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     using logging_policy  = typename detail::config_logging_policy<ConfigT>::type; ///< Issue #202, Phase 4.2
     using allocator       = AllocatorPolicy<free_block_tree, address_traits>;
     using index_type      = typename address_traits::index_type;
+    using forest_registry = detail::ForestDomainRegistry<address_traits>;
+    using forest_domain   = detail::ForestDomainRecord<address_traits>;
 
     /// @brief Тип самого менеджера.
     using manager_type = PersistMemoryManager<ConfigT, InstanceId>;
+
+    template <typename> friend struct pstringview;
 
     /**
      * @brief Вложенный псевдоним персистентного указателя, привязанного к данному менеджеру.
@@ -247,6 +252,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         }
         bool ok = init_layout( _backend.base_ptr(), _backend.total_size() );
         if ( ok )
+            ok = bootstrap_forest_registry_unlocked();
+        if ( ok )
         {
             _last_error = PmmError::Ok;
             logging_policy::on_create( _backend.total_size() );
@@ -268,6 +275,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
             return false;
         }
         bool ok = init_layout( _backend.base_ptr(), _backend.total_size() );
+        if ( ok )
+            ok = bootstrap_forest_registry_unlocked();
         if ( ok )
         {
             _last_error = PmmError::Ok;
@@ -316,6 +325,11 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         allocator::recompute_counters( base, hdr );
         allocator::rebuild_free_tree( base, hdr );
         _initialized = true;
+        if ( !validate_or_bootstrap_forest_registry_unlocked() )
+        {
+            _initialized = false;
+            return false;
+        }
         _last_error  = PmmError::Ok;
         logging_policy::on_load();
         return true;
@@ -353,60 +367,7 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     static void* allocate( std::size_t user_size ) noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
-        if ( !_initialized )
-        {
-            _last_error = PmmError::NotInitialized;
-            logging_policy::on_allocation_failure( user_size, PmmError::NotInitialized );
-            return nullptr;
-        }
-        if ( user_size == 0 )
-        {
-            _last_error = PmmError::InvalidSize;
-            logging_policy::on_allocation_failure( user_size, PmmError::InvalidSize );
-            return nullptr;
-        }
-
-        std::uint8_t*                          base = _backend.base_ptr();
-        detail::ManagerHeader<address_traits>* hdr  = get_header( base );
-        // Issue #146: use AddressTraits-specific granule size for required granule computation.
-        index_type data_gran = detail::bytes_to_granules_t<address_traits>( user_size );
-        if ( data_gran == 0 )
-            data_gran = 1;
-        // Issue #43 Phase 1.3: Overflow protection — check before adding header granules.
-        if ( data_gran > std::numeric_limits<index_type>::max() - kBlockHdrGranules )
-        {
-            _last_error = PmmError::Overflow;
-            logging_policy::on_allocation_failure( user_size, PmmError::Overflow );
-            return nullptr;
-        }
-        index_type needed = kBlockHdrGranules + data_gran;
-        index_type idx    = free_block_tree::find_best_fit( base, hdr, needed );
-
-        if ( idx != address_traits::no_block )
-        {
-            _last_error = PmmError::Ok;
-            return allocator::allocate_from_block( base, hdr, idx, user_size );
-        }
-
-        // Попытка расширить (если бэкенд поддерживает)
-        if ( !do_expand( user_size ) )
-        {
-            _last_error = PmmError::OutOfMemory;
-            logging_policy::on_allocation_failure( user_size, PmmError::OutOfMemory );
-            return nullptr;
-        }
-
-        base = _backend.base_ptr();
-        hdr  = get_header( base );
-        idx  = free_block_tree::find_best_fit( base, hdr, needed );
-        if ( idx != address_traits::no_block )
-        {
-            _last_error = PmmError::Ok;
-            return allocator::allocate_from_block( base, hdr, idx, user_size );
-        }
-        _last_error = PmmError::OutOfMemory;
-        logging_policy::on_allocation_failure( user_size, PmmError::OutOfMemory );
-        return nullptr;
+        return allocate_unlocked( user_size );
     }
 
     /**
@@ -417,31 +378,7 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     static void deallocate( void* ptr ) noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
-        if ( !_initialized || ptr == nullptr )
-            return;
-        pmm::Block<address_traits>* blk = find_block_from_user_ptr( ptr );
-        if ( blk == nullptr )
-            return;
-        index_type freed = BlockStateBase<address_traits>::get_weight( blk );
-        if ( freed == 0 )
-            return;
-
-        // Issue #126: Permanently locked blocks cannot be freed.
-        if ( BlockStateBase<address_traits>::get_node_type( blk ) == pmm::kNodeReadOnly )
-            return;
-
-        std::uint8_t*                          base    = _backend.base_ptr();
-        detail::ManagerHeader<address_traits>* hdr     = get_header( base );
-        index_type                             blk_idx = detail::block_idx_t<address_traits>( base, blk );
-
-        AllocatedBlock<address_traits>* alloc = AllocatedBlock<address_traits>::cast_from_raw( blk );
-        alloc->mark_as_free();
-
-        hdr->alloc_count--;
-        hdr->free_count++;
-        if ( hdr->used_size >= freed )
-            hdr->used_size -= freed;
-        allocator::coalesce( base, hdr, blk_idx );
+        deallocate_unlocked( ptr );
     }
 
     /**
@@ -456,16 +393,7 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     static bool lock_block_permanent( void* ptr ) noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
-        if ( !_initialized || ptr == nullptr )
-            return false;
-        pmm::Block<address_traits>* blk = find_block_from_user_ptr( ptr );
-        if ( blk == nullptr )
-            return false;
-        index_type w = BlockStateBase<address_traits>::get_weight( blk );
-        if ( w == 0 )
-            return false; // Свободный блок нельзя блокировать
-        BlockStateBase<address_traits>::set_node_type_of( blk, pmm::kNodeReadOnly );
-        return true;
+        return lock_block_permanent_unlocked( ptr );
     }
 
     /**
@@ -817,8 +745,7 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         typename thread_policy::unique_lock_type lock( _mutex );
         if ( !_initialized )
             return;
-        detail::ManagerHeader<address_traits>* hdr = get_header( _backend.base_ptr() );
-        hdr->root_offset                           = p.is_null() ? address_traits::no_block : p.offset();
+        set_legacy_root_offset_unlocked( p.is_null() ? static_cast<index_type>( 0 ) : p.offset() );
     }
 
     /**
@@ -832,10 +759,103 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         typename thread_policy::shared_lock_type lock( _mutex );
         if ( !_initialized )
             return pptr<T>();
-        const detail::ManagerHeader<address_traits>* hdr = get_header_c( _backend.base_ptr() );
-        if ( hdr->root_offset == address_traits::no_block )
+        index_type legacy_root = get_legacy_root_offset_unlocked();
+        if ( legacy_root == static_cast<index_type>( 0 ) )
             return pptr<T>();
-        return pptr<T>( hdr->root_offset );
+        return pptr<T>( legacy_root );
+    }
+
+    static index_type find_domain_by_name( const char* name ) noexcept
+    {
+        typename thread_policy::shared_lock_type lock( _mutex );
+        if ( !_initialized )
+            return 0;
+        const forest_domain* rec = find_domain_by_name_unlocked( name );
+        return ( rec != nullptr ) ? rec->binding_id : static_cast<index_type>( 0 );
+    }
+
+    static index_type find_domain_by_symbol( pptr<pstringview> symbol ) noexcept
+    {
+        typename thread_policy::shared_lock_type lock( _mutex );
+        if ( !_initialized )
+            return 0;
+        const forest_domain* rec = find_domain_by_symbol_unlocked( symbol );
+        return ( rec != nullptr ) ? rec->binding_id : static_cast<index_type>( 0 );
+    }
+
+    static bool has_domain( const char* name ) noexcept { return find_domain_by_name( name ) != 0; }
+
+    static bool register_domain( const char* name ) noexcept
+    {
+        typename thread_policy::unique_lock_type lock( _mutex );
+        if ( !_initialized )
+            return false;
+        return register_domain_unlocked( name, 0, detail::kForestBindingDirectRoot, 0 );
+    }
+
+    static bool register_system_domain( const char* name ) noexcept
+    {
+        typename thread_policy::unique_lock_type lock( _mutex );
+        if ( !_initialized )
+            return false;
+        return register_domain_unlocked( name, detail::kForestDomainFlagSystem, detail::kForestBindingDirectRoot, 0 );
+    }
+
+    static index_type get_domain_root_offset( const char* name ) noexcept
+    {
+        typename thread_policy::shared_lock_type lock( _mutex );
+        if ( !_initialized )
+            return 0;
+        const forest_domain* rec = find_domain_by_name_unlocked( name );
+        return domain_root_offset_unlocked( rec, get_header_c( _backend.base_ptr() ) );
+    }
+
+    static index_type get_domain_root_offset( index_type binding_id ) noexcept
+    {
+        typename thread_policy::shared_lock_type lock( _mutex );
+        if ( !_initialized )
+            return 0;
+        const forest_domain* rec = find_domain_by_binding_unlocked( binding_id );
+        return domain_root_offset_unlocked( rec, get_header_c( _backend.base_ptr() ) );
+    }
+
+    static index_type get_domain_root_offset( pptr<pstringview> symbol ) noexcept
+    {
+        typename thread_policy::shared_lock_type lock( _mutex );
+        if ( !_initialized )
+            return 0;
+        const forest_domain* rec = find_domain_by_symbol_unlocked( symbol );
+        return domain_root_offset_unlocked( rec, get_header_c( _backend.base_ptr() ) );
+    }
+
+    template <typename T> static pptr<T> get_domain_root( const char* name ) noexcept
+    {
+        index_type root = get_domain_root_offset( name );
+        return ( root == 0 ) ? pptr<T>() : pptr<T>( root );
+    }
+
+    template <typename T> static pptr<T> get_domain_root( index_type binding_id ) noexcept
+    {
+        index_type root = get_domain_root_offset( binding_id );
+        return ( root == 0 ) ? pptr<T>() : pptr<T>( root );
+    }
+
+    template <typename T> static pptr<T> get_domain_root( pptr<pstringview> symbol ) noexcept
+    {
+        index_type root = get_domain_root_offset( symbol );
+        return ( root == 0 ) ? pptr<T>() : pptr<T>( root );
+    }
+
+    template <typename T> static bool set_domain_root( const char* name, pptr<T> root ) noexcept
+    {
+        typename thread_policy::unique_lock_type lock( _mutex );
+        if ( !_initialized )
+            return false;
+        forest_domain* rec = find_domain_by_name_unlocked( name );
+        if ( rec == nullptr || rec->binding_kind != detail::kForestBindingDirectRoot )
+            return false;
+        rec->root_offset = root.is_null() ? static_cast<index_type>( 0 ) : root.offset();
+        return true;
     }
 
     // ─── Методы доступа к полям AVL-узла блока (Issue #125, #235) ──────────
@@ -1104,6 +1124,385 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     // ─── Вспомогательные методы ────────────────────────────────────────────────
 
     // ─── Issue #179: find_block helpers ───────────────────────────────────────
+
+    static bool is_valid_user_offset_unlocked( index_type off, std::size_t size_bytes ) noexcept
+    {
+        if ( off == 0 || _backend.base_ptr() == nullptr || _backend.total_size() == 0 )
+            return false;
+        std::size_t byte_off = static_cast<std::size_t>( off ) * address_traits::granule_size;
+        return byte_off + size_bytes <= _backend.total_size();
+    }
+
+    static void* allocate_unlocked( std::size_t user_size ) noexcept
+    {
+        if ( !_initialized )
+        {
+            _last_error = PmmError::NotInitialized;
+            logging_policy::on_allocation_failure( user_size, PmmError::NotInitialized );
+            return nullptr;
+        }
+        if ( user_size == 0 )
+        {
+            _last_error = PmmError::InvalidSize;
+            logging_policy::on_allocation_failure( user_size, PmmError::InvalidSize );
+            return nullptr;
+        }
+
+        std::uint8_t*                          base      = _backend.base_ptr();
+        detail::ManagerHeader<address_traits>* hdr       = get_header( base );
+        index_type                             data_gran = detail::bytes_to_granules_t<address_traits>( user_size );
+        if ( data_gran == 0 )
+            data_gran = 1;
+        if ( data_gran > std::numeric_limits<index_type>::max() - kBlockHdrGranules )
+        {
+            _last_error = PmmError::Overflow;
+            logging_policy::on_allocation_failure( user_size, PmmError::Overflow );
+            return nullptr;
+        }
+
+        index_type needed = kBlockHdrGranules + data_gran;
+        index_type idx    = free_block_tree::find_best_fit( base, hdr, needed );
+        if ( idx != address_traits::no_block )
+        {
+            _last_error = PmmError::Ok;
+            return allocator::allocate_from_block( base, hdr, idx, user_size );
+        }
+
+        if ( !do_expand( user_size ) )
+        {
+            _last_error = PmmError::OutOfMemory;
+            logging_policy::on_allocation_failure( user_size, PmmError::OutOfMemory );
+            return nullptr;
+        }
+
+        base = _backend.base_ptr();
+        hdr  = get_header( base );
+        idx  = free_block_tree::find_best_fit( base, hdr, needed );
+        if ( idx != address_traits::no_block )
+        {
+            _last_error = PmmError::Ok;
+            return allocator::allocate_from_block( base, hdr, idx, user_size );
+        }
+
+        _last_error = PmmError::OutOfMemory;
+        logging_policy::on_allocation_failure( user_size, PmmError::OutOfMemory );
+        return nullptr;
+    }
+
+    static void deallocate_unlocked( void* ptr ) noexcept
+    {
+        if ( !_initialized || ptr == nullptr )
+            return;
+        pmm::Block<address_traits>* blk = find_block_from_user_ptr( ptr );
+        if ( blk == nullptr )
+            return;
+        index_type freed = BlockStateBase<address_traits>::get_weight( blk );
+        if ( freed == 0 )
+            return;
+        if ( BlockStateBase<address_traits>::get_node_type( blk ) == pmm::kNodeReadOnly )
+            return;
+
+        std::uint8_t*                          base    = _backend.base_ptr();
+        detail::ManagerHeader<address_traits>* hdr     = get_header( base );
+        index_type                             blk_idx = detail::block_idx_t<address_traits>( base, blk );
+
+        AllocatedBlock<address_traits>* alloc = AllocatedBlock<address_traits>::cast_from_raw( blk );
+        alloc->mark_as_free();
+
+        hdr->alloc_count--;
+        hdr->free_count++;
+        if ( hdr->used_size >= freed )
+            hdr->used_size -= freed;
+        allocator::coalesce( base, hdr, blk_idx );
+    }
+
+    static bool lock_block_permanent_unlocked( void* ptr ) noexcept
+    {
+        if ( !_initialized || ptr == nullptr )
+            return false;
+        pmm::Block<address_traits>* blk = find_block_from_user_ptr( ptr );
+        if ( blk == nullptr )
+            return false;
+        index_type w = BlockStateBase<address_traits>::get_weight( blk );
+        if ( w == 0 )
+            return false;
+        BlockStateBase<address_traits>::set_node_type_of( blk, pmm::kNodeReadOnly );
+        return true;
+    }
+
+    template <typename T, typename... Args> static pptr<T> create_typed_unlocked( Args&&... args ) noexcept
+    {
+        static_assert( std::is_nothrow_constructible_v<T, Args...>,
+                       "create_typed_unlocked<T>: T must be nothrow-constructible" );
+        void* raw = allocate_unlocked( sizeof( T ) );
+        if ( raw == nullptr )
+            return pptr<T>();
+        ::new ( raw ) T( static_cast<Args&&>( args )... );
+        return make_pptr_from_raw<T>( raw );
+    }
+
+    static forest_registry* forest_registry_root_unlocked() noexcept
+    {
+        if ( !_initialized || _backend.base_ptr() == nullptr )
+            return nullptr;
+        detail::ManagerHeader<address_traits>* hdr = get_header( _backend.base_ptr() );
+        if ( hdr->root_offset == address_traits::no_block ||
+             !is_valid_user_offset_unlocked( hdr->root_offset, sizeof( forest_registry ) ) )
+            return nullptr;
+        auto* reg =
+            reinterpret_cast<forest_registry*>( _backend.base_ptr() +
+                                               static_cast<std::size_t>( hdr->root_offset ) * address_traits::granule_size );
+        if ( reg->magic != detail::kForestRegistryMagic || reg->version != detail::kForestRegistryVersion ||
+             reg->domain_count > detail::kMaxForestDomains )
+            return nullptr;
+        return reg;
+    }
+
+    static forest_domain* find_domain_by_name_unlocked( const char* name ) noexcept
+    {
+        if ( !detail::forest_domain_name_fits( name ) )
+            return nullptr;
+        forest_registry* reg = forest_registry_root_unlocked();
+        if ( reg == nullptr )
+            return nullptr;
+        for ( std::uint16_t i = 0; i < reg->domain_count; ++i )
+        {
+            if ( detail::forest_domain_name_equals( reg->domains[i], name ) )
+                return &reg->domains[i];
+        }
+        return nullptr;
+    }
+
+    static forest_domain* find_domain_by_binding_unlocked( index_type binding_id ) noexcept
+    {
+        if ( binding_id == 0 )
+            return nullptr;
+        forest_registry* reg = forest_registry_root_unlocked();
+        if ( reg == nullptr )
+            return nullptr;
+        for ( std::uint16_t i = 0; i < reg->domain_count; ++i )
+        {
+            if ( reg->domains[i].binding_id == binding_id )
+                return &reg->domains[i];
+        }
+        return nullptr;
+    }
+
+    static forest_domain* find_domain_by_symbol_unlocked( pptr<pstringview> symbol ) noexcept
+    {
+        if ( symbol.is_null() )
+            return nullptr;
+        pstringview* sym = resolve( symbol );
+        if ( sym == nullptr )
+            return nullptr;
+        forest_registry* reg = forest_registry_root_unlocked();
+        if ( reg == nullptr )
+            return nullptr;
+        for ( std::uint16_t i = 0; i < reg->domain_count; ++i )
+        {
+            if ( reg->domains[i].symbol_offset == symbol.offset() ||
+                 std::strncmp( reg->domains[i].name, sym->c_str(), detail::kForestDomainNameCapacity ) == 0 )
+            {
+                reg->domains[i].symbol_offset = symbol.offset();
+                return &reg->domains[i];
+            }
+        }
+        return nullptr;
+    }
+
+    static index_type domain_root_offset_unlocked( const forest_domain* rec,
+                                                   const detail::ManagerHeader<address_traits>* hdr ) noexcept
+    {
+        if ( rec == nullptr || hdr == nullptr )
+            return 0;
+        if ( rec->binding_kind == detail::kForestBindingFreeTree )
+            return ( hdr->free_tree_root == address_traits::no_block ) ? static_cast<index_type>( 0 ) : hdr->free_tree_root;
+        return rec->root_offset;
+    }
+
+    static index_type get_legacy_root_offset_unlocked() noexcept
+    {
+        forest_registry* reg = forest_registry_root_unlocked();
+        return ( reg != nullptr ) ? reg->legacy_root_offset : static_cast<index_type>( 0 );
+    }
+
+    static void set_legacy_root_offset_unlocked( index_type off ) noexcept
+    {
+        forest_registry* reg = forest_registry_root_unlocked();
+        if ( reg != nullptr )
+            reg->legacy_root_offset = off;
+    }
+
+    static forest_domain* symbol_domain_record_unlocked() noexcept
+    {
+        return find_domain_by_name_unlocked( detail::kSystemDomainSymbols );
+    }
+
+    static index_type symbol_domain_root_offset_unlocked() noexcept
+    {
+        forest_domain* rec = symbol_domain_record_unlocked();
+        return ( rec != nullptr ) ? rec->root_offset : static_cast<index_type>( 0 );
+    }
+
+    static void reset_symbol_domain_unlocked() noexcept
+    {
+        forest_domain* rec = symbol_domain_record_unlocked();
+        if ( rec != nullptr )
+            rec->root_offset = 0;
+    }
+
+    static bool register_domain_unlocked( const char* name, std::uint8_t flags, std::uint8_t binding_kind,
+                                          index_type initial_root ) noexcept
+    {
+        if ( !detail::forest_domain_name_fits( name ) )
+            return false;
+
+        forest_registry* reg = forest_registry_root_unlocked();
+        if ( reg == nullptr )
+            return false;
+
+        if ( forest_domain* existing = find_domain_by_name_unlocked( name ) )
+        {
+            existing->flags |= flags;
+            existing->binding_kind = binding_kind;
+            if ( binding_kind == detail::kForestBindingDirectRoot && initial_root != 0 )
+                existing->root_offset = initial_root;
+            return true;
+        }
+
+        if ( reg->domain_count >= detail::kMaxForestDomains )
+            return false;
+
+        forest_domain rec{};
+        if ( !detail::forest_domain_name_copy( rec, name ) )
+            return false;
+
+        rec.binding_id   = reg->next_binding_id++;
+        rec.root_offset  = ( binding_kind == detail::kForestBindingDirectRoot ) ? initial_root : static_cast<index_type>( 0 );
+        rec.binding_kind = binding_kind;
+        rec.flags        = flags;
+        reg->domains[reg->domain_count++] = rec;
+        return true;
+    }
+
+    static bool create_forest_registry_root_unlocked( index_type legacy_root_offset ) noexcept
+    {
+        static constexpr std::size_t kGranSz = address_traits::granule_size;
+
+        void* raw = allocate_unlocked( sizeof( forest_registry ) + ( kGranSz - 1 ) );
+        if ( raw == nullptr )
+        {
+            if ( _last_error == PmmError::Ok )
+                _last_error = PmmError::OutOfMemory;
+            return false;
+        }
+
+        std::uintptr_t raw_addr     = reinterpret_cast<std::uintptr_t>( raw );
+        std::uintptr_t aligned_addr = ( raw_addr + ( kGranSz - 1 ) ) & ~static_cast<std::uintptr_t>( kGranSz - 1 );
+        forest_registry* reg        = reinterpret_cast<forest_registry*>( aligned_addr );
+        if ( reg == nullptr )
+        {
+            _last_error = PmmError::InvalidPointer;
+            return false;
+        }
+
+        std::memset( reg, 0, sizeof( forest_registry ) );
+        reg->magic           = detail::kForestRegistryMagic;
+        reg->version         = detail::kForestRegistryVersion;
+        reg->domain_count    = 0;
+        reg->legacy_root_offset = legacy_root_offset;
+        reg->next_binding_id = 1;
+
+        if ( !lock_block_permanent_unlocked( raw ) )
+        {
+            _last_error = PmmError::InvalidPointer;
+            return false;
+        }
+
+        get_header( _backend.base_ptr() )->root_offset =
+            detail::ptr_to_granule_idx<address_traits>( _backend.base_ptr(), reg );
+
+        if ( !register_domain_unlocked( detail::kSystemDomainFreeTree, detail::kForestDomainFlagSystem,
+                                        detail::kForestBindingFreeTree, 0 ) )
+        {
+            _last_error = PmmError::BackendError;
+            return false;
+        }
+        if ( !register_domain_unlocked( detail::kSystemDomainSymbols, detail::kForestDomainFlagSystem,
+                                        detail::kForestBindingDirectRoot, 0 ) )
+        {
+            _last_error = PmmError::BackendError;
+            return false;
+        }
+        if ( !register_domain_unlocked( detail::kSystemDomainRegistry, detail::kForestDomainFlagSystem,
+                                        detail::kForestBindingDirectRoot,
+                                        get_header( _backend.base_ptr() )->root_offset ) )
+        {
+            _last_error = PmmError::BackendError;
+            return false;
+        }
+        return true;
+    }
+
+    static bool bootstrap_forest_registry_unlocked() noexcept { return create_forest_registry_root_unlocked( 0 ); }
+
+    static bool validate_or_bootstrap_forest_registry_unlocked() noexcept
+    {
+        detail::ManagerHeader<address_traits>* hdr = get_header( _backend.base_ptr() );
+        if ( forest_registry_root_unlocked() != nullptr )
+        {
+            if ( !register_domain_unlocked( detail::kSystemDomainFreeTree, detail::kForestDomainFlagSystem,
+                                            detail::kForestBindingFreeTree, 0 ) )
+                return false;
+            if ( !register_domain_unlocked( detail::kSystemDomainSymbols, detail::kForestDomainFlagSystem,
+                                            detail::kForestBindingDirectRoot, symbol_domain_root_offset_unlocked() ) )
+                return false;
+            if ( !register_domain_unlocked( detail::kSystemDomainRegistry, detail::kForestDomainFlagSystem,
+                                            detail::kForestBindingDirectRoot, hdr->root_offset ) )
+                return false;
+
+            if ( forest_domain* free_rec = find_domain_by_name_unlocked( detail::kSystemDomainFreeTree ) )
+            {
+                free_rec->flags |= detail::kForestDomainFlagSystem;
+                free_rec->binding_kind = detail::kForestBindingFreeTree;
+                free_rec->root_offset  = 0;
+            }
+            if ( forest_domain* symbols_rec = find_domain_by_name_unlocked( detail::kSystemDomainSymbols ) )
+            {
+                symbols_rec->flags |= detail::kForestDomainFlagSystem;
+                symbols_rec->binding_kind = detail::kForestBindingDirectRoot;
+            }
+            if ( forest_domain* registry_rec = find_domain_by_name_unlocked( detail::kSystemDomainRegistry ) )
+            {
+                registry_rec->flags |= detail::kForestDomainFlagSystem;
+                registry_rec->binding_kind = detail::kForestBindingDirectRoot;
+                registry_rec->root_offset  = hdr->root_offset;
+            }
+            return true;
+        }
+
+        index_type legacy_root = 0;
+        if ( hdr->root_offset != address_traits::no_block &&
+             is_valid_user_offset_unlocked( hdr->root_offset, sizeof( std::uint32_t ) ) )
+        {
+            if ( !is_valid_user_offset_unlocked( hdr->root_offset, sizeof( forest_registry ) ) )
+            {
+                legacy_root = hdr->root_offset;
+            }
+            else
+            {
+                auto* candidate =
+                    reinterpret_cast<const forest_registry*>( _backend.base_ptr() +
+                                                             static_cast<std::size_t>( hdr->root_offset ) *
+                                                                 address_traits::granule_size );
+                if ( candidate->magic != detail::kForestRegistryMagic )
+                    legacy_root = hdr->root_offset;
+            }
+        }
+
+        hdr->root_offset = address_traits::no_block;
+        return create_forest_registry_root_unlocked( legacy_root );
+    }
 
     /// @brief Find the mutable block header for a user-data pointer (or nullptr).
     static pmm::Block<address_traits>* find_block_from_user_ptr( void* ptr ) noexcept

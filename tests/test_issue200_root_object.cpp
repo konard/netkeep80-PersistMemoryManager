@@ -263,7 +263,9 @@ TEST_CASE( "I200-I  pmap registry pattern", "[test_issue200_root_object]" )
 TEST_CASE( "I200-J  SmallAddressTraits", "[test_issue200_root_object]" )
 {
     SmallMgr::destroy();
-    REQUIRE( SmallMgr::create( 4096 ) );
+    bool created = SmallMgr::create( 4096 );
+    CAPTURE( static_cast<int>( SmallMgr::last_error() ) );
+    REQUIRE( created );
 
     auto p = SmallMgr::allocate_typed<int>();
     REQUIRE( !p.is_null() );
@@ -286,7 +288,9 @@ TEST_CASE( "I200-J  SmallAddressTraits", "[test_issue200_root_object]" )
 TEST_CASE( "I200-K  LargeAddressTraits", "[test_issue200_root_object]" )
 {
     LargeMgr::destroy();
-    REQUIRE( LargeMgr::create( 64 * 1024 ) );
+    bool created = LargeMgr::create( 64 * 1024 );
+    CAPTURE( static_cast<int>( LargeMgr::last_error() ) );
+    REQUIRE( created );
 
     auto p = LargeMgr::create_typed<int>( 456 );
     REQUIRE( !p.is_null() );

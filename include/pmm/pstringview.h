@@ -186,15 +186,27 @@ template <typename ManagerT> struct pstringview
     static psview_pptr intern( const char* s ) noexcept { return _intern( s ); }
 
     /**
-     * @brief Сбросить синглтон словаря (для тестов).
+     * @brief Сбросить persistent root словаря (для тестов).
      *
-     * Сбрасывает статическую переменную _root_idx, но не освобождает
-     * данные в ПАП (блоки заблокированы навечно).
+     * Не освобождает сами pstringview-блоки в ПАП, а только очищает root binding
+     * системного domain `system/symbols`.
      */
-    static void reset() noexcept { _root_idx = static_cast<index_type>( 0 ); }
+    static void reset() noexcept
+    {
+        if ( !ManagerT::is_initialized() )
+            return;
+        typename ManagerT::thread_policy::unique_lock_type lock( ManagerT::_mutex );
+        ManagerT::reset_symbol_domain_unlocked();
+    }
 
-    /// @brief Granule-индекс корня AVL-дерева интернирования; 0 = пустое дерево.
-    static inline index_type _root_idx = static_cast<index_type>( 0 );
+    /// @brief Текущий persistent root словаря интернирования; 0 = пустое дерево.
+    static index_type root_index() noexcept
+    {
+        if ( !ManagerT::is_initialized() )
+            return static_cast<index_type>( 0 );
+        typename ManagerT::thread_policy::shared_lock_type lock( ManagerT::_mutex );
+        return ManagerT::symbol_domain_root_offset_unlocked();
+    }
 
     // Public destructor required for stack-temporary construction via pstringview<Mgr>("hello").
     ~pstringview() = default;
@@ -253,8 +265,11 @@ template <typename ManagerT> struct pstringview
     /// @brief Найти узел AVL-дерева с заданной строкой. Возвращает null если не найден.
     static psview_pptr _avl_find( const char* s ) noexcept
     {
+        auto* domain = ManagerT::symbol_domain_record_unlocked();
+        if ( domain == nullptr )
+            return psview_pptr();
         return detail::avl_find<psview_pptr>(
-            _root_idx,
+            domain->root_offset,
             [&]( psview_pptr cur ) -> int
             {
                 pstringview* obj = ManagerT::template resolve<pstringview>( cur );
@@ -266,10 +281,13 @@ template <typename ManagerT> struct pstringview
     /// @brief Вставить новый узел в AVL-дерево. Предполагается, что строка ещё не в дереве.
     static void _avl_insert( psview_pptr new_node ) noexcept
     {
+        auto* domain = ManagerT::symbol_domain_record_unlocked();
+        if ( domain == nullptr )
+            return;
         pstringview* new_obj = ManagerT::template resolve<pstringview>( new_node );
         const char*  new_str = ( new_obj != nullptr ) ? new_obj->c_str() : "";
         detail::avl_insert(
-            new_node, _root_idx,
+            new_node, domain->root_offset,
             [&]( psview_pptr cur ) -> bool
             {
                 pstringview* obj = ManagerT::template resolve<pstringview>( cur );
@@ -278,8 +296,5 @@ template <typename ManagerT> struct pstringview
             []( psview_pptr p ) -> pstringview* { return ManagerT::template resolve<pstringview>( p ); } );
     }
 };
-
-// Определение статической переменной _root_idx (C++17 inline).
-// Объявлено как static inline в теле структуры — определение не требуется вне класса.
 
 } // namespace pmm

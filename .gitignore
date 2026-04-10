@@ -6,6 +6,7 @@ issue-comments.txt
 .vscode/
 .DS_Store
 build/
+build_codex/
 build_test/
 build-test/
 build_clean/
