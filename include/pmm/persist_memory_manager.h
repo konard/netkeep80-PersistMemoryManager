@@ -254,6 +254,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( ok )
             ok = bootstrap_forest_registry_unlocked();
         if ( ok )
+            ok = validate_bootstrap_invariants_unlocked(); // Issue #241
+        if ( ok )
         {
             _last_error = PmmError::Ok;
             logging_policy::on_create( _backend.total_size() );
@@ -277,6 +279,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         bool ok = init_layout( _backend.base_ptr(), _backend.total_size() );
         if ( ok )
             ok = bootstrap_forest_registry_unlocked();
+        if ( ok )
+            ok = validate_bootstrap_invariants_unlocked(); // Issue #241
         if ( ok )
         {
             _last_error = PmmError::Ok;
@@ -326,6 +330,11 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         allocator::rebuild_free_tree( base, hdr );
         _initialized = true;
         if ( !validate_or_bootstrap_forest_registry_unlocked() )
+        {
+            _initialized = false;
+            return false;
+        }
+        if ( !validate_bootstrap_invariants_unlocked() ) // Issue #241
         {
             _initialized = false;
             return false;
@@ -784,6 +793,14 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     }
 
     static bool has_domain( const char* name ) noexcept { return find_domain_by_name( name ) != 0; }
+
+    /// @brief Verify that all bootstrap invariants hold (Issue #241).
+    /// Returns true iff the image is a valid, self-described persistent environment.
+    static bool validate_bootstrap_invariants() noexcept
+    {
+        typename thread_policy::shared_lock_type lock( _mutex );
+        return validate_bootstrap_invariants_unlocked();
+    }
 
     static bool register_domain( const char* name ) noexcept
     {
@@ -1550,6 +1567,59 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     }
 
     static bool bootstrap_forest_registry_unlocked() noexcept { return create_forest_registry_root_unlocked( 0 ); }
+
+    /// @brief Verify that all bootstrap invariants hold (Issue #241).
+    static bool validate_bootstrap_invariants_unlocked() noexcept
+    {
+        if ( !_initialized )
+            return false;
+        std::uint8_t* base = _backend.base_ptr();
+        if ( base == nullptr )
+            return false;
+        const auto* hdr = get_header_c( base );
+        // 1. Manager header valid
+        if ( hdr->magic != kMagic )
+            return false;
+        if ( hdr->total_size != _backend.total_size() )
+            return false;
+        if ( hdr->granule_size != static_cast<std::uint16_t>( address_traits::granule_size ) )
+            return false;
+        // 2. Forest registry exists and is valid
+        const forest_registry* reg = forest_registry_root_unlocked();
+        if ( reg == nullptr )
+            return false;
+        if ( reg->magic != detail::kForestRegistryMagic )
+            return false;
+        if ( reg->version != detail::kForestRegistryVersion )
+            return false;
+        if ( reg->domain_count < 3 )
+            return false; // at least free_tree, symbols, registry
+        // 3. System domains present with correct flags
+        static constexpr const char* kRequired[] = {
+            detail::kSystemDomainFreeTree, detail::kSystemDomainSymbols, detail::kSystemDomainRegistry };
+        for ( const char* name : kRequired )
+        {
+            const forest_domain* rec = find_domain_by_name_unlocked( name );
+            if ( rec == nullptr )
+                return false;
+            if ( ( rec->flags & detail::kForestDomainFlagSystem ) == 0 )
+                return false;
+            if ( rec->symbol_offset == 0 )
+                return false; // symbol must be interned
+        }
+        // 4. Free tree domain has binding kind kForestBindingFreeTree
+        const forest_domain* free_rec = find_domain_by_name_unlocked( detail::kSystemDomainFreeTree );
+        if ( free_rec->binding_kind != detail::kForestBindingFreeTree )
+            return false;
+        // 5. Symbol dictionary root is non-zero (at least bootstrap symbols exist)
+        if ( symbol_domain_root_offset_unlocked() == 0 )
+            return false;
+        // 6. Registry domain root matches header root_offset
+        const forest_domain* reg_rec = find_domain_by_name_unlocked( detail::kSystemDomainRegistry );
+        if ( reg_rec->root_offset != hdr->root_offset )
+            return false;
+        return true;
+    }
 
     static bool validate_or_bootstrap_forest_registry_unlocked() noexcept
     {
