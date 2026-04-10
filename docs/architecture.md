@@ -12,8 +12,9 @@ methods on the manager type. Multiple independent managers with the same configu
 coexist through the `InstanceId` template parameter (multiton pattern).
 
 The canonical high-level model of PMM as a linear persistent address space plus an intrusive
-AVL-forest is documented in [pmm_avl_forest.md](pmm_avl_forest.md). This document focuses on
-the low-level layout, invariants, and algorithms.
+AVL-forest is documented in [pmm_avl_forest.md](pmm_avl_forest.md). The canonical semantics
+of `Block` / `TreeNode` fields is documented in [block_and_treenode_semantics.md](block_and_treenode_semantics.md).
+This document focuses on the low-level layout, invariants, and algorithms.
 
 ---
 

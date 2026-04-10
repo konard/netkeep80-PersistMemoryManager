@@ -829,6 +829,7 @@ PersistMemoryManager/
 ├── docs/                             # Архитектура, API, план развития
 │   ├── plan.md                       # План развития pmm
 │   ├── pmm_avl_forest.md             # Каноническая forest-модель PMM
+│   ├── block_and_treenode_semantics.md # Каноническая семантика полей Block/TreeNode
 │   ├── architecture.md               # Архитектура и внутреннее устройство
 │   ├── api_reference.md              # Справочник API (Markdown)
 │   ├── thread_safety.md              # Потокобезопасность
@@ -899,6 +900,7 @@ cmake -B build && cmake --build build && ctest --test-dir build
 
 - [API Reference (Doxygen)](https://netkeep80.github.io/PersistMemoryManager/)
 - [PMM AVL-Forest](docs/pmm_avl_forest.md)
+- [Block and TreeNode Semantics](docs/block_and_treenode_semantics.md)
 - [Архитектура](docs/architecture.md)
 - [API Reference (Markdown)](docs/api_reference.md)
 - [Changelog](CHANGELOG.md)
