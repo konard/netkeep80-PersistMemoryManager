@@ -264,3 +264,6 @@ pmm_add_test(test_forest_registry test_forest_registry.cpp)
 
 # ─── Bootstrap invariant verification (Issue #241) ────────────────────────────
 pmm_add_test(test_issue241_bootstrap test_issue241_bootstrap.cpp)
+
+# ─── Free-tree forest-policy regression tests (Issue #243) ───────────────────
+pmm_add_test(test_issue243_free_tree_policy test_issue243_free_tree_policy.cpp)
