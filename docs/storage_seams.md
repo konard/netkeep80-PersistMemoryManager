@@ -113,7 +113,7 @@ save_manager<MgrT>(filename):
 load_manager_from_file<MgrT>(filename):
   1. Read file into backend buffer
   2. Verify CRC32
-  3. Call Mgr::load(result) — 5-phase repair
+  3. Call Mgr::load(result) — 7-phase load/repair (see mutation_ordering.md M6)
 ```
 
 **Seam insertion points:**
