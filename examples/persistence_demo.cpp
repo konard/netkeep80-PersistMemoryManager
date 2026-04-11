@@ -1,6 +1,6 @@
 /**
  * @file persistence_demo.cpp
- * @brief PersistMemoryManager persistence demo (updated #110)
+ * @brief PersistMemoryManager persistence demo
  *
  * Demonstrates:
  * 1. Creating a manager and populating with data.
@@ -10,7 +10,6 @@
  * 5. Verifying that data and metadata are fully restored.
  * 6. Continuing operations on the restored manager.
  *
- * Issue #110: uses new unified PersistMemoryManager<ConfigT, InstanceId> static API.
  * - All methods are static (Mgr::create(), Mgr::allocate(), etc.)
  * - p.resolve() — no argument needed (uses static manager resolve)
  * - pmm::save_manager<Mgr>(filename) — template-based save
@@ -33,7 +32,7 @@ static const char* IMAGE_FILE = "heap_image.dat";
 
 int main()
 {
-    std::cout << "=== PersistMemoryManager — Persistence Demo (updated #110) ===\n\n";
+    std::cout << "=== PersistMemoryManager — Persistence Demo ===\n\n";
 
     // ─── Phase A: Create and populate ────────────────────────────────────────
 

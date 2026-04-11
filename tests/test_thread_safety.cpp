@@ -1,8 +1,7 @@
 /**
  * @file test_thread_safety.cpp
- * @brief Thread safety tests for PersistMemoryManager (Phase 9, updated #102).
+ * @brief Thread safety tests for PersistMemoryManager.
  *
- * Issue #102: PersistMemoryManager<> (singleton) removed.
  * Uses MultiThreadedHeap preset (SharedMutexLock + HeapStorage).
  * reallocate_typed() removed; manual alloc-copy-free pattern used instead.
  */

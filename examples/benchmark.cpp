@@ -1,12 +1,11 @@
 /**
  * @file benchmark.cpp
- * @brief PersistMemoryManager performance benchmark (updated #110)
+ * @brief PersistMemoryManager performance benchmark
  *
  * Measures allocate/deallocate performance per target benchmarks:
  *   - allocate 100K blocks ≤ 100 ms
  *   - deallocate 100K blocks ≤ 100 ms
  *
- * Issue #110: uses new unified PersistMemoryManager<ConfigT, InstanceId> static API.
  * - All methods are static (Mgr::create(), Mgr::allocate(), etc.)
  * - p.resolve() — no argument needed (uses static manager resolve)
  * - No reallocate_typed() — uses manual alloc-copy-dealloc
@@ -202,7 +201,7 @@ static bool bench_manual_realloc()
 
 int main()
 {
-    std::cout << "=== PersistMemoryManager — Benchmark (updated #110) ===\n";
+    std::cout << "=== PersistMemoryManager — Benchmark ===\n";
     std::cout << "Targets: allocate/deallocate 100K blocks ≤ 100 ms\n\n";
 
     bool all_passed = true;
