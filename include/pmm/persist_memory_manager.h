@@ -291,18 +291,6 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     }
 
     /**
-     * @brief Load existing state from backend (compatibility path — no diagnostics report).
-     *
-     * @deprecated Prefer load(VerifyResult&) to get structured diagnostics on any repairs performed.
-     *             This overload is kept for backward compatibility only.
-     */
-    static bool load() noexcept
-    {
-        VerifyResult result;
-        return load( result );
-    }
-
-    /**
      * @brief Load existing state from backend with structured diagnostics.
      *
      * Performs verify-then-repair: first detects all violations, then applies

@@ -210,35 +210,15 @@ template <typename MgrT> inline bool load_manager_from_file( const char* filenam
         auto*         hdr          = reinterpret_cast<detail::ManagerHeader<address_traits>*>( buf + kHdrOffset );
         std::uint32_t stored_crc   = hdr->crc32;
         std::uint32_t computed_crc = detail::compute_image_crc32<address_traits>( buf, file_size );
-        if ( stored_crc != 0 && stored_crc != computed_crc )
+        if ( stored_crc != computed_crc )
         {
             MgrT::set_last_error( PmmError::CrcMismatch );
             MgrT::logging_policy::on_corruption_detected( PmmError::CrcMismatch );
             return false;
         }
-        // Note: stored_crc==0 is accepted for backward compatibility with images
-        // saved before CRC32 support was added (which had _reserved[8] zeroed).
     }
 
     return MgrT::load( result );
-}
-
-/**
- * @brief Загрузить образ менеджера из файла в PersistMemoryManager.
- *
- * Обёртка для обратной совместимости. Предпочтительно использовать перегрузку
- * с VerifyResult для получения полной диагностики восстановления.
- *
- * @tparam MgrT    Тип статического менеджера (PersistMemoryManager<ConfigT, Id>).
- * @param filename Путь к файлу с образом.
- * @return true при успешной загрузке, false при ошибке.
- *
- * @deprecated Используйте load_manager_from_file(filename, result) для получения диагностики.
- */
-template <typename MgrT> inline bool load_manager_from_file( const char* filename )
-{
-    VerifyResult result;
-    return load_manager_from_file<MgrT>( filename, result );
 }
 
 } // namespace pmm
