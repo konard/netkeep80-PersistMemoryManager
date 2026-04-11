@@ -341,7 +341,8 @@ TEST_CASE( "on_load hook", "[test_issue202_logging_hooks]" )
 
     MgrSave::create( 4096 );
     TestHookCounters::reset();
-    bool ok = pmm::load_manager_from_file<MgrSave>( "test_issue202_load.dat", pmm::VerifyResult{} );
+    pmm::VerifyResult vr_;
+    bool ok = pmm::load_manager_from_file<MgrSave>( "test_issue202_load.dat", vr_ );
     REQUIRE( ok );
     REQUIRE( TestHookCounters::load_count == 1 );
 
@@ -369,7 +370,8 @@ TEST_CASE( "on_corruption (CRC mismatch)", "[test_issue202_logging_hooks]" )
 
     MgrLogCrc::create( 4096 );
     TestHookCounters::reset();
-    bool ok = pmm::load_manager_from_file<MgrLogCrc>( "test_issue202_crc.dat", pmm::VerifyResult{} );
+    pmm::VerifyResult vr_;
+    bool ok = pmm::load_manager_from_file<MgrLogCrc>( "test_issue202_crc.dat", vr_ );
     REQUIRE( !ok );
     REQUIRE( TestHookCounters::corruption_count == 1 );
     REQUIRE( TestHookCounters::last_corrupt_err == pmm::PmmError::CrcMismatch );

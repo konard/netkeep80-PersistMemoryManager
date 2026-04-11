@@ -164,7 +164,8 @@ static void demo_persistence()
         return;
     }
 
-    if ( pmm::load_manager_from_file<SessionB>( export_file, pmm::VerifyResult{} ) )
+    pmm::VerifyResult vr;
+    if ( pmm::load_manager_from_file<SessionB>( export_file, vr ) )
     {
         // Reconstruct pptr from saved granule offset
         SessionB::pptr<double> q( saved_offset );

@@ -115,7 +115,8 @@ int main()
         return 1;
     }
 
-    if ( !pmm::load_manager_from_file<MgrB>( IMAGE_FILE, pmm::VerifyResult{} ) )
+    pmm::VerifyResult vr;
+    if ( !pmm::load_manager_from_file<MgrB>( IMAGE_FILE, vr ) )
     {
         std::cerr << "Failed to load image from file\n";
         MgrB::destroy();

@@ -529,7 +529,7 @@ TEST_CASE( "verify_repair: free-tree stale detected after save/load round-trip",
 
     // Load with VerifyResult to capture repair reporting.
     pmm::VerifyResult result;
-    REQUIRE( pmm::load_manager_from_file<Mgr6>( kFile, pmm::VerifyResult{} ) );
+    REQUIRE( pmm::load_manager_from_file<Mgr6>( kFile, result ) );
 
     // After successful load, verify should show clean state.
     pmm::VerifyResult post_result = Mgr6::verify();
@@ -564,7 +564,7 @@ TEST_CASE( "verify_repair: Repaired vs Rebuilt distinction in load repair result
     Mgr7::destroy();
 
     REQUIRE( Mgr8::create( 64 * 1024 ) );
-    REQUIRE( pmm::load_manager_from_file<Mgr8>( kFile, pmm::VerifyResult{} ) );
+    { pmm::VerifyResult vr_; REQUIRE( pmm::load_manager_from_file<Mgr8>( kFile, vr_ ) ); }
 
     // After load, verify that the image is clean (repairs applied).
     pmm::VerifyResult post = Mgr8::verify();

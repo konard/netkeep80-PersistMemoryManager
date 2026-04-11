@@ -239,7 +239,8 @@ TEST_CASE( "crc_mismatch", "[test_issue201_error_codes]" )
     // Try to load the corrupted file
     MgrCrc::create( 64 * 1024 );
     MgrCrc::clear_error();
-    bool loaded = pmm::load_manager_from_file<MgrCrc>( filename, pmm::VerifyResult{} );
+    pmm::VerifyResult vr_;
+    bool loaded = pmm::load_manager_from_file<MgrCrc>( filename, vr_ );
     REQUIRE( !loaded );
     REQUIRE( MgrCrc::last_error() == pmm::PmmError::CrcMismatch );
 

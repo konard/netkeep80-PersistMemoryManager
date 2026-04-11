@@ -121,7 +121,8 @@ int main()
         std::cout << "\nSaved manager state to: " << DEMO_FILE << "\n";
         Mgr::destroy();
 
-        if ( Mgr2::create( memory_size ) && pmm::load_manager_from_file<Mgr2>( DEMO_FILE, pmm::VerifyResult{} ) )
+        pmm::VerifyResult vr;
+        if ( Mgr2::create( memory_size ) && pmm::load_manager_from_file<Mgr2>( DEMO_FILE, vr ) )
         {
             std::cout << "Loaded manager state: " << ( Mgr2::is_initialized() ? "OK" : "FAIL" ) << "\n";
             Mgr2::destroy();
