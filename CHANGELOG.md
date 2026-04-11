@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [0.48.1] - 2026-04-11
+
+### Changed
+- Align `AvlFreeTree` with the general forest model (Issue #243):
+  - Document free-tree as a specialized forest-policy with explicit ordering semantics
+  - Clarify that `weight` serves as a state discriminator (not sort key) in the free-tree domain
+  - Add `kForestDomainName` tag to `AvlFreeTree` for forest-policy identification
+  - Update `TreeNode` field comments to use forest-model terminology
+  - Synchronize `block_and_treenode_semantics.md` and `pmm_avl_forest.md` with free-tree policy
+  - Add new canonical document: `docs/free_tree_forest_policy.md`
+
+
 ## [0.48.0] - 2026-04-11
 
 ### Added
