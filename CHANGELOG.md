@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [0.54.0] - 2026-04-11
+
+### Added
+- `docs/storage_seams.md` — canonical design document defining storage-layer extension points (seams) for encryption, compression, journaling, and crash-consistency support
+- `docs/mutation_ordering.md` — write ordering rules for all critical mutation paths with crash-consistency analysis, trust anchor identification, and partial-state tolerance specification
+
+
 ## [0.52.0] - 2026-04-11
 
 ### Added
