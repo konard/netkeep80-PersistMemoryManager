@@ -353,9 +353,9 @@ pmm::load_manager_from_file<Mgr>("heap.pmm");
 
 ## Валидация целостности
 
-### Режимы verify и repair (Issue #245)
+### Режимы verify и repair
 
-Начиная с Issue #245, библиотека предоставляет два явных режима:
+Библиотека предоставляет два явных режима:
 
 - **verify** (`Mgr::verify()`) — только диагностика, без модификации образа.
   Возвращает `VerifyResult` с типами нарушений, affected blocks, и actions.
