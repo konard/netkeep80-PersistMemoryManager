@@ -783,8 +783,9 @@ enum class PmmError : std::uint8_t
     SizeMismatch    = 8,  
     GranuleMismatch = 9,  
     BackendError    = 10, 
-    InvalidPointer  = 11, 
-    BlockLocked     = 12, 
+    InvalidPointer       = 11,
+    BlockLocked          = 12,
+    StructuralViolation  = 13,
 };
 
 inline constexpr std::size_t kGranuleSize = 16;
@@ -2469,6 +2470,29 @@ class AllocatorPolicy
         }
     }
 
+    static void verify_free_tree( const std::uint8_t* base, const detail::ManagerHeader<AddressTraitsT>* hdr,
+                                  VerifyResult& result ) noexcept
+    {
+        index_type free_count = 0;
+        index_type idx        = hdr->first_block_offset;
+        while ( idx != AddressTraitsT::no_block )
+        {
+            if ( static_cast<std::size_t>( idx ) * AddressTraitsT::granule_size + sizeof( BlockT ) > hdr->total_size )
+                break;
+            const void* blk_ptr = detail::block_at<AddressTraitsT>( base, idx );
+            if ( BlockState::get_weight( blk_ptr ) == 0 )
+                free_count++;
+            idx = BlockState::get_next_offset( blk_ptr );
+        }
+        bool root_present = ( hdr->free_tree_root != AddressTraitsT::no_block );
+        if ( ( free_count > 0 && !root_present ) || ( free_count == 0 && root_present ) )
+        {
+            result.add( ViolationType::FreeTreeStale, DiagnosticAction::NoAction, 0,
+                        static_cast<std::uint64_t>( free_count ),
+                        static_cast<std::uint64_t>( hdr->free_tree_root ) );
+        }
+    }
+
     static void realloc_shrink( std::uint8_t* base, detail::ManagerHeader<AddressTraitsT>* hdr, index_type blk_idx,
                                 void* blk_raw, index_type old_data_gran, index_type new_data_gran ) noexcept
     {
@@ -3864,8 +3888,17 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
 
     static bool load() noexcept
     {
-        VerifyResult unused;
-        return load( unused );
+        VerifyResult result;
+        bool         ok = load( result );
+        if ( !result.ok )
+        {
+            for ( std::size_t i = 0; i < result.entry_count; ++i )
+            {
+                if ( result.entries[i].type != ViolationType::HeaderCorruption )
+                    logging_policy::on_corruption_detected( PmmError::StructuralViolation );
+            }
+        }
+        return ok;
     }
 
     static bool load( VerifyResult& result ) noexcept
@@ -3906,21 +3939,52 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
             return false;
         }
         
+        std::size_t pre_block_states = result.entry_count;
         allocator::verify_block_states( base, hdr, result );
-        allocator::verify_linked_list( base, hdr, result );
-        allocator::verify_counters( base, hdr, result );
-        
-        for ( std::size_t i = 0; i < result.entry_count; ++i )
+        for ( std::size_t i = pre_block_states; i < result.entry_count; ++i )
             result.entries[i].action = DiagnosticAction::Repaired;
-        
+
+        std::size_t pre_linked_list = result.entry_count;
+        allocator::verify_linked_list( base, hdr, result );
+        for ( std::size_t i = pre_linked_list; i < result.entry_count; ++i )
+            result.entries[i].action = DiagnosticAction::Repaired;
+
+        std::size_t pre_counters = result.entry_count;
+        allocator::verify_counters( base, hdr, result );
+        for ( std::size_t i = pre_counters; i < result.entry_count; ++i )
+            result.entries[i].action = DiagnosticAction::Rebuilt;
+
+        std::size_t pre_free_tree = result.entry_count;
+        allocator::verify_free_tree( base, hdr, result );
+        for ( std::size_t i = pre_free_tree; i < result.entry_count; ++i )
+            result.entries[i].action = DiagnosticAction::Rebuilt;
+
         hdr->owns_memory     = false;
         hdr->prev_total_size = 0;
         allocator::repair_linked_list( base, hdr );
         allocator::recompute_counters( base, hdr );
         allocator::rebuild_free_tree( base, hdr );
         _initialized = true;
+
+        {
+            VerifyResult forest_verify;
+            verify_forest_registry_unlocked( forest_verify );
+            for ( std::size_t i = 0; i < forest_verify.entry_count; ++i )
+            {
+                const auto& e = forest_verify.entries[i];
+                result.add( e.type, DiagnosticAction::Repaired, e.block_index, e.expected, e.actual );
+            }
+        }
+
         if ( !validate_or_bootstrap_forest_registry_unlocked() )
         {
+            for ( std::size_t i = 0; i < result.entry_count; ++i )
+            {
+                if ( result.entries[i].type == ViolationType::ForestRegistryMissing ||
+                     result.entries[i].type == ViolationType::ForestDomainMissing ||
+                     result.entries[i].type == ViolationType::ForestDomainFlagsMissing )
+                    result.entries[i].action = DiagnosticAction::Aborted;
+            }
             _initialized = false;
             return false;
         }
@@ -5139,6 +5203,8 @@ static void verify_image_unlocked( VerifyResult& result ) noexcept
     allocator::verify_linked_list( base, hdr, result );
 
     allocator::verify_counters( base, hdr, result );
+
+    allocator::verify_free_tree( base, hdr, result );
 
     verify_forest_registry_unlocked( result );
 }

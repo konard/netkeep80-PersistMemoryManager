@@ -216,8 +216,19 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     /// @brief Load existing state from backend (default: no diagnostics report).
     static bool load() noexcept
     {
-        VerifyResult unused;
-        return load( unused );
+        VerifyResult result;
+        bool         ok = load( result );
+        // Issue #245: signal non-header violations via logging_policy so they are never silent.
+        // Header violations are already signaled inside load(VerifyResult&).
+        if ( !result.ok )
+        {
+            for ( std::size_t i = 0; i < result.entry_count; ++i )
+            {
+                if ( result.entries[i].type != ViolationType::HeaderCorruption )
+                    logging_policy::on_corruption_detected( PmmError::StructuralViolation );
+            }
+        }
+        return ok;
     }
 
     /**
@@ -268,21 +279,50 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
             return false;
         }
         // Issue #245: verify before repair — detect violations in the raw image.
-        allocator::verify_block_states( base, hdr, result );
-        allocator::verify_linked_list( base, hdr, result );
-        allocator::verify_counters( base, hdr, result );
-        // Mark repair actions for any violations found above.
-        for ( std::size_t i = 0; i < result.entry_count; ++i )
-            result.entries[i].action = DiagnosticAction::Repaired;
-        // Repair phase (same as before).
+        // Issue #245: verify before repair — detect violations, then mark with repair actions.
+        auto mark_entries = []( VerifyResult& r, std::size_t from, DiagnosticAction act )
+        {
+            for ( std::size_t i = from; i < r.entry_count; ++i )
+                r.entries[i].action = act;
+        };
+        std::size_t pre = result.entry_count;
+        allocator::verify_block_states( base, hdr, result ); // Phase 1: Repaired
+        mark_entries( result, pre, DiagnosticAction::Repaired );
+        pre = result.entry_count;
+        allocator::verify_linked_list( base, hdr, result ); // Phase 2: Repaired
+        mark_entries( result, pre, DiagnosticAction::Repaired );
+        pre = result.entry_count;
+        allocator::verify_counters( base, hdr, result ); // Phase 3: Rebuilt
+        mark_entries( result, pre, DiagnosticAction::Rebuilt );
+        pre = result.entry_count;
+        allocator::verify_free_tree( base, hdr, result ); // Phase 4: Rebuilt
+        mark_entries( result, pre, DiagnosticAction::Rebuilt );
+        // Repair phase: apply all fixes.
         hdr->owns_memory     = false;
         hdr->prev_total_size = 0;
         allocator::repair_linked_list( base, hdr );
         allocator::recompute_counters( base, hdr );
         allocator::rebuild_free_tree( base, hdr );
         _initialized = true;
+        // Phase 5: forest registry diagnostics.
+        {
+            VerifyResult forest_verify;
+            verify_forest_registry_unlocked( forest_verify );
+            for ( std::size_t i = 0; i < forest_verify.entry_count; ++i )
+            {
+                const auto& e = forest_verify.entries[i];
+                result.add( e.type, DiagnosticAction::Repaired, e.block_index, e.expected, e.actual );
+            }
+        }
         if ( !validate_or_bootstrap_forest_registry_unlocked() )
         {
+            for ( std::size_t i = 0; i < result.entry_count; ++i )
+            {
+                if ( result.entries[i].type == ViolationType::ForestRegistryMissing ||
+                     result.entries[i].type == ViolationType::ForestDomainMissing ||
+                     result.entries[i].type == ViolationType::ForestDomainFlagsMissing )
+                    result.entries[i].action = DiagnosticAction::Aborted;
+            }
             _initialized = false;
             return false;
         }

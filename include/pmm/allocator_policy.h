@@ -506,6 +506,42 @@ class AllocatorPolicy
         }
     }
 
+    /**
+     * @brief Verify free tree root consistency without modifying the image (Issue #245).
+     *
+     * Checks that the free_tree_root is consistent with the presence of free blocks.
+     * After file round-trip, AVL fields are not persisted, so the free tree root
+     * typically points to stale or zeroed AVL data. This check detects that condition.
+     *
+     * @param base    Base pointer of the managed area.
+     * @param hdr     Manager header (read-only).
+     * @param result  Diagnostic result to append violations to.
+     */
+    static void verify_free_tree( const std::uint8_t* base, const detail::ManagerHeader<AddressTraitsT>* hdr,
+                                  VerifyResult& result ) noexcept
+    {
+        // Count free blocks by walking the linked list.
+        index_type free_count = 0;
+        index_type idx        = hdr->first_block_offset;
+        while ( idx != AddressTraitsT::no_block )
+        {
+            if ( static_cast<std::size_t>( idx ) * AddressTraitsT::granule_size + sizeof( BlockT ) > hdr->total_size )
+                break;
+            const void* blk_ptr = detail::block_at<AddressTraitsT>( base, idx );
+            if ( BlockState::get_weight( blk_ptr ) == 0 )
+                free_count++;
+            idx = BlockState::get_next_offset( blk_ptr );
+        }
+        // If free blocks exist but the tree root is no_block (or vice versa),
+        // the free tree is stale and needs rebuild.
+        bool root_present = ( hdr->free_tree_root != AddressTraitsT::no_block );
+        if ( ( free_count > 0 && !root_present ) || ( free_count == 0 && root_present ) )
+        {
+            result.add( ViolationType::FreeTreeStale, DiagnosticAction::NoAction, 0,
+                        static_cast<std::uint64_t>( free_count ), static_cast<std::uint64_t>( hdr->free_tree_root ) );
+        }
+    }
+
     // ─── Issue #210: reallocate_typed helpers ─────────────────────────────────
 
     /// @brief In-place shrink: update weight, split remainder into free block + coalesce.

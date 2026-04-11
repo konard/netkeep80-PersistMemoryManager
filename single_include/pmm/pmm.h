@@ -1733,7 +1733,8 @@ enum class PmmError : std::uint8_t
     GranuleMismatch = 9,  ///< Stored granule_size does not match address_traits
     BackendError    = 10, ///< Backend returned null or invalid state
     InvalidPointer  = 11, ///< Pointer is null or out of bounds
-    BlockLocked     = 12, ///< Block is permanently locked (cannot deallocate)
+    BlockLocked          = 12, ///< Block is permanently locked (cannot deallocate)
+    StructuralViolation  = 13, ///< Non-header structural violation detected during load (Issue #245)
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -4293,6 +4294,43 @@ class AllocatorPolicy
             const void* blk_ptr = detail::block_at<AddressTraitsT>( base, idx );
             BlockState::verify_state( blk_ptr, idx, result );
             idx = BlockState::get_next_offset( blk_ptr );
+        }
+    }
+
+    /**
+     * @brief Verify free tree root consistency without modifying the image (Issue #245).
+     *
+     * Checks that the free_tree_root is consistent with the presence of free blocks.
+     * After file round-trip, AVL fields are not persisted, so the free tree root
+     * typically points to stale or zeroed AVL data. This check detects that condition.
+     *
+     * @param base    Base pointer of the managed area.
+     * @param hdr     Manager header (read-only).
+     * @param result  Diagnostic result to append violations to.
+     */
+    static void verify_free_tree( const std::uint8_t* base, const detail::ManagerHeader<AddressTraitsT>* hdr,
+                                  VerifyResult& result ) noexcept
+    {
+        // Count free blocks by walking the linked list.
+        index_type free_count = 0;
+        index_type idx        = hdr->first_block_offset;
+        while ( idx != AddressTraitsT::no_block )
+        {
+            if ( static_cast<std::size_t>( idx ) * AddressTraitsT::granule_size + sizeof( BlockT ) > hdr->total_size )
+                break;
+            const void* blk_ptr = detail::block_at<AddressTraitsT>( base, idx );
+            if ( BlockState::get_weight( blk_ptr ) == 0 )
+                free_count++;
+            idx = BlockState::get_next_offset( blk_ptr );
+        }
+        // If free blocks exist but the tree root is no_block (or vice versa),
+        // the free tree is stale and needs rebuild.
+        bool root_present = ( hdr->free_tree_root != AddressTraitsT::no_block );
+        if ( ( free_count > 0 && !root_present ) || ( free_count == 0 && root_present ) )
+        {
+            result.add( ViolationType::FreeTreeStale, DiagnosticAction::NoAction, 0,
+                        static_cast<std::uint64_t>( free_count ),
+                        static_cast<std::uint64_t>( hdr->free_tree_root ) );
         }
     }
 
@@ -6898,8 +6936,19 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     /// @brief Load existing state from backend (default: no diagnostics report).
     static bool load() noexcept
     {
-        VerifyResult unused;
-        return load( unused );
+        VerifyResult result;
+        bool         ok = load( result );
+        // Issue #245: signal non-header violations via logging_policy so they are never silent.
+        // Header violations are already signaled inside load(VerifyResult&).
+        if ( !result.ok )
+        {
+            for ( std::size_t i = 0; i < result.entry_count; ++i )
+            {
+                if ( result.entries[i].type != ViolationType::HeaderCorruption )
+                    logging_policy::on_corruption_detected( PmmError::StructuralViolation );
+            }
+        }
+        return ok;
     }
 
     /**
@@ -6949,22 +6998,49 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
                         static_cast<std::uint64_t>( hdr->granule_size ) );
             return false;
         }
-        // Issue #245: verify before repair — detect violations in the raw image.
-        allocator::verify_block_states( base, hdr, result );
-        allocator::verify_linked_list( base, hdr, result );
-        allocator::verify_counters( base, hdr, result );
-        // Mark repair actions for any violations found above.
-        for ( std::size_t i = 0; i < result.entry_count; ++i )
-            result.entries[i].action = DiagnosticAction::Repaired;
-        // Repair phase (same as before).
+        // Issue #245: verify before repair — detect violations, then mark with repair actions.
+        auto mark_entries = []( VerifyResult& r, std::size_t from, DiagnosticAction act ) {
+            for ( std::size_t i = from; i < r.entry_count; ++i )
+                r.entries[i].action = act;
+        };
+        std::size_t pre = result.entry_count;
+        allocator::verify_block_states( base, hdr, result ); // Phase 1: Repaired
+        mark_entries( result, pre, DiagnosticAction::Repaired );
+        pre = result.entry_count;
+        allocator::verify_linked_list( base, hdr, result ); // Phase 2: Repaired
+        mark_entries( result, pre, DiagnosticAction::Repaired );
+        pre = result.entry_count;
+        allocator::verify_counters( base, hdr, result ); // Phase 3: Rebuilt
+        mark_entries( result, pre, DiagnosticAction::Rebuilt );
+        pre = result.entry_count;
+        allocator::verify_free_tree( base, hdr, result ); // Phase 4: Rebuilt
+        mark_entries( result, pre, DiagnosticAction::Rebuilt );
+        // Repair phase: apply all fixes.
         hdr->owns_memory     = false;
         hdr->prev_total_size = 0;
         allocator::repair_linked_list( base, hdr );
         allocator::recompute_counters( base, hdr );
         allocator::rebuild_free_tree( base, hdr );
         _initialized = true;
+        // Phase 5: forest registry diagnostics.
+        {
+            VerifyResult forest_verify;
+            verify_forest_registry_unlocked( forest_verify );
+            for ( std::size_t i = 0; i < forest_verify.entry_count; ++i )
+            {
+                const auto& e = forest_verify.entries[i];
+                result.add( e.type, DiagnosticAction::Repaired, e.block_index, e.expected, e.actual );
+            }
+        }
         if ( !validate_or_bootstrap_forest_registry_unlocked() )
         {
+            for ( std::size_t i = 0; i < result.entry_count; ++i )
+            {
+                if ( result.entries[i].type == ViolationType::ForestRegistryMissing ||
+                     result.entries[i].type == ViolationType::ForestDomainMissing ||
+                     result.entries[i].type == ViolationType::ForestDomainFlagsMissing )
+                    result.entries[i].action = DiagnosticAction::Aborted;
+            }
             _initialized = false;
             return false;
         }
@@ -8422,7 +8498,8 @@ static void for_each_free_block_inorder( const std::uint8_t* base, const detail:
  *   1. Block state consistency (weight/root_offset mismatches)
  *   2. Linked list prev_offset correctness
  *   3. Counter consistency (block_count, free_count, alloc_count, used_size)
- *   4. Forest registry and system domain presence/flags
+ *   4. Free tree root consistency (free_tree_root vs actual free block count)
+ *   5. Forest registry and system domain presence/flags
  *
  * @param result  VerifyResult to populate with diagnostic entries.
  */
@@ -8461,7 +8538,10 @@ static void verify_image_unlocked( VerifyResult& result ) noexcept
     // 4. Counter consistency
     allocator::verify_counters( base, hdr, result );
 
-    // 5. Forest registry validation
+    // 5. Free tree root consistency
+    allocator::verify_free_tree( base, hdr, result );
+
+    // 6. Forest registry validation
     verify_forest_registry_unlocked( result );
 }
 

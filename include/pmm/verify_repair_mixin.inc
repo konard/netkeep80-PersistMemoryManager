@@ -9,7 +9,8 @@
  *   1. Block state consistency (weight/root_offset mismatches)
  *   2. Linked list prev_offset correctness
  *   3. Counter consistency (block_count, free_count, alloc_count, used_size)
- *   4. Forest registry and system domain presence/flags
+ *   4. Free tree root consistency (free_tree_root vs actual free block count)
+ *   5. Forest registry and system domain presence/flags
  *
  * @param result  VerifyResult to populate with diagnostic entries.
  */
@@ -48,7 +49,10 @@ static void verify_image_unlocked( VerifyResult& result ) noexcept
     // 4. Counter consistency
     allocator::verify_counters( base, hdr, result );
 
-    // 5. Forest registry validation
+    // 5. Free tree root consistency
+    allocator::verify_free_tree( base, hdr, result );
+
+    // 6. Forest registry validation
     verify_forest_registry_unlocked( result );
 }
 
