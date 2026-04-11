@@ -3,8 +3,8 @@
  * @brief Structural invariant tests.
  *
  * Covers test matrix group C: linked-list topology, block count
- * consistency, weight/state consistency, no overlapping blocks,
- * total size equals sum of blocks.
+ * consistency, free-tree AVL balance, weight/state consistency,
+ * no overlapping blocks, total size equals sum of blocks.
  *
  * @see docs/test_matrix.md — C1–C8
  * @see docs/core_invariants.md — B1a, B1b, B3b, B4a, B4b
@@ -16,6 +16,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstdint>
+#include <map>
 #include <vector>
 
 using AT  = pmm::DefaultAddressTraits;
@@ -138,6 +139,72 @@ TEST_CASE( "structural: block count matches walk count", "[issue258][structural]
     }
     REQUIRE( free_count == Mgr::free_block_count() );
     REQUIRE( alloc_count == Mgr::alloc_block_count() );
+
+    Mgr::destroy();
+}
+
+// ─── C3: Free-tree AVL balance ──────────────────────────────────────────────
+
+TEST_CASE( "structural: free-tree AVL balance factor within [-1,+1]", "[issue258][structural]" )
+{
+    Mgr::destroy();
+    REQUIRE( Mgr::create( 64 * 1024 ) );
+
+    // Create several free blocks of varying sizes to build a non-trivial tree.
+    std::vector<typename Mgr::template pptr<std::uint32_t>> ptrs;
+    for ( int i = 0; i < 12; ++i )
+    {
+        auto p = Mgr::allocate_typed<std::uint32_t>( 8 + i * 4 );
+        REQUIRE( !p.is_null() );
+        ptrs.push_back( p );
+    }
+    // Insert barriers to prevent coalescing of freed blocks.
+    std::vector<typename Mgr::template pptr<std::uint8_t>> barriers;
+    for ( int i = 0; i < 6; ++i )
+    {
+        auto b = Mgr::allocate_typed<std::uint8_t>( 16 );
+        REQUIRE( !b.is_null() );
+        barriers.push_back( b );
+    }
+    // Free every other block to populate the free tree with varied-size entries.
+    for ( int i = 0; i < 12; i += 2 )
+    {
+        Mgr::deallocate_typed( ptrs[static_cast<std::size_t>( i )] );
+    }
+
+    // Collect all free-tree nodes with their structural info.
+    std::map<std::ptrdiff_t, pmm::FreeBlockView> nodes;
+    Mgr::for_each_free_block( [&]( const pmm::FreeBlockView& v ) { nodes[v.offset] = v; } );
+
+    REQUIRE( nodes.size() >= 2 );
+
+    for ( const auto& [off, v] : nodes )
+    {
+        int left_h  = 0;
+        int right_h = 0;
+
+        if ( v.left_offset != -1 )
+        {
+            auto it = nodes.find( v.left_offset );
+            REQUIRE( it != nodes.end() );
+            left_h = it->second.avl_height;
+        }
+        if ( v.right_offset != -1 )
+        {
+            auto it = nodes.find( v.right_offset );
+            REQUIRE( it != nodes.end() );
+            right_h = it->second.avl_height;
+        }
+
+        int balance = left_h - right_h;
+        // AVL invariant: balance factor must be -1, 0, or +1.
+        REQUIRE( balance >= -1 );
+        REQUIRE( balance <= 1 );
+
+        // Stored height must equal max(left_h, right_h) + 1.
+        int expected_h = ( ( left_h > right_h ) ? left_h : right_h ) + 1;
+        REQUIRE( v.avl_height == expected_h );
+    }
 
     Mgr::destroy();
 }
