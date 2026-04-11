@@ -861,6 +861,9 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
     /// Byte offset of root_offset within Block<A> layout.
     static constexpr std::size_t kOffsetRootOffset = 4 * sizeof( index_type );
     /// Byte offset of avl_height within Block<A> layout (after weight+left+right+parent+root = 5 index_type fields).
+    /// Note: correct only when sizeof(index_type) is even (no alignment padding before int16_t).
+    /// For odd-sized index types, get_avl_height()/set_avl_height_of() use reinterpret_cast
+    /// to honour the compiler's actual layout including any padding.
     static constexpr std::size_t kOffsetAvlHeight = 5 * sizeof( index_type );
     /// Byte offset of node_type within Block<A> layout (after avl_height(2) = 2 bytes).
     static constexpr std::size_t kOffsetNodeType = 5 * sizeof( index_type ) + 2;
@@ -1055,101 +1058,46 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
     }
 
     // ─── Статические утилиты для AVL-дерева ────────────────────────────────
+    //
+    // Unified field access via memcpy (avoids separate cast+delegate per field).
+    // kOffset* constants are defined above; layout verified by static_assert.
 
-    /**
-     * @brief Прочитать left_offset блока.
-     */
-    static index_type get_left_offset( const void* raw_blk ) noexcept
+    /// @brief Read an index_type field from raw block memory at the given byte offset.
+    static index_type field_read_idx( const void* raw_blk, std::size_t offset ) noexcept
     {
-        return reinterpret_cast<const BlockStateBase*>( raw_blk )->left_offset();
+        index_type v;
+        std::memcpy( &v, static_cast<const std::uint8_t*>( raw_blk ) + offset, sizeof( v ) );
+        return v;
     }
-    /**
-     * @brief Прочитать right_offset блока.
-     */
-    static index_type get_right_offset( const void* raw_blk ) noexcept
+    /// @brief Write an index_type field into raw block memory at the given byte offset.
+    static void field_write_idx( void* raw_blk, std::size_t offset, index_type v ) noexcept
     {
-        return reinterpret_cast<const BlockStateBase*>( raw_blk )->right_offset();
+        std::memcpy( static_cast<std::uint8_t*>( raw_blk ) + offset, &v, sizeof( v ) );
     }
-    /**
-     * @brief Прочитать parent_offset блока.
-     */
-    static index_type get_parent_offset( const void* raw_blk ) noexcept
-    {
-        return reinterpret_cast<const BlockStateBase*>( raw_blk )->parent_offset();
-    }
-    /**
-     * @brief Прочитать avl_height блока.
-     */
+
+    static index_type get_left_offset( const void* b ) noexcept { return field_read_idx( b, kOffsetLeftOffset ); }
+    static index_type get_right_offset( const void* b ) noexcept { return field_read_idx( b, kOffsetRightOffset ); }
+    static index_type get_parent_offset( const void* b ) noexcept { return field_read_idx( b, kOffsetParentOffset ); }
+    static index_type get_root_offset( const void* b ) noexcept { return field_read_idx( b, kOffsetRootOffset ); }
+    static void set_left_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetLeftOffset, v ); }
+    static void set_right_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetRightOffset, v ); }
+    static void set_parent_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetParentOffset, v ); }
+    static void set_prev_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetPrevOffset, v ); }
+    static void set_weight_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetWeight, v ); }
+    static void set_root_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetRootOffset, v ); }
+
     static std::int16_t get_avl_height( const void* raw_blk ) noexcept
     {
         return reinterpret_cast<const BlockStateBase*>( raw_blk )->avl_height();
     }
-    /**
-     * @brief Установить left_offset блока.
-     */
-    static void set_left_offset_of( void* raw_blk, index_type v ) noexcept
-    {
-        reinterpret_cast<BlockStateBase*>( raw_blk )->set_left_offset( v );
-    }
-    /**
-     * @brief Установить right_offset блока.
-     */
-    static void set_right_offset_of( void* raw_blk, index_type v ) noexcept
-    {
-        reinterpret_cast<BlockStateBase*>( raw_blk )->set_right_offset( v );
-    }
-    /**
-     * @brief Установить parent_offset блока.
-     */
-    static void set_parent_offset_of( void* raw_blk, index_type v ) noexcept
-    {
-        reinterpret_cast<BlockStateBase*>( raw_blk )->set_parent_offset( v );
-    }
-    /**
-     * @brief Установить avl_height блока.
-     */
     static void set_avl_height_of( void* raw_blk, std::int16_t v ) noexcept
     {
         reinterpret_cast<BlockStateBase*>( raw_blk )->set_avl_height( v );
     }
-    /**
-     * @brief Прочитать root_offset блока.
-     */
-    static index_type get_root_offset( const void* raw_blk ) noexcept
-    {
-        return reinterpret_cast<const BlockStateBase*>( raw_blk )->root_offset();
-    }
-    /**
-     * @brief Установить prev_offset блока.
-     */
-    static void set_prev_offset_of( void* raw_blk, index_type v ) noexcept
-    {
-        reinterpret_cast<BlockStateBase*>( raw_blk )->set_prev_offset( v );
-    }
-    /**
-     * @brief Установить weight блока.
-     */
-    static void set_weight_of( void* raw_blk, index_type v ) noexcept
-    {
-        reinterpret_cast<BlockStateBase*>( raw_blk )->set_weight( v );
-    }
-    /**
-     * @brief Установить root_offset блока.
-     */
-    static void set_root_offset_of( void* raw_blk, index_type v ) noexcept
-    {
-        reinterpret_cast<BlockStateBase*>( raw_blk )->set_root_offset( v );
-    }
-    /**
-     * @brief Прочитать node_type блока.
-     */
     static std::uint16_t get_node_type( const void* raw_blk ) noexcept
     {
         return reinterpret_cast<const BlockStateBase*>( raw_blk )->node_type();
     }
-    /**
-     * @brief Установить node_type блока.
-     */
     static void set_node_type_of( void* raw_blk, std::uint16_t v ) noexcept
     {
         reinterpret_cast<BlockStateBase*>( raw_blk )->set_node_type( v );
@@ -1631,37 +1579,17 @@ int detect_block_state( const void* raw_blk, typename AddressTraitsT::index_type
     return -1;    // Неопределённое состояние (ошибка или переходное)
 }
 
-/**
- * @brief Восстановить блок в корректное состояние (при load()).
- *
- * Используется для восстановления после crash — приводит блок к корректному
- * состоянию (FreeBlock или AllocatedBlock) в зависимости от weight и root_offset.
- *
- * @tparam AddressTraitsT Traits адресного пространства.
- * @param raw_blk   Указатель на блок.
- * @param own_idx   Гранульный индекс данного блока.
- */
-template <typename AddressTraitsT>
-void recover_block_state( void* raw_blk, typename AddressTraitsT::index_type own_idx ) noexcept
+/// @brief Alias for BlockStateBase<AT>::recover_state().
+template <typename AT> inline void recover_block_state( void* raw_blk, typename AT::index_type own_idx ) noexcept
 {
-    BlockStateBase<AddressTraitsT>::recover_state( raw_blk, own_idx );
+    BlockStateBase<AT>::recover_state( raw_blk, own_idx );
 }
 
-/**
- * @brief Verify block state consistency without modification.
- *
- * Read-only counterpart of recover_block_state(). Reports violations into result.
- *
- * @tparam AddressTraitsT Traits адресного пространства.
- * @param raw_blk   Pointer to the block (read-only).
- * @param own_idx   Granule index of this block.
- * @param result    Diagnostic result to append violations to.
- */
-template <typename AddressTraitsT>
-void verify_block_state( const void* raw_blk, typename AddressTraitsT::index_type own_idx,
-                         VerifyResult& result ) noexcept
+/// @brief Alias for BlockStateBase<AT>::verify_state().
+template <typename AT>
+inline void verify_block_state( const void* raw_blk, typename AT::index_type own_idx, VerifyResult& result ) noexcept
 {
-    BlockStateBase<AddressTraitsT>::verify_state( raw_blk, own_idx, result );
+    BlockStateBase<AT>::verify_state( raw_blk, own_idx, result );
 }
 
 } // namespace pmm
@@ -1834,6 +1762,11 @@ static_assert( kNoBlock == pmm::DefaultAddressTraits::no_block, "kNoBlock must m
 /// For DefaultAddressTraits, kNoBlock_v<DefaultAddressTraits> == kNoBlock == 0xFFFFFFFFU.
 template <typename AddressTraitsT>
 inline constexpr typename AddressTraitsT::index_type kNoBlock_v = AddressTraitsT::no_block;
+
+/// @brief Null granule index sentinel: index_type(0) means "no data" in persistent containers.
+/// Use this instead of `static_cast<index_type>(0)` in parray, pstring, ppool, pmap.
+template <typename AddressTraitsT>
+inline constexpr typename AddressTraitsT::index_type kNullIdx_v = static_cast<typename AddressTraitsT::index_type>( 0 );
 
 /// @brief Manager header parameterized on AddressTraitsT.
 /// All _offset and counter fields use index_type, so LargeDBConfig uses uint64_t indices
@@ -4608,7 +4541,9 @@ template <typename T, typename ManagerT> struct parray
     // --- Constructor / Destructor -----------------------------------------------
 
     /// @brief Default constructor — empty array.
-    parray() noexcept : _size( 0 ), _capacity( 0 ), _data_idx( static_cast<index_type>( 0 ) ) {}
+    parray() noexcept : _size( 0 ), _capacity( 0 ), _data_idx( detail::kNullIdx_v<typename ManagerT::address_traits> )
+    {
+    }
 
     /// @brief Destructor — trivial (data is freed via free_data()).
     ~parray() noexcept = default;
@@ -4849,11 +4784,11 @@ template <typename T, typename ManagerT> struct parray
      */
     void free_data() noexcept
     {
-        if ( _data_idx != static_cast<index_type>( 0 ) )
+        if ( _data_idx != detail::kNullIdx_v<typename ManagerT::address_traits> )
         {
             ManagerT::deallocate( detail::resolve_granule_ptr<typename ManagerT::address_traits>(
                 ManagerT::backend().base_ptr(), _data_idx ) );
-            _data_idx = static_cast<index_type>( 0 );
+            _data_idx = detail::kNullIdx_v<typename ManagerT::address_traits>;
         }
         _size     = 0;
         _capacity = 0;
@@ -4928,7 +4863,7 @@ template <typename T, typename ManagerT> struct parray
         index_type    new_dat_idx = detail::ptr_to_granule_idx<typename ManagerT::address_traits>( base, new_raw );
 
         // Copy old data.
-        if ( _size > 0 && _data_idx != static_cast<index_type>( 0 ) )
+        if ( _size > 0 && _data_idx != detail::kNullIdx_v<typename ManagerT::address_traits> )
         {
             T* old_data = resolve_data();
             if ( old_data != nullptr )
@@ -4936,7 +4871,7 @@ template <typename T, typename ManagerT> struct parray
         }
 
         // Free old block.
-        if ( _data_idx != static_cast<index_type>( 0 ) )
+        if ( _data_idx != detail::kNullIdx_v<typename ManagerT::address_traits> )
             ManagerT::deallocate( detail::resolve_granule_ptr<typename ManagerT::address_traits>( base, _data_idx ) );
 
         _data_idx = new_dat_idx;
@@ -5409,7 +5344,8 @@ template <typename T, typename ManagerT> struct ppool
 
     /// @brief Default constructor — empty pool with default chunk size.
     ppool() noexcept
-        : _free_head_idx( static_cast<index_type>( 0 ) ), _chunk_head_idx( static_cast<index_type>( 0 ) ),
+        : _free_head_idx( detail::kNullIdx_v<typename ManagerT::address_traits> ),
+          _chunk_head_idx( detail::kNullIdx_v<typename ManagerT::address_traits> ),
           _objects_per_chunk( default_objects_per_chunk ), _total_allocated( 0 ), _total_capacity( 0 )
     {
     }
@@ -5428,7 +5364,7 @@ template <typename T, typename ManagerT> struct ppool
      */
     void set_objects_per_chunk( std::uint32_t n ) noexcept
     {
-        if ( n >= 1 && _chunk_head_idx == static_cast<index_type>( 0 ) )
+        if ( n >= 1 && _chunk_head_idx == detail::kNullIdx_v<typename ManagerT::address_traits> )
             _objects_per_chunk = n;
     }
 
@@ -5459,7 +5395,7 @@ template <typename T, typename ManagerT> struct ppool
     T* allocate() noexcept
     {
         // If free-list is empty, allocate a new chunk.
-        if ( _free_head_idx == static_cast<index_type>( 0 ) )
+        if ( _free_head_idx == detail::kNullIdx_v<typename ManagerT::address_traits> )
         {
             if ( !allocate_chunk() )
                 return nullptr;
@@ -5520,7 +5456,7 @@ template <typename T, typename ManagerT> struct ppool
         // Walk the chunk list and deallocate each chunk.
         std::uint8_t* base      = ManagerT::backend().base_ptr();
         index_type    chunk_idx = _chunk_head_idx;
-        while ( chunk_idx != static_cast<index_type>( 0 ) )
+        while ( chunk_idx != detail::kNullIdx_v<typename ManagerT::address_traits> )
         {
             std::uint8_t* chunk_raw = reinterpret_cast<std::uint8_t*>(
                 detail::resolve_granule_ptr<typename ManagerT::address_traits>( base, chunk_idx ) );
@@ -5535,8 +5471,8 @@ template <typename T, typename ManagerT> struct ppool
             chunk_idx = next_chunk;
         }
 
-        _free_head_idx   = static_cast<index_type>( 0 );
-        _chunk_head_idx  = static_cast<index_type>( 0 );
+        _free_head_idx   = detail::kNullIdx_v<typename ManagerT::address_traits>;
+        _chunk_head_idx  = detail::kNullIdx_v<typename ManagerT::address_traits>;
         _total_allocated = 0;
         _total_capacity  = 0;
     }
@@ -5922,7 +5858,10 @@ template <typename ManagerT> struct pstring
     // ─── Конструктор / Деструктор ────────────────────────────────────────────
 
     /// @brief Конструктор по умолчанию — пустая строка.
-    pstring() noexcept : _length( 0 ), _capacity( 0 ), _data_idx( static_cast<index_type>( 0 ) ) {}
+    pstring() noexcept
+        : _length( 0 ), _capacity( 0 ), _data_idx( detail::kNullIdx_v<typename ManagerT::address_traits> )
+    {
+    }
 
     /// @brief Деструктор — trivial (данные освобождаются через free_data()).
     ~pstring() noexcept = default;
@@ -5939,7 +5878,7 @@ template <typename ManagerT> struct pstring
      */
     const char* c_str() const noexcept
     {
-        if ( _data_idx == static_cast<index_type>( 0 ) )
+        if ( _data_idx == detail::kNullIdx_v<typename ManagerT::address_traits> )
             return "";
         char* data = resolve_data();
         return ( data != nullptr ) ? data : "";
@@ -6019,7 +5958,7 @@ template <typename ManagerT> struct pstring
     void clear() noexcept
     {
         _length = 0;
-        if ( _data_idx != static_cast<index_type>( 0 ) )
+        if ( _data_idx != detail::kNullIdx_v<typename ManagerT::address_traits> )
         {
             char* data = resolve_data();
             if ( data != nullptr )
@@ -6036,11 +5975,11 @@ template <typename ManagerT> struct pstring
      */
     void free_data() noexcept
     {
-        if ( _data_idx != static_cast<index_type>( 0 ) )
+        if ( _data_idx != detail::kNullIdx_v<typename ManagerT::address_traits> )
         {
             ManagerT::deallocate( detail::resolve_granule_ptr<typename ManagerT::address_traits>(
                 ManagerT::backend().base_ptr(), _data_idx ) );
-            _data_idx = static_cast<index_type>( 0 );
+            _data_idx = detail::kNullIdx_v<typename ManagerT::address_traits>;
         }
         _length   = 0;
         _capacity = 0;
@@ -6122,7 +6061,7 @@ template <typename ManagerT> struct pstring
         index_type    new_dat_idx = detail::ptr_to_granule_idx<typename ManagerT::address_traits>( base, new_raw );
 
         // Копируем старые данные.
-        if ( _length > 0 && _data_idx != static_cast<index_type>( 0 ) )
+        if ( _length > 0 && _data_idx != detail::kNullIdx_v<typename ManagerT::address_traits> )
         {
             char* old_data = resolve_data();
             if ( old_data != nullptr )
@@ -6135,7 +6074,7 @@ template <typename ManagerT> struct pstring
         }
 
         // Освобождаем старый блок.
-        if ( _data_idx != static_cast<index_type>( 0 ) )
+        if ( _data_idx != detail::kNullIdx_v<typename ManagerT::address_traits> )
             ManagerT::deallocate( detail::resolve_granule_ptr<typename ManagerT::address_traits>( base, _data_idx ) );
 
         _data_idx = new_dat_idx;
@@ -7470,60 +7409,59 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         return true;
     }
 
-    // ─── Методы доступа к полям AVL-узла блока ──────────
+    // ─── Методы доступа к полям AVL-узла блока ─────────────
     // Safe-wrappers over BlockStateBase get_*/set_* with manager-level guards.
-    // Condensed Doxygen to reduce file size (was near 1500-line CI limit).
 
+  private:
+    /// @brief Read an index_type AVL field from pptr's block (returns 0 for null/no_block).
+    template <typename T>
+    static index_type get_tree_idx_field( pptr<T> p, index_type ( *getter )( const void* ) ) noexcept
+    {
+        if ( p.is_null() || !_initialized )
+            return 0;
+        index_type v = getter( block_raw_ptr_from_pptr( p ) );
+        return ( v == address_traits::no_block ) ? static_cast<index_type>( 0 ) : v;
+    }
+    /// @brief Write an index_type AVL field into pptr's block (0 maps to no_block).
+    template <typename T>
+    static void set_tree_idx_field( pptr<T> p, void ( *setter )( void*, index_type ), index_type val ) noexcept
+    {
+        if ( p.is_null() || !_initialized )
+            return;
+        setter( block_raw_mut_ptr_from_pptr( p ), ( val == 0 ) ? address_traits::no_block : val );
+    }
+
+  public:
     /// @brief Get left/right/parent AVL offset for pptr's block (0 if null/no_block).
     /// @{
     template <typename T> static index_type get_tree_left_offset( pptr<T> p ) noexcept
     {
-        if ( p.is_null() || !_initialized )
-            return 0;
-        index_type v = BlockStateBase<address_traits>::get_left_offset( block_raw_ptr_from_pptr( p ) );
-        return ( v == address_traits::no_block ) ? static_cast<index_type>( 0 ) : v;
+        return get_tree_idx_field( p, &BlockStateBase<address_traits>::get_left_offset );
     }
     template <typename T> static index_type get_tree_right_offset( pptr<T> p ) noexcept
     {
-        if ( p.is_null() || !_initialized )
-            return 0;
-        index_type v = BlockStateBase<address_traits>::get_right_offset( block_raw_ptr_from_pptr( p ) );
-        return ( v == address_traits::no_block ) ? static_cast<index_type>( 0 ) : v;
+        return get_tree_idx_field( p, &BlockStateBase<address_traits>::get_right_offset );
     }
     template <typename T> static index_type get_tree_parent_offset( pptr<T> p ) noexcept
     {
-        if ( p.is_null() || !_initialized )
-            return 0;
-        index_type v = BlockStateBase<address_traits>::get_parent_offset( block_raw_ptr_from_pptr( p ) );
-        return ( v == address_traits::no_block ) ? static_cast<index_type>( 0 ) : v;
+        return get_tree_idx_field( p, &BlockStateBase<address_traits>::get_parent_offset );
     }
     /// @}
-
     /// @brief Set left/right/parent AVL offset for pptr's block (0 maps to no_block).
     /// @{
-    template <typename T> static void set_tree_left_offset( pptr<T> p, index_type left ) noexcept
+    template <typename T> static void set_tree_left_offset( pptr<T> p, index_type v ) noexcept
     {
-        if ( p.is_null() || !_initialized )
-            return;
-        index_type v = ( left == 0 ) ? address_traits::no_block : left;
-        BlockStateBase<address_traits>::set_left_offset_of( block_raw_mut_ptr_from_pptr( p ), v );
+        set_tree_idx_field( p, &BlockStateBase<address_traits>::set_left_offset_of, v );
     }
-    template <typename T> static void set_tree_right_offset( pptr<T> p, index_type right ) noexcept
+    template <typename T> static void set_tree_right_offset( pptr<T> p, index_type v ) noexcept
     {
-        if ( p.is_null() || !_initialized )
-            return;
-        index_type v = ( right == 0 ) ? address_traits::no_block : right;
-        BlockStateBase<address_traits>::set_right_offset_of( block_raw_mut_ptr_from_pptr( p ), v );
+        set_tree_idx_field( p, &BlockStateBase<address_traits>::set_right_offset_of, v );
     }
-    template <typename T> static void set_tree_parent_offset( pptr<T> p, index_type parent ) noexcept
+    template <typename T> static void set_tree_parent_offset( pptr<T> p, index_type v ) noexcept
     {
-        if ( p.is_null() || !_initialized )
-            return;
-        index_type v = ( parent == 0 ) ? address_traits::no_block : parent;
-        BlockStateBase<address_traits>::set_parent_offset_of( block_raw_mut_ptr_from_pptr( p ), v );
+        set_tree_idx_field( p, &BlockStateBase<address_traits>::set_parent_offset_of, v );
     }
     /// @}
-
     /// @brief Get/set weight (data granule count) of pptr's block.
     /// @warning set_tree_weight: use only for permanently locked blocks.
     /// @{
@@ -7568,10 +7506,27 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     }
 
     // ─── Статистика ────────────────────────────────────────────────────────────
-    // All read-only methods take shared_lock to prevent data races in
-    // multi-threaded configurations (e.g. SharedMutexLock). _initialized is
-    // std::atomic<bool> — we do a fast load first to avoid contention when not initialized.
+    // All read-only methods use read_stat() to eliminate repeated
+    // double-check-initialized + shared_lock boilerplate.
 
+  private:
+    /// @brief Shared-lock read with double-check-initialized guard.
+    /// Returns fn(hdr) if initialized, else 0.
+    template <typename Fn> static std::size_t read_stat( Fn fn ) noexcept
+    {
+        if ( !_initialized.load( std::memory_order_acquire ) )
+            return 0;
+        typename thread_policy::shared_lock_type lock( _mutex );
+        if ( !_initialized.load( std::memory_order_relaxed ) )
+            return 0;
+        return fn( get_header_c( _backend.base_ptr() ) );
+    }
+
+  public:
+    /// @brief Returns the backend's total managed memory size.
+    /// Special-cased to read from _backend (authoritative source of truth for
+    /// physical size) rather than the header, so callers always see the real
+    /// backend size even if the header is stale or corrupted.
     static std::size_t total_size() noexcept
     {
         if ( !_initialized.load( std::memory_order_acquire ) )
@@ -7579,60 +7534,30 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         typename thread_policy::shared_lock_type lock( _mutex );
         return _initialized.load( std::memory_order_relaxed ) ? _backend.total_size() : 0;
     }
-
     static std::size_t used_size() noexcept
     {
-        if ( !_initialized.load( std::memory_order_acquire ) )
-            return 0;
-        typename thread_policy::shared_lock_type lock( _mutex );
-        if ( !_initialized.load( std::memory_order_relaxed ) )
-            return 0;
-        const detail::ManagerHeader<address_traits>* hdr = get_header_c( _backend.base_ptr() );
-        // Use address_traits::granules_to_bytes() instead of deprecated detail::granules_to_bytes().
-        return address_traits::granules_to_bytes( hdr->used_size );
+        return read_stat( []( const auto* h ) { return address_traits::granules_to_bytes( h->used_size ); } );
     }
-
     static std::size_t free_size() noexcept
     {
-        if ( !_initialized.load( std::memory_order_acquire ) )
-            return 0;
-        typename thread_policy::shared_lock_type lock( _mutex );
-        if ( !_initialized.load( std::memory_order_relaxed ) )
-            return 0;
-        const detail::ManagerHeader<address_traits>* hdr = get_header_c( _backend.base_ptr() );
-        // Use address_traits::granules_to_bytes() instead of deprecated detail::granules_to_bytes().
-        std::size_t used = address_traits::granules_to_bytes( hdr->used_size );
-        return ( hdr->total_size > used ) ? ( hdr->total_size - used ) : 0;
+        return read_stat(
+            []( const auto* h )
+            {
+                std::size_t used = address_traits::granules_to_bytes( h->used_size );
+                return ( h->total_size > used ) ? ( h->total_size - used ) : std::size_t( 0 );
+            } );
     }
-
     static std::size_t block_count() noexcept
     {
-        if ( !_initialized.load( std::memory_order_acquire ) )
-            return 0;
-        typename thread_policy::shared_lock_type lock( _mutex );
-        return _initialized.load( std::memory_order_relaxed )
-                   ? static_cast<std::size_t>( get_header_c( _backend.base_ptr() )->block_count )
-                   : 0;
+        return read_stat( []( const auto* h ) { return static_cast<std::size_t>( h->block_count ); } );
     }
-
     static std::size_t free_block_count() noexcept
     {
-        if ( !_initialized.load( std::memory_order_acquire ) )
-            return 0;
-        typename thread_policy::shared_lock_type lock( _mutex );
-        return _initialized.load( std::memory_order_relaxed )
-                   ? static_cast<std::size_t>( get_header_c( _backend.base_ptr() )->free_count )
-                   : 0;
+        return read_stat( []( const auto* h ) { return static_cast<std::size_t>( h->free_count ); } );
     }
-
     static std::size_t alloc_block_count() noexcept
     {
-        if ( !_initialized.load( std::memory_order_acquire ) )
-            return 0;
-        typename thread_policy::shared_lock_type lock( _mutex );
-        return _initialized.load( std::memory_order_relaxed )
-                   ? static_cast<std::size_t>( get_header_c( _backend.base_ptr() )->alloc_count )
-                   : 0;
+        return read_stat( []( const auto* h ) { return static_cast<std::size_t>( h->alloc_count ); } );
     }
 
     // ─── Verify / Repair ───────────────────────────────────────────
