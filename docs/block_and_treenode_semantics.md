@@ -14,6 +14,7 @@
 Связанные документы:
 
 - общая forest-модель PMM: [pmm_avl_forest.md](pmm_avl_forest.md)
+- free-tree forest-policy: [free_tree_forest_policy.md](free_tree_forest_policy.md)
 - низкоуровневый layout и алгоритмы: [architecture.md](architecture.md)
 - фактические объявления: [../include/pmm/block.h](../include/pmm/block.h), [../include/pmm/tree_node.h](../include/pmm/tree_node.h)
 
@@ -205,18 +206,28 @@
 
 Именно поэтому `weight` нельзя документировать только как “allocator size field”.
 
-#### Важная оговорка про текущий код
+#### Free-tree domain: `weight` as state discriminator (Issue #243)
 
-Текущая реализация PMM по-прежнему использует `weight` как часть allocator/block-state encoding:
+In the free-tree domain, `weight` serves a specific role:
 
-- `weight == 0` участвует в кодировке свободного блока;
-- `weight > 0` используется для данных выделенного блока в гранулах.
+- `weight == 0` — block is free (part of the canonical `is_free()` check).
+- `weight > 0` — block is allocated (data granules count).
 
-Кроме того, текущий free-tree в коде может принимать решения, опираясь на физический span,
-выводимый из линейного ПАП через `next_offset`, а не только на `weight`.
+The free-tree **does not use `weight` as its sort key**. Instead, the free-tree
+derives its ordering key from linear PAP geometry: `block_size = next_offset - block_index`.
 
-Это **не отменяет** каноническую семантику поля. Это лишь означает, что текущая allocator-логика
-является специальным operational case, а не полным описанием будущей forest-модели.
+This is a deliberate forest-policy choice, not an inconsistency:
+
+1. `weight == 0` provides O(1) free/allocated discrimination without extra fields.
+2. Block size is always recoverable from the linear PAP chain.
+3. The derived key is always consistent with the physical layout after split/coalesce.
+
+The free-tree's use of `weight` as a state discriminator rather than a sort key
+is consistent with the general forest model: each domain determines its own
+semantics for `weight`. The free-tree domain simply interprets `weight` differently
+from user domains that use it as an actual sort key.
+
+See [free_tree_forest_policy.md](free_tree_forest_policy.md) for the full ordering policy.
 
 ### `root_offset`
 
