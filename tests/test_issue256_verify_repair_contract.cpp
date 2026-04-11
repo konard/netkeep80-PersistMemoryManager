@@ -293,6 +293,52 @@ TEST_CASE( "contract: non-recoverable corruption causes deterministic hard stop"
     }
 }
 
+// ─── Test 6c: verify with bad total_size → single HeaderCorruption, no deeper diagnostics
+
+TEST_CASE( "contract: verify with bad total_size stops after HeaderCorruption", "[test_issue256]" )
+{
+    setup_clean_image();
+
+    std::uint8_t* base = Mgr::backend().base_ptr();
+    auto*         hdr  = test_get_header( base );
+    auto          orig = hdr->total_size;
+    hdr->total_size    = orig + 4096; // mismatch with backend
+
+    pmm::VerifyResult v = Mgr::verify();
+    REQUIRE_FALSE( v.ok );
+    // Must produce exactly one entry: HeaderCorruption/Aborted.
+    REQUIRE( v.entry_count == 1 );
+    REQUIRE( v.entries[0].type == pmm::ViolationType::HeaderCorruption );
+    REQUIRE( v.entries[0].action == pmm::DiagnosticAction::Aborted );
+    // No deeper structural diagnostics should be present.
+
+    hdr->total_size = orig;
+    Mgr::destroy();
+}
+
+// ─── Test 6d: verify with bad granule_size → single HeaderCorruption, no deeper diagnostics
+
+TEST_CASE( "contract: verify with bad granule_size stops after HeaderCorruption", "[test_issue256]" )
+{
+    setup_clean_image();
+
+    std::uint8_t* base = Mgr::backend().base_ptr();
+    auto*         hdr  = test_get_header( base );
+    auto          orig = hdr->granule_size;
+    hdr->granule_size  = 999; // mismatch with address_traits
+
+    pmm::VerifyResult v = Mgr::verify();
+    REQUIRE_FALSE( v.ok );
+    // Must produce exactly one entry: HeaderCorruption/Aborted.
+    REQUIRE( v.entry_count == 1 );
+    REQUIRE( v.entries[0].type == pmm::ViolationType::HeaderCorruption );
+    REQUIRE( v.entries[0].action == pmm::DiagnosticAction::Aborted );
+    // No deeper structural diagnostics should be present.
+
+    hdr->granule_size = orig;
+    Mgr::destroy();
+}
+
 // ─── Test 7: allocate/deallocate do not perform hidden repair ──────────────
 
 TEST_CASE( "contract: normal operations do not perform hidden repair", "[test_issue256]" )

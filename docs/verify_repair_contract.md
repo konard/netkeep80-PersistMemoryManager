@@ -65,6 +65,8 @@ Code: `persist_memory_manager.h:1084–1095`, `verify_repair_mixin.inc:17–57`.
 - `test_issue245_verify_repair.cpp` — "verify detects missing system domain flags"
 - `test_issue256_verify_repair_contract.cpp` — "verify and load roles do not overlap"
 - `test_issue256_verify_repair_contract.cpp` — "load does not run on verify path"
+- `test_issue256_verify_repair_contract.cpp` — "verify with bad total_size stops after HeaderCorruption"
+- `test_issue256_verify_repair_contract.cpp` — "verify with bad granule_size stops after HeaderCorruption"
 
 ---
 
