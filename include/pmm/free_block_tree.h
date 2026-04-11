@@ -139,14 +139,14 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree
         bool       go_left = false;
         while ( cur != AddressTraitsT::no_block )
         {
-            parent              = cur;
-            const void* n       = detail::block_at<AddressTraitsT>( base, cur );
-            index_type  n_next  = BlockState::get_next_offset( n );
-            index_type  n_gran  = ( n_next != AddressTraitsT::no_block ) ? ( n_next - cur ) : ( total_gran - cur );
+            parent             = cur;
+            const void* n      = detail::block_at<AddressTraitsT>( base, cur );
+            index_type  n_next = BlockState::get_next_offset( n );
+            index_type  n_gran = ( n_next != AddressTraitsT::no_block ) ? ( n_next - cur ) : ( total_gran - cur );
             // Forest-policy ordering: (block_size, block_index) — smaller size goes left.
-            bool        smaller = ( blk_gran < n_gran ) || ( blk_gran == n_gran && blk_idx < cur );
-            go_left             = smaller;
-            cur                 = smaller ? BlockState::get_left_offset( n ) : BlockState::get_right_offset( n );
+            bool smaller = ( blk_gran < n_gran ) || ( blk_gran == n_gran && blk_idx < cur );
+            go_left      = smaller;
+            cur          = smaller ? BlockState::get_left_offset( n ) : BlockState::get_right_offset( n );
         }
         BlockState::set_parent_offset_of( blk, parent );
         if ( go_left )
