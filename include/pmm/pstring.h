@@ -91,7 +91,10 @@ template <typename ManagerT> struct pstring
     // ─── Конструктор / Деструктор ────────────────────────────────────────────
 
     /// @brief Конструктор по умолчанию — пустая строка.
-    pstring() noexcept : _length( 0 ), _capacity( 0 ), _data_idx( detail::kNullIdx_v<typename ManagerT::address_traits> ) {}
+    pstring() noexcept
+        : _length( 0 ), _capacity( 0 ), _data_idx( detail::kNullIdx_v<typename ManagerT::address_traits> )
+    {
+    }
 
     /// @brief Деструктор — trivial (данные освобождаются через free_data()).
     ~pstring() noexcept = default;

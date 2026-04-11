@@ -141,7 +141,8 @@ template <typename T, typename ManagerT> struct ppool
 
     /// @brief Default constructor — empty pool with default chunk size.
     ppool() noexcept
-        : _free_head_idx( detail::kNullIdx_v<typename ManagerT::address_traits> ), _chunk_head_idx( detail::kNullIdx_v<typename ManagerT::address_traits> ),
+        : _free_head_idx( detail::kNullIdx_v<typename ManagerT::address_traits> ),
+          _chunk_head_idx( detail::kNullIdx_v<typename ManagerT::address_traits> ),
           _objects_per_chunk( default_objects_per_chunk ), _total_allocated( 0 ), _total_capacity( 0 )
     {
     }

@@ -110,7 +110,9 @@ template <typename T, typename ManagerT> struct parray
     // --- Constructor / Destructor -----------------------------------------------
 
     /// @brief Default constructor — empty array.
-    parray() noexcept : _size( 0 ), _capacity( 0 ), _data_idx( detail::kNullIdx_v<typename ManagerT::address_traits> ) {}
+    parray() noexcept : _size( 0 ), _capacity( 0 ), _data_idx( detail::kNullIdx_v<typename ManagerT::address_traits> )
+    {
+    }
 
     /// @brief Destructor — trivial (data is freed via free_data()).
     ~parray() noexcept = default;

@@ -951,15 +951,33 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
   public:
     /// @brief Get left/right/parent AVL offset for pptr's block (0 if null/no_block).
     /// @{
-    template <typename T> static index_type get_tree_left_offset( pptr<T> p ) noexcept { return get_tree_idx_field( p, &BlockStateBase<address_traits>::get_left_offset ); }
-    template <typename T> static index_type get_tree_right_offset( pptr<T> p ) noexcept { return get_tree_idx_field( p, &BlockStateBase<address_traits>::get_right_offset ); }
-    template <typename T> static index_type get_tree_parent_offset( pptr<T> p ) noexcept { return get_tree_idx_field( p, &BlockStateBase<address_traits>::get_parent_offset ); }
+    template <typename T> static index_type get_tree_left_offset( pptr<T> p ) noexcept
+    {
+        return get_tree_idx_field( p, &BlockStateBase<address_traits>::get_left_offset );
+    }
+    template <typename T> static index_type get_tree_right_offset( pptr<T> p ) noexcept
+    {
+        return get_tree_idx_field( p, &BlockStateBase<address_traits>::get_right_offset );
+    }
+    template <typename T> static index_type get_tree_parent_offset( pptr<T> p ) noexcept
+    {
+        return get_tree_idx_field( p, &BlockStateBase<address_traits>::get_parent_offset );
+    }
     /// @}
     /// @brief Set left/right/parent AVL offset for pptr's block (0 maps to no_block).
     /// @{
-    template <typename T> static void set_tree_left_offset( pptr<T> p, index_type v ) noexcept { set_tree_idx_field( p, &BlockStateBase<address_traits>::set_left_offset_of, v ); }
-    template <typename T> static void set_tree_right_offset( pptr<T> p, index_type v ) noexcept { set_tree_idx_field( p, &BlockStateBase<address_traits>::set_right_offset_of, v ); }
-    template <typename T> static void set_tree_parent_offset( pptr<T> p, index_type v ) noexcept { set_tree_idx_field( p, &BlockStateBase<address_traits>::set_parent_offset_of, v ); }
+    template <typename T> static void set_tree_left_offset( pptr<T> p, index_type v ) noexcept
+    {
+        set_tree_idx_field( p, &BlockStateBase<address_traits>::set_left_offset_of, v );
+    }
+    template <typename T> static void set_tree_right_offset( pptr<T> p, index_type v ) noexcept
+    {
+        set_tree_idx_field( p, &BlockStateBase<address_traits>::set_right_offset_of, v );
+    }
+    template <typename T> static void set_tree_parent_offset( pptr<T> p, index_type v ) noexcept
+    {
+        set_tree_idx_field( p, &BlockStateBase<address_traits>::set_parent_offset_of, v );
+    }
     /// @}
     /// @brief Get/set weight (data granule count) of pptr's block.
     /// @warning set_tree_weight: use only for permanently locked blocks.
@@ -1032,11 +1050,12 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     }
     static std::size_t free_size() noexcept
     {
-        return read_stat( []( const auto* h )
-        {
-            std::size_t used = address_traits::granules_to_bytes( h->used_size );
-            return ( h->total_size > used ) ? ( h->total_size - used ) : std::size_t( 0 );
-        } );
+        return read_stat(
+            []( const auto* h )
+            {
+                std::size_t used = address_traits::granules_to_bytes( h->used_size );
+                return ( h->total_size > used ) ? ( h->total_size - used ) : std::size_t( 0 );
+            } );
     }
     static std::size_t block_count() noexcept
     {

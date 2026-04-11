@@ -1075,16 +1075,16 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
         std::memcpy( static_cast<std::uint8_t*>( raw_blk ) + offset, &v, sizeof( v ) );
     }
 
-    static index_type     get_left_offset( const void* b ) noexcept { return field_read_idx( b, kOffsetLeftOffset ); }
-    static index_type     get_right_offset( const void* b ) noexcept { return field_read_idx( b, kOffsetRightOffset ); }
-    static index_type     get_parent_offset( const void* b ) noexcept { return field_read_idx( b, kOffsetParentOffset ); }
-    static index_type     get_root_offset( const void* b ) noexcept { return field_read_idx( b, kOffsetRootOffset ); }
-    static void           set_left_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetLeftOffset, v ); }
-    static void           set_right_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetRightOffset, v ); }
-    static void           set_parent_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetParentOffset, v ); }
-    static void           set_prev_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetPrevOffset, v ); }
-    static void           set_weight_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetWeight, v ); }
-    static void           set_root_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetRootOffset, v ); }
+    static index_type get_left_offset( const void* b ) noexcept { return field_read_idx( b, kOffsetLeftOffset ); }
+    static index_type get_right_offset( const void* b ) noexcept { return field_read_idx( b, kOffsetRightOffset ); }
+    static index_type get_parent_offset( const void* b ) noexcept { return field_read_idx( b, kOffsetParentOffset ); }
+    static index_type get_root_offset( const void* b ) noexcept { return field_read_idx( b, kOffsetRootOffset ); }
+    static void set_left_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetLeftOffset, v ); }
+    static void set_right_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetRightOffset, v ); }
+    static void set_parent_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetParentOffset, v ); }
+    static void set_prev_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetPrevOffset, v ); }
+    static void set_weight_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetWeight, v ); }
+    static void set_root_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetRootOffset, v ); }
 
     static std::int16_t get_avl_height( const void* raw_blk ) noexcept
     {
@@ -1580,8 +1580,7 @@ int detect_block_state( const void* raw_blk, typename AddressTraitsT::index_type
 }
 
 /// @brief Alias for BlockStateBase<AT>::recover_state().
-template <typename AT>
-inline void recover_block_state( void* raw_blk, typename AT::index_type own_idx ) noexcept
+template <typename AT> inline void recover_block_state( void* raw_blk, typename AT::index_type own_idx ) noexcept
 {
     BlockStateBase<AT>::recover_state( raw_blk, own_idx );
 }
@@ -4542,7 +4541,9 @@ template <typename T, typename ManagerT> struct parray
     // --- Constructor / Destructor -----------------------------------------------
 
     /// @brief Default constructor — empty array.
-    parray() noexcept : _size( 0 ), _capacity( 0 ), _data_idx( detail::kNullIdx_v<typename ManagerT::address_traits> ) {}
+    parray() noexcept : _size( 0 ), _capacity( 0 ), _data_idx( detail::kNullIdx_v<typename ManagerT::address_traits> )
+    {
+    }
 
     /// @brief Destructor — trivial (data is freed via free_data()).
     ~parray() noexcept = default;
@@ -5343,7 +5344,8 @@ template <typename T, typename ManagerT> struct ppool
 
     /// @brief Default constructor — empty pool with default chunk size.
     ppool() noexcept
-        : _free_head_idx( detail::kNullIdx_v<typename ManagerT::address_traits> ), _chunk_head_idx( detail::kNullIdx_v<typename ManagerT::address_traits> ),
+        : _free_head_idx( detail::kNullIdx_v<typename ManagerT::address_traits> ),
+          _chunk_head_idx( detail::kNullIdx_v<typename ManagerT::address_traits> ),
           _objects_per_chunk( default_objects_per_chunk ), _total_allocated( 0 ), _total_capacity( 0 )
     {
     }
@@ -5856,7 +5858,10 @@ template <typename ManagerT> struct pstring
     // ─── Конструктор / Деструктор ────────────────────────────────────────────
 
     /// @brief Конструктор по умолчанию — пустая строка.
-    pstring() noexcept : _length( 0 ), _capacity( 0 ), _data_idx( detail::kNullIdx_v<typename ManagerT::address_traits> ) {}
+    pstring() noexcept
+        : _length( 0 ), _capacity( 0 ), _data_idx( detail::kNullIdx_v<typename ManagerT::address_traits> )
+    {
+    }
 
     /// @brief Деструктор — trivial (данные освобождаются через free_data()).
     ~pstring() noexcept = default;
@@ -7429,15 +7434,33 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
   public:
     /// @brief Get left/right/parent AVL offset for pptr's block (0 if null/no_block).
     /// @{
-    template <typename T> static index_type get_tree_left_offset( pptr<T> p ) noexcept { return get_tree_idx_field( p, &BlockStateBase<address_traits>::get_left_offset ); }
-    template <typename T> static index_type get_tree_right_offset( pptr<T> p ) noexcept { return get_tree_idx_field( p, &BlockStateBase<address_traits>::get_right_offset ); }
-    template <typename T> static index_type get_tree_parent_offset( pptr<T> p ) noexcept { return get_tree_idx_field( p, &BlockStateBase<address_traits>::get_parent_offset ); }
+    template <typename T> static index_type get_tree_left_offset( pptr<T> p ) noexcept
+    {
+        return get_tree_idx_field( p, &BlockStateBase<address_traits>::get_left_offset );
+    }
+    template <typename T> static index_type get_tree_right_offset( pptr<T> p ) noexcept
+    {
+        return get_tree_idx_field( p, &BlockStateBase<address_traits>::get_right_offset );
+    }
+    template <typename T> static index_type get_tree_parent_offset( pptr<T> p ) noexcept
+    {
+        return get_tree_idx_field( p, &BlockStateBase<address_traits>::get_parent_offset );
+    }
     /// @}
     /// @brief Set left/right/parent AVL offset for pptr's block (0 maps to no_block).
     /// @{
-    template <typename T> static void set_tree_left_offset( pptr<T> p, index_type v ) noexcept { set_tree_idx_field( p, &BlockStateBase<address_traits>::set_left_offset_of, v ); }
-    template <typename T> static void set_tree_right_offset( pptr<T> p, index_type v ) noexcept { set_tree_idx_field( p, &BlockStateBase<address_traits>::set_right_offset_of, v ); }
-    template <typename T> static void set_tree_parent_offset( pptr<T> p, index_type v ) noexcept { set_tree_idx_field( p, &BlockStateBase<address_traits>::set_parent_offset_of, v ); }
+    template <typename T> static void set_tree_left_offset( pptr<T> p, index_type v ) noexcept
+    {
+        set_tree_idx_field( p, &BlockStateBase<address_traits>::set_left_offset_of, v );
+    }
+    template <typename T> static void set_tree_right_offset( pptr<T> p, index_type v ) noexcept
+    {
+        set_tree_idx_field( p, &BlockStateBase<address_traits>::set_right_offset_of, v );
+    }
+    template <typename T> static void set_tree_parent_offset( pptr<T> p, index_type v ) noexcept
+    {
+        set_tree_idx_field( p, &BlockStateBase<address_traits>::set_parent_offset_of, v );
+    }
     /// @}
     /// @brief Get/set weight (data granule count) of pptr's block.
     /// @warning set_tree_weight: use only for permanently locked blocks.
@@ -7510,11 +7533,12 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     }
     static std::size_t free_size() noexcept
     {
-        return read_stat( []( const auto* h )
-        {
-            std::size_t used = address_traits::granules_to_bytes( h->used_size );
-            return ( h->total_size > used ) ? ( h->total_size - used ) : std::size_t( 0 );
-        } );
+        return read_stat(
+            []( const auto* h )
+            {
+                std::size_t used = address_traits::granules_to_bytes( h->used_size );
+                return ( h->total_size > used ) ? ( h->total_size - used ) : std::size_t( 0 );
+            } );
     }
     static std::size_t block_count() noexcept
     {

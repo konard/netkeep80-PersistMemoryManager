@@ -315,16 +315,16 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
         std::memcpy( static_cast<std::uint8_t*>( raw_blk ) + offset, &v, sizeof( v ) );
     }
 
-    static index_type     get_left_offset( const void* b ) noexcept { return field_read_idx( b, kOffsetLeftOffset ); }
-    static index_type     get_right_offset( const void* b ) noexcept { return field_read_idx( b, kOffsetRightOffset ); }
-    static index_type     get_parent_offset( const void* b ) noexcept { return field_read_idx( b, kOffsetParentOffset ); }
-    static index_type     get_root_offset( const void* b ) noexcept { return field_read_idx( b, kOffsetRootOffset ); }
-    static void           set_left_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetLeftOffset, v ); }
-    static void           set_right_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetRightOffset, v ); }
-    static void           set_parent_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetParentOffset, v ); }
-    static void           set_prev_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetPrevOffset, v ); }
-    static void           set_weight_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetWeight, v ); }
-    static void           set_root_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetRootOffset, v ); }
+    static index_type get_left_offset( const void* b ) noexcept { return field_read_idx( b, kOffsetLeftOffset ); }
+    static index_type get_right_offset( const void* b ) noexcept { return field_read_idx( b, kOffsetRightOffset ); }
+    static index_type get_parent_offset( const void* b ) noexcept { return field_read_idx( b, kOffsetParentOffset ); }
+    static index_type get_root_offset( const void* b ) noexcept { return field_read_idx( b, kOffsetRootOffset ); }
+    static void set_left_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetLeftOffset, v ); }
+    static void set_right_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetRightOffset, v ); }
+    static void set_parent_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetParentOffset, v ); }
+    static void set_prev_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetPrevOffset, v ); }
+    static void set_weight_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetWeight, v ); }
+    static void set_root_offset_of( void* b, index_type v ) noexcept { field_write_idx( b, kOffsetRootOffset, v ); }
 
     static std::int16_t get_avl_height( const void* raw_blk ) noexcept
     {
@@ -820,8 +820,7 @@ int detect_block_state( const void* raw_blk, typename AddressTraitsT::index_type
 }
 
 /// @brief Alias for BlockStateBase<AT>::recover_state().
-template <typename AT>
-inline void recover_block_state( void* raw_blk, typename AT::index_type own_idx ) noexcept
+template <typename AT> inline void recover_block_state( void* raw_blk, typename AT::index_type own_idx ) noexcept
 {
     BlockStateBase<AT>::recover_state( raw_blk, own_idx );
 }
