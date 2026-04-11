@@ -969,30 +969,6 @@ template <typename AddressTraitsT> inline typename AddressTraitsT::index_type by
     return static_cast<IndexT>( byte_off / AddressTraitsT::granule_size );
 }
 
-[[deprecated( "Use bytes_to_granules_t<DefaultAddressTraits>() — will be removed in v1.0" )]]
-inline std::uint32_t bytes_to_granules( std::size_t bytes )
-{
-    return bytes_to_granules_t<pmm::DefaultAddressTraits>( bytes );
-}
-
-[[deprecated( "Use DefaultAddressTraits::granules_to_bytes() — will be removed in v1.0" )]]
-inline std::size_t granules_to_bytes( std::uint32_t granules )
-{
-    return pmm::DefaultAddressTraits::granules_to_bytes( granules );
-}
-
-[[deprecated( "Use DefaultAddressTraits::idx_to_byte_off() — will be removed in v1.0" )]]
-inline std::size_t idx_to_byte_off( std::uint32_t idx )
-{
-    return pmm::DefaultAddressTraits::idx_to_byte_off( idx );
-}
-
-[[deprecated( "Use byte_off_to_idx_t<DefaultAddressTraits>() — will be removed in v1.0" )]]
-inline std::uint32_t byte_off_to_idx( std::size_t byte_off )
-{
-    return byte_off_to_idx_t<pmm::DefaultAddressTraits>( byte_off );
-}
-
 inline bool is_valid_alignment( std::size_t align )
 {
     return align == kGranuleSize;
@@ -1012,13 +988,6 @@ inline const pmm::Block<AddressTraitsT>* block_at( const std::uint8_t* base, typ
     assert( idx != kNoBlock_v<AddressTraitsT> );
     return reinterpret_cast<const pmm::Block<AddressTraitsT>*>( base + static_cast<std::size_t>( idx ) *
                                                                            AddressTraitsT::granule_size );
-}
-
-inline std::uint32_t block_idx( const std::uint8_t* base, const pmm::Block<pmm::DefaultAddressTraits>* block )
-{
-    std::size_t byte_off = reinterpret_cast<const std::uint8_t*>( block ) - base;
-    assert( byte_off % kGranuleSize == 0 );
-    return static_cast<std::uint32_t>( byte_off / kGranuleSize );
 }
 
 template <typename AddressTraitsT>
@@ -1041,18 +1010,6 @@ inline constexpr typename AddressTraitsT::index_type kManagerHeaderGranules_t =
         ( sizeof( ManagerHeader<AddressTraitsT> ) + AddressTraitsT::granule_size - 1 ) / AddressTraitsT::granule_size );
 
 template <typename AddressTraitsT>
-inline typename AddressTraitsT::index_type to_u32_idx( typename AddressTraitsT::index_type v )
-{
-    return v;
-}
-
-template <typename AddressTraitsT>
-inline typename AddressTraitsT::index_type from_u32_idx( typename AddressTraitsT::index_type v )
-{
-    return v;
-}
-
-template <typename AddressTraitsT>
 inline typename AddressTraitsT::index_type block_total_granules( const std::uint8_t*                  base,
                                                                  const ManagerHeader<AddressTraitsT>* hdr,
                                                                  const pmm::Block<AddressTraitsT>*    blk )
@@ -1069,43 +1026,6 @@ inline typename AddressTraitsT::index_type block_total_granules( const std::uint
     if ( next_off != kNoBlk )
         return static_cast<IndexT>( next_off - this_idx );
     return static_cast<IndexT>( total_gran - this_idx );
-}
-
-inline bool is_valid_block( const std::uint8_t* base, const ManagerHeader<pmm::DefaultAddressTraits>* hdr,
-                            std::uint32_t idx )
-{
-    using BlockState = pmm::BlockStateBase<pmm::DefaultAddressTraits>;
-    if ( idx == kNoBlock )
-        return false;
-    if ( idx_to_byte_off_t<pmm::DefaultAddressTraits>( idx ) + sizeof( pmm::Block<pmm::DefaultAddressTraits> ) >
-         hdr->total_size )
-        return false;
-
-    const void*   blk      = base + idx_to_byte_off_t<pmm::DefaultAddressTraits>( idx );
-    auto          next_off = BlockState::get_next_offset( blk );
-    std::uint32_t total_gran =
-        ( next_off != kNoBlock )
-            ? ( next_off - idx )
-            : ( byte_off_to_idx_t<pmm::DefaultAddressTraits>( static_cast<std::size_t>( hdr->total_size ) ) - idx );
-    if ( BlockState::get_weight( blk ) >= total_gran )
-        return false;
-    auto prev_off = BlockState::get_prev_offset( blk );
-    if ( prev_off != kNoBlock && prev_off >= idx )
-        return false;
-    if ( next_off != kNoBlock && next_off <= idx )
-        return false;
-    if ( BlockState::get_avl_height( blk ) >= 32 )
-        return false;
-    auto       left_off   = BlockState::get_left_offset( blk );
-    auto       right_off  = BlockState::get_right_offset( blk );
-    auto       parent_off = BlockState::get_parent_offset( blk );
-    const bool l          = ( left_off != kNoBlock );
-    const bool r          = ( right_off != kNoBlock );
-    const bool p          = ( parent_off != kNoBlock );
-    if ( ( l || r || p ) && ( ( l && r && left_off == right_off ) || ( l && p && left_off == parent_off ) ||
-                              ( r && p && right_off == parent_off ) ) )
-        return false;
-    return true;
 }
 
 template <typename AddressTraitsT>
@@ -1156,15 +1076,6 @@ inline pmm::Block<AddressTraitsT>* header_from_ptr_t( std::uint8_t* base, void* 
     if ( cand_addr < base || cand_addr + kBlockSize > base + total_size )
         return nullptr;
     return reinterpret_cast<pmm::Block<AddressTraitsT>*>( cand_addr );
-}
-
-[[deprecated( "Use required_block_granules_t<DefaultAddressTraits>() — will be removed in v1.0" )]]
-inline std::uint32_t required_block_granules( std::size_t user_bytes )
-{
-    std::uint32_t data_granules = bytes_to_granules_t<pmm::DefaultAddressTraits>( user_bytes );
-    if ( data_granules == 0 )
-        data_granules = 1;
-    return kBlockHeaderGranules_t<pmm::DefaultAddressTraits> + data_granules;
 }
 
 template <typename AddressTraitsT>
@@ -1672,11 +1583,6 @@ concept FreeBlockTreePolicyForTraitsConcept = requires( std::uint8_t* base, deta
     { Policy::find_best_fit( base, hdr, idx ) } -> std::convertible_to<typename AddressTraitsT::index_type>;
 };
 
-template <typename Policy>
-concept FreeBlockTreePolicyConcept = FreeBlockTreePolicyForTraitsConcept<Policy, DefaultAddressTraits>;
-
-template <typename Policy> inline constexpr bool is_free_block_tree_policy_v = FreeBlockTreePolicyConcept<Policy>;
-
 template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree
 {
     using address_traits = AddressTraitsT;
@@ -1832,10 +1738,8 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree
     }
 };
 
-static_assert( is_free_block_tree_policy_v<AvlFreeTree<DefaultAddressTraits>>,
-               "AvlFreeTree<DefaultAddressTraits> must satisfy FreeBlockTreePolicy" );
-
-using PersistentAvlTree = AvlFreeTree<DefaultAddressTraits>;
+static_assert( FreeBlockTreePolicyForTraitsConcept<AvlFreeTree<DefaultAddressTraits>, DefaultAddressTraits>,
+               "AvlFreeTree<DefaultAddressTraits> must satisfy FreeBlockTreePolicyForTraitsConcept" );
 
 } 
 
@@ -3882,12 +3786,6 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         return ok;
     }
 
-    static bool load() noexcept
-    {
-        VerifyResult result;
-        return load( result );
-    }
-
     static bool load( VerifyResult& result ) noexcept
     {
         result.mode = RecoveryMode::Repair;
@@ -5550,22 +5448,15 @@ template <typename MgrT> inline bool load_manager_from_file( const char* filenam
         auto*         hdr          = reinterpret_cast<detail::ManagerHeader<address_traits>*>( buf + kHdrOffset );
         std::uint32_t stored_crc   = hdr->crc32;
         std::uint32_t computed_crc = detail::compute_image_crc32<address_traits>( buf, file_size );
-        if ( stored_crc != 0 && stored_crc != computed_crc )
+        if ( stored_crc != computed_crc )
         {
             MgrT::set_last_error( PmmError::CrcMismatch );
             MgrT::logging_policy::on_corruption_detected( PmmError::CrcMismatch );
             return false;
         }
-        
     }
 
     return MgrT::load( result );
-}
-
-template <typename MgrT> inline bool load_manager_from_file( const char* filename )
-{
-    VerifyResult result;
-    return load_manager_from_file<MgrT>( filename, result );
 }
 
 } 

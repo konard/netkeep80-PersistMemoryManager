@@ -37,9 +37,9 @@ using Mgr = pmm::presets::SingleThreadedHeap;
 TEST_CASE( "A1: granule_size constant", "[test_issue87_abstraction]" )
 {
     static_assert( pmm::kGranuleSize == 16, "kGranuleSize must be 16" );
-    REQUIRE( pmm::detail::bytes_to_granules( 16 ) == 1 );
-    REQUIRE( pmm::detail::bytes_to_granules( 17 ) == 2 );
-    REQUIRE( pmm::detail::granules_to_bytes( 1 ) == 16 );
+    REQUIRE( pmm::detail::bytes_to_granules_t<pmm::DefaultAddressTraits>( 16 ) == 1 );
+    REQUIRE( pmm::detail::bytes_to_granules_t<pmm::DefaultAddressTraits>( 17 ) == 2 );
+    REQUIRE( pmm::DefaultAddressTraits::granules_to_bytes( 1 ) == 16 );
 }
 
 TEST_CASE( "A2: kNoBlock is max uint32", "[test_issue87_abstraction]" )
@@ -106,12 +106,12 @@ TEST_CASE( "A6: config constants", "[test_issue87_abstraction]" )
     static_assert( pmm::config::kDefaultGrowDenominator == 4 );
 }
 
-// ─── A5: PersistentAvlTree is standalone ────────────────────────────────────
+// ─── A5: AvlFreeTree<DefaultAddressTraits> is standalone ────────────────────────────────────
 
-TEST_CASE( "A7: PersistentAvlTree is standalone", "[test_issue87_abstraction]" )
+TEST_CASE( "A7: AvlFreeTree<DefaultAddressTraits> is standalone", "[test_issue87_abstraction]" )
 {
-    static_assert( !std::is_constructible<pmm::PersistentAvlTree>::value,
-                   "PersistentAvlTree must not be constructible (all-static)" );
+    static_assert( !std::is_constructible<pmm::AvlFreeTree<pmm::DefaultAddressTraits>>::value,
+                   "AvlFreeTree<DefaultAddressTraits> must not be constructible (all-static)" );
 
     Mgr pmm;
     REQUIRE( pmm.create( 64 * 1024 ) );
@@ -249,7 +249,10 @@ TEST_CASE( "C2: persistence save/load", "[test_issue87_abstraction]" )
 
     Mgr pmm2;
     REQUIRE( pmm2.create( 64 * 1024 ) );
-    REQUIRE( pmm::load_manager_from_file<decltype( pmm2 )>( TEST_FILE ) );
+    {
+        pmm::VerifyResult vr_;
+        REQUIRE( pmm::load_manager_from_file<decltype( pmm2 )>( TEST_FILE, vr_ ) );
+    }
     REQUIRE( pmm2.is_initialized() );
 
     Mgr::pptr<std::uint64_t> p2( saved_offset );

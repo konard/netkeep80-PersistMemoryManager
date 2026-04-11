@@ -65,24 +65,6 @@ concept FreeBlockTreePolicyForTraitsConcept = requires( std::uint8_t* base, deta
 };
 
 /**
- * @brief C++20 concept: validates that Policy is a correct free-tree forest-policy.
- *
- * Backward-compatibility variant checked against DefaultAddressTraits (uint32_t, 16B granule).
- * For checking against a specific AddressTraitsT, use FreeBlockTreePolicyForTraitsConcept<Policy, AT>.
- *
- * @tparam Policy  Type to check against the concept.
- */
-template <typename Policy>
-concept FreeBlockTreePolicyConcept = FreeBlockTreePolicyForTraitsConcept<Policy, DefaultAddressTraits>;
-
-/**
- * @brief Вспомогательная переменная: true если Policy удовлетворяет FreeBlockTreePolicyConcept.
- *
- * @tparam Policy  Тип, проверяемый на соответствие концепту.
- */
-template <typename Policy> inline constexpr bool is_free_block_tree_policy_v = FreeBlockTreePolicyConcept<Policy>;
-
-/**
  * @brief Specialized forest-policy: AVL tree for the free-tree domain.
  *
  * All-static class implementing the free-tree forest-policy.
@@ -267,11 +249,7 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree
 
 // ─── Static_assert: AvlFreeTree satisfies the concept ────────────────────────
 
-static_assert( is_free_block_tree_policy_v<AvlFreeTree<DefaultAddressTraits>>,
-               "AvlFreeTree<DefaultAddressTraits> must satisfy FreeBlockTreePolicy" );
-
-/// @brief Backward compatibility alias for PersistentAvlTree.
-/// Deprecated: Use AvlFreeTree<DefaultAddressTraits> instead.
-using PersistentAvlTree = AvlFreeTree<DefaultAddressTraits>;
+static_assert( FreeBlockTreePolicyForTraitsConcept<AvlFreeTree<DefaultAddressTraits>, DefaultAddressTraits>,
+               "AvlFreeTree<DefaultAddressTraits> must satisfy FreeBlockTreePolicyForTraitsConcept" );
 
 } // namespace pmm
