@@ -4340,9 +4340,13 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     }
 
   public:
+    
     static std::size_t total_size() noexcept
     {
-        return read_stat( []( const auto* h ) { return static_cast<std::size_t>( h->total_size ); } );
+        if ( !_initialized.load( std::memory_order_acquire ) )
+            return 0;
+        typename thread_policy::shared_lock_type lock( _mutex );
+        return _initialized.load( std::memory_order_relaxed ) ? _backend.total_size() : 0;
     }
     static std::size_t used_size() noexcept
     {

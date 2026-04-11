@@ -7409,7 +7409,7 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         return true;
     }
 
-    // ──��� Методы дост��па к полям AVL-узла блока ──────────
+    // ─── Методы доступа к полям AVL-узла блока ─────────────
     // Safe-wrappers over BlockStateBase get_*/set_* with manager-level guards.
 
   private:
@@ -7523,9 +7523,16 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     }
 
   public:
+    /// @brief Returns the backend's total managed memory size.
+    /// Special-cased to read from _backend (authoritative source of truth for
+    /// physical size) rather than the header, so callers always see the real
+    /// backend size even if the header is stale or corrupted.
     static std::size_t total_size() noexcept
     {
-        return read_stat( []( const auto* h ) { return static_cast<std::size_t>( h->total_size ); } );
+        if ( !_initialized.load( std::memory_order_acquire ) )
+            return 0;
+        typename thread_policy::shared_lock_type lock( _mutex );
+        return _initialized.load( std::memory_order_relaxed ) ? _backend.total_size() : 0;
     }
     static std::size_t used_size() noexcept
     {
