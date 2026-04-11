@@ -101,6 +101,9 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
     /// Byte offset of root_offset within Block<A> layout.
     static constexpr std::size_t kOffsetRootOffset = 4 * sizeof( index_type );
     /// Byte offset of avl_height within Block<A> layout (after weight+left+right+parent+root = 5 index_type fields).
+    /// Note: correct only when sizeof(index_type) is even (no alignment padding before int16_t).
+    /// For odd-sized index types, get_avl_height()/set_avl_height_of() use reinterpret_cast
+    /// to honour the compiler's actual layout including any padding.
     static constexpr std::size_t kOffsetAvlHeight = 5 * sizeof( index_type );
     /// Byte offset of node_type within Block<A> layout (after avl_height(2) = 2 bytes).
     static constexpr std::size_t kOffsetNodeType = 5 * sizeof( index_type ) + 2;
@@ -325,23 +328,19 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
 
     static std::int16_t get_avl_height( const void* raw_blk ) noexcept
     {
-        std::int16_t v;
-        std::memcpy( &v, static_cast<const std::uint8_t*>( raw_blk ) + kOffsetAvlHeight, sizeof( v ) );
-        return v;
+        return reinterpret_cast<const BlockStateBase*>( raw_blk )->avl_height();
     }
     static void set_avl_height_of( void* raw_blk, std::int16_t v ) noexcept
     {
-        std::memcpy( static_cast<std::uint8_t*>( raw_blk ) + kOffsetAvlHeight, &v, sizeof( v ) );
+        reinterpret_cast<BlockStateBase*>( raw_blk )->set_avl_height( v );
     }
     static std::uint16_t get_node_type( const void* raw_blk ) noexcept
     {
-        std::uint16_t v;
-        std::memcpy( &v, static_cast<const std::uint8_t*>( raw_blk ) + kOffsetNodeType, sizeof( v ) );
-        return v;
+        return reinterpret_cast<const BlockStateBase*>( raw_blk )->node_type();
     }
     static void set_node_type_of( void* raw_blk, std::uint16_t v ) noexcept
     {
-        std::memcpy( static_cast<std::uint8_t*>( raw_blk ) + kOffsetNodeType, &v, sizeof( v ) );
+        reinterpret_cast<BlockStateBase*>( raw_blk )->set_node_type( v );
     }
 
   protected:
