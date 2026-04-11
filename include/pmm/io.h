@@ -35,6 +35,7 @@
 
 #pragma once
 
+#include "pmm/diagnostics.h"
 #include "pmm/types.h"
 
 #include <cstdint>
@@ -141,10 +142,11 @@ template <typename MgrT> inline bool save_manager( const char* filename )
 }
 
 /**
- * @brief Загрузить образ менеджера из файла в PersistMemoryManager (Issue #110 — статический интерфейс).
+ * @brief Загрузить образ менеджера из файла в PersistMemoryManager с диагностикой (Issue #245).
  *
  * Читает файл, записанный функцией save_manager(), в буфер менеджера,
- * затем вызывает MgrT::load() для проверки заголовка и восстановления состояния.
+ * затем вызывает MgrT::load(result) для проверки заголовка и восстановления состояния.
+ * Все обнаруженные нарушения и выполненные исправления записываются в result.
  *
  * Issue #43 Phase 2.1: After reading the file, verifies CRC32 before calling load().
  * If the CRC does not match, returns false without modifying manager state.
@@ -154,12 +156,13 @@ template <typename MgrT> inline bool save_manager( const char* filename )
  *
  * @tparam MgrT    Тип статического менеджера (PersistMemoryManager<ConfigT, Id>).
  * @param filename Путь к файлу с образом.
+ * @param result   VerifyResult, заполняемый обнаруженными нарушениями и выполненными исправлениями.
  * @return true при успешной загрузке, false при ошибке.
  *
  * Предусловие:  filename != nullptr, MgrT::backend().base_ptr() != nullptr.
- * Постусловие: менеджер восстановлен из файла.
+ * Постусловие: менеджер восстановлен из файла, result содержит полную диагностику.
  */
-template <typename MgrT> inline bool load_manager_from_file( const char* filename )
+template <typename MgrT> inline bool load_manager_from_file( const char* filename, VerifyResult& result )
 {
     using address_traits = typename MgrT::address_traits;
 
@@ -218,7 +221,25 @@ template <typename MgrT> inline bool load_manager_from_file( const char* filenam
         // saved before Phase 2.1 (which had _reserved[8] zeroed).
     }
 
-    return MgrT::load();
+    return MgrT::load( result );
+}
+
+/**
+ * @brief Загрузить образ менеджера из файла в PersistMemoryManager (Issue #110 — статический интерфейс).
+ *
+ * Обёртка для обратной совместимости. Предпочтительно использовать перегрузку
+ * с VerifyResult для получения полной диагностики восстановления.
+ *
+ * @tparam MgrT    Тип статического менеджера (PersistMemoryManager<ConfigT, Id>).
+ * @param filename Путь к файлу с образом.
+ * @return true при успешной загрузке, false при ошибке.
+ *
+ * @deprecated Используйте load_manager_from_file(filename, result) для получения диагностики.
+ */
+template <typename MgrT> inline bool load_manager_from_file( const char* filename )
+{
+    VerifyResult result;
+    return load_manager_from_file<MgrT>( filename, result );
 }
 
 } // namespace pmm

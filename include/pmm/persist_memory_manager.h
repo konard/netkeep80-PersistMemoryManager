@@ -23,6 +23,7 @@
 #include "pmm/allocator_policy.h"
 #include "pmm/block.h"
 #include "pmm/block_state.h"
+#include "pmm/diagnostics.h"
 #include "pmm/forest_registry.h"
 #include "pmm/logging_policy.h"
 #include "pmm/manager_configs.h"
@@ -290,16 +291,36 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     }
 
     /**
-     * @brief Загрузить существующее состояние из бэкенда.
+     * @brief Load existing state from backend (compatibility path — no diagnostics report).
      *
-     * @return true при успехе.
+     * @deprecated Prefer load(VerifyResult&) to get structured diagnostics on any repairs performed.
+     *             This overload is kept for backward compatibility only (Issue #245).
      */
     static bool load() noexcept
     {
+        VerifyResult result;
+        return load( result );
+    }
+
+    /**
+     * @brief Load existing state from backend with structured diagnostics (Issue #245).
+     *
+     * Performs verify-then-repair: first detects all violations, then applies
+     * documented fixes. The VerifyResult records every repair action taken.
+     * Header corruption (magic, size, granule) is non-recoverable and aborts load.
+     *
+     * @param result  VerifyResult populated with detected violations and repair actions.
+     * @return true on successful load (repairs applied), false on non-recoverable corruption.
+     */
+    static bool load( VerifyResult& result ) noexcept
+    {
+        result.mode = RecoveryMode::Repair;
+        result.ok   = true;
         typename thread_policy::unique_lock_type lock( _mutex );
         if ( _backend.base_ptr() == nullptr || _backend.total_size() < detail::kMinMemorySize )
         {
             _last_error = ( _backend.base_ptr() == nullptr ) ? PmmError::BackendError : PmmError::InvalidSize;
+            result.add( ViolationType::HeaderCorruption, DiagnosticAction::Aborted );
             return false;
         }
         std::uint8_t*                          base = _backend.base_ptr();
@@ -308,33 +329,75 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         {
             _last_error = PmmError::InvalidMagic;
             logging_policy::on_corruption_detected( PmmError::InvalidMagic );
+            result.add( ViolationType::HeaderCorruption, DiagnosticAction::Aborted, 0,
+                        static_cast<std::uint64_t>( kMagic ), static_cast<std::uint64_t>( hdr->magic ) );
             return false;
         }
         if ( hdr->total_size != _backend.total_size() )
         {
             _last_error = PmmError::SizeMismatch;
             logging_policy::on_corruption_detected( PmmError::SizeMismatch );
+            result.add( ViolationType::HeaderCorruption, DiagnosticAction::Aborted, 0, _backend.total_size(),
+                        static_cast<std::uint64_t>( hdr->total_size ) );
             return false;
         }
-        // Issue #146: compare stored granule size against address_traits::granule_size.
         if ( hdr->granule_size != static_cast<std::uint16_t>( address_traits::granule_size ) )
         {
             _last_error = PmmError::GranuleMismatch;
             logging_policy::on_corruption_detected( PmmError::GranuleMismatch );
+            result.add( ViolationType::HeaderCorruption, DiagnosticAction::Aborted, 0, address_traits::granule_size,
+                        static_cast<std::uint64_t>( hdr->granule_size ) );
             return false;
         }
+        // Issue #245: verify before repair — detect violations in the raw image.
+        // Issue #245: verify before repair — detect violations, then mark with repair actions.
+        auto mark_entries = []( VerifyResult& r, std::size_t from, DiagnosticAction act )
+        {
+            for ( std::size_t i = from; i < r.entry_count; ++i )
+                r.entries[i].action = act;
+        };
+        std::size_t pre = result.entry_count;
+        allocator::verify_block_states( base, hdr, result ); // Phase 1: Repaired
+        mark_entries( result, pre, DiagnosticAction::Repaired );
+        pre = result.entry_count;
+        allocator::verify_linked_list( base, hdr, result ); // Phase 2: Repaired
+        mark_entries( result, pre, DiagnosticAction::Repaired );
+        pre = result.entry_count;
+        allocator::verify_counters( base, hdr, result ); // Phase 3: Rebuilt
+        mark_entries( result, pre, DiagnosticAction::Rebuilt );
+        pre = result.entry_count;
+        allocator::verify_free_tree( base, hdr, result ); // Phase 4: Rebuilt
+        mark_entries( result, pre, DiagnosticAction::Rebuilt );
+        // Repair phase: apply all fixes.
         hdr->owns_memory     = false;
         hdr->prev_total_size = 0;
         allocator::repair_linked_list( base, hdr );
         allocator::recompute_counters( base, hdr );
         allocator::rebuild_free_tree( base, hdr );
         _initialized = true;
+        // Phase 5: forest registry diagnostics.
+        {
+            VerifyResult forest_verify;
+            verify_forest_registry_unlocked( forest_verify );
+            for ( std::size_t i = 0; i < forest_verify.entry_count; ++i )
+            {
+                const auto& e = forest_verify.entries[i];
+                result.add( e.type, DiagnosticAction::Repaired, e.block_index, e.expected, e.actual );
+            }
+        }
         if ( !validate_or_bootstrap_forest_registry_unlocked() )
         {
+            for ( std::size_t i = 0; i < result.entry_count; ++i )
+            {
+                if ( result.entries[i].type == ViolationType::ForestRegistryMissing ||
+                     result.entries[i].type == ViolationType::ForestDomainMissing ||
+                     result.entries[i].type == ViolationType::ForestDomainFlagsMissing )
+                    result.entries[i].action = DiagnosticAction::Aborted;
+            }
             _initialized = false;
             return false;
         }
-        if ( !validate_bootstrap_invariants_unlocked() ) // Issue #241
+        if ( !validate_bootstrap_invariants_unlocked() )
         {
             _initialized = false;
             return false;
@@ -1040,6 +1103,23 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
                    : 0;
     }
 
+    // ─── Verify / Repair (Issue #245) ───────────────────────────────────────────
+
+    /// @brief Read-only structural diagnostics. Returns violations without modifying image.
+    /// @return VerifyResult with ok=true if no violations, false otherwise.
+    static VerifyResult verify() noexcept
+    {
+        VerifyResult                             result;
+        typename thread_policy::shared_lock_type lock( _mutex );
+        if ( !_initialized || _backend.base_ptr() == nullptr )
+        {
+            result.add( ViolationType::HeaderCorruption, DiagnosticAction::Aborted );
+            return result;
+        }
+        verify_image_unlocked( result );
+        return result;
+    }
+
     // ─── Итерация по блокам ────────────────────────────────────────────────────
 
     /**
@@ -1261,6 +1341,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     // Forest/domain registry private methods — extracted to forest_domain_mixin.inc
     // to keep this file under the 1500-line CI limit.
 #include "pmm/forest_domain_mixin.inc"
+    // Verify/repair methods — extracted to verify_repair_mixin.inc (Issue #245).
+#include "pmm/verify_repair_mixin.inc"
 
     /// @brief Find the mutable block header for a user-data pointer (or nullptr).
     static pmm::Block<address_traits>* find_block_from_user_ptr( void* ptr ) noexcept
@@ -1342,146 +1424,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         return reinterpret_cast<const detail::ManagerHeader<address_traits>*>( base + kBlockHdrByteSize );
     }
 
-    static bool init_layout( std::uint8_t* base, std::size_t size ) noexcept
-    {
-        using BlockState                         = BlockStateBase<address_traits>;
-        static constexpr index_type  kHdrBlkIdx  = 0;
-        static constexpr index_type  kFreeBlkIdx = kFreeBlkIdxLayout;
-        static constexpr std::size_t kGranSz     = address_traits::granule_size;
-
-        // Minimum size check: Block_0 + ManagerHeader + Block_1 + at least 1 data granule
-        static constexpr std::size_t kMinBlockDataSize = kGranSz; // 1 data granule
-        if ( static_cast<std::size_t>( kFreeBlkIdx ) * kGranSz + sizeof( Block<address_traits> ) + kMinBlockDataSize >
-             size )
-            return false;
-
-        // Инициализация блока-заголовка (Block_0) через state machine утилиты
-        void* hdr_blk = base;
-        std::memset( hdr_blk, 0, kBlockHdrByteSize ); // zero entire aligned region (including padding)
-        BlockState::init_fields( hdr_blk,
-                                 /*prev*/ address_traits::no_block,
-                                 /*next*/ kFreeBlkIdx,
-                                 /*avl_height*/ 0,
-                                 /*weight*/ kMgrHdrGranules,
-                                 /*root_offset*/ kHdrBlkIdx );
-
-        detail::ManagerHeader<address_traits>* hdr = get_header( base );
-        std::memset( hdr, 0, sizeof( detail::ManagerHeader<address_traits> ) );
-        hdr->magic              = kMagic;
-        hdr->total_size         = size;
-        hdr->first_block_offset = kHdrBlkIdx;
-        hdr->last_block_offset  = address_traits::no_block;
-        hdr->free_tree_root     = address_traits::no_block;
-        hdr->granule_size       = static_cast<std::uint16_t>( kGranSz );
-        hdr->root_offset        = address_traits::no_block; // Issue #200: no root object by default
-
-        // Инициализация первого свободного блока через state machine утилиты
-        void* blk = base + static_cast<std::size_t>( kFreeBlkIdx ) * kGranSz;
-        std::memset( blk, 0, sizeof( Block<address_traits> ) );
-        BlockState::init_fields( blk,
-                                 /*prev*/ kHdrBlkIdx,
-                                 /*next*/ address_traits::no_block,
-                                 /*avl_height*/ 1,
-                                 /*weight*/ 0,
-                                 /*root_offset*/ 0 );
-
-        hdr->last_block_offset = kFreeBlkIdx;
-        hdr->free_tree_root    = kFreeBlkIdx;
-        hdr->block_count       = 2;
-        hdr->free_count        = 1;
-        hdr->alloc_count       = 1;
-        hdr->used_size         = kFreeBlkIdx + kBlockHdrGranules;
-
-        _initialized = true;
-        return true;
-    }
-
-    static bool do_expand( std::size_t user_size ) noexcept
-    {
-        using BlockState = BlockStateBase<address_traits>;
-        if ( !_initialized )
-            return false;
-        std::uint8_t*                          base     = _backend.base_ptr();
-        detail::ManagerHeader<address_traits>* hdr      = get_header( base );
-        std::size_t                            old_size = hdr->total_size;
-
-        // Issue #146: use AddressTraitsT-specific granule size for all computations.
-        static constexpr std::size_t kGranSz        = address_traits::granule_size;
-        index_type                   data_gran_need = detail::bytes_to_granules_t<address_traits>( user_size );
-        if ( data_gran_need == 0 )
-            data_gran_need = 1;
-        // min_need = block_header + data + another block_header (for the new expand block)
-        std::size_t min_need =
-            static_cast<std::size_t>( kBlockHdrGranules + data_gran_need + kBlockHdrGranules ) * kGranSz;
-        std::size_t growth = old_size / 4;
-        if ( growth < min_need )
-            growth = min_need;
-
-        if ( !_backend.expand( growth ) )
-            return false;
-
-        std::uint8_t* new_base = _backend.base_ptr();
-        std::size_t   new_size = _backend.total_size();
-        if ( new_base == nullptr || new_size <= old_size )
-            return false;
-
-        logging_policy::on_expand( old_size, new_size );
-        hdr = get_header( new_base );
-
-        // Issue #146: compute extra_idx using address_traits::granule_size.
-        index_type  extra_idx  = detail::byte_off_to_idx_t<address_traits>( old_size );
-        std::size_t extra_size = new_size - old_size;
-
-        void* last_blk_raw =
-            ( hdr->last_block_offset != address_traits::no_block )
-                ? static_cast<void*>( new_base + static_cast<std::size_t>( hdr->last_block_offset ) * kGranSz )
-                : nullptr;
-
-        if ( last_blk_raw != nullptr && BlockState::get_weight( last_blk_raw ) == 0 )
-        {
-            Block<address_traits>* last_blk = reinterpret_cast<Block<address_traits>*>( last_blk_raw );
-            index_type             loff     = detail::block_idx_t<address_traits>( new_base, last_blk );
-            free_block_tree::remove( new_base, hdr, loff );
-            hdr->total_size = new_size;
-            free_block_tree::insert( new_base, hdr, loff );
-        }
-        else
-        {
-            // Issue #146: minimum extra size check uses address_traits granule size.
-            if ( extra_size < sizeof( Block<address_traits> ) + kGranSz )
-                return false;
-            void* nb_blk = new_base + static_cast<std::size_t>( extra_idx ) * kGranSz;
-            std::memset( nb_blk, 0, sizeof( Block<address_traits> ) );
-            if ( last_blk_raw != nullptr )
-            {
-                Block<address_traits>* last_blk = reinterpret_cast<Block<address_traits>*>( last_blk_raw );
-                index_type             loff     = detail::block_idx_t<address_traits>( new_base, last_blk );
-                BlockState::init_fields( nb_blk,
-                                         /*prev*/ loff,
-                                         /*next*/ address_traits::no_block,
-                                         /*avl_height*/ 1,
-                                         /*weight*/ 0,
-                                         /*root_offset*/ 0 );
-                BlockState::set_next_offset_of( last_blk_raw, static_cast<index_type>( extra_idx ) );
-            }
-            else
-            {
-                BlockState::init_fields( nb_blk,
-                                         /*prev*/ address_traits::no_block,
-                                         /*next*/ address_traits::no_block,
-                                         /*avl_height*/ 1,
-                                         /*weight*/ 0,
-                                         /*root_offset*/ 0 );
-                hdr->first_block_offset = extra_idx;
-            }
-            hdr->last_block_offset = extra_idx;
-            hdr->block_count++;
-            hdr->free_count++;
-            hdr->total_size = new_size;
-            free_block_tree::insert( new_base, hdr, extra_idx );
-        }
-        return true;
-    }
+    // Layout init / expand helpers — extracted to layout_mixin.inc (Issue #245 line-limit compliance).
+#include "pmm/layout_mixin.inc"
 };
 
 } // namespace pmm

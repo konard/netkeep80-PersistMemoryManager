@@ -52,6 +52,7 @@
 #pragma once
 
 #include "pmm/block_state.h"
+#include "pmm/diagnostics.h"
 #include "pmm/free_block_tree.h"
 #include "pmm/types.h"
 
@@ -399,6 +400,146 @@ class AllocatorPolicy
         hdr->free_count  = free_count;
         hdr->alloc_count = alloc_count;
         hdr->used_size   = used_gran;
+    }
+
+    // ─── Verify-only diagnostics (Issue #245) ──────────────────────────────────
+
+    /**
+     * @brief Verify linked list prev_offset consistency without modifying the image.
+     *
+     * Walks the block chain via next_offset and checks that each block's prev_offset
+     * matches the index of the preceding block.
+     *
+     * @param base    Base pointer of the managed area.
+     * @param hdr     Manager header (read-only).
+     * @param result  Diagnostic result to append violations to.
+     */
+    static void verify_linked_list( const std::uint8_t* base, const detail::ManagerHeader<AddressTraitsT>* hdr,
+                                    VerifyResult& result ) noexcept
+    {
+        index_type idx  = hdr->first_block_offset;
+        index_type prev = AddressTraitsT::no_block;
+        while ( idx != AddressTraitsT::no_block )
+        {
+            if ( static_cast<std::size_t>( idx ) * AddressTraitsT::granule_size + sizeof( BlockT ) > hdr->total_size )
+                break;
+            const void* blk_ptr     = detail::block_at<AddressTraitsT>( base, idx );
+            index_type  stored_prev = BlockState::get_prev_offset( blk_ptr );
+            if ( stored_prev != prev )
+            {
+                result.add( ViolationType::PrevOffsetMismatch, DiagnosticAction::NoAction,
+                            static_cast<std::uint64_t>( idx ), static_cast<std::uint64_t>( prev ),
+                            static_cast<std::uint64_t>( stored_prev ) );
+            }
+            prev                   = idx;
+            index_type next_offset = BlockState::get_next_offset( blk_ptr );
+            idx                    = next_offset;
+        }
+    }
+
+    /**
+     * @brief Verify block counters consistency without modifying the image.
+     *
+     * Recomputes block_count, free_count, alloc_count, used_size by walking the
+     * linked list and compares against stored header values.
+     *
+     * @param base    Base pointer of the managed area.
+     * @param hdr     Manager header (read-only).
+     * @param result  Diagnostic result to append violations to.
+     */
+    static void verify_counters( const std::uint8_t* base, const detail::ManagerHeader<AddressTraitsT>* hdr,
+                                 VerifyResult& result ) noexcept
+    {
+        static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AddressTraitsT>;
+
+        index_type block_count = 0, free_count = 0, alloc_count = 0;
+        index_type used_gran = 0;
+        index_type idx       = hdr->first_block_offset;
+        while ( idx != AddressTraitsT::no_block )
+        {
+            if ( static_cast<std::size_t>( idx ) * AddressTraitsT::granule_size + sizeof( BlockT ) > hdr->total_size )
+                break;
+            const void* blk_ptr = detail::block_at<AddressTraitsT>( base, idx );
+            block_count++;
+            used_gran += kBlkHdrGran;
+            index_type w = BlockState::get_weight( blk_ptr );
+            if ( w > 0 )
+            {
+                alloc_count++;
+                used_gran += w;
+            }
+            else
+            {
+                free_count++;
+            }
+            idx = BlockState::get_next_offset( blk_ptr );
+        }
+        if ( hdr->block_count != block_count || hdr->free_count != free_count || hdr->alloc_count != alloc_count ||
+             hdr->used_size != used_gran )
+        {
+            result.add( ViolationType::CounterMismatch, DiagnosticAction::NoAction, 0,
+                        static_cast<std::uint64_t>( block_count ), static_cast<std::uint64_t>( hdr->block_count ) );
+        }
+    }
+
+    /**
+     * @brief Verify block state consistency for all blocks without modification.
+     *
+     * Walks the linked list and calls verify_state() for each block, detecting
+     * any transitional (inconsistent) states.
+     *
+     * @param base    Base pointer of the managed area.
+     * @param hdr     Manager header (read-only).
+     * @param result  Diagnostic result to append violations to.
+     */
+    static void verify_block_states( const std::uint8_t* base, const detail::ManagerHeader<AddressTraitsT>* hdr,
+                                     VerifyResult& result ) noexcept
+    {
+        index_type idx = hdr->first_block_offset;
+        while ( idx != AddressTraitsT::no_block )
+        {
+            if ( static_cast<std::size_t>( idx ) * AddressTraitsT::granule_size + sizeof( BlockT ) > hdr->total_size )
+                break;
+            const void* blk_ptr = detail::block_at<AddressTraitsT>( base, idx );
+            BlockState::verify_state( blk_ptr, idx, result );
+            idx = BlockState::get_next_offset( blk_ptr );
+        }
+    }
+
+    /**
+     * @brief Verify free tree root consistency without modifying the image (Issue #245).
+     *
+     * Checks that the free_tree_root is consistent with the presence of free blocks.
+     * After file round-trip, AVL fields are not persisted, so the free tree root
+     * typically points to stale or zeroed AVL data. This check detects that condition.
+     *
+     * @param base    Base pointer of the managed area.
+     * @param hdr     Manager header (read-only).
+     * @param result  Diagnostic result to append violations to.
+     */
+    static void verify_free_tree( const std::uint8_t* base, const detail::ManagerHeader<AddressTraitsT>* hdr,
+                                  VerifyResult& result ) noexcept
+    {
+        // Count free blocks by walking the linked list.
+        index_type free_count = 0;
+        index_type idx        = hdr->first_block_offset;
+        while ( idx != AddressTraitsT::no_block )
+        {
+            if ( static_cast<std::size_t>( idx ) * AddressTraitsT::granule_size + sizeof( BlockT ) > hdr->total_size )
+                break;
+            const void* blk_ptr = detail::block_at<AddressTraitsT>( base, idx );
+            if ( BlockState::get_weight( blk_ptr ) == 0 )
+                free_count++;
+            idx = BlockState::get_next_offset( blk_ptr );
+        }
+        // If free blocks exist but the tree root is no_block (or vice versa),
+        // the free tree is stale and needs rebuild.
+        bool root_present = ( hdr->free_tree_root != AddressTraitsT::no_block );
+        if ( ( free_count > 0 && !root_present ) || ( free_count == 0 && root_present ) )
+        {
+            result.add( ViolationType::FreeTreeStale, DiagnosticAction::NoAction, 0,
+                        static_cast<std::uint64_t>( free_count ), static_cast<std::uint64_t>( hdr->free_tree_root ) );
+        }
     }
 
     // ─── Issue #210: reallocate_typed helpers ─────────────────────────────────

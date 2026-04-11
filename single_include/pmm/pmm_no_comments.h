@@ -197,6 +197,80 @@ static_assert( sizeof( pmm::Block<pmm::DefaultAddressTraits> ) == 32,
 
 } 
 
+#include <cstddef>
+#include <cstdint>
+
+namespace pmm
+{
+
+enum class RecoveryMode : std::uint8_t
+{
+    Verify = 0, 
+    Repair = 1, 
+};
+
+enum class ViolationType : std::uint8_t
+{
+    None = 0,                 
+    BlockStateInconsistent,   
+    PrevOffsetMismatch,       
+    CounterMismatch,          
+    FreeTreeStale,            
+    ForestRegistryMissing,    
+    ForestDomainMissing,      
+    ForestDomainFlagsMissing, 
+    HeaderCorruption,         
+};
+
+enum class DiagnosticAction : std::uint8_t
+{
+    NoAction = 0, 
+    Repaired,     
+    Rebuilt,      
+    Aborted,      
+};
+
+struct DiagnosticEntry
+{
+    ViolationType    type        = ViolationType::None;        
+    DiagnosticAction action      = DiagnosticAction::NoAction; 
+    std::uint64_t    block_index = 0;                          
+    std::uint64_t    expected    = 0;                          
+    std::uint64_t    actual      = 0;                          
+};
+
+inline constexpr std::size_t kMaxDiagnosticEntries = 64;
+
+struct VerifyResult
+{
+    RecoveryMode mode = RecoveryMode::Verify; 
+    bool         ok   = true;                 
+
+    std::size_t violation_count = 0;
+
+    DiagnosticEntry entries[kMaxDiagnosticEntries] = {};
+
+    std::size_t entry_count = 0;
+
+    void add( ViolationType type, DiagnosticAction action, std::uint64_t block_index = 0, std::uint64_t expected = 0,
+              std::uint64_t actual = 0 ) noexcept
+    {
+        ok = false;
+        violation_count++;
+        if ( entry_count < kMaxDiagnosticEntries )
+        {
+            entries[entry_count].type        = type;
+            entries[entry_count].action      = action;
+            entries[entry_count].block_index = block_index;
+            entries[entry_count].expected    = expected;
+            entries[entry_count].actual      = actual;
+            entry_count++;
+        }
+    }
+};
+
+} 
+
 #include <cstdint>
 #include <cstring>
 #include <type_traits>
@@ -270,6 +344,22 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
         
         if ( blk->weight() == 0 && blk->root_offset() != 0 )
             blk->set_root_offset( 0 );
+    }
+
+    static void verify_state( const void* raw_blk, index_type own_idx, VerifyResult& result ) noexcept
+    {
+        const auto* blk = reinterpret_cast<const BlockStateBase*>( raw_blk );
+        if ( blk->weight() > 0 && blk->root_offset() != own_idx )
+        {
+            result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction,
+                        static_cast<std::uint64_t>( own_idx ), static_cast<std::uint64_t>( own_idx ),
+                        static_cast<std::uint64_t>( blk->root_offset() ) );
+        }
+        if ( blk->weight() == 0 && blk->root_offset() != 0 )
+        {
+            result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction,
+                        static_cast<std::uint64_t>( own_idx ), 0, static_cast<std::uint64_t>( blk->root_offset() ) );
+        }
     }
 
     static void reset_avl_fields_of( void* raw_blk ) noexcept
@@ -659,6 +749,13 @@ template <typename AddressTraitsT>
 void recover_block_state( void* raw_blk, typename AddressTraitsT::index_type own_idx ) noexcept
 {
     BlockStateBase<AddressTraitsT>::recover_state( raw_blk, own_idx );
+}
+
+template <typename AddressTraitsT>
+void verify_block_state( const void* raw_blk, typename AddressTraitsT::index_type own_idx,
+                         VerifyResult& result ) noexcept
+{
+    BlockStateBase<AddressTraitsT>::verify_state( raw_blk, own_idx, result );
 }
 
 } 
@@ -2300,6 +2397,102 @@ class AllocatorPolicy
         hdr->used_size   = used_gran;
     }
 
+    static void verify_linked_list( const std::uint8_t* base, const detail::ManagerHeader<AddressTraitsT>* hdr,
+                                    VerifyResult& result ) noexcept
+    {
+        index_type idx  = hdr->first_block_offset;
+        index_type prev = AddressTraitsT::no_block;
+        while ( idx != AddressTraitsT::no_block )
+        {
+            if ( static_cast<std::size_t>( idx ) * AddressTraitsT::granule_size + sizeof( BlockT ) > hdr->total_size )
+                break;
+            const void* blk_ptr     = detail::block_at<AddressTraitsT>( base, idx );
+            index_type  stored_prev = BlockState::get_prev_offset( blk_ptr );
+            if ( stored_prev != prev )
+            {
+                result.add( ViolationType::PrevOffsetMismatch, DiagnosticAction::NoAction,
+                            static_cast<std::uint64_t>( idx ), static_cast<std::uint64_t>( prev ),
+                            static_cast<std::uint64_t>( stored_prev ) );
+            }
+            prev                   = idx;
+            index_type next_offset = BlockState::get_next_offset( blk_ptr );
+            idx                    = next_offset;
+        }
+    }
+
+    static void verify_counters( const std::uint8_t* base, const detail::ManagerHeader<AddressTraitsT>* hdr,
+                                 VerifyResult& result ) noexcept
+    {
+        static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AddressTraitsT>;
+
+        index_type block_count = 0, free_count = 0, alloc_count = 0;
+        index_type used_gran = 0;
+        index_type idx       = hdr->first_block_offset;
+        while ( idx != AddressTraitsT::no_block )
+        {
+            if ( static_cast<std::size_t>( idx ) * AddressTraitsT::granule_size + sizeof( BlockT ) > hdr->total_size )
+                break;
+            const void* blk_ptr = detail::block_at<AddressTraitsT>( base, idx );
+            block_count++;
+            used_gran += kBlkHdrGran;
+            index_type w = BlockState::get_weight( blk_ptr );
+            if ( w > 0 )
+            {
+                alloc_count++;
+                used_gran += w;
+            }
+            else
+            {
+                free_count++;
+            }
+            idx = BlockState::get_next_offset( blk_ptr );
+        }
+        if ( hdr->block_count != block_count || hdr->free_count != free_count || hdr->alloc_count != alloc_count ||
+             hdr->used_size != used_gran )
+        {
+            result.add( ViolationType::CounterMismatch, DiagnosticAction::NoAction, 0,
+                        static_cast<std::uint64_t>( block_count ), static_cast<std::uint64_t>( hdr->block_count ) );
+        }
+    }
+
+    static void verify_block_states( const std::uint8_t* base, const detail::ManagerHeader<AddressTraitsT>* hdr,
+                                     VerifyResult& result ) noexcept
+    {
+        index_type idx = hdr->first_block_offset;
+        while ( idx != AddressTraitsT::no_block )
+        {
+            if ( static_cast<std::size_t>( idx ) * AddressTraitsT::granule_size + sizeof( BlockT ) > hdr->total_size )
+                break;
+            const void* blk_ptr = detail::block_at<AddressTraitsT>( base, idx );
+            BlockState::verify_state( blk_ptr, idx, result );
+            idx = BlockState::get_next_offset( blk_ptr );
+        }
+    }
+
+    static void verify_free_tree( const std::uint8_t* base, const detail::ManagerHeader<AddressTraitsT>* hdr,
+                                  VerifyResult& result ) noexcept
+    {
+        
+        index_type free_count = 0;
+        index_type idx        = hdr->first_block_offset;
+        while ( idx != AddressTraitsT::no_block )
+        {
+            if ( static_cast<std::size_t>( idx ) * AddressTraitsT::granule_size + sizeof( BlockT ) > hdr->total_size )
+                break;
+            const void* blk_ptr = detail::block_at<AddressTraitsT>( base, idx );
+            if ( BlockState::get_weight( blk_ptr ) == 0 )
+                free_count++;
+            idx = BlockState::get_next_offset( blk_ptr );
+        }
+        
+        bool root_present = ( hdr->free_tree_root != AddressTraitsT::no_block );
+        if ( ( free_count > 0 && !root_present ) || ( free_count == 0 && root_present ) )
+        {
+            result.add( ViolationType::FreeTreeStale, DiagnosticAction::NoAction, 0,
+                        static_cast<std::uint64_t>( free_count ), static_cast<std::uint64_t>( hdr->free_tree_root ) );
+        }
+    }
+
     static void realloc_shrink( std::uint8_t* base, detail::ManagerHeader<AddressTraitsT>* hdr, index_type blk_idx,
                                 void* blk_raw, index_type old_data_gran, index_type new_data_gran ) noexcept
     {
@@ -3695,10 +3888,19 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
 
     static bool load() noexcept
     {
+        VerifyResult result;
+        return load( result );
+    }
+
+    static bool load( VerifyResult& result ) noexcept
+    {
+        result.mode = RecoveryMode::Repair;
+        result.ok   = true;
         typename thread_policy::unique_lock_type lock( _mutex );
         if ( _backend.base_ptr() == nullptr || _backend.total_size() < detail::kMinMemorySize )
         {
             _last_error = ( _backend.base_ptr() == nullptr ) ? PmmError::BackendError : PmmError::InvalidSize;
+            result.add( ViolationType::HeaderCorruption, DiagnosticAction::Aborted );
             return false;
         }
         std::uint8_t*                          base = _backend.base_ptr();
@@ -3707,33 +3909,74 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         {
             _last_error = PmmError::InvalidMagic;
             logging_policy::on_corruption_detected( PmmError::InvalidMagic );
+            result.add( ViolationType::HeaderCorruption, DiagnosticAction::Aborted, 0,
+                        static_cast<std::uint64_t>( kMagic ), static_cast<std::uint64_t>( hdr->magic ) );
             return false;
         }
         if ( hdr->total_size != _backend.total_size() )
         {
             _last_error = PmmError::SizeMismatch;
             logging_policy::on_corruption_detected( PmmError::SizeMismatch );
+            result.add( ViolationType::HeaderCorruption, DiagnosticAction::Aborted, 0, _backend.total_size(),
+                        static_cast<std::uint64_t>( hdr->total_size ) );
             return false;
         }
-        
         if ( hdr->granule_size != static_cast<std::uint16_t>( address_traits::granule_size ) )
         {
             _last_error = PmmError::GranuleMismatch;
             logging_policy::on_corruption_detected( PmmError::GranuleMismatch );
+            result.add( ViolationType::HeaderCorruption, DiagnosticAction::Aborted, 0, address_traits::granule_size,
+                        static_cast<std::uint64_t>( hdr->granule_size ) );
             return false;
         }
+        
+        auto mark_entries = []( VerifyResult& r, std::size_t from, DiagnosticAction act )
+        {
+            for ( std::size_t i = from; i < r.entry_count; ++i )
+                r.entries[i].action = act;
+        };
+        std::size_t pre = result.entry_count;
+        allocator::verify_block_states( base, hdr, result ); 
+        mark_entries( result, pre, DiagnosticAction::Repaired );
+        pre = result.entry_count;
+        allocator::verify_linked_list( base, hdr, result ); 
+        mark_entries( result, pre, DiagnosticAction::Repaired );
+        pre = result.entry_count;
+        allocator::verify_counters( base, hdr, result ); 
+        mark_entries( result, pre, DiagnosticAction::Rebuilt );
+        pre = result.entry_count;
+        allocator::verify_free_tree( base, hdr, result ); 
+        mark_entries( result, pre, DiagnosticAction::Rebuilt );
+        
         hdr->owns_memory     = false;
         hdr->prev_total_size = 0;
         allocator::repair_linked_list( base, hdr );
         allocator::recompute_counters( base, hdr );
         allocator::rebuild_free_tree( base, hdr );
         _initialized = true;
+        
+        {
+            VerifyResult forest_verify;
+            verify_forest_registry_unlocked( forest_verify );
+            for ( std::size_t i = 0; i < forest_verify.entry_count; ++i )
+            {
+                const auto& e = forest_verify.entries[i];
+                result.add( e.type, DiagnosticAction::Repaired, e.block_index, e.expected, e.actual );
+            }
+        }
         if ( !validate_or_bootstrap_forest_registry_unlocked() )
         {
+            for ( std::size_t i = 0; i < result.entry_count; ++i )
+            {
+                if ( result.entries[i].type == ViolationType::ForestRegistryMissing ||
+                     result.entries[i].type == ViolationType::ForestDomainMissing ||
+                     result.entries[i].type == ViolationType::ForestDomainFlagsMissing )
+                    result.entries[i].action = DiagnosticAction::Aborted;
+            }
             _initialized = false;
             return false;
         }
-        if ( !validate_bootstrap_invariants_unlocked() ) 
+        if ( !validate_bootstrap_invariants_unlocked() )
         {
             _initialized = false;
             return false;
@@ -4271,6 +4514,19 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         return _initialized.load( std::memory_order_relaxed )
                    ? static_cast<std::size_t>( get_header_c( _backend.base_ptr() )->alloc_count )
                    : 0;
+    }
+
+    static VerifyResult verify() noexcept
+    {
+        VerifyResult                             result;
+        typename thread_policy::shared_lock_type lock( _mutex );
+        if ( !_initialized || _backend.base_ptr() == nullptr )
+        {
+            result.add( ViolationType::HeaderCorruption, DiagnosticAction::Aborted );
+            return result;
+        }
+        verify_image_unlocked( result );
+        return result;
     }
 
     template <typename Callback> static bool for_each_block( Callback&& callback ) noexcept
@@ -4905,6 +5161,75 @@ static void for_each_free_block_inorder( const std::uint8_t* base, const detail:
     for_each_free_block_inorder( base, hdr, right_off, depth + 1, callback );
 }
 
+static void verify_image_unlocked( VerifyResult& result ) noexcept
+{
+    result.mode = RecoveryMode::Verify;
+    result.ok   = true;
+
+    const std::uint8_t*                          base = _backend.base_ptr();
+    const detail::ManagerHeader<address_traits>* hdr  = get_header_c( base );
+
+    if ( hdr->magic != kMagic )
+    {
+        result.add( ViolationType::HeaderCorruption, DiagnosticAction::Aborted, 0, static_cast<std::uint64_t>( kMagic ),
+                    static_cast<std::uint64_t>( hdr->magic ) );
+        return; 
+    }
+    if ( hdr->total_size != _backend.total_size() )
+    {
+        result.add( ViolationType::HeaderCorruption, DiagnosticAction::Aborted, 0, _backend.total_size(),
+                    static_cast<std::uint64_t>( hdr->total_size ) );
+    }
+    if ( hdr->granule_size != static_cast<std::uint16_t>( address_traits::granule_size ) )
+    {
+        result.add( ViolationType::HeaderCorruption, DiagnosticAction::Aborted, 0, address_traits::granule_size,
+                    static_cast<std::uint64_t>( hdr->granule_size ) );
+    }
+
+    allocator::verify_block_states( base, hdr, result );
+
+    allocator::verify_linked_list( base, hdr, result );
+
+    allocator::verify_counters( base, hdr, result );
+
+    allocator::verify_free_tree( base, hdr, result );
+
+    verify_forest_registry_unlocked( result );
+}
+
+static void verify_forest_registry_unlocked( VerifyResult& result ) noexcept
+{
+    const forest_registry* reg = forest_registry_root_unlocked();
+    if ( reg == nullptr )
+    {
+        result.add( ViolationType::ForestRegistryMissing, DiagnosticAction::NoAction );
+        return;
+    }
+    if ( reg->magic != detail::kForestRegistryMagic || reg->version != detail::kForestRegistryVersion )
+    {
+        result.add( ViolationType::ForestRegistryMissing, DiagnosticAction::NoAction, 0,
+                    static_cast<std::uint64_t>( detail::kForestRegistryMagic ),
+                    static_cast<std::uint64_t>( reg->magic ) );
+        return;
+    }
+
+    static constexpr const char* kRequired[] = { detail::kSystemDomainFreeTree, detail::kSystemDomainSymbols,
+                                                 detail::kSystemDomainRegistry };
+    for ( const char* name : kRequired )
+    {
+        const forest_domain* rec = find_domain_by_name_unlocked( name );
+        if ( rec == nullptr )
+        {
+            result.add( ViolationType::ForestDomainMissing, DiagnosticAction::NoAction );
+            continue;
+        }
+        if ( ( rec->flags & detail::kForestDomainFlagSystem ) == 0 )
+        {
+            result.add( ViolationType::ForestDomainFlagsMissing, DiagnosticAction::NoAction );
+        }
+    }
+}
+
     static pmm::Block<address_traits>* find_block_from_user_ptr( void* ptr ) noexcept
     {
         std::uint8_t*                          base = _backend.base_ptr();
@@ -4963,141 +5288,142 @@ static void for_each_free_block_inorder( const std::uint8_t* base, const detail:
         return reinterpret_cast<const detail::ManagerHeader<address_traits>*>( base + kBlockHdrByteSize );
     }
 
-    static bool init_layout( std::uint8_t* base, std::size_t size ) noexcept
+static bool init_layout( std::uint8_t* base, std::size_t size ) noexcept
+{
+    using BlockState                         = BlockStateBase<address_traits>;
+    static constexpr index_type  kHdrBlkIdx  = 0;
+    static constexpr index_type  kFreeBlkIdx = kFreeBlkIdxLayout;
+    static constexpr std::size_t kGranSz     = address_traits::granule_size;
+
+    static constexpr std::size_t kMinBlockDataSize = kGranSz; 
+    if ( static_cast<std::size_t>( kFreeBlkIdx ) * kGranSz + sizeof( Block<address_traits> ) + kMinBlockDataSize >
+         size )
+        return false;
+
+    void* hdr_blk = base;
+    std::memset( hdr_blk, 0, kBlockHdrByteSize ); 
+    BlockState::init_fields( hdr_blk,
+                              address_traits::no_block,
+                              kFreeBlkIdx,
+                              0,
+                              kMgrHdrGranules,
+                              kHdrBlkIdx );
+
+    detail::ManagerHeader<address_traits>* hdr = get_header( base );
+    std::memset( hdr, 0, sizeof( detail::ManagerHeader<address_traits> ) );
+    hdr->magic              = kMagic;
+    hdr->total_size         = size;
+    hdr->first_block_offset = kHdrBlkIdx;
+    hdr->last_block_offset  = address_traits::no_block;
+    hdr->free_tree_root     = address_traits::no_block;
+    hdr->granule_size       = static_cast<std::uint16_t>( kGranSz );
+    hdr->root_offset        = address_traits::no_block; 
+
+    void* blk = base + static_cast<std::size_t>( kFreeBlkIdx ) * kGranSz;
+    std::memset( blk, 0, sizeof( Block<address_traits> ) );
+    BlockState::init_fields( blk,
+                              kHdrBlkIdx,
+                              address_traits::no_block,
+                              1,
+                              0,
+                              0 );
+
+    hdr->last_block_offset = kFreeBlkIdx;
+    hdr->free_tree_root    = kFreeBlkIdx;
+    hdr->block_count       = 2;
+    hdr->free_count        = 1;
+    hdr->alloc_count       = 1;
+    hdr->used_size         = kFreeBlkIdx + kBlockHdrGranules;
+
+    _initialized = true;
+    return true;
+}
+
+static bool do_expand( std::size_t user_size ) noexcept
+{
+    using BlockState = BlockStateBase<address_traits>;
+    if ( !_initialized )
+        return false;
+    std::uint8_t*                          base     = _backend.base_ptr();
+    detail::ManagerHeader<address_traits>* hdr      = get_header( base );
+    std::size_t                            old_size = hdr->total_size;
+
+    static constexpr std::size_t kGranSz       = address_traits::granule_size;
+    index_type                   data_gran_need = detail::bytes_to_granules_t<address_traits>( user_size );
+    if ( data_gran_need == 0 )
+        data_gran_need = 1;
+    
+    std::size_t min_need =
+        static_cast<std::size_t>( kBlockHdrGranules + data_gran_need + kBlockHdrGranules ) * kGranSz;
+    std::size_t growth = old_size / 4;
+    if ( growth < min_need )
+        growth = min_need;
+
+    if ( !_backend.expand( growth ) )
+        return false;
+
+    std::uint8_t* new_base = _backend.base_ptr();
+    std::size_t   new_size = _backend.total_size();
+    if ( new_base == nullptr || new_size <= old_size )
+        return false;
+
+    logging_policy::on_expand( old_size, new_size );
+    hdr = get_header( new_base );
+
+    index_type  extra_idx  = detail::byte_off_to_idx_t<address_traits>( old_size );
+    std::size_t extra_size = new_size - old_size;
+
+    void* last_blk_raw =
+        ( hdr->last_block_offset != address_traits::no_block )
+            ? static_cast<void*>( new_base + static_cast<std::size_t>( hdr->last_block_offset ) * kGranSz )
+            : nullptr;
+
+    if ( last_blk_raw != nullptr && BlockState::get_weight( last_blk_raw ) == 0 )
     {
-        using BlockState                         = BlockStateBase<address_traits>;
-        static constexpr index_type  kHdrBlkIdx  = 0;
-        static constexpr index_type  kFreeBlkIdx = kFreeBlkIdxLayout;
-        static constexpr std::size_t kGranSz     = address_traits::granule_size;
-
-        static constexpr std::size_t kMinBlockDataSize = kGranSz; 
-        if ( static_cast<std::size_t>( kFreeBlkIdx ) * kGranSz + sizeof( Block<address_traits> ) + kMinBlockDataSize >
-             size )
-            return false;
-
-        void* hdr_blk = base;
-        std::memset( hdr_blk, 0, kBlockHdrByteSize ); 
-        BlockState::init_fields( hdr_blk,
-                                  address_traits::no_block,
-                                  kFreeBlkIdx,
-                                  0,
-                                  kMgrHdrGranules,
-                                  kHdrBlkIdx );
-
-        detail::ManagerHeader<address_traits>* hdr = get_header( base );
-        std::memset( hdr, 0, sizeof( detail::ManagerHeader<address_traits> ) );
-        hdr->magic              = kMagic;
-        hdr->total_size         = size;
-        hdr->first_block_offset = kHdrBlkIdx;
-        hdr->last_block_offset  = address_traits::no_block;
-        hdr->free_tree_root     = address_traits::no_block;
-        hdr->granule_size       = static_cast<std::uint16_t>( kGranSz );
-        hdr->root_offset        = address_traits::no_block; 
-
-        void* blk = base + static_cast<std::size_t>( kFreeBlkIdx ) * kGranSz;
-        std::memset( blk, 0, sizeof( Block<address_traits> ) );
-        BlockState::init_fields( blk,
-                                  kHdrBlkIdx,
-                                  address_traits::no_block,
-                                  1,
-                                  0,
-                                  0 );
-
-        hdr->last_block_offset = kFreeBlkIdx;
-        hdr->free_tree_root    = kFreeBlkIdx;
-        hdr->block_count       = 2;
-        hdr->free_count        = 1;
-        hdr->alloc_count       = 1;
-        hdr->used_size         = kFreeBlkIdx + kBlockHdrGranules;
-
-        _initialized = true;
-        return true;
+        Block<address_traits>* last_blk = reinterpret_cast<Block<address_traits>*>( last_blk_raw );
+        index_type             loff     = detail::block_idx_t<address_traits>( new_base, last_blk );
+        free_block_tree::remove( new_base, hdr, loff );
+        hdr->total_size = new_size;
+        free_block_tree::insert( new_base, hdr, loff );
     }
-
-    static bool do_expand( std::size_t user_size ) noexcept
+    else
     {
-        using BlockState = BlockStateBase<address_traits>;
-        if ( !_initialized )
-            return false;
-        std::uint8_t*                          base     = _backend.base_ptr();
-        detail::ManagerHeader<address_traits>* hdr      = get_header( base );
-        std::size_t                            old_size = hdr->total_size;
-
-        static constexpr std::size_t kGranSz        = address_traits::granule_size;
-        index_type                   data_gran_need = detail::bytes_to_granules_t<address_traits>( user_size );
-        if ( data_gran_need == 0 )
-            data_gran_need = 1;
         
-        std::size_t min_need =
-            static_cast<std::size_t>( kBlockHdrGranules + data_gran_need + kBlockHdrGranules ) * kGranSz;
-        std::size_t growth = old_size / 4;
-        if ( growth < min_need )
-            growth = min_need;
-
-        if ( !_backend.expand( growth ) )
+        if ( extra_size < sizeof( Block<address_traits> ) + kGranSz )
             return false;
-
-        std::uint8_t* new_base = _backend.base_ptr();
-        std::size_t   new_size = _backend.total_size();
-        if ( new_base == nullptr || new_size <= old_size )
-            return false;
-
-        logging_policy::on_expand( old_size, new_size );
-        hdr = get_header( new_base );
-
-        index_type  extra_idx  = detail::byte_off_to_idx_t<address_traits>( old_size );
-        std::size_t extra_size = new_size - old_size;
-
-        void* last_blk_raw =
-            ( hdr->last_block_offset != address_traits::no_block )
-                ? static_cast<void*>( new_base + static_cast<std::size_t>( hdr->last_block_offset ) * kGranSz )
-                : nullptr;
-
-        if ( last_blk_raw != nullptr && BlockState::get_weight( last_blk_raw ) == 0 )
+        void* nb_blk = new_base + static_cast<std::size_t>( extra_idx ) * kGranSz;
+        std::memset( nb_blk, 0, sizeof( Block<address_traits> ) );
+        if ( last_blk_raw != nullptr )
         {
             Block<address_traits>* last_blk = reinterpret_cast<Block<address_traits>*>( last_blk_raw );
             index_type             loff     = detail::block_idx_t<address_traits>( new_base, last_blk );
-            free_block_tree::remove( new_base, hdr, loff );
-            hdr->total_size = new_size;
-            free_block_tree::insert( new_base, hdr, loff );
+            BlockState::init_fields( nb_blk,
+                                      loff,
+                                      address_traits::no_block,
+                                      1,
+                                      0,
+                                      0 );
+            BlockState::set_next_offset_of( last_blk_raw, static_cast<index_type>( extra_idx ) );
         }
         else
         {
-            
-            if ( extra_size < sizeof( Block<address_traits> ) + kGranSz )
-                return false;
-            void* nb_blk = new_base + static_cast<std::size_t>( extra_idx ) * kGranSz;
-            std::memset( nb_blk, 0, sizeof( Block<address_traits> ) );
-            if ( last_blk_raw != nullptr )
-            {
-                Block<address_traits>* last_blk = reinterpret_cast<Block<address_traits>*>( last_blk_raw );
-                index_type             loff     = detail::block_idx_t<address_traits>( new_base, last_blk );
-                BlockState::init_fields( nb_blk,
-                                          loff,
-                                          address_traits::no_block,
-                                          1,
-                                          0,
-                                          0 );
-                BlockState::set_next_offset_of( last_blk_raw, static_cast<index_type>( extra_idx ) );
-            }
-            else
-            {
-                BlockState::init_fields( nb_blk,
-                                          address_traits::no_block,
-                                          address_traits::no_block,
-                                          1,
-                                          0,
-                                          0 );
-                hdr->first_block_offset = extra_idx;
-            }
-            hdr->last_block_offset = extra_idx;
-            hdr->block_count++;
-            hdr->free_count++;
-            hdr->total_size = new_size;
-            free_block_tree::insert( new_base, hdr, extra_idx );
+            BlockState::init_fields( nb_blk,
+                                      address_traits::no_block,
+                                      address_traits::no_block,
+                                      1,
+                                      0,
+                                      0 );
+            hdr->first_block_offset = extra_idx;
         }
-        return true;
+        hdr->last_block_offset = extra_idx;
+        hdr->block_count++;
+        hdr->free_count++;
+        hdr->total_size = new_size;
+        free_block_tree::insert( new_base, hdr, extra_idx );
     }
+    return true;
+}
+
 };
 
 } 
@@ -5180,7 +5506,7 @@ template <typename MgrT> inline bool save_manager( const char* filename )
     return true;
 }
 
-template <typename MgrT> inline bool load_manager_from_file( const char* filename )
+template <typename MgrT> inline bool load_manager_from_file( const char* filename, VerifyResult& result )
 {
     using address_traits = typename MgrT::address_traits;
 
@@ -5237,7 +5563,13 @@ template <typename MgrT> inline bool load_manager_from_file( const char* filenam
         
     }
 
-    return MgrT::load();
+    return MgrT::load( result );
+}
+
+template <typename MgrT> inline bool load_manager_from_file( const char* filename )
+{
+    VerifyResult result;
+    return load_manager_from_file<MgrT>( filename, result );
 }
 
 } 
