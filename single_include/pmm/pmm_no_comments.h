@@ -772,20 +772,19 @@ namespace pmm
 
 enum class PmmError : std::uint8_t
 {
-    Ok                  = 0,  
-    NotInitialized      = 1,  
-    InvalidSize         = 2,  
-    Overflow            = 3,  
-    OutOfMemory         = 4,  
-    ExpandFailed        = 5,  
-    InvalidMagic        = 6,  
-    CrcMismatch         = 7,  
-    SizeMismatch        = 8,  
-    GranuleMismatch     = 9,  
-    BackendError        = 10, 
-    InvalidPointer      = 11, 
-    BlockLocked         = 12, 
-    StructuralViolation = 13, 
+    Ok              = 0,  
+    NotInitialized  = 1,  
+    InvalidSize     = 2,  
+    Overflow        = 3,  
+    OutOfMemory     = 4,  
+    ExpandFailed    = 5,  
+    InvalidMagic    = 6,  
+    CrcMismatch     = 7,  
+    SizeMismatch    = 8,  
+    GranuleMismatch = 9,  
+    BackendError    = 10, 
+    InvalidPointer  = 11, 
+    BlockLocked     = 12, 
 };
 
 inline constexpr std::size_t kGranuleSize = 16;
@@ -3802,17 +3801,17 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     template <typename> friend struct pstringview;
 
     template <typename T> using pptr = pmm::pptr<T, manager_type>;
-    
+
     using pstringview = pmm::pstringview<manager_type>;
-    
+
     using pstring = pmm::pstring<manager_type>;
-    
+
     template <typename _K, typename _V> using pmap = pmm::pmap<_K, _V, manager_type>;
-    
+
     template <typename T> using parray = pmm::parray<T, manager_type>;
-    
+
     template <typename T> using pallocator = pmm::pallocator<T, manager_type>;
-    
+
     template <typename T> using ppool = pmm::ppool<T, manager_type>;
 
     static PmmError last_error() noexcept { return _last_error; }
@@ -3890,17 +3889,7 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     static bool load() noexcept
     {
         VerifyResult result;
-        bool         ok = load( result );
-        
-        if ( !result.ok )
-        {
-            for ( std::size_t i = 0; i < result.entry_count; ++i )
-            {
-                if ( result.entries[i].type != ViolationType::HeaderCorruption )
-                    logging_policy::on_corruption_detected( PmmError::StructuralViolation );
-            }
-        }
-        return ok;
+        return load( result );
     }
 
     static bool load( VerifyResult& result ) noexcept
@@ -5299,141 +5288,142 @@ static void verify_forest_registry_unlocked( VerifyResult& result ) noexcept
         return reinterpret_cast<const detail::ManagerHeader<address_traits>*>( base + kBlockHdrByteSize );
     }
 
-    static bool init_layout( std::uint8_t* base, std::size_t size ) noexcept
+static bool init_layout( std::uint8_t* base, std::size_t size ) noexcept
+{
+    using BlockState                         = BlockStateBase<address_traits>;
+    static constexpr index_type  kHdrBlkIdx  = 0;
+    static constexpr index_type  kFreeBlkIdx = kFreeBlkIdxLayout;
+    static constexpr std::size_t kGranSz     = address_traits::granule_size;
+
+    static constexpr std::size_t kMinBlockDataSize = kGranSz; 
+    if ( static_cast<std::size_t>( kFreeBlkIdx ) * kGranSz + sizeof( Block<address_traits> ) + kMinBlockDataSize >
+         size )
+        return false;
+
+    void* hdr_blk = base;
+    std::memset( hdr_blk, 0, kBlockHdrByteSize ); 
+    BlockState::init_fields( hdr_blk,
+                              address_traits::no_block,
+                              kFreeBlkIdx,
+                              0,
+                              kMgrHdrGranules,
+                              kHdrBlkIdx );
+
+    detail::ManagerHeader<address_traits>* hdr = get_header( base );
+    std::memset( hdr, 0, sizeof( detail::ManagerHeader<address_traits> ) );
+    hdr->magic              = kMagic;
+    hdr->total_size         = size;
+    hdr->first_block_offset = kHdrBlkIdx;
+    hdr->last_block_offset  = address_traits::no_block;
+    hdr->free_tree_root     = address_traits::no_block;
+    hdr->granule_size       = static_cast<std::uint16_t>( kGranSz );
+    hdr->root_offset        = address_traits::no_block; 
+
+    void* blk = base + static_cast<std::size_t>( kFreeBlkIdx ) * kGranSz;
+    std::memset( blk, 0, sizeof( Block<address_traits> ) );
+    BlockState::init_fields( blk,
+                              kHdrBlkIdx,
+                              address_traits::no_block,
+                              1,
+                              0,
+                              0 );
+
+    hdr->last_block_offset = kFreeBlkIdx;
+    hdr->free_tree_root    = kFreeBlkIdx;
+    hdr->block_count       = 2;
+    hdr->free_count        = 1;
+    hdr->alloc_count       = 1;
+    hdr->used_size         = kFreeBlkIdx + kBlockHdrGranules;
+
+    _initialized = true;
+    return true;
+}
+
+static bool do_expand( std::size_t user_size ) noexcept
+{
+    using BlockState = BlockStateBase<address_traits>;
+    if ( !_initialized )
+        return false;
+    std::uint8_t*                          base     = _backend.base_ptr();
+    detail::ManagerHeader<address_traits>* hdr      = get_header( base );
+    std::size_t                            old_size = hdr->total_size;
+
+    static constexpr std::size_t kGranSz       = address_traits::granule_size;
+    index_type                   data_gran_need = detail::bytes_to_granules_t<address_traits>( user_size );
+    if ( data_gran_need == 0 )
+        data_gran_need = 1;
+    
+    std::size_t min_need =
+        static_cast<std::size_t>( kBlockHdrGranules + data_gran_need + kBlockHdrGranules ) * kGranSz;
+    std::size_t growth = old_size / 4;
+    if ( growth < min_need )
+        growth = min_need;
+
+    if ( !_backend.expand( growth ) )
+        return false;
+
+    std::uint8_t* new_base = _backend.base_ptr();
+    std::size_t   new_size = _backend.total_size();
+    if ( new_base == nullptr || new_size <= old_size )
+        return false;
+
+    logging_policy::on_expand( old_size, new_size );
+    hdr = get_header( new_base );
+
+    index_type  extra_idx  = detail::byte_off_to_idx_t<address_traits>( old_size );
+    std::size_t extra_size = new_size - old_size;
+
+    void* last_blk_raw =
+        ( hdr->last_block_offset != address_traits::no_block )
+            ? static_cast<void*>( new_base + static_cast<std::size_t>( hdr->last_block_offset ) * kGranSz )
+            : nullptr;
+
+    if ( last_blk_raw != nullptr && BlockState::get_weight( last_blk_raw ) == 0 )
     {
-        using BlockState                         = BlockStateBase<address_traits>;
-        static constexpr index_type  kHdrBlkIdx  = 0;
-        static constexpr index_type  kFreeBlkIdx = kFreeBlkIdxLayout;
-        static constexpr std::size_t kGranSz     = address_traits::granule_size;
-
-        static constexpr std::size_t kMinBlockDataSize = kGranSz; 
-        if ( static_cast<std::size_t>( kFreeBlkIdx ) * kGranSz + sizeof( Block<address_traits> ) + kMinBlockDataSize >
-             size )
-            return false;
-
-        void* hdr_blk = base;
-        std::memset( hdr_blk, 0, kBlockHdrByteSize ); 
-        BlockState::init_fields( hdr_blk,
-                                  address_traits::no_block,
-                                  kFreeBlkIdx,
-                                  0,
-                                  kMgrHdrGranules,
-                                  kHdrBlkIdx );
-
-        detail::ManagerHeader<address_traits>* hdr = get_header( base );
-        std::memset( hdr, 0, sizeof( detail::ManagerHeader<address_traits> ) );
-        hdr->magic              = kMagic;
-        hdr->total_size         = size;
-        hdr->first_block_offset = kHdrBlkIdx;
-        hdr->last_block_offset  = address_traits::no_block;
-        hdr->free_tree_root     = address_traits::no_block;
-        hdr->granule_size       = static_cast<std::uint16_t>( kGranSz );
-        hdr->root_offset        = address_traits::no_block; 
-
-        void* blk = base + static_cast<std::size_t>( kFreeBlkIdx ) * kGranSz;
-        std::memset( blk, 0, sizeof( Block<address_traits> ) );
-        BlockState::init_fields( blk,
-                                  kHdrBlkIdx,
-                                  address_traits::no_block,
-                                  1,
-                                  0,
-                                  0 );
-
-        hdr->last_block_offset = kFreeBlkIdx;
-        hdr->free_tree_root    = kFreeBlkIdx;
-        hdr->block_count       = 2;
-        hdr->free_count        = 1;
-        hdr->alloc_count       = 1;
-        hdr->used_size         = kFreeBlkIdx + kBlockHdrGranules;
-
-        _initialized = true;
-        return true;
+        Block<address_traits>* last_blk = reinterpret_cast<Block<address_traits>*>( last_blk_raw );
+        index_type             loff     = detail::block_idx_t<address_traits>( new_base, last_blk );
+        free_block_tree::remove( new_base, hdr, loff );
+        hdr->total_size = new_size;
+        free_block_tree::insert( new_base, hdr, loff );
     }
-
-    static bool do_expand( std::size_t user_size ) noexcept
+    else
     {
-        using BlockState = BlockStateBase<address_traits>;
-        if ( !_initialized )
-            return false;
-        std::uint8_t*                          base     = _backend.base_ptr();
-        detail::ManagerHeader<address_traits>* hdr      = get_header( base );
-        std::size_t                            old_size = hdr->total_size;
-
-        static constexpr std::size_t kGranSz        = address_traits::granule_size;
-        index_type                   data_gran_need = detail::bytes_to_granules_t<address_traits>( user_size );
-        if ( data_gran_need == 0 )
-            data_gran_need = 1;
         
-        std::size_t min_need =
-            static_cast<std::size_t>( kBlockHdrGranules + data_gran_need + kBlockHdrGranules ) * kGranSz;
-        std::size_t growth = old_size / 4;
-        if ( growth < min_need )
-            growth = min_need;
-
-        if ( !_backend.expand( growth ) )
+        if ( extra_size < sizeof( Block<address_traits> ) + kGranSz )
             return false;
-
-        std::uint8_t* new_base = _backend.base_ptr();
-        std::size_t   new_size = _backend.total_size();
-        if ( new_base == nullptr || new_size <= old_size )
-            return false;
-
-        logging_policy::on_expand( old_size, new_size );
-        hdr = get_header( new_base );
-
-        index_type  extra_idx  = detail::byte_off_to_idx_t<address_traits>( old_size );
-        std::size_t extra_size = new_size - old_size;
-
-        void* last_blk_raw =
-            ( hdr->last_block_offset != address_traits::no_block )
-                ? static_cast<void*>( new_base + static_cast<std::size_t>( hdr->last_block_offset ) * kGranSz )
-                : nullptr;
-
-        if ( last_blk_raw != nullptr && BlockState::get_weight( last_blk_raw ) == 0 )
+        void* nb_blk = new_base + static_cast<std::size_t>( extra_idx ) * kGranSz;
+        std::memset( nb_blk, 0, sizeof( Block<address_traits> ) );
+        if ( last_blk_raw != nullptr )
         {
             Block<address_traits>* last_blk = reinterpret_cast<Block<address_traits>*>( last_blk_raw );
             index_type             loff     = detail::block_idx_t<address_traits>( new_base, last_blk );
-            free_block_tree::remove( new_base, hdr, loff );
-            hdr->total_size = new_size;
-            free_block_tree::insert( new_base, hdr, loff );
+            BlockState::init_fields( nb_blk,
+                                      loff,
+                                      address_traits::no_block,
+                                      1,
+                                      0,
+                                      0 );
+            BlockState::set_next_offset_of( last_blk_raw, static_cast<index_type>( extra_idx ) );
         }
         else
         {
-            
-            if ( extra_size < sizeof( Block<address_traits> ) + kGranSz )
-                return false;
-            void* nb_blk = new_base + static_cast<std::size_t>( extra_idx ) * kGranSz;
-            std::memset( nb_blk, 0, sizeof( Block<address_traits> ) );
-            if ( last_blk_raw != nullptr )
-            {
-                Block<address_traits>* last_blk = reinterpret_cast<Block<address_traits>*>( last_blk_raw );
-                index_type             loff     = detail::block_idx_t<address_traits>( new_base, last_blk );
-                BlockState::init_fields( nb_blk,
-                                          loff,
-                                          address_traits::no_block,
-                                          1,
-                                          0,
-                                          0 );
-                BlockState::set_next_offset_of( last_blk_raw, static_cast<index_type>( extra_idx ) );
-            }
-            else
-            {
-                BlockState::init_fields( nb_blk,
-                                          address_traits::no_block,
-                                          address_traits::no_block,
-                                          1,
-                                          0,
-                                          0 );
-                hdr->first_block_offset = extra_idx;
-            }
-            hdr->last_block_offset = extra_idx;
-            hdr->block_count++;
-            hdr->free_count++;
-            hdr->total_size = new_size;
-            free_block_tree::insert( new_base, hdr, extra_idx );
+            BlockState::init_fields( nb_blk,
+                                      address_traits::no_block,
+                                      address_traits::no_block,
+                                      1,
+                                      0,
+                                      0 );
+            hdr->first_block_offset = extra_idx;
         }
-        return true;
+        hdr->last_block_offset = extra_idx;
+        hdr->block_count++;
+        hdr->free_count++;
+        hdr->total_size = new_size;
+        free_block_tree::insert( new_base, hdr, extra_idx );
     }
+    return true;
+}
+
 };
 
 } 
@@ -5516,7 +5506,7 @@ template <typename MgrT> inline bool save_manager( const char* filename )
     return true;
 }
 
-template <typename MgrT> inline bool load_manager_from_file( const char* filename )
+template <typename MgrT> inline bool load_manager_from_file( const char* filename, VerifyResult& result )
 {
     using address_traits = typename MgrT::address_traits;
 
@@ -5573,7 +5563,13 @@ template <typename MgrT> inline bool load_manager_from_file( const char* filenam
         
     }
 
-    return MgrT::load();
+    return MgrT::load( result );
+}
+
+template <typename MgrT> inline bool load_manager_from_file( const char* filename )
+{
+    VerifyResult result;
+    return load_manager_from_file<MgrT>( filename, result );
 }
 
 } 
