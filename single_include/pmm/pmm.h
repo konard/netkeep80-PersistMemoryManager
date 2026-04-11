@@ -1734,7 +1734,6 @@ enum class PmmError : std::uint8_t
     BackendError        = 10, ///< Backend returned null or invalid state
     InvalidPointer      = 11, ///< Pointer is null or out of bounds
     BlockLocked         = 12, ///< Block is permanently locked (cannot deallocate)
-    StructuralViolation = 13, ///< Non-header structural violation detected during load (Issue #245)
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -6823,19 +6822,96 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
 
     template <typename> friend struct pstringview;
 
-    /// @brief Persistent pointer bound to this manager. @tparam T Pointed-to type.
+    /**
+     * @brief Вложенный псевдоним персистентного указателя, привязанного к данному менеджеру.
+     *
+     * `PersistMemoryManager<ConfigT, 0>::pptr<T>` и
+     * `PersistMemoryManager<ConfigT, 1>::pptr<T>` — разные типы.
+     *
+     * @tparam T Тип данных, на который указывает pptr.
+     */
     template <typename T> using pptr = pmm::pptr<T, manager_type>;
-    /// @brief Persistent interned string (shorthand for pmm::pstringview<Mgr>).
+
+    /**
+     * @brief Псевдоним для персистентной интернированной строки, привязанной к данному менеджеру.
+     *
+     * Позволяет использовать краткий синтаксис:
+     * @code
+     *   Mgr::pptr<Mgr::pstringview> p = Mgr::pstringview("hello");
+     * @endcode
+     * вместо `Mgr::pptr<pmm::pstringview<Mgr>> p = pmm::pstringview<Mgr>("hello");`
+     */
     using pstringview = pmm::pstringview<manager_type>;
-    /// @brief Persistent mutable string (shorthand for pmm::pstring<Mgr>).
+
+    /**
+     * @brief Псевдоним для мутабельной персистентной строки, привязанной к данному менеджеру.
+     *
+     * Позволяет использовать краткий синтаксис:
+     * @code
+     *   Mgr::pptr<Mgr::pstring> p = Mgr::create_typed<Mgr::pstring>();
+     *   p->assign("hello");
+     * @endcode
+     * вместо `Mgr::pptr<pmm::pstring<Mgr>> p = ...;`
+     */
     using pstring = pmm::pstring<manager_type>;
-    /// @brief Persistent sorted map (AVL). @tparam _K Key. @tparam _V Value.
+
+    /**
+     * @brief Псевдоним для персистентного словаря (AVL-дерева), привязанного к данному менеджеру.
+     *
+     * Позволяет использовать краткий синтаксис:
+     * @code
+     *   Mgr::pmap<int, int> map;
+     *   map.insert(42, 100);
+     *   auto p = map.find(42);
+     * @endcode
+     * вместо `pmm::pmap<int, int, Mgr> map;`
+     *
+     * @tparam _K Тип ключа. Должен поддерживать operator< и operator==.
+     * @tparam _V Тип значения.
+     */
     template <typename _K, typename _V> using pmap = pmm::pmap<_K, _V, manager_type>;
-    /// @brief Persistent array with O(1) random access. @tparam T Element type.
+
+    /**
+     * @brief Алиас для персистентного массива с O(1) индексацией (Issue #195, Phase 3.2).
+     *
+     * Позволяет писать:
+     * @code
+     *   Mgr::parray<int> arr;
+     *   arr.push_back(42);
+     *   int* elem = arr.at(0);
+     * @endcode
+     * вместо `pmm::parray<int, Mgr> arr;`
+     *
+     * @tparam T Тип элемента. Должен быть trivially copyable.
+     */
     template <typename T> using parray = pmm::parray<T, manager_type>;
-    /// @brief STL-compatible allocator. @tparam T Element type.
+
+    /**
+     * @brief Алиас для STL-совместимого аллокатора (Issue #198, Phase 3.5).
+     *
+     * Позволяет писать:
+     * @code
+     *   std::vector<int, Mgr::pallocator<int>> vec;
+     *   vec.push_back(42);
+     * @endcode
+     * вместо `std::vector<int, pmm::pallocator<int, Mgr>> vec;`
+     *
+     * @tparam T Тип элемента.
+     */
     template <typename T> using pallocator = pmm::pallocator<T, manager_type>;
-    /// @brief Persistent object pool. @tparam T Object type (trivially copyable).
+
+    /**
+     * @brief Алиас для персистентного пула объектов (Issue #199, Phase 3.6).
+     *
+     * Позволяет писать:
+     * @code
+     *   Mgr::pptr<Mgr::ppool<int>> pool = Mgr::create_typed<Mgr::ppool<int>>();
+     *   int* obj = pool->allocate();
+     * @endcode
+     * вместо `Mgr::pptr<pmm::ppool<int, Mgr>> pool = ...;`
+     *
+     * @tparam T Тип объекта. Должен быть trivially copyable.
+     */
     template <typename T> using ppool = pmm::ppool<T, manager_type>;
 
     // ─── Error code API (Issue #201, Phase 4.1) ───────────────────────────────
@@ -6932,22 +7008,16 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         return ok;
     }
 
-    /// @brief Load existing state from backend (default: no diagnostics report).
+    /**
+     * @brief Load existing state from backend (compatibility path — no diagnostics report).
+     *
+     * @deprecated Prefer load(VerifyResult&) to get structured diagnostics on any repairs performed.
+     *             This overload is kept for backward compatibility only (Issue #245).
+     */
     static bool load() noexcept
     {
         VerifyResult result;
-        bool         ok = load( result );
-        // Issue #245: signal non-header violations via logging_policy so they are never silent.
-        // Header violations are already signaled inside load(VerifyResult&).
-        if ( !result.ok )
-        {
-            for ( std::size_t i = 0; i < result.entry_count; ++i )
-            {
-                if ( result.entries[i].type != ViolationType::HeaderCorruption )
-                    logging_policy::on_corruption_detected( PmmError::StructuralViolation );
-            }
-        }
-        return ok;
+        return load( result );
     }
 
     /**
@@ -8947,10 +9017,11 @@ template <typename MgrT> inline bool save_manager( const char* filename )
 }
 
 /**
- * @brief Загрузить образ менеджера из файла в PersistMemoryManager (Issue #110 — статический интерфейс).
+ * @brief Загрузить образ менеджера из файла в PersistMemoryManager с диагностикой (Issue #245).
  *
  * Читает файл, записанный функцией save_manager(), в буфер менеджера,
- * затем вызывает MgrT::load() для проверки заголовка и восстановления состояния.
+ * затем вызывает MgrT::load(result) для проверки заголовка и восстановления состояния.
+ * Все обнаруженные нарушения и выполненные исправления записываются в result.
  *
  * Issue #43 Phase 2.1: After reading the file, verifies CRC32 before calling load().
  * If the CRC does not match, returns false without modifying manager state.
@@ -8960,12 +9031,13 @@ template <typename MgrT> inline bool save_manager( const char* filename )
  *
  * @tparam MgrT    Тип статического менеджера (PersistMemoryManager<ConfigT, Id>).
  * @param filename Путь к файлу с образом.
+ * @param result   VerifyResult, заполняемый обнаруженными нарушениями и выполненными исправлениями.
  * @return true при успешной загрузке, false при ошибке.
  *
  * Предусловие:  filename != nullptr, MgrT::backend().base_ptr() != nullptr.
- * Постусловие: менеджер восстановлен из файла.
+ * Постусловие: менеджер восстановлен из файла, result содержит полную диагностику.
  */
-template <typename MgrT> inline bool load_manager_from_file( const char* filename )
+template <typename MgrT> inline bool load_manager_from_file( const char* filename, VerifyResult& result )
 {
     using address_traits = typename MgrT::address_traits;
 
@@ -9024,7 +9096,25 @@ template <typename MgrT> inline bool load_manager_from_file( const char* filenam
         // saved before Phase 2.1 (which had _reserved[8] zeroed).
     }
 
-    return MgrT::load();
+    return MgrT::load( result );
+}
+
+/**
+ * @brief Загрузить образ менеджера из файла в PersistMemoryManager (Issue #110 — статический интерфейс).
+ *
+ * Обёртка для обратной совместимости. Предпочтительно использовать перегрузку
+ * с VerifyResult для получения полной диагностики восстановления.
+ *
+ * @tparam MgrT    Тип статического менеджера (PersistMemoryManager<ConfigT, Id>).
+ * @param filename Путь к файлу с образом.
+ * @return true при успешной загрузке, false при ошибке.
+ *
+ * @deprecated Используйте load_manager_from_file(filename, result) для получения диагностики.
+ */
+template <typename MgrT> inline bool load_manager_from_file( const char* filename )
+{
+    VerifyResult result;
+    return load_manager_from_file<MgrT>( filename, result );
 }
 
 } // namespace pmm

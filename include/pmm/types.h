@@ -60,7 +60,6 @@ enum class PmmError : std::uint8_t
     BackendError        = 10, ///< Backend returned null or invalid state
     InvalidPointer      = 11, ///< Pointer is null or out of bounds
     BlockLocked         = 12, ///< Block is permanently locked (cannot deallocate)
-    StructuralViolation = 13, ///< Non-header structural violation detected during load (Issue #245)
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────

@@ -64,7 +64,6 @@ TEST_CASE( "enum_values", "[test_issue201_error_codes]" )
     REQUIRE( static_cast<int>( pmm::PmmError::BackendError ) == 10 );
     REQUIRE( static_cast<int>( pmm::PmmError::InvalidPointer ) == 11 );
     REQUIRE( static_cast<int>( pmm::PmmError::BlockLocked ) == 12 );
-    REQUIRE( static_cast<int>( pmm::PmmError::StructuralViolation ) == 13 );
 }
 
 /// 2. last_error() returns Ok after successful create().

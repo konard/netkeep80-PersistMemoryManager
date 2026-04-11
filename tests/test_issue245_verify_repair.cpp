@@ -147,14 +147,15 @@ TEST_CASE( "verify_repair: verify does not modify the image", "[test_issue245]" 
     Mgr::destroy();
 }
 
-// ─── Test 4: load(VerifyResult&) reports repairs via file round-trip ────────
+// ─── Test 4: load(VerifyResult&) reports repairs — called directly ──────────
+//
+// This test calls Mgr2::load(result) directly (not via load_manager_from_file)
+// to verify the reporting path in load(VerifyResult&) itself.
 
-TEST_CASE( "verify_repair: load with VerifyResult reports repairs", "[test_issue245]" )
+TEST_CASE( "verify_repair: load(VerifyResult&) reports repairs directly", "[test_issue245]" )
 {
     using Mgr1 = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 2450>;
     using Mgr2 = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 2451>;
-
-    static const char* kFile = "test_issue245_repair.dat";
 
     const std::size_t arena = 64 * 1024;
     REQUIRE( Mgr1::create( arena ) );
@@ -162,8 +163,64 @@ TEST_CASE( "verify_repair: load with VerifyResult reports repairs", "[test_issue
     auto p = Mgr1::allocate_typed<std::uint64_t>( 4 );
     REQUIRE( !p.is_null() );
 
+    // Corrupt a block's root_offset directly in memory.
+    std::uint8_t* src     = Mgr1::backend().base_ptr();
+    std::size_t   usr_off = static_cast<std::size_t>( p.offset() ) * pmm::DefaultAddressTraits::granule_size;
+    void*         blk_raw = src + usr_off - sizeof( pmm::Block<pmm::DefaultAddressTraits> );
+    auto          blk_idx = static_cast<pmm::DefaultAddressTraits::index_type>(
+        p.offset() - sizeof( pmm::Block<pmm::DefaultAddressTraits> ) / pmm::DefaultAddressTraits::granule_size );
+    pmm::BlockStateBase<pmm::DefaultAddressTraits>::set_root_offset_of( blk_raw, blk_idx + 777 );
+
+    // Create Mgr2's backend BEFORE destroying Mgr1, so we can copy the corrupted
+    // image (with valid magic) directly into Mgr2's buffer.
+    REQUIRE( Mgr2::create( arena ) );
+    std::memcpy( Mgr2::backend().base_ptr(), src, arena );
+    Mgr1::destroy();
+
+    // Call load(VerifyResult&) directly — this is the API under test.
+    pmm::VerifyResult result;
+    bool              ok = Mgr2::load( result );
+    REQUIRE( ok );
+
+    // load(VerifyResult&) must have detected and repaired the block state inconsistency.
+    REQUIRE_FALSE( result.ok );
+    REQUIRE( result.violation_count > 0 );
+    bool found_repaired = false;
+    for ( std::size_t i = 0; i < result.entry_count; ++i )
+    {
+        if ( result.entries[i].action == pmm::DiagnosticAction::Repaired ||
+             result.entries[i].action == pmm::DiagnosticAction::Rebuilt )
+        {
+            found_repaired = true;
+            break;
+        }
+    }
+    REQUIRE( found_repaired );
+
+    // After repair, verify should show a clean state.
+    pmm::VerifyResult verify_after = Mgr2::verify();
+    REQUIRE( verify_after.ok );
+
+    Mgr2::destroy();
+}
+
+// ─── Test 4b: load_manager_from_file with VerifyResult uses load(VerifyResult&) ──
+
+TEST_CASE( "verify_repair: load_manager_from_file with VerifyResult reports repairs", "[test_issue245]" )
+{
+    using Mgr3 = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 2448>;
+    using Mgr4 = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 2449>;
+
+    static const char* kFile = "test_issue245_repair.dat";
+
+    const std::size_t arena = 64 * 1024;
+    REQUIRE( Mgr3::create( arena ) );
+
+    auto p = Mgr3::allocate_typed<std::uint64_t>( 4 );
+    REQUIRE( !p.is_null() );
+
     // Corrupt a block's root_offset before saving.
-    std::uint8_t* base    = Mgr1::backend().base_ptr();
+    std::uint8_t* base    = Mgr3::backend().base_ptr();
     std::size_t   usr_off = static_cast<std::size_t>( p.offset() ) * pmm::DefaultAddressTraits::granule_size;
     void*         blk_raw = base + usr_off - sizeof( pmm::Block<pmm::DefaultAddressTraits> );
     auto          blk_idx = static_cast<pmm::DefaultAddressTraits::index_type>(
@@ -171,18 +228,30 @@ TEST_CASE( "verify_repair: load with VerifyResult reports repairs", "[test_issue
     pmm::BlockStateBase<pmm::DefaultAddressTraits>::set_root_offset_of( blk_raw, blk_idx + 777 );
 
     // Save the corrupted image.
-    REQUIRE( pmm::save_manager<Mgr1>( kFile ) );
-    Mgr1::destroy();
+    REQUIRE( pmm::save_manager<Mgr3>( kFile ) );
+    Mgr3::destroy();
 
-    // Load into Mgr2 — load_manager_from_file calls load() internally.
-    REQUIRE( Mgr2::create( arena ) );
-    REQUIRE( pmm::load_manager_from_file<Mgr2>( kFile ) );
+    // Load via the new overload that accepts VerifyResult — uses load(VerifyResult&) internally.
+    REQUIRE( Mgr4::create( arena ) );
+    pmm::VerifyResult result;
+    REQUIRE( pmm::load_manager_from_file<Mgr4>( kFile, result ) );
 
-    // After load, verify should show clean state (repairs applied by load()).
-    pmm::VerifyResult result = Mgr2::verify();
-    REQUIRE( result.ok );
+    // Repairs must be reported in result.
+    REQUIRE_FALSE( result.ok );
+    REQUIRE( result.violation_count > 0 );
+    bool found_repaired = false;
+    for ( std::size_t i = 0; i < result.entry_count; ++i )
+    {
+        if ( result.entries[i].action == pmm::DiagnosticAction::Repaired ||
+             result.entries[i].action == pmm::DiagnosticAction::Rebuilt )
+        {
+            found_repaired = true;
+            break;
+        }
+    }
+    REQUIRE( found_repaired );
 
-    Mgr2::destroy();
+    Mgr4::destroy();
     std::remove( kFile );
 }
 
