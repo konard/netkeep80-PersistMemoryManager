@@ -734,10 +734,14 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     {
         if ( p.is_null() || !_initialized )
             return nullptr;
-        std::uint8_t* base = _backend.base_ptr();
-        // Bounds check — verify offset is within the managed region.
-        std::size_t byte_off = static_cast<std::size_t>( p.offset() ) * address_traits::granule_size;
-        assert( byte_off + sizeof( T ) <= _backend.total_size() && "resolve(): pptr offset out of bounds" );
+        std::uint8_t* base     = _backend.base_ptr();
+        std::size_t   byte_off = static_cast<std::size_t>( p.offset() ) * address_traits::granule_size;
+        // Safety: reject out-of-bounds offsets instead of UB.
+        if ( byte_off + sizeof( T ) > _backend.total_size() )
+        {
+            _last_error = PmmError::InvalidPointer;
+            return nullptr;
+        }
         return reinterpret_cast<T*>( base + byte_off );
     }
 
@@ -1339,30 +1343,49 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
 
     /// @brief Convert a raw user-data pointer returned by allocate() into a pptr<T>.
     /// Caller must ensure raw != nullptr and _initialized before calling.
+    /// Returns null pptr if the pointer is not within the managed region.
     template <typename T> static pptr<T> make_pptr_from_raw( void* raw ) noexcept
     {
         std::uint8_t* base     = _backend.base_ptr();
-        std::size_t   byte_off = static_cast<std::uint8_t*>( raw ) - base;
-        return pptr<T>( static_cast<index_type>( byte_off / address_traits::granule_size ) );
+        auto*         raw_byte = static_cast<std::uint8_t*>( raw );
+        if ( raw_byte < base || raw_byte >= base + _backend.total_size() )
+            return pptr<T>();
+        std::size_t byte_off = static_cast<std::size_t>( raw_byte - base );
+        std::size_t idx      = byte_off / address_traits::granule_size;
+        if ( idx > static_cast<std::size_t>( std::numeric_limits<index_type>::max() ) )
+            return pptr<T>();
+        return pptr<T>( static_cast<index_type>( idx ) );
     }
 
     // ─── blk_raw helpers ──────────────────────────────────────────
     // base + offset * granule_size - sizeof(Block<AT>) → block header before user data.
 
     /// @brief Return a const pointer to the block header for the given pptr.
+    /// Returns nullptr if offset is invalid (would place block header before base).
     template <typename T> static const void* block_raw_ptr_from_pptr( pptr<T> p ) noexcept
     {
-        const std::uint8_t* base = _backend.base_ptr();
-        return base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size -
-               sizeof( Block<address_traits> );
+        const std::uint8_t* base     = _backend.base_ptr();
+        std::size_t         byte_off = static_cast<std::size_t>( p.offset() ) * address_traits::granule_size;
+        if ( byte_off < sizeof( Block<address_traits> ) )
+            return nullptr;
+        std::size_t blk_off = byte_off - sizeof( Block<address_traits> );
+        if ( blk_off + sizeof( Block<address_traits> ) > _backend.total_size() )
+            return nullptr;
+        return base + blk_off;
     }
 
     /// @brief Return a mutable pointer to the block header for the given pptr.
+    /// Returns nullptr if offset is invalid (would place block header before base).
     template <typename T> static void* block_raw_mut_ptr_from_pptr( pptr<T> p ) noexcept
     {
-        std::uint8_t* base = _backend.base_ptr();
-        return base + static_cast<std::size_t>( p.offset() ) * address_traits::granule_size -
-               sizeof( Block<address_traits> );
+        std::uint8_t* base     = _backend.base_ptr();
+        std::size_t   byte_off = static_cast<std::size_t>( p.offset() ) * address_traits::granule_size;
+        if ( byte_off < sizeof( Block<address_traits> ) )
+            return nullptr;
+        std::size_t blk_off = byte_off - sizeof( Block<address_traits> );
+        if ( blk_off + sizeof( Block<address_traits> ) > _backend.total_size() )
+            return nullptr;
+        return base + blk_off;
     }
 
     // ─── Address-traits-specific layout constants ──────────────────
