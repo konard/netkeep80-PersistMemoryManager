@@ -1,35 +1,32 @@
 /**
  * @file pmm/tree_node.h
- * @brief TreeNode<AddressTraits> — узел AVL-дерева для ПАП (Issue #87 Phase 2, #138).
+ * @brief TreeNode<AddressTraits> — intrusive AVL-slot for the forest model (Issue #87, #138, #243).
  *
- * Параметрический узел AVL-дерева, где тип индексных полей определяется
- * через `AddressTraits::index_type`.
+ * Parametric AVL tree node where index field types are defined by
+ * `AddressTraits::index_type`.
  *
- * ПАП-менеджер организует блоки памяти как лес AVL-деревьев.  Каждый узел
- * принадлежит ровно одному дереву и может мигрировать из одного дерева в другое
- * (например, из дерева свободных блоков в пользовательское дерево).
+ * The PAP manager organizes blocks as an AVL-forest. Each node belongs to exactly
+ * one forest domain and can migrate between domains (e.g., from the free-tree
+ * to a user domain tree).
  *
- * Поля `weight` и `root_offset` хранятся внутри узла дерева, поскольку они
- * являются атрибутами именно узла дерева:
- *   - `weight`      — ключ балансировки; семантика определяется деревом-владельцем
- *                     (для дерева свободных блоков — количество свободных гранул
- *                     за этим узлом; для других деревьев — произвольный вес).
- *   - `root_offset` — идентификатор дерева-владельца:
- *                       0         = узел принадлежит дереву свободных блоков (ПАП);
- *                       own_index = узел занят и является корнем своего дерева.
+ * ## Field semantics in the forest model
  *
- * Поля (Issue #126 — новый порядок):
- *   `weight`, `left_offset`, `right_offset`, `parent_offset`, `root_offset`,
- *   `avl_height`, `node_type`.  Layout подтверждён через `static_assert` в `types.h`.
+ *   - `weight`      — universal granule-key / granule-scalar field.
+ *                     Semantics are determined by the owning forest domain:
+ *                       - free-tree domain: state discriminator (0 = free block);
+ *                         ordering key is derived from linear PAP geometry, not weight.
+ *                       - user domains (pstringview, pmap): domain-specific sort key.
+ *   - `root_offset` — owner-domain / owner-tree marker:
+ *                       0         = node belongs to the free-tree domain;
+ *                       own_index = node is allocated (self-owned).
  *
- * Issue #126: Поле `weight` перемещено в начало для ускорения доступа.
- *             Поля `avl_height` и `node_type` (бывший `_pad`) перемещены в конец.
- *             Два типа узлов: kNodeReadWrite (0) и kNodeReadOnly (1).
- * Issue #138: Добавлены публичные методы доступа к полям TreeNode, чтобы операции
- *             над узлом дерева можно было выполнять через ссылку, полученную из pptr.
+ * Issue #126: `weight` moved to first field for cache-efficient access.
+ * Issue #138: Public accessors added for use via pptr::tree_node().
+ * Issue #243: Comments aligned with the general forest model.
  *
- * @see plan_issue87.md §5 «Фаза 2: LinkedListNode и TreeNode»
- * @version 0.4 (Issue #138 — public accessors added for use via pptr::tree_node())
+ * @see docs/free_tree_forest_policy.md — free-tree ordering policy
+ * @see docs/block_and_treenode_semantics.md — canonical field semantics
+ * @version 0.5 (Issue #243 — align with forest model)
  */
 
 #pragma once
@@ -44,31 +41,32 @@ namespace pmm
 {
 
 /**
- * @brief Узел AVL-дерева для адресного пространства ПАП, использование только через наследование.
+ * @brief Intrusive AVL-slot for the forest model — used only via inheritance.
  *
- * @tparam AddressTraitsT  Traits адресного пространства (из address_traits.h).
- *                         Определяет тип индексных полей.
+ * @tparam AddressTraitsT  Address space traits (from address_traits.h).
+ *                         Defines index field types.
  *
- * Поля хранят гранульные индексы узлов-потомков / родителя в ПАП.
- * Sentinel «нет узла» = `AddressTraitsT::no_block`.
+ * Fields store granule indices of child/parent nodes in the PAP.
+ * Sentinel "no node" = `AddressTraitsT::no_block`.
  *
- * `weight`     — ключ балансировки дерева (для дерева свободных блоков: количество
- *               свободных гранул за узлом; семантика произвольна для других деревьев).
- *               Первое поле для ускорения доступа (Issue #126).
- * `root_offset`— идентификатор дерева: 0 = свободный блок (дерево свободных блоков),
- *               own_idx = занятый блок (дерево с корнем own_idx).
- * `avl_height` — высота AVL-поддерева (0 = узел не в дереве).
- * `node_type`  — тип узла (Issue #126): kNodeReadWrite (0) = доступен на чтение/запись,
- *               kNodeReadOnly (1) = заблокирован навечно (только чтение, нельзя освободить).
+ * `weight`     — universal granule-key whose semantics depend on the owning domain.
+ *               Free-tree domain: state discriminator (0 = free block);
+ *               ordering is derived from linear PAP geometry, not this field.
+ *               User domains: domain-specific sort key (e.g., string index, entity ID).
+ *               First field for cache-efficient access (Issue #126).
+ * `root_offset`— owner-domain marker: 0 = free-tree domain,
+ *               own_idx = allocated block (self-owned tree).
+ * `avl_height` — AVL subtree height (0 = slot not in any tree).
+ * `node_type`  — coarse-grained block type (Issue #126):
+ *               kNodeReadWrite (0) = read/write, kNodeReadOnly (1) = read-only.
  *
- * Размеры `TreeNode<DefaultAddressTraits>` (uint32_t, 16):
+ * Layout `TreeNode<DefaultAddressTraits>` (uint32_t, 16-byte granule):
  *   weight        (4) +
  *   left_offset   (4) + right_offset (4) + parent_offset (4) +
  *   root_offset   (4) +
  *   avl_height    (2) + node_type    (2) = 24 bytes
  *
- * Публичные методы (Issue #138): доступ к полям узла дерева для использования
- * через ссылку, полученную из pptr<T, ManagerT>::tree_node().
+ * Public accessors (Issue #138): for use via pptr<T, ManagerT>::tree_node().
  */
 
 /// @brief Тип узла (Issue #126): значения для поля `TreeNode::node_type`.
@@ -102,12 +100,12 @@ template <typename AddressTraitsT> struct TreeNode
     /// @return Гранульный индекс или no_block если нет родителя (корень).
     index_type get_parent() const noexcept { return parent_offset; }
 
-    /// @brief Получить идентификатор дерева-владельца (root_offset).
-    /// @return 0 = свободный блок; own_idx = занятый блок.
+    /// @brief Get the owner-domain marker (root_offset).
+    /// @return 0 = free-tree domain; own_idx = allocated block.
     index_type get_root() const noexcept { return root_offset; }
 
-    /// @brief Получить ключ балансировки (weight).
-    /// @return Вес узла (для дерева свободных блоков: число свободных гранул).
+    /// @brief Get the universal granule-key (weight).
+    /// @return Domain-specific scalar (free-tree: 0 = free; user domains: sort key).
     index_type get_weight() const noexcept { return weight; }
 
     /// @brief Получить высоту AVL-поддерева.
@@ -130,12 +128,12 @@ template <typename AddressTraitsT> struct TreeNode
     /// @param v Гранульный индекс или no_block.
     void set_parent( index_type v ) noexcept { parent_offset = v; }
 
-    /// @brief Установить идентификатор дерева-владельца (root_offset).
-    /// @param v 0 = свободный блок; own_idx = занятый блок.
+    /// @brief Set the owner-domain marker (root_offset).
+    /// @param v 0 = free-tree domain; own_idx = allocated block.
     void set_root( index_type v ) noexcept { root_offset = v; }
 
-    /// @brief Установить ключ балансировки (weight).
-    /// @param v Новый вес узла.
+    /// @brief Set the universal granule-key (weight).
+    /// @param v Domain-specific scalar value.
     void set_weight( index_type v ) noexcept { weight = v; }
 
     /// @brief Установить высоту AVL-поддерева.
@@ -147,9 +145,10 @@ template <typename AddressTraitsT> struct TreeNode
     void set_node_type( std::uint16_t v ) noexcept { node_type = v; }
 
   protected:
-    /// Ключ балансировки дерева. Первое поле для ускорения доступа (Issue #126).
-    /// Для дерева свободных блоков (root_offset == 0): количество свободных гранул за блоком.
-    /// Для других деревьев: произвольный вес, определяемый деревом-владельцем.
+    /// Universal granule-key / granule-scalar. First field for cache-efficient access (Issue #126).
+    /// Semantics determined by the owning forest domain:
+    ///   - free-tree: state discriminator (0 = free); sort key derived from PAP geometry.
+    ///   - user domains: domain-specific sort key (e.g., granule count, string index).
     index_type weight;
     /// Гранульный индекс левого дочернего узла AVL-дерева (или no_block).
     index_type left_offset;
@@ -157,9 +156,9 @@ template <typename AddressTraitsT> struct TreeNode
     index_type right_offset;
     /// Гранульный индекс родительского узла AVL-дерева (или no_block).
     index_type parent_offset;
-    /// Идентификатор дерева-владельца.
-    /// 0 = узел принадлежит дереву свободных блоков (ПАП-менеджер).
-    /// own_idx = узел занят; значение равно гранульному индексу самого блока.
+    /// Owner-domain / owner-tree marker.
+    /// 0 = node belongs to the free-tree domain (system/free_tree).
+    /// own_idx = node is allocated; value equals the block's own granule index.
     index_type root_offset;
     /// Высота AVL-поддерева (0 = узел не в дереве).
     std::int16_t avl_height;

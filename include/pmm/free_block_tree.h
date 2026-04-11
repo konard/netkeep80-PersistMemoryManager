@@ -1,26 +1,30 @@
 /**
  * @file pmm/free_block_tree.h
- * @brief FreeBlockTree — AVL tree policy for free blocks (Issue #87 Phase 4, #95, #129).
+ * @brief AvlFreeTree — specialized forest-policy for the free-tree domain (Issue #87, #95, #129, #243).
  *
- * Defines C++20 concept `FreeBlockTreePolicyConcept<Policy>` for free block tree policy
- * and provides the standard implementation `AvlFreeTree<AddressTraits>`.
+ * Implements the free-tree as a specialized forest-policy within the AVL-forest model.
+ * The free-tree is the primary system domain of the forest: it indexes free blocks
+ * of the persistent address space (PAP) for best-fit allocation.
  *
- * The `FreeBlockTreePolicyConcept<Policy>` concept requires three static methods:
- *   - `insert(base, hdr, blk_idx)`       — add block to tree
- *   - `remove(base, hdr, blk_idx)`       — remove block from tree
- *   - `find_best_fit(base, hdr, needed)` — find smallest suitable block
+ * ## Forest-policy: ordering and key derivation
  *
- * Issue #95: AVL tree implementation moved here from persist_avl_tree.h
- * to consolidate all PMM code under include/pmm/.
+ * Sort key: (block_size_in_granules, block_index) — strict total ordering.
+ * The sort key is **derived** from linear PAP geometry (next_offset - block_index),
+ * not read from the `weight` field. In the free-tree domain, `weight == 0` serves
+ * as a state discriminator (free vs. allocated), not as a sort key.
  *
- * Issue #106: AvlFreeTree uses Block<AddressTraitsT> layout (BlockState machine).
- * All field accesses go through Block<A> (prev/next/left/right/parent/avl_height/weight/root_offset).
- * Issue #112: BlockHeader struct removed — Block<A> is the sole block type.
+ * This is an explicit forest-policy choice: the free-tree derives its ordering
+ * from physical block layout, while other forest domains (pstringview, pmap)
+ * use `weight` directly as their sort key. Both approaches are consistent
+ * with the general forest model, which allows each domain to define its own
+ * interpretation of `weight` and ordering semantics.
  *
- * @see plan_issue87.md "Phase 4: FreeBlockTree as template policy"
+ * @see docs/free_tree_forest_policy.md — canonical free-tree forest-policy document
+ * @see docs/pmm_avl_forest.md — general forest model
+ * @see docs/block_and_treenode_semantics.md — field semantics
  * @see block_state.h — BlockState machine (Issue #93, #106)
  * @see avl_tree_mixin.h — shared AVL operations via BlockPPtr adapter (Issue #188)
- * @version 1.5 (Issue #188 — deduplicate AVL operations via BlockPPtr adapter)
+ * @version 1.6 (Issue #243 — align with forest model, document forest-policy)
  */
 
 #pragma once
@@ -38,19 +42,19 @@ namespace pmm
 {
 
 /**
- * @brief C++20 концепт: проверяет, является ли Policy корректной политикой дерева свободных блоков
- * для конкретного AddressTraitsT.
+ * @brief C++20 concept: validates that Policy is a correct free-tree forest-policy
+ * for a specific AddressTraitsT.
  *
- * Policy должна предоставлять три статических метода:
+ * A free-tree forest-policy must provide three static methods:
  *   - `insert(uint8_t* base, ManagerHeader<AT>* hdr, AT::index_type blk_idx)   -> void`
  *   - `remove(uint8_t* base, ManagerHeader<AT>* hdr, AT::index_type blk_idx)   -> void`
  *   - `find_best_fit(uint8_t* base, ManagerHeader<AT>* hdr, AT::index_type n)  -> AT::index_type`
  *
- * Issue #175: ManagerHeader is now templated on AddressTraitsT, so the concept must be
- * checked against the specific AT used — not hardcoded to DefaultAddressTraits.
+ * The ordering policy (sort key, key derivation, weight interpretation) is
+ * determined by the concrete policy type. See AvlFreeTree for the standard policy.
  *
- * @tparam Policy         Тип, проверяемый на соответствие концепту.
- * @tparam AddressTraitsT Traits адресного пространства (определяет типы индексов).
+ * @tparam Policy         Type to check against the concept.
+ * @tparam AddressTraitsT Address space traits (defines index types).
  */
 template <typename Policy, typename AddressTraitsT>
 concept FreeBlockTreePolicyForTraitsConcept = requires( std::uint8_t* base, detail::ManagerHeader<AddressTraitsT>* hdr,
@@ -61,12 +65,12 @@ concept FreeBlockTreePolicyForTraitsConcept = requires( std::uint8_t* base, deta
 };
 
 /**
- * @brief C++20 концепт: проверяет, является ли Policy корректной политикой дерева свободных блоков.
+ * @brief C++20 concept: validates that Policy is a correct free-tree forest-policy.
  *
  * Backward-compatibility variant checked against DefaultAddressTraits (uint32_t, 16B granule).
  * For checking against a specific AddressTraitsT, use FreeBlockTreePolicyForTraitsConcept<Policy, AT>.
  *
- * @tparam Policy  Тип, проверяемый на соответствие концепту.
+ * @tparam Policy  Type to check against the concept.
  */
 template <typename Policy>
 concept FreeBlockTreePolicyConcept = FreeBlockTreePolicyForTraitsConcept<Policy, DefaultAddressTraits>;
@@ -79,18 +83,19 @@ concept FreeBlockTreePolicyConcept = FreeBlockTreePolicyForTraitsConcept<Policy,
 template <typename Policy> inline constexpr bool is_free_block_tree_policy_v = FreeBlockTreePolicyConcept<Policy>;
 
 /**
- * @brief Standard AVL tree implementation for free block tree policy.
+ * @brief Specialized forest-policy: AVL tree for the free-tree domain.
  *
- * All-static class for AVL tree of free blocks (Issue #73 FR-02, AR-03).
+ * All-static class implementing the free-tree forest-policy (Issue #73 FR-02, AR-03).
  * Does not depend on PersistMemoryManager singleton — takes base_ptr and header as context.
  *
- * Sort key: (total_granules, block_index) — strict ordering.
- * Best-fit search runs in O(log n).
+ * Forest-policy details:
+ *   - Sort key: (block_size_in_granules, block_index) — strict total ordering.
+ *   - Block size is derived from linear PAP geometry (next_offset - block_index).
+ *   - `weight` is NOT used as sort key (it is 0 for free blocks — state discriminator).
+ *   - Best-fit search runs in O(log n).
+ *   - Uses shared AVL substrate via BlockPPtr adapter (Issue #188).
  *
- * Issue #106/#112: Uses Block<AddressTraitsT> layout (BlockHeader struct removed).
- * Issue #126: Fields reordered — weight moved to first TreeNode field.
- * Issue #188: Rotation, rebalancing, and min_node operations delegate to shared
- *   AVL functions via BlockPPtr adapter, eliminating ~120 lines of duplicate code.
+ * @see docs/free_tree_forest_policy.md — canonical ordering policy documentation
  *
  * @tparam AddressTraitsT  Address space traits (compatible with DefaultAddressTraits).
  */
@@ -102,11 +107,16 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree
     using BlockState     = BlockStateBase<AddressTraitsT>;
     using BPPtr          = detail::BlockPPtr<AddressTraitsT>;
 
+    /// Forest-policy tag: identifies this as the free-tree domain policy (Issue #243).
+    static constexpr const char* kForestDomainName = "system/free_tree";
+
     AvlFreeTree()                                = delete;
     AvlFreeTree( const AvlFreeTree& )            = delete;
     AvlFreeTree& operator=( const AvlFreeTree& ) = delete;
 
-    /// @brief Insert block into AVL tree of free blocks.
+    /// @brief Insert block into the free-tree (forest domain: system/free_tree).
+    ///
+    /// Derives sort key (block_size_in_granules, block_index) from linear PAP geometry.
     static void insert( std::uint8_t* base, detail::ManagerHeader<AddressTraitsT>* hdr, index_type blk_idx )
     {
         void* blk = detail::block_at<AddressTraitsT>( base, blk_idx );
@@ -119,7 +129,7 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree
             hdr->free_tree_root = blk_idx;
             return;
         }
-        // Issue #59: cache total_gran once; compute blk size in granules before the traversal loop
+        // Derive sort key from linear PAP geometry: block_size = next_offset - block_index.
         // Issue #146: use AddressTraitsT::granule_size for correct byte→granule conversion.
         index_type total_gran = detail::byte_off_to_idx_t<AddressTraitsT>( hdr->total_size );
         index_type blk_next   = BlockState::get_next_offset( blk );
@@ -133,6 +143,7 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree
             const void* n       = detail::block_at<AddressTraitsT>( base, cur );
             index_type  n_next  = BlockState::get_next_offset( n );
             index_type  n_gran  = ( n_next != AddressTraitsT::no_block ) ? ( n_next - cur ) : ( total_gran - cur );
+            // Forest-policy ordering: (block_size, block_index) — smaller size goes left.
             bool        smaller = ( blk_gran < n_gran ) || ( blk_gran == n_gran && blk_idx < cur );
             go_left             = smaller;
             cur                 = smaller ? BlockState::get_left_offset( n ) : BlockState::get_right_offset( n );
@@ -146,7 +157,7 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree
         detail::avl_rebalance_up( BPPtr( base, parent ), hdr->free_tree_root );
     }
 
-    /// @brief Remove block from AVL tree of free blocks.
+    /// @brief Remove block from the free-tree (forest domain: system/free_tree).
     static void remove( std::uint8_t* base, detail::ManagerHeader<AddressTraitsT>* hdr, index_type blk_idx )
     {
         void*      blk    = detail::block_at<AddressTraitsT>( base, blk_idx );
@@ -205,7 +216,9 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree
         detail::avl_rebalance_up( BPPtr( base, rebal ), hdr->free_tree_root );
     }
 
-    /// @brief Find smallest block >= needed granules (best-fit, O(log n)).
+    /// @brief Best-fit search: find smallest free block >= needed granules (O(log n)).
+    ///
+    /// Derives sort key from linear PAP geometry at each node during traversal.
     static index_type find_best_fit( std::uint8_t* base, detail::ManagerHeader<AddressTraitsT>* hdr,
                                      index_type needed_granules )
     {

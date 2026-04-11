@@ -1592,6 +1592,8 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree
     using BlockState     = BlockStateBase<AddressTraitsT>;
     using BPPtr          = detail::BlockPPtr<AddressTraitsT>;
 
+    static constexpr const char* kForestDomainName = "system/free_tree";
+
     AvlFreeTree()                                = delete;
     AvlFreeTree( const AvlFreeTree& )            = delete;
     AvlFreeTree& operator=( const AvlFreeTree& ) = delete;
@@ -1621,6 +1623,7 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree
             const void* n       = detail::block_at<AddressTraitsT>( base, cur );
             index_type  n_next  = BlockState::get_next_offset( n );
             index_type  n_gran  = ( n_next != AddressTraitsT::no_block ) ? ( n_next - cur ) : ( total_gran - cur );
+            
             bool        smaller = ( blk_gran < n_gran ) || ( blk_gran == n_gran && blk_idx < cur );
             go_left             = smaller;
             cur                 = smaller ? BlockState::get_left_offset( n ) : BlockState::get_right_offset( n );
