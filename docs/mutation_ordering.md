@@ -162,11 +162,15 @@ Interning a new symbol in the `system/symbols` pstringview dictionary.
 | Step | Write | Critical? | Code |
 |------|-------|-----------|------|
 | 1 | Allocate block for pstringview | See M4 | `forest_domain_mixin.inc:206` |
-| 2 | Initialize pstringview header (length, flags) | **CRITICAL** | `forest_domain_mixin.inc:213` |
+| 2 | Initialize pstringview header (length) | **CRITICAL** | `forest_domain_mixin.inc:213` |
 | 3 | Copy string content into block | **CRITICAL** | `forest_domain_mixin.inc:214–215` |
-| 4 | AVL insert into symbol tree (updates tree links) | NON-CRITICAL | `forest_domain_mixin.inc:223–230` |
+| 4 | Initialize AVL node fields | NON-CRITICAL | `forest_domain_mixin.inc:217` |
 | 5 | Lock block permanently (`kNodeReadOnly`) | NON-CRITICAL | `forest_domain_mixin.inc:218` |
-| 6 | Update `symbol_domain->root_offset` (AVL root) | **CRITICAL** | `forest_domain_mixin.inc:229` |
+| 6 | AVL insert into symbol tree (updates tree links and `symbol_domain->root_offset`) | NON-CRITICAL (tree) / **CRITICAL** (root) | `forest_domain_mixin.inc:223–230` |
+
+Note: the AVL tree itself is NON-CRITICAL (rebuilt on `load()`), but the
+`symbol_domain->root_offset` update embedded in the `avl_insert()` call
+is **CRITICAL** — it is the only persistent pointer to the symbol tree root.
 
 **Interruption between steps 1 and 2:**
 - Block is allocated but not initialized as a pstringview.
@@ -176,14 +180,24 @@ Interning a new symbol in the `system/symbols` pstringview dictionary.
 - **Repair:** not automatically repairable — leaked block. The upper
   layer can detect this via `for_each_block()` audit.
 
-**Interruption between steps 3 and 4:**
-- pstringview block is initialized but not in the AVL tree.
-- **Partial state:** symbol is not discoverable via tree search but
-  occupies a permanently locked block.
-- **Verify observation:** none (block is valid).
-- **Repair:** on next `load()`, `bootstrap_system_symbols_unlocked()`
-  re-interns system symbols, which will find the existing block via
-  content comparison and re-insert it.
+**Interruption between steps 3 and 6 (after content copy, before AVL insert):**
+- pstringview block is allocated, initialized, and permanently locked,
+  but not inserted into the symbol AVL tree.
+- **Partial state:** the block is valid and permanently locked but
+  unreachable via tree search. On next `load()`,
+  `bootstrap_system_symbols_unlocked()` calls `intern_symbol_unlocked()`
+  for each system symbol. That function searches only the AVL tree
+  (`avl_find()`); it does not scan blocks by content. Since the orphaned
+  block is not in the tree, it will not be found — a **new** block is
+  allocated for the same string, and the orphaned block remains as an
+  **unreachable permanently locked leak**.
+- **Verify observation:** none (orphaned block appears as a valid
+  allocated block).
+- **Repair:** not automatically repairable. The orphaned symbol block
+  persists as a small leak. An upper-layer audit via `for_each_block()`
+  could detect permanently locked blocks that are not reachable from any
+  domain tree. A future recovery scan for orphaned symbol blocks would
+  be needed to reclaim them.
 
 **Interruption after step 6:**
 - Symbol is fully interned.
@@ -420,7 +434,7 @@ Phase 7: validate_bootstrap_invariants_unlocked()
 | **Coalesce** | After list update, before header zero | Old header unreachable | Yes | Covered by merged block |
 | **Bootstrap** | Before `root_offset` update | No registry visible | Yes | Bootstrap on `load()` |
 | **Bootstrap** | After registry, before domains | Missing system domains | Yes | Re-register on `load()` |
-| **Symbol intern** | Before AVL insert | Block allocated but not in tree | Yes | Re-intern on `load()` |
+| **Symbol intern** | Before AVL insert | Block allocated but not in tree (orphaned leak) | Yes | Leaked — new block allocated on `load()` |
 | **Symbol intern** | After AVL insert | Fully interned | Yes | No repair needed |
 | **Save** | Before atomic rename | Old file intact | Yes | `.tmp` file can be deleted |
 | **Save** | After atomic rename | New file complete | Yes | No repair needed |
