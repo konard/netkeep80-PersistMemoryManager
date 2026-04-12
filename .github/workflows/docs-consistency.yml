@@ -1,0 +1,29 @@
+name: Docs Consistency
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "**/*.md"
+      - "CMakeLists.txt"
+      - "repo-policy.json"
+      - "scripts/check-docs-consistency.sh"
+      - ".github/workflows/docs-consistency.yml"
+  pull_request:
+    branches: ["**"]
+    paths:
+      - "**/*.md"
+      - "CMakeLists.txt"
+      - "repo-policy.json"
+      - "scripts/check-docs-consistency.sh"
+      - ".github/workflows/docs-consistency.yml"
+
+jobs:
+  docs-consistency:
+    name: Docs consistency check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check version and docs consistency
+        run: bash scripts/check-docs-consistency.sh
