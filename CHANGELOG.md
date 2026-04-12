@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [0.55.2] - 2026-04-12
+
+### Changed
+- Narrowed canonical documentation surface: removed governance docs (repository_shape, deletion_policy, comment_policy) and index from canonical set — they remain as supporting documents
+- Updated repo-guard pin to latest (7877108e84fc) with draft-aware PR behavior and semantic hardening
+
+### Removed
+- Removed Doxygen completely: deleted Doxyfile, docs.yml workflow, and all Doxygen references from README and repository_shape; Markdown docs are now the only documentation surface
+
+
 ## [0.55.1] - 2026-04-12
 
 ### Fixed
