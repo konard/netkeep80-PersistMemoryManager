@@ -18,7 +18,7 @@ jobs:
         run: |
           git clone https://github.com/netkeep80/repo-guard.git /tmp/repo-guard
           cd /tmp/repo-guard
-          git checkout 539484836dcc5b3bdf5ea099cfabd9e65ccb2a0d
+          git checkout 7877108e84fcc6539ded13ac09ad9358bc9cf529
 
       - uses: actions/setup-node@v4
         with:
@@ -28,15 +28,10 @@ jobs:
         working-directory: /tmp/repo-guard
         run: npm ci
 
-      - name: Inject PMM policy into repo-guard
-        run: cp repo-policy.json /tmp/repo-guard/repo-policy.json
-
       - name: Validate repo-policy.json
-        run: node /tmp/repo-guard/src/repo-guard.mjs
+        run: node /tmp/repo-guard/src/repo-guard.mjs --repo-root ${{ github.workspace }}
 
       - name: Run PR policy check (audit)
-        run: node /tmp/repo-guard/src/repo-guard.mjs check-pr
+        run: node /tmp/repo-guard/src/repo-guard.mjs check-pr --repo-root ${{ github.workspace }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GIT_DIR: ${{ github.workspace }}/.git
-          GIT_WORK_TREE: ${{ github.workspace }}
