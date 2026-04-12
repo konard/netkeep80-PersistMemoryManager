@@ -6,8 +6,7 @@
 [![CI](https://github.com/netkeep80/PersistMemoryManager/actions/workflows/ci.yml/badge.svg)](https://github.com/netkeep80/PersistMemoryManager/actions/workflows/ci.yml)
 [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](LICENSE)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-blue.svg)](https://isocpp.org/std/the-standard)
-[![Version](https://img.shields.io/badge/version-0.26.0-green.svg)](CHANGELOG.md)
-[![Docs](https://img.shields.io/badge/docs-Doxygen-informational)](https://netkeep80.github.io/PersistMemoryManager/)
+[![Version](https://img.shields.io/badge/version-0.55.0-green.svg)](CHANGELOG.md)
 
 ## Обзор
 
@@ -866,17 +865,21 @@ cmake -B build && cmake --build build && ctest --test-dir build
 
 ## Документация
 
+Каноническая документация — Markdown-файлы в `docs/`.
 Полный указатель: **[docs/index.md](docs/index.md)**
 
-- [API Reference (Doxygen)](https://netkeep80.github.io/PersistMemoryManager/)
 - [PMM AVL-Forest](docs/pmm_avl_forest.md) — каноническая архитектурная модель
 - [Block and TreeNode Semantics](docs/block_and_treenode_semantics.md) — семантика полей
 - [Архитектура](docs/architecture.md) — слои, layout, алгоритмы
-- [API Reference (Markdown)](docs/api_reference.md) — справочник API
+- [API Reference](docs/api_reference.md) — справочник API
 - [Bootstrap](docs/bootstrap.md) — инициализация ПАП
 - [Recovery](docs/recovery.md) — восстановление после сбоев
 - [Thread Safety](docs/thread_safety.md) — потокобезопасность
 - [Changelog](CHANGELOG.md)
+
+**Doxygen** — вторичная автогенерируемая документация, доступна по адресу
+[netkeep80.github.io/PersistMemoryManager](https://netkeep80.github.io/PersistMemoryManager/).
+Она не является каноническим источником; при расхождениях приоритет у Markdown-документов.
 
 ## Лицензия
 
