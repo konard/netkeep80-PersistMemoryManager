@@ -32,7 +32,8 @@ jobs:
         run: node /tmp/repo-guard/src/repo-guard.mjs
 
       - name: Run PR policy check (audit)
-        run: node /tmp/repo-guard/src/repo-guard.mjs check-pr
+        run: |
+          node /tmp/repo-guard/src/repo-guard.mjs check-pr || echo "::warning::repo-guard audit found issues (non-blocking)"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GIT_DIR: ${{ github.workspace }}/.git
