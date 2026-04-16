@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [0.55.3] - 2026-04-16
+
+### Changed
+- Updated the repo-guard policy workflow to the current reusable Action baseline in advisory mode.
+- Added YAML change-contract templates for pull requests and issues.
+
+
 ## [0.55.2] - 2026-04-12
 
 ### Changed
