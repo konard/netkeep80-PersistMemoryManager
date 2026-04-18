@@ -1,56 +1,63 @@
-# Comment policy
+# Comment and documentation policy
 
-## Purpose
+This is the canonical policy for PMM text discipline: code comments,
+documentation placement, and review criteria for text changes. `CONTRIBUTING.md`
+links here instead of restating these rules.
 
-This document defines the rules for comments in code and canonical documentation.
-The goal is to keep the repository free of historical noise while preserving comments
-that carry real engineering value.
+## Canonical places
 
-## Scope
+One concept has one canonical place:
 
-Applies to every file under `include/`, `single_include/`, `tests/`, `demo/`,
-`examples/`, `benchmarks/`, `scripts/`, and `docs/`.
+- PMM role and boundaries live in [pmm_target_model.md](pmm_target_model.md).
+- Operational transformation rules live in [pmm_transformation_rules.md](pmm_transformation_rules.md).
+- Text discipline lives in this document.
+- Contributor workflow lives in [../CONTRIBUTING.md](../CONTRIBUTING.md).
 
-## Allowed comment types
+Duplicate explanations must be removed or replaced with links to the canonical
+document.
 
-| Type                  | Purpose                                              | Example                                                        |
-|-----------------------|------------------------------------------------------|----------------------------------------------------------------|
-| **Invariant**         | States what must always be true                      | `// left->weight < right->weight after every rebalance`        |
-| **Persistence contract** | States what must survive reload / relocation      | `// header CRC is written last so partial writes are detected` |
-| **Safety note**       | Warns about UB, corruption, or non-obvious risk      | `// must hold lock — concurrent resize causes UB`              |
-| **Design note**       | Short explanation of a non-obvious decision (1-3 lines) | `// AVL instead of RB because height bound matters for mmap` |
+## Comments
 
-If a comment does not fit one of these four types, it should be removed or rewritten
-to fit.
+Comments are allowed only when they carry knowledge not derivable from the code:
 
-## Prohibited comment patterns
+- **Invariant**: what must always remain true.
+- **Persistence contract**: what must survive reload, relocation, or crash.
+- **Safety note**: non-obvious UB, corruption, ordering, or concurrency risk.
+- **Short design note**: a compact reason for a non-obvious decision.
 
-The following patterns must not appear in code or canonical docs:
+Prohibited comment patterns:
 
-- Issue references: `Issue #N`, `TODO for issue #N`, `implemented in #N`
-- Refactoring history: `was previously ...`, `moved from ...`, `renamed from ...`
-- Temporal promises: `temporarily left`, `remove later`, `possibly delete`
-- Narrative without invariant: multi-line explanations that retell the code
-- Obvious restatements: comments that repeat the name of a function or field
+- historical or issue narrative: `Issue #N`, `implemented in #N`, `moved from`;
+- tutorial-style prose in the kernel;
+- restating a function, field, or type name;
+- temporary promises: `remove later`, `temporary`, `possibly delete`;
+- long narrative without an invariant, contract, safety note, or design reason.
 
-History belongs in Git, issues, and pull requests — not in the source tree.
+History belongs in Git, issues, and pull requests, not in the source tree.
 
-## Comment length rule
+## Documentation
 
-If a comment is longer than the code it annotates, it requires explicit justification.
-By default, long narratives are removed and the useful part is condensed into
-1-3 lines of invariant or design note.
+Canonical docs are limited to these classes:
 
-## Documentation rules
+- target model;
+- transformation rules;
+- contracts and invariants;
+- public API or usage index;
+- comment and docs policy.
 
-Canonical docs (`docs/`) must not contain:
+Other text is collapsed into an existing canonical document, archived when it has
+historical value, or left in issue / PR discussion. A new markdown file is an
+exception, not the norm.
 
-- Chronologies or phase histories
-- Lists of closed issues
-- "Implemented in version ..." sections
-- Issue references as part of normative text
+## Surface rule
 
-## Related docs
+PMM text surface should shrink over time. New text must replace older text or
+explicitly justify temporary surface debt in the issue and PR. Duplicating text
+beside the new version is not allowed.
 
-- `tasks/00_REPOSITORY_STYLE.md` — full repository style guide
-- `CONTRIBUTING.md` — development workflow and quality standards
+Docs and comments PRs are reviewed first for:
+
+- no duplicated policy or architecture text;
+- non-positive text surface delta by default;
+- correct canonical placement;
+- no process-noise, phase logs, roadmap dumps, or temporary notes.
