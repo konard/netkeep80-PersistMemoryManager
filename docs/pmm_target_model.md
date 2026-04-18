@@ -30,7 +30,7 @@ PMM owns, and only owns:
 - `create` / `load` / `destroy` lifecycle;
 - `verify` / `repair` discipline over its own structures;
 - the root / domain registry;
-- storage hooks for encryption, compression, and journaling seams.
+- storage hooks for encryption and compression.
 
 ## 3. What PMM is not
 
