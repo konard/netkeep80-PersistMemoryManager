@@ -61,23 +61,15 @@ Key style rules:
 
 ## Comment Policy
 
-Comments must serve one of four purposes:
+Comments and docs follow the canonical text discipline in
+[`docs/comment_policy.md`](docs/comment_policy.md). Do not duplicate policy,
+architecture, or process text in this guide; link to the canonical document
+instead.
 
-| Type                     | Purpose                                           |
-|--------------------------|---------------------------------------------------|
-| **Invariant**            | States what must always be true                   |
-| **Persistence contract** | States what must survive reload / relocation      |
-| **Safety note**          | Warns about UB, corruption, or non-obvious risk   |
-| **Design note**          | Short explanation of a non-obvious decision       |
-
-**Prohibited patterns** — do not add:
-- Issue references (`Issue #N`, `TODO for issue #N`, `implemented in #N`)
-- Refactoring history (`was previously ...`, `moved from ...`)
-- Temporal promises (`temporarily left`, `remove later`)
-- Narrative without invariant (multi-line retelling of code)
-
-History belongs in Git, issues, and pull requests — not in source files.
-See [`docs/comment_policy.md`](docs/comment_policy.md) for the full policy.
+Canonical ownership:
+- PMM role and boundaries: [`docs/pmm_target_model.md`](docs/pmm_target_model.md)
+- Operational transformation rules: [`docs/pmm_transformation_rules.md`](docs/pmm_transformation_rules.md)
+- Comment and docs discipline: [`docs/comment_policy.md`](docs/comment_policy.md)
 
 ## File Size Limits
 
