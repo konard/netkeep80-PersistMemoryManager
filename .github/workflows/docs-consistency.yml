@@ -64,25 +64,22 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
+          # Release-owned surface: files that encode the published version
+          # triple. Touching any of these signals a release-state change and
+          # triggers the check. Changelog fragments, governance scripts and
+          # the workflow itself are intentionally NOT in this list — they do
+          # not alter the published version and must not force a README bump.
+          release_paths='^(CMakeLists\.txt|README\.md|CHANGELOG\.md)'
+
           if [ "$EVENT_NAME" = "pull_request" ]; then
             git fetch origin "$BASE_REF" --depth=1
             changed=$(git diff --name-only "origin/$BASE_REF"...HEAD)
-            diff_base="origin/$BASE_REF"...HEAD
           else
             # push event: compare against previous commit
             changed=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git ls-files)
-            diff_base=HEAD~1..HEAD
           fi
 
-          cmake_version_changed=false
-          if echo "$changed" | grep -qx 'CMakeLists.txt' &&
-             git diff -U0 "$diff_base" -- CMakeLists.txt |
-               grep -Eq '^[+-]project\(PersistMemoryManager VERSION '; then
-            cmake_version_changed=true
-          fi
-
-          if echo "$changed" | grep -Eq '^(README\.md|CHANGELOG\.md)' ||
-             [ "$cmake_version_changed" = "true" ]; then
+          if echo "$changed" | grep -Eq "$release_paths"; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
             echo "Release-related paths changed — running version-consistency check."
           else
