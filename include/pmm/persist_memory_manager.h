@@ -522,7 +522,7 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     {
         if ( p.is_null() || !_initialized )
             return;
-        void* raw = resolve_unchecked( p );
+        void* raw = raw_user_ptr_from_pptr( p );
         deallocate( raw );
     }
 
@@ -702,7 +702,7 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
 
         if ( p.is_null() || !_initialized )
             return;
-        void* raw = resolve_unchecked( p );
+        void* raw = raw_user_ptr_from_pptr( p );
         reinterpret_cast<T*>( raw )->~T();
         deallocate( raw );
     }
@@ -737,27 +737,7 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
             _last_error = PmmError::InvalidPointer;
             return nullptr;
         }
-        if constexpr ( sizeof( Block<address_traits> ) % address_traits::granule_size == 0 )
-        {
-            return reinterpret_cast<T*>( base + byte_off );
-        }
-        else
-        {
-            constexpr std::size_t hdr_granules =
-                ( sizeof( Block<address_traits> ) + address_traits::granule_size - 1 ) / address_traits::granule_size;
-            if ( p.offset() < hdr_granules )
-            {
-                _last_error = PmmError::InvalidPointer;
-                return nullptr;
-            }
-            std::size_t blk_off = static_cast<std::size_t>( p.offset() - hdr_granules ) * address_traits::granule_size;
-            if ( blk_off + sizeof( Block<address_traits> ) > _backend.total_size() )
-            {
-                _last_error = PmmError::InvalidPointer;
-                return nullptr;
-            }
-            return reinterpret_cast<T*>( base + blk_off + sizeof( Block<address_traits> ) );
-        }
+        return reinterpret_cast<T*>( base + byte_off );
     }
 
     /**
@@ -777,7 +757,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( raw == nullptr )
             return nullptr;
 
-        const void* blk_raw = find_block_from_user_ptr( raw );
+        const void* user_raw = raw_user_ptr_from_pptr( p );
+        const void* blk_raw  = find_block_from_user_ptr( user_raw );
         if ( blk_raw == nullptr )
         {
             _last_error = PmmError::InvalidPointer;

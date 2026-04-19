@@ -7561,7 +7561,7 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
     {
         if ( p.is_null() || !_initialized )
             return;
-        void* raw = resolve_unchecked( p );
+        void* raw = raw_user_ptr_from_pptr( p );
         deallocate( raw );
     }
 
@@ -7741,7 +7741,7 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
 
         if ( p.is_null() || !_initialized )
             return;
-        void* raw = resolve_unchecked( p );
+        void* raw = raw_user_ptr_from_pptr( p );
         reinterpret_cast<T*>( raw )->~T();
         deallocate( raw );
     }
@@ -7776,27 +7776,7 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
             _last_error = PmmError::InvalidPointer;
             return nullptr;
         }
-        if constexpr ( sizeof( Block<address_traits> ) % address_traits::granule_size == 0 )
-        {
-            return reinterpret_cast<T*>( base + byte_off );
-        }
-        else
-        {
-            constexpr std::size_t hdr_granules =
-                ( sizeof( Block<address_traits> ) + address_traits::granule_size - 1 ) / address_traits::granule_size;
-            if ( p.offset() < hdr_granules )
-            {
-                _last_error = PmmError::InvalidPointer;
-                return nullptr;
-            }
-            std::size_t blk_off = static_cast<std::size_t>( p.offset() - hdr_granules ) * address_traits::granule_size;
-            if ( blk_off + sizeof( Block<address_traits> ) > _backend.total_size() )
-            {
-                _last_error = PmmError::InvalidPointer;
-                return nullptr;
-            }
-            return reinterpret_cast<T*>( base + blk_off + sizeof( Block<address_traits> ) );
-        }
+        return reinterpret_cast<T*>( base + byte_off );
     }
 
     /**
@@ -7816,7 +7796,8 @@ template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0> cla
         if ( raw == nullptr )
             return nullptr;
 
-        const void* blk_raw = find_block_from_user_ptr( raw );
+        const void* user_raw = raw_user_ptr_from_pptr( p );
+        const void* blk_raw  = find_block_from_user_ptr( user_raw );
         if ( blk_raw == nullptr )
         {
             _last_error = PmmError::InvalidPointer;
@@ -8523,8 +8504,8 @@ static forest_domain* find_domain_by_symbol_unlocked( pptr<pstringview> symbol )
 {
     if ( symbol.is_null() )
         return nullptr;
-    pstringview* sym = resolve_unchecked( symbol );
-    if ( sym == nullptr )
+    const char* sym_str = pstringview_c_str_unlocked( symbol );
+    if ( sym_str == nullptr )
         return nullptr;
     forest_registry* reg = forest_registry_root_unlocked();
     if ( reg == nullptr )
@@ -8532,7 +8513,7 @@ static forest_domain* find_domain_by_symbol_unlocked( pptr<pstringview> symbol )
     for ( std::uint16_t i = 0; i < reg->domain_count; ++i )
     {
         if ( reg->domains[i].symbol_offset == symbol.offset() ||
-             std::strncmp( reg->domains[i].name, sym->c_str(), detail::kForestDomainNameCapacity ) == 0 )
+             std::strncmp( reg->domains[i].name, sym_str, detail::kForestDomainNameCapacity ) == 0 )
         {
             reg->domains[i].symbol_offset = symbol.offset();
             return &reg->domains[i];
@@ -8650,10 +8631,10 @@ static pptr<pstringview> intern_symbol_unlocked( const char* s ) noexcept
         symbol_domain->root_offset,
         [&]( pptr<pstringview> cur ) -> int
         {
-            pstringview* obj = resolve_unchecked( cur );
-            return ( obj != nullptr ) ? std::strcmp( s, obj->c_str() ) : 0;
+            const char* cur_str = pstringview_c_str_unlocked( cur );
+            return ( cur_str != nullptr ) ? std::strcmp( s, cur_str ) : 0;
         },
-        []( pptr<pstringview> p ) -> pstringview* { return resolve_unchecked( p ); } );
+        []( pptr<pstringview> p ) -> const char* { return pstringview_c_str_unlocked( p ); } );
     if ( !found.is_null() )
         return found;
 
@@ -8679,10 +8660,10 @@ static pptr<pstringview> intern_symbol_unlocked( const char* s ) noexcept
         new_node, symbol_domain->root_offset,
         [&]( pptr<pstringview> cur ) -> bool
         {
-            pstringview* cur_obj = resolve_unchecked( cur );
-            return ( cur_obj != nullptr ) && ( std::strcmp( new_str, cur_obj->c_str() ) < 0 );
+            const char* cur_str = pstringview_c_str_unlocked( cur );
+            return ( cur_str != nullptr ) && ( std::strcmp( new_str, cur_str ) < 0 );
         },
-        []( pptr<pstringview> p ) -> pstringview* { return resolve_unchecked( p ); } );
+        []( pptr<pstringview> p ) -> const char* { return pstringview_c_str_unlocked( p ); } );
 
     return new_node;
 }
@@ -9024,6 +9005,40 @@ template <typename T> static constexpr index_type block_idx_from_pptr( pptr<T> p
     constexpr index_type kHdrGranules = static_cast<index_type>(
         ( sizeof( Block<address_traits> ) + address_traits::granule_size - 1 ) / address_traits::granule_size );
     return static_cast<index_type>( p.offset() - kHdrGranules );
+}
+
+template <typename T> static void* raw_user_ptr_from_pptr( pptr<T> p ) noexcept
+{
+    if ( p.is_null() || !_initialized )
+        return nullptr;
+
+    std::uint8_t* base     = _backend.base_ptr();
+    std::size_t   byte_off = static_cast<std::size_t>( p.offset() ) * address_traits::granule_size;
+    if constexpr ( sizeof( Block<address_traits> ) % address_traits::granule_size == 0 )
+    {
+        if ( byte_off + sizeof( T ) > _backend.total_size() )
+            return nullptr;
+        return base + byte_off;
+    }
+    else
+    {
+        constexpr std::size_t hdr_granules =
+            ( sizeof( Block<address_traits> ) + address_traits::granule_size - 1 ) / address_traits::granule_size;
+        if ( p.offset() < hdr_granules )
+            return nullptr;
+        std::size_t blk_off = static_cast<std::size_t>( p.offset() - hdr_granules ) * address_traits::granule_size;
+        if ( blk_off + sizeof( Block<address_traits> ) > _backend.total_size() )
+            return nullptr;
+        return base + blk_off + sizeof( Block<address_traits> );
+    }
+}
+
+static const char* pstringview_c_str_unlocked( pptr<pstringview> p ) noexcept
+{
+    const void* raw = raw_user_ptr_from_pptr( p );
+    if ( raw == nullptr )
+        return nullptr;
+    return static_cast<const char*>( raw ) + offsetof( pstringview, str );
 }
 
     // Verify/repair methods — extracted to verify_repair_mixin.inc.
