@@ -5,6 +5,7 @@
 
 #include <array>
 #include <cstdint>
+#include <vector>
 
 using AT  = pmm::DefaultAddressTraits;
 using Mgr = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 303>;
@@ -120,6 +121,49 @@ TEST_CASE( "free-tree verifier detects duplicate revisit", "[issue303][verify]" 
     pmm::VerifyResult result = Mgr::verify();
     REQUIRE_FALSE( result.ok );
     REQUIRE( has_free_tree_violation( result ) );
+
+    Mgr::destroy();
+}
+
+TEST_CASE( "free-tree verifier does not cap traversal at diagnostic entry limit", "[issue303][verify]" )
+{
+    Mgr::destroy();
+    REQUIRE( Mgr::create( 1024 * 1024 ) );
+
+    constexpr std::size_t gap_count    = pmm::kMaxDiagnosticEntries + 16;
+    constexpr std::size_t gap_size     = 96;
+    constexpr std::size_t barrier_size = 32;
+
+    std::vector<Mgr::pptr<std::uint8_t>> gaps;
+    std::vector<Mgr::pptr<std::uint8_t>> barriers;
+    gaps.reserve( gap_count );
+    barriers.reserve( gap_count + 1 );
+
+    for ( std::size_t i = 0; i < gap_count; ++i )
+    {
+        auto gap     = Mgr::allocate_typed<std::uint8_t>( gap_size );
+        auto barrier = Mgr::allocate_typed<std::uint8_t>( barrier_size );
+        REQUIRE( !gap.is_null() );
+        REQUIRE( !barrier.is_null() );
+        gaps.push_back( gap );
+        barriers.push_back( barrier );
+    }
+
+    auto tail_barrier = Mgr::allocate_typed<std::uint8_t>( barrier_size );
+    REQUIRE( !tail_barrier.is_null() );
+    barriers.push_back( tail_barrier );
+
+    for ( auto gap : gaps )
+        Mgr::deallocate_typed( gap );
+
+    REQUIRE( Mgr::free_block_count() > pmm::kMaxDiagnosticEntries );
+
+    pmm::VerifyResult result = Mgr::verify();
+    REQUIRE( result.ok );
+    REQUIRE_FALSE( has_free_tree_violation( result ) );
+
+    for ( auto barrier : barriers )
+        Mgr::deallocate_typed( barrier );
 
     Mgr::destroy();
 }

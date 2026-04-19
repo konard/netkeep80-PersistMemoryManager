@@ -2181,11 +2181,11 @@ using LargeDBConfig = BasicConfig<LargeAddressTraits, config::SharedMutexLock, 2
 
 #include <cassert>
 #include <algorithm>
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <vector>
 
 namespace pmm
 {
@@ -2500,13 +2500,11 @@ class AllocatorPolicy
     }
 
     static void verify_free_tree( const std::uint8_t* base, const detail::ManagerHeader<AddressTraitsT>* hdr,
-                                  VerifyResult& result ) noexcept
+                                  VerifyResult& result )
     {
-        std::array<index_type, kMaxDiagnosticEntries> expected_free{};
-        std::array<index_type, kMaxDiagnosticEntries> visited_free{};
-        std::size_t                                   expected_count    = 0;
-        std::size_t                                   visited_count     = 0;
-        bool                                          expected_overflow = false;
+        std::vector<index_type>   expected_free;
+        std::vector<index_type>   visited_free;
+        std::vector<std::int16_t> heights;
 
         index_type idx = hdr->first_block_offset;
         while ( idx != AddressTraitsT::no_block )
@@ -2515,18 +2513,12 @@ class AllocatorPolicy
                 break;
             const void* blk_ptr = detail::block_at<AddressTraitsT>( base, idx );
             if ( BlockState::get_weight( blk_ptr ) == 0 )
-            {
-                if ( expected_count < expected_free.size() )
-                    expected_free[expected_count] = idx;
-                else
-                    expected_overflow = true;
-                expected_count++;
-            }
+                expected_free.push_back( idx );
             idx = BlockState::get_next_offset( blk_ptr );
         }
 
         const bool root_present = ( hdr->free_tree_root != AddressTraitsT::no_block );
-        if ( expected_count == 0 )
+        if ( expected_free.empty() )
         {
             if ( root_present )
             {
@@ -2538,7 +2530,7 @@ class AllocatorPolicy
         if ( !root_present )
         {
             result.add( ViolationType::FreeTreeStale, DiagnosticAction::NoAction, 0,
-                        static_cast<std::uint64_t>( expected_count ),
+                        static_cast<std::uint64_t>( expected_free.size() ),
                         static_cast<std::uint64_t>( hdr->free_tree_root ) );
             return;
         }
@@ -2581,14 +2573,13 @@ class AllocatorPolicy
             bool       has_upper;
             bool       expanded;
         };
-        std::array<Frame, kMaxDiagnosticEntries>        stack{};
-        std::array<std::int16_t, kMaxDiagnosticEntries> heights{};
-        std::size_t                                     stack_size = 0;
-        stack[stack_size++] = { hdr->free_tree_root, AddressTraitsT::no_block, {}, false, {}, false, false };
+        std::vector<Frame> stack;
+        stack.push_back( { hdr->free_tree_root, AddressTraitsT::no_block, {}, false, {}, false, false } );
 
-        while ( stack_size > 0 )
+        while ( !stack.empty() )
         {
-            Frame frame = stack[--stack_size];
+            Frame frame = stack.back();
+            stack.pop_back();
             if ( frame.node == AddressTraitsT::no_block )
                 continue;
             if ( !detail::validate_block_index<AddressTraitsT>( hdr->total_size, frame.node ) )
@@ -2625,9 +2616,8 @@ class AllocatorPolicy
                             static_cast<std::uint64_t>( frame.upper ) );
             }
 
-            const auto visited_begin = visited_free.begin();
-            const auto visited_end   = visited_begin + static_cast<std::ptrdiff_t>( visited_count );
-            const bool already_seen  = std::find( visited_begin, visited_end, frame.node ) != visited_end;
+            const bool already_seen =
+                std::find( visited_free.begin(), visited_free.end(), frame.node ) != visited_free.end();
             if ( !frame.expanded && already_seen )
             {
                 result.add( ViolationType::FreeTreeStale, DiagnosticAction::NoAction,
@@ -2635,32 +2625,25 @@ class AllocatorPolicy
                 continue;
             }
 
-            if ( !frame.expanded && ( visited_count >= visited_free.size() || stack_size + 3 >= stack.size() ) )
-            {
-                result.add( ViolationType::FreeTreeStale, DiagnosticAction::NoAction,
-                            static_cast<std::uint64_t>( frame.node ), static_cast<std::uint64_t>( expected_count ),
-                            static_cast<std::uint64_t>( visited_count ) );
-                break;
-            }
-
             if ( !frame.expanded )
             {
-                visited_free[visited_count++] = frame.node;
-                stack[stack_size++]           = { frame.node,  frame.parent,    frame.lower, frame.has_lower,
-                                                  frame.upper, frame.has_upper, true };
-                index_type right              = BlockState::get_right_offset( node );
-                index_type left               = BlockState::get_left_offset( node );
+                visited_free.push_back( frame.node );
+                heights.push_back( 0 );
+                stack.push_back(
+                    { frame.node, frame.parent, frame.lower, frame.has_lower, frame.upper, frame.has_upper, true } );
+                index_type right = BlockState::get_right_offset( node );
+                index_type left  = BlockState::get_left_offset( node );
                 if ( right != AddressTraitsT::no_block )
-                    stack[stack_size++] = { right, frame.node, frame.node, true, frame.upper, frame.has_upper, false };
+                    stack.push_back( { right, frame.node, frame.node, true, frame.upper, frame.has_upper, false } );
                 if ( left != AddressTraitsT::no_block )
-                    stack[stack_size++] = { left, frame.node, frame.lower, frame.has_lower, frame.node, true, false };
+                    stack.push_back( { left, frame.node, frame.lower, frame.has_lower, frame.node, true, false } );
                 continue;
             }
 
             std::int16_t left_h = 0, right_h = 0;
             index_type   left  = BlockState::get_left_offset( node );
             index_type   right = BlockState::get_right_offset( node );
-            for ( std::size_t i = 0; i < visited_count; ++i )
+            for ( std::size_t i = 0; i < visited_free.size(); ++i )
             {
                 if ( visited_free[i] == left )
                     left_h = heights[i];
@@ -2675,7 +2658,7 @@ class AllocatorPolicy
                             static_cast<std::uint64_t>( frame.node ), static_cast<std::uint64_t>( expected_h ),
                             static_cast<std::uint64_t>( stored_h ) );
             }
-            for ( std::size_t i = 0; i < visited_count; ++i )
+            for ( std::size_t i = 0; i < visited_free.size(); ++i )
             {
                 if ( visited_free[i] == frame.node )
                 {
@@ -2685,23 +2668,19 @@ class AllocatorPolicy
             }
         }
 
-        if ( !expected_overflow )
+        for ( index_type expected : expected_free )
         {
-            for ( std::size_t i = 0; i < expected_count; ++i )
+            if ( std::find( visited_free.begin(), visited_free.end(), expected ) == visited_free.end() )
             {
-                const auto begin = visited_free.begin();
-                const auto end   = begin + static_cast<std::ptrdiff_t>( visited_count );
-                if ( std::find( begin, end, expected_free[i] ) == end )
-                {
-                    result.add( ViolationType::FreeTreeStale, DiagnosticAction::NoAction,
-                                static_cast<std::uint64_t>( expected_free[i] ), 1, 0 );
-                }
+                result.add( ViolationType::FreeTreeStale, DiagnosticAction::NoAction,
+                            static_cast<std::uint64_t>( expected ), 1, 0 );
             }
         }
-        if ( visited_count != expected_count )
+        if ( visited_free.size() != expected_free.size() )
         {
             result.add( ViolationType::FreeTreeStale, DiagnosticAction::NoAction, 0,
-                        static_cast<std::uint64_t>( expected_count ), static_cast<std::uint64_t>( visited_count ) );
+                        static_cast<std::uint64_t>( expected_free.size() ),
+                        static_cast<std::uint64_t>( visited_free.size() ) );
         }
     }
 
