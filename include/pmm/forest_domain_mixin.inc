@@ -123,13 +123,6 @@ static index_type symbol_domain_root_offset_unlocked() noexcept
     return ( rec != nullptr ) ? rec->root_offset : static_cast<index_type>( 0 );
 }
 
-static void reset_symbol_domain_unlocked() noexcept
-{
-    forest_domain* rec = symbol_domain_record_unlocked();
-    if ( rec != nullptr )
-        rec->root_offset = 0;
-}
-
 // ─── Domain registration ─────────────────────────────────────────────────────
 
 static bool register_domain_unlocked( const char* name, std::uint8_t flags, std::uint8_t binding_kind,
@@ -186,18 +179,11 @@ static pptr<pstringview> intern_symbol_unlocked( const char* s ) noexcept
     if ( s == nullptr )
         s = "";
 
-    forest_domain* symbol_domain = symbol_domain_record_unlocked();
-    if ( symbol_domain == nullptr )
+    using symbol_policy = typename pstringview::forest_domain_policy;
+    if ( symbol_policy::root_index_ptr() == nullptr )
         return pptr<pstringview>();
 
-    pptr<pstringview> found = detail::avl_find<pptr<pstringview>>(
-        symbol_domain->root_offset,
-        [&]( pptr<pstringview> cur ) -> int
-        {
-            const char* cur_str = pstringview_c_str_unlocked( cur );
-            return ( cur_str != nullptr ) ? std::strcmp( s, cur_str ) : 0;
-        },
-        []( pptr<pstringview> p ) -> const char* { return pstringview_c_str_unlocked( p ); } );
+    pptr<pstringview> found = symbol_policy::find( s );
     if ( !found.is_null() )
         return found;
 
@@ -223,16 +209,7 @@ static pptr<pstringview> intern_symbol_unlocked( const char* s ) noexcept
     if ( !lock_block_permanent_unlocked( public_raw ) )
         return pptr<pstringview>();
 
-    // Re-derive c_str() pointer for comparisons using offset-based access.
-    const char* new_str = static_cast<const char*>( public_raw ) + offsetof( pstringview, str );
-    detail::avl_insert(
-        new_node, symbol_domain->root_offset,
-        [&]( pptr<pstringview> cur ) -> bool
-        {
-            const char* cur_str = pstringview_c_str_unlocked( cur );
-            return ( cur_str != nullptr ) && ( std::strcmp( new_str, cur_str ) < 0 );
-        },
-        []( pptr<pstringview> p ) -> const char* { return pstringview_c_str_unlocked( p ); } );
+    symbol_policy::insert( new_node );
 
     return new_node;
 }

@@ -305,6 +305,35 @@ TEST_CASE( "    AVL root tracked by persistent symbol domain", "[test_issue151_p
     TestPsv::reset();
 }
 
+/// @brief pstringview exposes an explicit forest-domain descriptor/policy contract.
+TEST_CASE( "    forest-domain descriptor drives symbol dictionary", "[test_issue151_pstringview]" )
+{
+    using Domain = TestPsv::forest_domain_descriptor;
+    static_assert( pmm::detail::ForestDomainDescriptorForKey<Domain, const char*> );
+
+    TestMgr::destroy();
+    TestPsv::reset();
+    REQUIRE( TestMgr::create( 128 * 1024 ) );
+
+    REQUIRE( std::strcmp( Domain::name(), pmm::detail::kSystemDomainSymbols ) == 0 );
+    REQUIRE( Domain::root_index_ptr() != nullptr );
+    REQUIRE( Domain::root_index() == TestPsv::root_index() );
+    REQUIRE( TestMgr::get_domain_root_offset( Domain::name() ) == TestPsv::root_index() );
+
+    TestMgr_pptr_psv alpha = TestMgr::pstringview( "descriptor_alpha" );
+    TestMgr_pptr_psv beta  = TestMgr::pstringview( "descriptor_beta" );
+    REQUIRE( ( !alpha.is_null() && !beta.is_null() ) );
+
+    REQUIRE( TestPsv::forest_domain_policy::find( "descriptor_alpha" ) == alpha );
+    REQUIRE( TestPsv::forest_domain_policy::find( "descriptor_beta" ) == beta );
+    REQUIRE( TestPsv::forest_domain_policy::find( "descriptor_missing" ).is_null() );
+    REQUIRE( Domain::validate_node( alpha ) );
+    REQUIRE( *Domain::root_index_ptr() == TestPsv::root_index() );
+
+    TestMgr::destroy();
+    TestPsv::reset();
+}
+
 // =============================================================================
 // I151-E: Dictionary grows during manager lifetime (key requirement #5)
 // =============================================================================

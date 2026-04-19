@@ -2296,6 +2296,7 @@ inline typename AddressTraitsT::index_type required_block_granules_t( std::size_
 
 } // namespace pmm
 
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 
@@ -2769,6 +2770,78 @@ static void avl_insert( PPtr new_node, IndexType& root_idx, GoLeftFn&& go_left, 
 
     avl_rebalance_up( parent, root_idx, update_node );
 }
+
+// ─── Forest-domain descriptor/policy seam ────────────────────────────────────
+
+template <typename Domain, typename Key>
+concept ForestDomainDescriptorForKey = requires( typename Domain::node_pptr p, const Key& key ) {
+    typename Domain::index_type;
+    typename Domain::node_type;
+    typename Domain::node_pptr;
+    { Domain::name() } -> std::convertible_to<const char*>;
+    { Domain::root_index() } -> std::convertible_to<typename Domain::index_type>;
+    { Domain::root_index_ptr() } -> std::same_as<typename Domain::index_type*>;
+    { Domain::resolve_node( p ) } -> std::convertible_to<typename Domain::node_type*>;
+    { Domain::compare_key( key, p ) } -> std::convertible_to<int>;
+    { Domain::less_node( p, p ) } -> std::convertible_to<bool>;
+};
+
+template <typename Domain> static bool forest_domain_validate_node( typename Domain::node_pptr p ) noexcept
+{
+    if constexpr ( requires {
+                       { Domain::validate_node( p ) } -> std::convertible_to<bool>;
+                   } )
+        return Domain::validate_node( p );
+    else
+        return true;
+}
+
+/**
+ * @brief Generic AVL-backed forest-domain operations for a concrete descriptor.
+ *
+ * The descriptor owns domain identity, root binding, node resolution, ordering,
+ * and optional node validation. This wrapper keeps the AVL substrate reusable
+ * without forcing allocator and non-allocator domains into the same runtime type.
+ */
+template <typename Domain> struct ForestDomainOps
+{
+    using index_type = typename Domain::index_type;
+    using node_pptr  = typename Domain::node_pptr;
+
+    static constexpr const char* name() noexcept { return Domain::name(); }
+    static index_type            root_index() noexcept { return Domain::root_index(); }
+    static index_type*           root_index_ptr() noexcept { return Domain::root_index_ptr(); }
+
+    static bool reset_root() noexcept
+    {
+        index_type* root = root_index_ptr();
+        if ( root == nullptr )
+            return false;
+        *root = static_cast<index_type>( 0 );
+        return true;
+    }
+
+    template <typename Key>
+        requires ForestDomainDescriptorForKey<Domain, Key>
+    static node_pptr find( const Key& key ) noexcept
+    {
+        return avl_find<node_pptr>(
+            Domain::root_index(), [&]( node_pptr cur ) -> int { return Domain::compare_key( key, cur ); },
+            []( node_pptr p ) -> typename Domain::node_type* { return Domain::resolve_node( p ); } );
+    }
+
+    static void insert( node_pptr new_node ) noexcept
+    {
+        index_type* root = Domain::root_index_ptr();
+        if ( root == nullptr || new_node.is_null() )
+            return;
+        if ( Domain::resolve_node( new_node ) == nullptr || !forest_domain_validate_node<Domain>( new_node ) )
+            return;
+        avl_insert(
+            new_node, *root, [new_node]( node_pptr cur ) -> bool { return Domain::less_node( new_node, cur ); },
+            []( node_pptr p ) -> typename Domain::node_type* { return Domain::resolve_node( p ); } );
+    }
+};
 
 // ─── BlockPPtr: adapter for free_block_tree to reuse shared AVL operations ───
 
@@ -6742,6 +6815,49 @@ template <typename ManagerT> struct pstringview
     using index_type   = typename ManagerT::index_type;
     using psview_pptr  = typename ManagerT::template pptr<pstringview>;
 
+    struct forest_domain_descriptor
+    {
+        using manager_type = ManagerT;
+        using index_type   = typename ManagerT::index_type;
+        using node_type    = pstringview;
+        using node_pptr    = psview_pptr;
+
+        static constexpr const char* name() noexcept { return detail::kSystemDomainSymbols; }
+
+        static index_type root_index() noexcept
+        {
+            auto* domain = ManagerT::symbol_domain_record_unlocked();
+            return ( domain != nullptr ) ? domain->root_offset : static_cast<index_type>( 0 );
+        }
+
+        static index_type* root_index_ptr() noexcept
+        {
+            auto* domain = ManagerT::symbol_domain_record_unlocked();
+            return ( domain != nullptr ) ? &domain->root_offset : nullptr;
+        }
+
+        static node_type* resolve_node( node_pptr p ) noexcept { return ManagerT::template resolve<node_type>( p ); }
+
+        static int compare_key( const char* key, node_pptr cur ) noexcept
+        {
+            if ( key == nullptr )
+                key = "";
+            node_type* obj = resolve_node( cur );
+            return ( obj != nullptr ) ? std::strcmp( key, obj->c_str() ) : 0;
+        }
+
+        static bool less_node( node_pptr lhs, node_pptr rhs ) noexcept
+        {
+            node_type* lhs_obj = resolve_node( lhs );
+            node_type* rhs_obj = resolve_node( rhs );
+            return lhs_obj != nullptr && rhs_obj != nullptr && std::strcmp( lhs_obj->c_str(), rhs_obj->c_str() ) < 0;
+        }
+
+        static bool validate_node( node_pptr p ) noexcept { return resolve_node( p ) != nullptr; }
+    };
+
+    using forest_domain_policy = detail::ForestDomainOps<forest_domain_descriptor>;
+
     std::uint32_t length; ///< Длина строки (без нулевого терминатора)
     char          str[1]; ///< Строковые данные (flexible array member pattern)
 
@@ -6838,7 +6954,7 @@ template <typename ManagerT> struct pstringview
         if ( !ManagerT::is_initialized() )
             return;
         typename ManagerT::thread_policy::unique_lock_type lock( ManagerT::_mutex );
-        ManagerT::reset_symbol_domain_unlocked();
+        forest_domain_policy::reset_root();
     }
 
     /// @brief Текущий persistent root словаря интернирования; 0 = пустое дерево.
@@ -6847,7 +6963,7 @@ template <typename ManagerT> struct pstringview
         if ( !ManagerT::is_initialized() )
             return static_cast<index_type>( 0 );
         typename ManagerT::thread_policy::shared_lock_type lock( ManagerT::_mutex );
-        return ManagerT::symbol_domain_root_offset_unlocked();
+        return forest_domain_policy::root_index();
     }
 
     // Public destructor required for stack-temporary construction via pstringview<Mgr>("hello").
@@ -6930,38 +7046,10 @@ template <typename ManagerT> struct pstringview
     // ─── AVL-дерево (использует встроенные TreeNode-поля каждого pstringview-блока) ─
 
     /// @brief Найти узел AVL-дерева с заданной строкой. Возвращает null если не найден.
-    static psview_pptr _avl_find( const char* s ) noexcept
-    {
-        auto* domain = ManagerT::symbol_domain_record_unlocked();
-        if ( domain == nullptr )
-            return psview_pptr();
-        return detail::avl_find<psview_pptr>(
-            domain->root_offset,
-            [&]( psview_pptr cur ) -> int
-            {
-                pstringview* obj = ManagerT::template resolve<pstringview>( cur );
-                return ( obj != nullptr ) ? std::strcmp( s, obj->c_str() ) : 0;
-            },
-            []( psview_pptr p ) -> pstringview* { return ManagerT::template resolve<pstringview>( p ); } );
-    }
+    static psview_pptr _avl_find( const char* s ) noexcept { return forest_domain_policy::find( s ); }
 
     /// @brief Вставить новый узел в AVL-дерево. Предполагается, что строка ещё не в дереве.
-    static void _avl_insert( psview_pptr new_node ) noexcept
-    {
-        auto* domain = ManagerT::symbol_domain_record_unlocked();
-        if ( domain == nullptr )
-            return;
-        pstringview* new_obj = ManagerT::template resolve<pstringview>( new_node );
-        const char*  new_str = ( new_obj != nullptr ) ? new_obj->c_str() : "";
-        detail::avl_insert(
-            new_node, domain->root_offset,
-            [&]( psview_pptr cur ) -> bool
-            {
-                pstringview* obj = ManagerT::template resolve<pstringview>( cur );
-                return ( obj != nullptr ) && ( std::strcmp( new_str, obj->c_str() ) < 0 );
-            },
-            []( psview_pptr p ) -> pstringview* { return ManagerT::template resolve<pstringview>( p ); } );
-    }
+    static void _avl_insert( psview_pptr new_node ) noexcept { forest_domain_policy::insert( new_node ); }
 };
 
 } // namespace pmm
@@ -8605,13 +8693,6 @@ static index_type symbol_domain_root_offset_unlocked() noexcept
     return ( rec != nullptr ) ? rec->root_offset : static_cast<index_type>( 0 );
 }
 
-static void reset_symbol_domain_unlocked() noexcept
-{
-    forest_domain* rec = symbol_domain_record_unlocked();
-    if ( rec != nullptr )
-        rec->root_offset = 0;
-}
-
 // ─── Domain registration ─────────────────────────────────────────────────────
 
 static bool register_domain_unlocked( const char* name, std::uint8_t flags, std::uint8_t binding_kind,
@@ -8668,18 +8749,11 @@ static pptr<pstringview> intern_symbol_unlocked( const char* s ) noexcept
     if ( s == nullptr )
         s = "";
 
-    forest_domain* symbol_domain = symbol_domain_record_unlocked();
-    if ( symbol_domain == nullptr )
+    using symbol_policy = typename pstringview::forest_domain_policy;
+    if ( symbol_policy::root_index_ptr() == nullptr )
         return pptr<pstringview>();
 
-    pptr<pstringview> found = detail::avl_find<pptr<pstringview>>(
-        symbol_domain->root_offset,
-        [&]( pptr<pstringview> cur ) -> int
-        {
-            const char* cur_str = pstringview_c_str_unlocked( cur );
-            return ( cur_str != nullptr ) ? std::strcmp( s, cur_str ) : 0;
-        },
-        []( pptr<pstringview> p ) -> const char* { return pstringview_c_str_unlocked( p ); } );
+    pptr<pstringview> found = symbol_policy::find( s );
     if ( !found.is_null() )
         return found;
 
@@ -8705,16 +8779,7 @@ static pptr<pstringview> intern_symbol_unlocked( const char* s ) noexcept
     if ( !lock_block_permanent_unlocked( public_raw ) )
         return pptr<pstringview>();
 
-    // Re-derive c_str() pointer for comparisons using offset-based access.
-    const char* new_str = static_cast<const char*>( public_raw ) + offsetof( pstringview, str );
-    detail::avl_insert(
-        new_node, symbol_domain->root_offset,
-        [&]( pptr<pstringview> cur ) -> bool
-        {
-            const char* cur_str = pstringview_c_str_unlocked( cur );
-            return ( cur_str != nullptr ) && ( std::strcmp( new_str, cur_str ) < 0 );
-        },
-        []( pptr<pstringview> p ) -> const char* { return pstringview_c_str_unlocked( p ); } );
+    symbol_policy::insert( new_node );
 
     return new_node;
 }

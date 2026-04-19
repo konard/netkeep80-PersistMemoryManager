@@ -51,6 +51,7 @@
 #pragma once
 
 #include "pmm/avl_tree_mixin.h"
+#include "pmm/forest_registry.h"
 #include "pmm/types.h"
 
 #include <cstddef>
@@ -99,6 +100,49 @@ template <typename ManagerT> struct pstringview
     using manager_type = ManagerT;
     using index_type   = typename ManagerT::index_type;
     using psview_pptr  = typename ManagerT::template pptr<pstringview>;
+
+    struct forest_domain_descriptor
+    {
+        using manager_type = ManagerT;
+        using index_type   = typename ManagerT::index_type;
+        using node_type    = pstringview;
+        using node_pptr    = psview_pptr;
+
+        static constexpr const char* name() noexcept { return detail::kSystemDomainSymbols; }
+
+        static index_type root_index() noexcept
+        {
+            auto* domain = ManagerT::symbol_domain_record_unlocked();
+            return ( domain != nullptr ) ? domain->root_offset : static_cast<index_type>( 0 );
+        }
+
+        static index_type* root_index_ptr() noexcept
+        {
+            auto* domain = ManagerT::symbol_domain_record_unlocked();
+            return ( domain != nullptr ) ? &domain->root_offset : nullptr;
+        }
+
+        static node_type* resolve_node( node_pptr p ) noexcept { return ManagerT::template resolve<node_type>( p ); }
+
+        static int compare_key( const char* key, node_pptr cur ) noexcept
+        {
+            if ( key == nullptr )
+                key = "";
+            node_type* obj = resolve_node( cur );
+            return ( obj != nullptr ) ? std::strcmp( key, obj->c_str() ) : 0;
+        }
+
+        static bool less_node( node_pptr lhs, node_pptr rhs ) noexcept
+        {
+            node_type* lhs_obj = resolve_node( lhs );
+            node_type* rhs_obj = resolve_node( rhs );
+            return lhs_obj != nullptr && rhs_obj != nullptr && std::strcmp( lhs_obj->c_str(), rhs_obj->c_str() ) < 0;
+        }
+
+        static bool validate_node( node_pptr p ) noexcept { return resolve_node( p ) != nullptr; }
+    };
+
+    using forest_domain_policy = detail::ForestDomainOps<forest_domain_descriptor>;
 
     std::uint32_t length; ///< Длина строки (без нулевого терминатора)
     char          str[1]; ///< Строковые данные (flexible array member pattern)
@@ -196,7 +240,7 @@ template <typename ManagerT> struct pstringview
         if ( !ManagerT::is_initialized() )
             return;
         typename ManagerT::thread_policy::unique_lock_type lock( ManagerT::_mutex );
-        ManagerT::reset_symbol_domain_unlocked();
+        forest_domain_policy::reset_root();
     }
 
     /// @brief Текущий persistent root словаря интернирования; 0 = пустое дерево.
@@ -205,7 +249,7 @@ template <typename ManagerT> struct pstringview
         if ( !ManagerT::is_initialized() )
             return static_cast<index_type>( 0 );
         typename ManagerT::thread_policy::shared_lock_type lock( ManagerT::_mutex );
-        return ManagerT::symbol_domain_root_offset_unlocked();
+        return forest_domain_policy::root_index();
     }
 
     // Public destructor required for stack-temporary construction via pstringview<Mgr>("hello").
@@ -288,38 +332,10 @@ template <typename ManagerT> struct pstringview
     // ─── AVL-дерево (использует встроенные TreeNode-поля каждого pstringview-блока) ─
 
     /// @brief Найти узел AVL-дерева с заданной строкой. Возвращает null если не найден.
-    static psview_pptr _avl_find( const char* s ) noexcept
-    {
-        auto* domain = ManagerT::symbol_domain_record_unlocked();
-        if ( domain == nullptr )
-            return psview_pptr();
-        return detail::avl_find<psview_pptr>(
-            domain->root_offset,
-            [&]( psview_pptr cur ) -> int
-            {
-                pstringview* obj = ManagerT::template resolve<pstringview>( cur );
-                return ( obj != nullptr ) ? std::strcmp( s, obj->c_str() ) : 0;
-            },
-            []( psview_pptr p ) -> pstringview* { return ManagerT::template resolve<pstringview>( p ); } );
-    }
+    static psview_pptr _avl_find( const char* s ) noexcept { return forest_domain_policy::find( s ); }
 
     /// @brief Вставить новый узел в AVL-дерево. Предполагается, что строка ещё не в дереве.
-    static void _avl_insert( psview_pptr new_node ) noexcept
-    {
-        auto* domain = ManagerT::symbol_domain_record_unlocked();
-        if ( domain == nullptr )
-            return;
-        pstringview* new_obj = ManagerT::template resolve<pstringview>( new_node );
-        const char*  new_str = ( new_obj != nullptr ) ? new_obj->c_str() : "";
-        detail::avl_insert(
-            new_node, domain->root_offset,
-            [&]( psview_pptr cur ) -> bool
-            {
-                pstringview* obj = ManagerT::template resolve<pstringview>( cur );
-                return ( obj != nullptr ) && ( std::strcmp( new_str, obj->c_str() ) < 0 );
-            },
-            []( psview_pptr p ) -> pstringview* { return ManagerT::template resolve<pstringview>( p ); } );
-    }
+    static void _avl_insert( psview_pptr new_node ) noexcept { forest_domain_policy::insert( new_node ); }
 };
 
 } // namespace pmm
