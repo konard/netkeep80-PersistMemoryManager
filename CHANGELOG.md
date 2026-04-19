@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [0.57.0] - 2026-04-19
+
+### Added
+- Added a minimal AVL forest-domain descriptor/policy seam and migrated the pstringview symbol dictionary to it.
+
+
 ## [0.56.1] - 2026-04-19
 
 ### Fixed
