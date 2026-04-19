@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [0.56.0] - 2026-04-19
+
+### Added
+- Added explicit checked and unchecked `pptr` resolution APIs so stale persistent pointers can be detected without removing internal raw access.
+
+
 ## [0.55.14] - 2026-04-19
 
 ### Fixed
