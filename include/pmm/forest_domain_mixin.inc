@@ -495,3 +495,77 @@ static void for_each_free_block_inorder( const std::uint8_t* base, const detail:
     // Visit right subtree (larger blocks)
     for_each_free_block_inorder( base, hdr, right_off, depth + 1, callback );
 }
+
+/// @brief Find the mutable block header for a user-data pointer (or nullptr).
+static pmm::Block<address_traits>* find_block_from_user_ptr( void* ptr ) noexcept
+{
+    std::uint8_t*                          base = _backend.base_ptr();
+    detail::ManagerHeader<address_traits>* hdr  = get_header( base );
+    return detail::header_from_ptr_t<address_traits>( base, ptr, static_cast<std::size_t>( hdr->total_size ) );
+}
+
+/// @brief Find the const block header for a user-data pointer.
+/// Returns nullptr if ptr is out of range or the block header is invalid.
+static const pmm::Block<address_traits>* find_block_from_user_ptr( const void* ptr ) noexcept
+{
+    const std::uint8_t* base = _backend.base_ptr();
+    return detail::header_from_ptr_t<address_traits>(
+        const_cast<std::uint8_t*>( base ), const_cast<void*>( ptr ),
+        static_cast<std::size_t>( get_header_c( base )->total_size ) );
+}
+
+// ─── raw ↔ pptr helpers ───────────────────────────────────────
+
+/// @brief Convert a raw user-data pointer returned by allocate() into a pptr<T>.
+/// Caller must ensure raw != nullptr and _initialized before calling.
+/// Returns null pptr if the pointer is not within the managed region.
+template <typename T> static pptr<T> make_pptr_from_raw( void* raw ) noexcept
+{
+    std::uint8_t* base     = _backend.base_ptr();
+    auto*         raw_byte = static_cast<std::uint8_t*>( raw );
+    if ( raw_byte < base || raw_byte >= base + _backend.total_size() )
+        return pptr<T>();
+    std::size_t byte_off = static_cast<std::size_t>( raw_byte - base );
+    std::size_t idx      = ( byte_off + address_traits::granule_size - 1 ) / address_traits::granule_size;
+    if ( idx > static_cast<std::size_t>( std::numeric_limits<index_type>::max() ) )
+        return pptr<T>();
+    return pptr<T>( static_cast<index_type>( idx ) );
+}
+
+// ─── blk_raw helpers ──────────────────────────────────────────
+// base + offset * granule_size - sizeof(Block<AT>) → block header before user data.
+
+/// @brief Return a const pointer to the block header for the given pptr.
+/// Returns nullptr if offset is invalid (would place block header before base).
+template <typename T> static const void* block_raw_ptr_from_pptr( pptr<T> p ) noexcept
+{
+    const std::uint8_t* base     = _backend.base_ptr();
+    std::size_t         byte_off = static_cast<std::size_t>( p.offset() ) * address_traits::granule_size;
+    if ( byte_off < sizeof( Block<address_traits> ) )
+        return nullptr;
+    std::size_t blk_off = byte_off - sizeof( Block<address_traits> );
+    if ( blk_off + sizeof( Block<address_traits> ) > _backend.total_size() )
+        return nullptr;
+    return base + blk_off;
+}
+
+/// @brief Return a mutable pointer to the block header for the given pptr.
+/// Returns nullptr if offset is invalid (would place block header before base).
+template <typename T> static void* block_raw_mut_ptr_from_pptr( pptr<T> p ) noexcept
+{
+    std::uint8_t* base     = _backend.base_ptr();
+    std::size_t   byte_off = static_cast<std::size_t>( p.offset() ) * address_traits::granule_size;
+    if ( byte_off < sizeof( Block<address_traits> ) )
+        return nullptr;
+    std::size_t blk_off = byte_off - sizeof( Block<address_traits> );
+    if ( blk_off + sizeof( Block<address_traits> ) > _backend.total_size() )
+        return nullptr;
+    return base + blk_off;
+}
+
+template <typename T> static constexpr index_type block_idx_from_pptr( pptr<T> p ) noexcept
+{
+    constexpr index_type kHdrGranules = static_cast<index_type>(
+        ( sizeof( Block<address_traits> ) + address_traits::granule_size - 1 ) / address_traits::granule_size );
+    return static_cast<index_type>( p.offset() - kHdrGranules );
+}
