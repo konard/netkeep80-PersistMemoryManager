@@ -22,17 +22,21 @@ if(NOT configure_result EQUAL 0)
     message(FATAL_ERROR "Configure failed:\n${configure_output}\n${configure_error}")
 endif()
 
-execute_process(
-    COMMAND "${CMAKE_COMMAND}" --build "${BINARY_DIR}" --target help
-    RESULT_VARIABLE help_result
-    OUTPUT_VARIABLE help_output
-    ERROR_VARIABLE help_error
+file(
+    GLOB_RECURSE generated_project_files
+    "${BINARY_DIR}/*.vcxproj"
+    "${BINARY_DIR}/build.ninja"
+    "${BINARY_DIR}/Makefile"
 )
 
-if(NOT help_result EQUAL 0)
-    message(FATAL_ERROR "Target listing failed:\n${help_output}\n${help_error}")
-endif()
+foreach(project_file IN LISTS generated_project_files)
+    get_filename_component(project_name "${project_file}" NAME_WE)
+    if(project_name MATCHES "^test_[A-Za-z0-9_]+$")
+        list(APPEND generated_test_projects "${project_file}")
+    endif()
+endforeach()
 
-if(help_output MATCHES "(^|[\r\n])\\.\\.\\. test_[A-Za-z0-9_]+")
-    message(FATAL_ERROR "BUILD_TESTING=OFF generated test targets:\n${help_output}")
+if(generated_test_projects)
+    list(JOIN generated_test_projects "\n" generated_test_projects_text)
+    message(FATAL_ERROR "BUILD_TESTING=OFF generated test targets:\n${generated_test_projects_text}")
 endif()
