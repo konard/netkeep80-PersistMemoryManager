@@ -2568,7 +2568,6 @@ class AllocatorPolicy
         }
     }
 
-  private:
     static index_type free_tree_block_granules( const std::uint8_t*                          base,
                                                 const detail::ManagerHeader<AddressTraitsT>* hdr,
                                                 index_type                                   block_idx ) noexcept
