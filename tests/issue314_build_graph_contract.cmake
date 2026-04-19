@@ -6,6 +6,10 @@ file(REMOVE_RECURSE "${build_root}")
 
 function(issue314_configure name)
     set(build_dir "${build_root}/${name}")
+    set(query_dir "${build_dir}/.cmake/api/v1/query")
+    file(MAKE_DIRECTORY "${query_dir}")
+    file(WRITE "${query_dir}/codemodel-v2" "")
+
     execute_process(
         COMMAND
             "${CMAKE_COMMAND}"
@@ -25,17 +29,19 @@ function(issue314_configure name)
 endfunction()
 
 function(issue314_assert_target build_dir target should_exist)
-    execute_process(
-        COMMAND "${CMAKE_COMMAND}" --build "${build_dir}" --target help
-        RESULT_VARIABLE result
-        OUTPUT_VARIABLE output
-        ERROR_VARIABLE error
-    )
-    if(NOT result EQUAL 0)
-        message(FATAL_ERROR "Target listing failed for ${build_dir}:\n${output}\n${error}")
+    file(GLOB target_files "${build_dir}/.cmake/api/v1/reply/target-*.json")
+    if(should_exist AND NOT target_files)
+        message(FATAL_ERROR "CMake File API target metadata was not generated for ${build_dir}")
     endif()
 
-    string(REGEX MATCH "(^|\n)\\.\\.\\. ${target}($|\n)" found "${output}")
+    set(found FALSE)
+    foreach(target_file IN LISTS target_files)
+        file(READ "${target_file}" target_json)
+        if(target_json MATCHES "\"name\"[ \t\r\n]*:[ \t\r\n]*\"${target}\"")
+            set(found TRUE)
+        endif()
+    endforeach()
+
     if(should_exist AND NOT found)
         message(FATAL_ERROR "Expected target '${target}' in ${build_dir}, but it was absent")
     endif()
