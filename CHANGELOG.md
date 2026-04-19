@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [0.55.6] - 2026-04-19
+
+### Changed
+- Compact public header comments and refresh generated single-header output.
+
+
 ## [0.55.5] - 2026-04-18
 
 ### Changed
