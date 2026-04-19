@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [0.55.12] - 2026-04-19
+
+### Changed
+- Honor `BUILD_TESTING=OFF` in CMake so CI demo builds do not compile the full test suite.
+- Run CI CMake builds and CTest with a fixed parallelism level.
+
+
 ## [0.55.11] - 2026-04-19
 
 ### Fixed
