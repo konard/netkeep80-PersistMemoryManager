@@ -310,6 +310,7 @@ TEST_CASE( "    forest-domain descriptor drives symbol dictionary", "[test_issue
 {
     using Domain = TestPsv::forest_domain_descriptor;
     static_assert( pmm::detail::ForestDomainDescriptor<Domain> );
+    static_assert( pmm::detail::ForestDomainViewDescriptor<Domain> );
     static_assert( pmm::detail::ForestDomainDescriptorForKey<Domain, const char*> );
 
     TestMgr::destroy();

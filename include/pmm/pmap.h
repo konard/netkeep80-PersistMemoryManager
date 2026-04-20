@@ -144,15 +144,24 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
         using node_type  = pmap_node<_K, _V>;
         using node_pptr  = typename ManagerT::template pptr<node_type>;
 
-        index_type* root_index_slot;
+        const index_type* root_index_slot;
+        index_type*       mutable_root_index_slot;
 
-        constexpr explicit forest_domain_descriptor( index_type* root = nullptr ) noexcept : root_index_slot( root ) {}
+        constexpr explicit forest_domain_descriptor( index_type* root = nullptr ) noexcept
+            : root_index_slot( root ), mutable_root_index_slot( root )
+        {
+        }
+
+        constexpr explicit forest_domain_descriptor( const index_type* root ) noexcept
+            : root_index_slot( root ), mutable_root_index_slot( nullptr )
+        {
+        }
 
         static constexpr const char* name() noexcept { return "container/pmap"; }
 
         index_type root_index() const noexcept { return root_index_slot != nullptr ? *root_index_slot : 0; }
 
-        index_type* root_index_ptr() const noexcept { return root_index_slot; }
+        index_type* root_index_ptr() noexcept { return mutable_root_index_slot; }
 
         static node_type* resolve_node( node_pptr p ) noexcept { return ManagerT::template resolve<node_type>( p ); }
 
@@ -174,7 +183,8 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
         static bool validate_node( node_pptr p ) noexcept { return resolve_node( p ) != nullptr; }
     };
 
-    using forest_domain_policy = detail::ForestDomainOps<forest_domain_descriptor>;
+    using forest_domain_view_policy = detail::ForestDomainViewOps<forest_domain_descriptor>;
+    using forest_domain_policy      = detail::ForestDomainOps<forest_domain_descriptor>;
 
     /// @brief Sentinel value for "no node" in TreeNode fields.
     static constexpr index_type no_block = ManagerT::address_traits::no_block;
@@ -194,9 +204,9 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
         return forest_domain_policy( forest_domain_descriptor( &_root_idx ) );
     }
 
-    forest_domain_policy forest_domain_ops() const noexcept
+    forest_domain_view_policy forest_domain_view_ops() const noexcept
     {
-        return forest_domain_policy( forest_domain_descriptor( const_cast<index_type*>( &_root_idx ) ) );
+        return forest_domain_view_policy( forest_domain_descriptor( &_root_idx ) );
     }
 
     /// @brief Проверить, пуст ли словарь.
@@ -265,7 +275,7 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
      * @param key Ключ для поиска.
      * @return pptr на найденный узел, или нулевой pptr если не найден.
      */
-    node_pptr find( const _K& key ) const noexcept { return forest_domain_ops().find( key ); }
+    node_pptr find( const _K& key ) const noexcept { return forest_domain_view_ops().find( key ); }
 
     /**
      * @brief Проверить, содержит ли словарь заданный ключ.
@@ -273,7 +283,7 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
      * @param key Ключ для проверки.
      * @return true если ключ найден.
      */
-    bool contains( const _K& key ) const noexcept { return !forest_domain_ops().find( key ).is_null(); }
+    bool contains( const _K& key ) const noexcept { return !forest_domain_view_ops().find( key ).is_null(); }
 
     /**
      * @brief Удалить узел по ключу.

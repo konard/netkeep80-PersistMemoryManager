@@ -52,6 +52,21 @@
 
 using TestMgr = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 153>;
 
+template <typename MapT>
+concept HasConstForestDomainOps = requires( const MapT& const_map ) { const_map.forest_domain_ops(); };
+
+template <typename MapT>
+concept HasConstForestDomainViewOps = requires( const MapT& const_map ) { const_map.forest_domain_view_ops(); };
+
+template <typename OpsT, typename NodePPtr>
+concept HasConstForestDomainInsert = requires( const OpsT& ops, NodePPtr node ) { ops.insert( node ); };
+
+template <typename OpsT>
+concept HasConstForestDomainResetRoot = requires( const OpsT& ops ) { ops.reset_root(); };
+
+template <typename OpsT>
+concept HasConstForestDomainRootIndexPtr = requires( const OpsT& ops ) { ops.root_index_ptr(); };
+
 // =============================================================================
 // I153-A: Basic insert and find with int keys
 // =============================================================================
@@ -84,7 +99,13 @@ TEST_CASE( "    forest-domain descriptor drives pmap dictionary", "[test_issue15
     using Map    = TestMgr::pmap<int, int>;
     using Domain = Map::forest_domain_descriptor;
     static_assert( pmm::detail::ForestDomainDescriptor<Domain> );
+    static_assert( pmm::detail::ForestDomainViewDescriptor<Domain> );
     static_assert( pmm::detail::ForestDomainDescriptorForKey<Domain, int> );
+    static_assert( !HasConstForestDomainOps<Map> );
+    static_assert( HasConstForestDomainViewOps<Map> );
+    static_assert( !HasConstForestDomainInsert<Map::forest_domain_policy, Map::node_pptr> );
+    static_assert( !HasConstForestDomainResetRoot<Map::forest_domain_policy> );
+    static_assert( !HasConstForestDomainRootIndexPtr<Map::forest_domain_policy> );
 
     TestMgr::destroy();
     REQUIRE( TestMgr::create( 64 * 1024 ) );
@@ -104,6 +125,15 @@ TEST_CASE( "    forest-domain descriptor drives pmap dictionary", "[test_issue15
     REQUIRE( ops.find( 10 ) == p10 );
     REQUIRE( ops.find( 20 ) == p20 );
     REQUIRE( ops.find( 30 ).is_null() );
+
+    const Map& const_map = map;
+    auto       view_ops  = const_map.forest_domain_view_ops();
+    REQUIRE( std::strcmp( view_ops.name(), "container/pmap" ) == 0 );
+    REQUIRE( view_ops.root_index() == ops.root_index() );
+    REQUIRE( view_ops.find( 10 ) == p10 );
+    REQUIRE( view_ops.find( 20 ) == p20 );
+    REQUIRE( const_map.find( 10 ) == p10 );
+    REQUIRE( const_map.contains( 20 ) );
 
     REQUIRE( ops.reset_root() );
     REQUIRE( map.empty() );
