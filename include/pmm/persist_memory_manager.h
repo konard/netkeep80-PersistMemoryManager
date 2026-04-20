@@ -511,19 +511,18 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
 
     // ─── Root object API ──────────────────────────────
 
-    /// @brief Compatibility shim for the legacy root object API.
-    /// Stores the root in the canonical `service/legacy_root` domain record.
+    /// @brief Store a user root pptr in the canonical `service/domain_root` registry record.
     template <typename T> static void set_root( pptr<T> p ) noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
         if ( !_initialized )
             return;
-        set_forest_domain_root_index_unlocked( find_domain_by_name_unlocked( detail::kServiceNameLegacyRoot ),
+        set_forest_domain_root_index_unlocked( find_domain_by_name_unlocked( detail::kServiceNameDomainRoot ),
                                                p.is_null() ? static_cast<index_type>( 0 ) : p.offset() );
     }
 
     /**
-     * @brief Compatibility shim for the legacy root object API.
+     * @brief Retrieve the user root pptr from the `service/domain_root` registry record.
      *
      * @tparam T Тип объекта (должен совпадать с типом, переданным в set_root).
      * @return pptr<T> — корневой указатель или пустой pptr, если корень не установлен.
@@ -533,11 +532,11 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         typename thread_policy::shared_lock_type lock( _mutex );
         if ( !_initialized )
             return pptr<T>();
-        index_type legacy_root =
-            forest_domain_root_index_unlocked( find_domain_by_name_unlocked( detail::kServiceNameLegacyRoot ) );
-        if ( legacy_root == static_cast<index_type>( 0 ) )
+        index_type root =
+            forest_domain_root_index_unlocked( find_domain_by_name_unlocked( detail::kServiceNameDomainRoot ) );
+        if ( root == static_cast<index_type>( 0 ) )
             return pptr<T>();
-        return pptr<T>( legacy_root );
+        return pptr<T>( root );
     }
 
     static index_type find_domain_by_name( const char* name ) noexcept

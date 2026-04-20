@@ -5113,7 +5113,6 @@ inline constexpr const char*   kSystemDomainRegistry         = "system/domain_re
 inline constexpr const char*   kSystemTypeForestRegistry     = "type/forest_registry";
 inline constexpr const char*   kSystemTypeForestDomainRecord = "type/forest_domain_record";
 inline constexpr const char*   kSystemTypePstringview        = "type/pstringview";
-inline constexpr const char*   kServiceNameLegacyRoot        = "service/legacy_root";
 inline constexpr const char*   kServiceNameDomainRoot        = "service/domain_root";
 inline constexpr const char*   kServiceNameDomainSymbol      = "service/domain_symbol";
 inline constexpr std::uint32_t kForestRegistryMagic          = 0x50465247U; // "PFRG"
@@ -5148,13 +5147,12 @@ template <typename AddressTraitsT> struct ForestDomainRegistry
     std::uint32_t                      magic;
     std::uint16_t                      version;
     std::uint16_t                      domain_count;
-    index_type                         reserved_root_offset;
     index_type                         next_binding_id;
     ForestDomainRecord<AddressTraitsT> domains[kMaxForestDomains];
 
     constexpr ForestDomainRegistry() noexcept
-        : magic( kForestRegistryMagic ), version( kForestRegistryVersion ), domain_count( 0 ),
-          reserved_root_offset( 0 ), next_binding_id( 1 ), domains{}
+        : magic( kForestRegistryMagic ), version( kForestRegistryVersion ), domain_count( 0 ), next_binding_id( 1 ),
+          domains{}
     {
     }
 };
@@ -8357,19 +8355,18 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
 
     // ─── Root object API ──────────────────────────────
 
-    /// @brief Compatibility shim for the legacy root object API.
-    /// Stores the root in the canonical `service/legacy_root` domain record.
+    /// @brief Store a user root pptr in the canonical `service/domain_root` registry record.
     template <typename T> static void set_root( pptr<T> p ) noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
         if ( !_initialized )
             return;
-        set_forest_domain_root_index_unlocked( find_domain_by_name_unlocked( detail::kServiceNameLegacyRoot ),
+        set_forest_domain_root_index_unlocked( find_domain_by_name_unlocked( detail::kServiceNameDomainRoot ),
                                                p.is_null() ? static_cast<index_type>( 0 ) : p.offset() );
     }
 
     /**
-     * @brief Compatibility shim for the legacy root object API.
+     * @brief Retrieve the user root pptr from the `service/domain_root` registry record.
      *
      * @tparam T Тип объекта (должен совпадать с типом, переданным в set_root).
      * @return pptr<T> — корневой указатель или пустой pptr, если корень не установлен.
@@ -8379,11 +8376,11 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         typename thread_policy::shared_lock_type lock( _mutex );
         if ( !_initialized )
             return pptr<T>();
-        index_type legacy_root =
-            forest_domain_root_index_unlocked( find_domain_by_name_unlocked( detail::kServiceNameLegacyRoot ) );
-        if ( legacy_root == static_cast<index_type>( 0 ) )
+        index_type root =
+            forest_domain_root_index_unlocked( find_domain_by_name_unlocked( detail::kServiceNameDomainRoot ) );
+        if ( root == static_cast<index_type>( 0 ) )
             return pptr<T>();
-        return pptr<T>( legacy_root );
+        return pptr<T>( root );
     }
 
     static index_type find_domain_by_name( const char* name ) noexcept
@@ -9148,7 +9145,7 @@ static bool bootstrap_system_symbols_unlocked() noexcept
     static constexpr const char* kBootstrapSymbols[] = {
         detail::kSystemDomainFreeTree,     detail::kSystemDomainSymbols,          detail::kSystemDomainRegistry,
         detail::kSystemTypeForestRegistry, detail::kSystemTypeForestDomainRecord, detail::kSystemTypePstringview,
-        detail::kServiceNameLegacyRoot,    detail::kServiceNameDomainRoot,        detail::kServiceNameDomainSymbol,
+        detail::kServiceNameDomainRoot,    detail::kServiceNameDomainSymbol,
     };
 
     for ( const char* sym : kBootstrapSymbols )
@@ -9177,7 +9174,7 @@ static bool bootstrap_system_symbols_unlocked() noexcept
 
 // ─── Bootstrap: create forest registry root ───────────────────────────────────
 
-static bool create_forest_registry_root_unlocked( index_type legacy_root_offset ) noexcept
+static bool bootstrap_forest_registry_unlocked() noexcept
 {
     static constexpr std::size_t kGranSz = address_traits::granule_size;
 
@@ -9200,11 +9197,10 @@ static bool create_forest_registry_root_unlocked( index_type legacy_root_offset 
     }
 
     std::memset( reg, 0, sizeof( forest_registry ) );
-    reg->magic                = detail::kForestRegistryMagic;
-    reg->version              = detail::kForestRegistryVersion;
-    reg->domain_count         = 0;
-    reg->reserved_root_offset = 0;
-    reg->next_binding_id      = 1;
+    reg->magic           = detail::kForestRegistryMagic;
+    reg->version         = detail::kForestRegistryVersion;
+    reg->domain_count    = 0;
+    reg->next_binding_id = 1;
 
     if ( !lock_block_permanent_unlocked( raw ) )
     {
@@ -9233,8 +9229,8 @@ static bool create_forest_registry_root_unlocked( index_type legacy_root_offset 
         _last_error = PmmError::BackendError;
         return false;
     }
-    if ( !register_domain_unlocked( detail::kServiceNameLegacyRoot, detail::kForestDomainFlagSystem,
-                                    detail::kForestBindingDirectRoot, legacy_root_offset ) )
+    if ( !register_domain_unlocked( detail::kServiceNameDomainRoot, detail::kForestDomainFlagSystem,
+                                    detail::kForestBindingDirectRoot, 0 ) )
     {
         _last_error = PmmError::BackendError;
         return false;
@@ -9245,11 +9241,6 @@ static bool create_forest_registry_root_unlocked( index_type legacy_root_offset 
         return false;
     }
     return true;
-}
-
-static bool bootstrap_forest_registry_unlocked() noexcept
-{
-    return create_forest_registry_root_unlocked( 0 );
 }
 
 // ─── Bootstrap: invariant verification ───────────────────────────
@@ -9281,12 +9272,10 @@ static bool validate_bootstrap_invariants_unlocked() noexcept
     if ( reg->version != detail::kForestRegistryVersion )
         return false;
     if ( reg->domain_count < 4 )
-        return false; // at least free_tree, symbols, registry, legacy_root
-    if ( reg->reserved_root_offset != 0 )
-        return false;
+        return false; // at least free_tree, symbols, registry, domain_root
     // 3. System domains present with correct flags
     static constexpr const char* kRequired[] = { detail::kSystemDomainFreeTree, detail::kSystemDomainSymbols,
-                                                 detail::kSystemDomainRegistry, detail::kServiceNameLegacyRoot };
+                                                 detail::kSystemDomainRegistry, detail::kServiceNameDomainRoot };
     for ( const char* name : kRequired )
     {
         const forest_domain* rec = find_domain_by_name_unlocked( name );
@@ -9308,8 +9297,8 @@ static bool validate_bootstrap_invariants_unlocked() noexcept
     const forest_domain* reg_rec = find_domain_by_name_unlocked( detail::kSystemDomainRegistry );
     if ( reg_rec->root_offset != hdr->root_offset )
         return false;
-    const forest_domain* legacy_rec = find_domain_by_name_unlocked( detail::kServiceNameLegacyRoot );
-    if ( legacy_rec->binding_kind != detail::kForestBindingDirectRoot )
+    const forest_domain* root_rec = find_domain_by_name_unlocked( detail::kServiceNameDomainRoot );
+    if ( root_rec->binding_kind != detail::kForestBindingDirectRoot )
         return false;
     return true;
 }
@@ -9321,12 +9310,6 @@ static bool validate_or_bootstrap_forest_registry_unlocked() noexcept
     detail::ManagerHeader<address_traits>* hdr = get_header( _backend.base_ptr() );
     if ( forest_registry_root_unlocked() != nullptr )
     {
-        forest_registry* reg = forest_registry_root_unlocked();
-        index_type       migrated_legacy_root =
-            ( find_domain_by_name_unlocked( detail::kServiceNameLegacyRoot ) == nullptr && reg != nullptr )
-                ? reg->reserved_root_offset
-                : static_cast<index_type>( 0 );
-
         if ( !register_domain_unlocked( detail::kSystemDomainFreeTree, detail::kForestDomainFlagSystem,
                                         detail::kForestBindingFreeTree, 0 ) )
             return false;
@@ -9337,56 +9320,15 @@ static bool validate_or_bootstrap_forest_registry_unlocked() noexcept
         if ( !register_domain_unlocked( detail::kSystemDomainRegistry, detail::kForestDomainFlagSystem,
                                         detail::kForestBindingDirectRoot, hdr->root_offset ) )
             return false;
-        if ( !register_domain_unlocked( detail::kServiceNameLegacyRoot, detail::kForestDomainFlagSystem,
-                                        detail::kForestBindingDirectRoot, migrated_legacy_root ) )
+        if ( !register_domain_unlocked( detail::kServiceNameDomainRoot, detail::kForestDomainFlagSystem,
+                                        detail::kForestBindingDirectRoot, 0 ) )
             return false;
 
-        if ( forest_domain* free_rec = find_domain_by_name_unlocked( detail::kSystemDomainFreeTree ) )
-        {
-            free_rec->flags |= detail::kForestDomainFlagSystem;
-            free_rec->binding_kind = detail::kForestBindingFreeTree;
-            free_rec->root_offset  = 0;
-        }
-        if ( forest_domain* symbols_rec = find_domain_by_name_unlocked( detail::kSystemDomainSymbols ) )
-        {
-            symbols_rec->flags |= detail::kForestDomainFlagSystem;
-            symbols_rec->binding_kind = detail::kForestBindingDirectRoot;
-        }
-        if ( forest_domain* registry_rec = find_domain_by_name_unlocked( detail::kSystemDomainRegistry ) )
-        {
-            registry_rec->flags |= detail::kForestDomainFlagSystem;
-            registry_rec->binding_kind = detail::kForestBindingDirectRoot;
-            registry_rec->root_offset  = hdr->root_offset;
-        }
-        if ( forest_domain* legacy_rec = find_domain_by_name_unlocked( detail::kServiceNameLegacyRoot ) )
-        {
-            legacy_rec->flags |= detail::kForestDomainFlagSystem;
-            legacy_rec->binding_kind = detail::kForestBindingDirectRoot;
-        }
-        if ( reg != nullptr )
-            reg->reserved_root_offset = 0;
         return bootstrap_system_symbols_unlocked();
     }
 
-    index_type legacy_root = 0;
-    if ( hdr->root_offset != address_traits::no_block &&
-         is_valid_user_offset_unlocked( hdr->root_offset, sizeof( std::uint32_t ) ) )
-    {
-        if ( !is_valid_user_offset_unlocked( hdr->root_offset, sizeof( forest_registry ) ) )
-        {
-            legacy_root = hdr->root_offset;
-        }
-        else
-        {
-            auto* candidate = reinterpret_cast<const forest_registry*>(
-                _backend.base_ptr() + static_cast<std::size_t>( hdr->root_offset ) * address_traits::granule_size );
-            if ( candidate->magic != detail::kForestRegistryMagic )
-                legacy_root = hdr->root_offset;
-        }
-    }
-
     hdr->root_offset = address_traits::no_block;
-    return create_forest_registry_root_unlocked( legacy_root );
+    return bootstrap_forest_registry_unlocked();
 }
 
 // ─── Free block tree traversal ────────────────────────────────────────────────
@@ -9719,7 +9661,7 @@ static void verify_forest_registry_unlocked( VerifyResult& result ) noexcept
     }
 
     static constexpr const char* kRequired[] = { detail::kSystemDomainFreeTree, detail::kSystemDomainSymbols,
-                                                 detail::kSystemDomainRegistry, detail::kServiceNameLegacyRoot };
+                                                 detail::kSystemDomainRegistry, detail::kServiceNameDomainRoot };
     for ( const char* name : kRequired )
     {
         const forest_domain* rec = find_domain_by_name_unlocked( name );
