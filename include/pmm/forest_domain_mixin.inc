@@ -507,6 +507,7 @@ static void for_each_free_block_inorder( const std::uint8_t* base, const detail:
 }
 
 /// @brief Find the mutable block header for a user-data pointer (or nullptr).
+/// @pre Caller holds the manager lock, or block links are otherwise stable for canonical raw-pointer validation.
 static pmm::Block<address_traits>* find_block_from_user_ptr( void* ptr ) noexcept
 {
     std::uint8_t*                          base = _backend.base_ptr();
@@ -535,6 +536,7 @@ static pmm::Block<address_traits>* find_block_from_user_ptr( void* ptr ) noexcep
 }
 
 /// @brief Find the const block header for a user-data pointer.
+/// @pre Caller holds the manager lock, or block links are otherwise stable for canonical raw-pointer validation.
 /// Returns nullptr if ptr is out of range or the block header is invalid.
 static const pmm::Block<address_traits>* find_block_from_user_ptr( const void* ptr ) noexcept
 {

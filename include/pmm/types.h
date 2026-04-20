@@ -495,8 +495,9 @@ inline void* user_ptr( pmm::Block<AddressTraitsT>* block )
 }
 
 // Canonical public-pointer reconstruction is a manager-structure check, not a
-// payload-byte self-consistency check. Callers in multi-threaded managers must
-// ensure the block links are stable while this runs.
+// payload-byte self-consistency check. This reads first/last anchors plus
+// prev/next neighbor back-links without internal locking; callers must hold the
+// manager lock or otherwise guarantee that block links are stable while this runs.
 template <typename AddressTraitsT>
 inline bool is_block_header_linked_in_canonical_chain( const std::uint8_t*                  base,
                                                        const ManagerHeader<AddressTraitsT>* hdr, std::size_t total_size,
@@ -621,7 +622,8 @@ inline bool is_canonical_user_ptr( const std::uint8_t* base, std::size_t total_s
     return is_canonical_allocated_block_header<AddressTraitsT>( base, total_size, cand_addr );
 }
 
-/// @brief O(1) get Block<AddressTraitsT> from user_ptr (ptr - sizeof(Block<AddressTraitsT>)).
+/// @brief O(1) get Block<AddressTraitsT> from canonical user_ptr (ptr - sizeof(Block<AddressTraitsT>)).
+/// @pre Caller holds the manager lock, or block links are otherwise stable for the canonical-chain proof.
 /// Block<AddressTraitsT> is the sole block type.
 /// Unified templated helper replaces the former DefaultAddressTraits-specific overload.
 template <typename AddressTraitsT>

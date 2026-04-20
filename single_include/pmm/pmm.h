@@ -2528,8 +2528,9 @@ inline void* user_ptr( pmm::Block<AddressTraitsT>* block )
 }
 
 // Canonical public-pointer reconstruction is a manager-structure check, not a
-// payload-byte self-consistency check. Callers in multi-threaded managers must
-// ensure the block links are stable while this runs.
+// payload-byte self-consistency check. This reads first/last anchors plus
+// prev/next neighbor back-links without internal locking; callers must hold the
+// manager lock or otherwise guarantee that block links are stable while this runs.
 template <typename AddressTraitsT>
 inline bool is_block_header_linked_in_canonical_chain( const std::uint8_t*                  base,
                                                        const ManagerHeader<AddressTraitsT>* hdr, std::size_t total_size,
@@ -2654,7 +2655,8 @@ inline bool is_canonical_user_ptr( const std::uint8_t* base, std::size_t total_s
     return is_canonical_allocated_block_header<AddressTraitsT>( base, total_size, cand_addr );
 }
 
-/// @brief O(1) get Block<AddressTraitsT> from user_ptr (ptr - sizeof(Block<AddressTraitsT>)).
+/// @brief O(1) get Block<AddressTraitsT> from canonical user_ptr (ptr - sizeof(Block<AddressTraitsT>)).
+/// @pre Caller holds the manager lock, or block links are otherwise stable for the canonical-chain proof.
 /// Block<AddressTraitsT> is the sole block type.
 /// Unified templated helper replaces the former DefaultAddressTraits-specific overload.
 template <typename AddressTraitsT>
@@ -8279,6 +8281,8 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
      * @brief Освободить блок по указателю на пользовательские данные.
      *
      * @note Если блок заблокирован навечно (lock_block_permanent), освобождение не выполняется.
+     * @note Raw-pointer reconstruction checks block-chain links; this entry point holds the manager lock so canonical
+     *       validation observes stable prev/next relationships.
      */
     static void deallocate( void* ptr ) noexcept
     {
@@ -8294,6 +8298,9 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
      *
      * @param ptr Указатель на пользовательские данные (тот же, что возвращает allocate()).
      * @return true если блок успешно заблокирован, false если блок не найден или уже свободен.
+     *
+     * @note Raw-pointer reconstruction checks block-chain links; this entry point holds the manager lock so canonical
+     *       validation observes stable prev/next relationships.
      */
     static bool lock_block_permanent( void* ptr ) noexcept
     {
@@ -8306,6 +8313,9 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
      *
      * @param ptr Указатель на пользовательские данные.
      * @return true если блок заблокирован навечно (node_type == kNodeReadOnly).
+     *
+     * @note Raw-pointer reconstruction checks block-chain links; this entry point holds a shared lock so no writer
+     *       mutates prev/next relationships during validation.
      */
     static bool is_permanently_locked( const void* ptr ) noexcept
     {
@@ -8829,6 +8839,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         return nullptr;
     }
 
+    /// @pre Caller must guarantee stable block links, normally by holding the manager lock.
     static void deallocate_unlocked( void* ptr ) noexcept
     {
         if ( !_initialized || ptr == nullptr )
@@ -8856,6 +8867,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         allocator::coalesce( base, hdr, blk_idx );
     }
 
+    /// @pre Caller must guarantee stable block links, normally by holding the manager lock.
     static bool lock_block_permanent_unlocked( void* ptr ) noexcept
     {
         if ( !_initialized || ptr == nullptr )
@@ -9399,6 +9411,7 @@ static void for_each_free_block_inorder( const std::uint8_t* base, const detail:
 }
 
 /// @brief Find the mutable block header for a user-data pointer (or nullptr).
+/// @pre Caller holds the manager lock, or block links are otherwise stable for canonical raw-pointer validation.
 static pmm::Block<address_traits>* find_block_from_user_ptr( void* ptr ) noexcept
 {
     std::uint8_t*                          base = _backend.base_ptr();
@@ -9427,6 +9440,7 @@ static pmm::Block<address_traits>* find_block_from_user_ptr( void* ptr ) noexcep
 }
 
 /// @brief Find the const block header for a user-data pointer.
+/// @pre Caller holds the manager lock, or block links are otherwise stable for canonical raw-pointer validation.
 /// Returns nullptr if ptr is out of range or the block header is invalid.
 static const pmm::Block<address_traits>* find_block_from_user_ptr( const void* ptr ) noexcept
 {
