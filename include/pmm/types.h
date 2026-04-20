@@ -494,9 +494,61 @@ inline void* user_ptr( pmm::Block<AddressTraitsT>* block )
     return reinterpret_cast<std::uint8_t*>( block ) + sizeof( pmm::Block<AddressTraitsT> );
 }
 
-// This helper runs on public pointer conversion paths that may not hold the
-// manager write lock, so keep validation to stable manager state and the
-// candidate header itself.
+// Canonical public-pointer reconstruction is a manager-structure check, not a
+// payload-byte self-consistency check. Callers in multi-threaded managers must
+// ensure the block links are stable while this runs.
+template <typename AddressTraitsT>
+inline bool is_block_header_linked_in_canonical_chain( const std::uint8_t*                  base,
+                                                       const ManagerHeader<AddressTraitsT>* hdr, std::size_t total_size,
+                                                       typename AddressTraitsT::index_type cand_idx ) noexcept
+{
+    using BlockState = pmm::BlockStateBase<AddressTraitsT>;
+    using IndexT     = typename AddressTraitsT::index_type;
+
+    if ( base == nullptr || hdr == nullptr )
+        return false;
+    if ( hdr->block_count == 0 || hdr->first_block_offset == AddressTraitsT::no_block )
+        return false;
+
+    if ( !validate_block_index<AddressTraitsT>( total_size, hdr->first_block_offset ) ||
+         !validate_block_index<AddressTraitsT>( total_size, hdr->last_block_offset ) )
+        return false;
+
+    const void*  cand = base + static_cast<std::size_t>( cand_idx ) * AddressTraitsT::granule_size;
+    const IndexT prev = BlockState::get_prev_offset( cand );
+    const IndexT next = BlockState::get_next_offset( cand );
+
+    if ( prev == AddressTraitsT::no_block )
+    {
+        if ( cand_idx != hdr->first_block_offset )
+            return false;
+    }
+    else
+    {
+        if ( !validate_block_index<AddressTraitsT>( total_size, prev ) || prev >= cand_idx )
+            return false;
+        const void* prev_block = base + static_cast<std::size_t>( prev ) * AddressTraitsT::granule_size;
+        if ( BlockState::get_next_offset( prev_block ) != cand_idx )
+            return false;
+    }
+
+    if ( next == AddressTraitsT::no_block )
+    {
+        if ( cand_idx != hdr->last_block_offset )
+            return false;
+    }
+    else
+    {
+        if ( !validate_block_index<AddressTraitsT>( total_size, next ) || next <= cand_idx )
+            return false;
+        const void* next_block = base + static_cast<std::size_t>( next ) * AddressTraitsT::granule_size;
+        if ( BlockState::get_prev_offset( next_block ) != cand_idx )
+            return false;
+    }
+
+    return true;
+}
+
 template <typename AddressTraitsT>
 inline bool is_canonical_allocated_block_header( const std::uint8_t* base, std::size_t total_size,
                                                  const std::uint8_t* cand_addr ) noexcept
@@ -535,6 +587,8 @@ inline bool is_canonical_allocated_block_header( const std::uint8_t* base, std::
 
     const auto* hdr = manager_header_at<AddressTraitsT>( base );
     if ( hdr->total_size != total_size )
+        return false;
+    if ( !is_block_header_linked_in_canonical_chain<AddressTraitsT>( base, hdr, total_size, cand_idx ) )
         return false;
 
     constexpr std::size_t kBlockSize = sizeof( pmm::Block<AddressTraitsT> );

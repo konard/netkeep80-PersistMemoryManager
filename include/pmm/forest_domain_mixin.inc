@@ -575,12 +575,31 @@ template <typename T> static pptr<T> make_pptr_from_raw( void* raw ) noexcept
         return pptr<T>();
     std::uint8_t* base     = _backend.base_ptr();
     auto*         raw_byte = static_cast<std::uint8_t*>( raw );
-    if ( base == nullptr || raw_byte < base || raw_byte >= base + _backend.total_size() )
+    if ( base == nullptr )
         return pptr<T>();
-    pmm::Block<address_traits>* blk = find_block_from_user_ptr( raw );
-    if ( blk == nullptr )
+    const std::uintptr_t base_addr = reinterpret_cast<std::uintptr_t>( base );
+    const std::uintptr_t raw_addr  = reinterpret_cast<std::uintptr_t>( raw_byte );
+    if ( raw_addr < base_addr )
         return pptr<T>();
-    index_type blk_idx = detail::block_idx_t<address_traits>( base, blk );
+    const std::size_t raw_off = static_cast<std::size_t>( raw_addr - base_addr );
+    if ( raw_off < sizeof( Block<address_traits> ) || raw_off >= _backend.total_size() )
+        return pptr<T>();
+    const std::size_t blk_off = raw_off - sizeof( Block<address_traits> );
+    if ( blk_off % address_traits::granule_size != 0 )
+        return pptr<T>();
+    const std::size_t blk_idx_raw = blk_off / address_traits::granule_size;
+    if ( blk_idx_raw > static_cast<std::size_t>( std::numeric_limits<index_type>::max() ) )
+        return pptr<T>();
+    index_type blk_idx = static_cast<index_type>( blk_idx_raw );
+    if ( !detail::validate_block_index<address_traits>( _backend.total_size(), blk_idx ) )
+        return pptr<T>();
+    const void* blk = detail::block_at<address_traits>( base, blk_idx );
+    if ( BlockStateBase<address_traits>::get_weight( blk ) == 0 ||
+         BlockStateBase<address_traits>::get_root_offset( blk ) != blk_idx )
+        return pptr<T>();
+    const std::uint16_t node_type = BlockStateBase<address_traits>::get_node_type( blk );
+    if ( node_type != pmm::kNodeReadWrite && node_type != pmm::kNodeReadOnly )
+        return pptr<T>();
     if ( blk_idx > std::numeric_limits<index_type>::max() - kBlockHdrGranules )
         return pptr<T>();
     return pptr<T>( static_cast<index_type>( blk_idx + kBlockHdrGranules ) );

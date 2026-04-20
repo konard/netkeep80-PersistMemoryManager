@@ -2527,9 +2527,61 @@ inline void* user_ptr( pmm::Block<AddressTraitsT>* block )
     return reinterpret_cast<std::uint8_t*>( block ) + sizeof( pmm::Block<AddressTraitsT> );
 }
 
-// This helper runs on public pointer conversion paths that may not hold the
-// manager write lock, so keep validation to stable manager state and the
-// candidate header itself.
+// Canonical public-pointer reconstruction is a manager-structure check, not a
+// payload-byte self-consistency check. Callers in multi-threaded managers must
+// ensure the block links are stable while this runs.
+template <typename AddressTraitsT>
+inline bool is_block_header_linked_in_canonical_chain( const std::uint8_t*                  base,
+                                                       const ManagerHeader<AddressTraitsT>* hdr, std::size_t total_size,
+                                                       typename AddressTraitsT::index_type cand_idx ) noexcept
+{
+    using BlockState = pmm::BlockStateBase<AddressTraitsT>;
+    using IndexT     = typename AddressTraitsT::index_type;
+
+    if ( base == nullptr || hdr == nullptr )
+        return false;
+    if ( hdr->block_count == 0 || hdr->first_block_offset == AddressTraitsT::no_block )
+        return false;
+
+    if ( !validate_block_index<AddressTraitsT>( total_size, hdr->first_block_offset ) ||
+         !validate_block_index<AddressTraitsT>( total_size, hdr->last_block_offset ) )
+        return false;
+
+    const void*  cand = base + static_cast<std::size_t>( cand_idx ) * AddressTraitsT::granule_size;
+    const IndexT prev = BlockState::get_prev_offset( cand );
+    const IndexT next = BlockState::get_next_offset( cand );
+
+    if ( prev == AddressTraitsT::no_block )
+    {
+        if ( cand_idx != hdr->first_block_offset )
+            return false;
+    }
+    else
+    {
+        if ( !validate_block_index<AddressTraitsT>( total_size, prev ) || prev >= cand_idx )
+            return false;
+        const void* prev_block = base + static_cast<std::size_t>( prev ) * AddressTraitsT::granule_size;
+        if ( BlockState::get_next_offset( prev_block ) != cand_idx )
+            return false;
+    }
+
+    if ( next == AddressTraitsT::no_block )
+    {
+        if ( cand_idx != hdr->last_block_offset )
+            return false;
+    }
+    else
+    {
+        if ( !validate_block_index<AddressTraitsT>( total_size, next ) || next <= cand_idx )
+            return false;
+        const void* next_block = base + static_cast<std::size_t>( next ) * AddressTraitsT::granule_size;
+        if ( BlockState::get_prev_offset( next_block ) != cand_idx )
+            return false;
+    }
+
+    return true;
+}
+
 template <typename AddressTraitsT>
 inline bool is_canonical_allocated_block_header( const std::uint8_t* base, std::size_t total_size,
                                                  const std::uint8_t* cand_addr ) noexcept
@@ -2568,6 +2620,8 @@ inline bool is_canonical_allocated_block_header( const std::uint8_t* base, std::
 
     const auto* hdr = manager_header_at<AddressTraitsT>( base );
     if ( hdr->total_size != total_size )
+        return false;
+    if ( !is_block_header_linked_in_canonical_chain<AddressTraitsT>( base, hdr, total_size, cand_idx ) )
         return false;
 
     constexpr std::size_t kBlockSize = sizeof( pmm::Block<AddressTraitsT> );
@@ -7757,23 +7811,33 @@ template <typename ManagerT> class PersistMemoryTypedApi
     template <typename T> static T* resolve_checked( pmm::pptr<T, ManagerT> p ) noexcept
     {
         using address_traits = typename ManagerT::address_traits;
+        using index_type     = typename ManagerT::index_type;
 
-        T*          raw      = resolve_unchecked<T>( p );
-        const void* user_raw = raw;
-        if ( user_raw == nullptr )
+        if ( p.is_null() || !ManagerT::_initialized )
             return nullptr;
-        const void* blk_raw = ManagerT::find_block_from_user_ptr( user_raw );
+
+        const void* blk_raw = ManagerT::template block_raw_ptr_from_pptr<T>( p );
         if ( blk_raw == nullptr )
         {
             ManagerT::_last_error = PmmError::InvalidPointer;
             return nullptr;
         }
+        index_type blk_idx = ManagerT::template block_idx_from_pptr<T>( p );
         if ( BlockStateBase<address_traits>::get_weight( blk_raw ) == 0 ||
-             BlockStateBase<address_traits>::get_root_offset( blk_raw ) == 0 )
+             BlockStateBase<address_traits>::get_root_offset( blk_raw ) != blk_idx )
         {
             ManagerT::_last_error = PmmError::InvalidPointer;
             return nullptr;
         }
+        const std::uint16_t node_type = BlockStateBase<address_traits>::get_node_type( blk_raw );
+        if ( node_type != pmm::kNodeReadWrite && node_type != pmm::kNodeReadOnly )
+        {
+            ManagerT::_last_error = PmmError::InvalidPointer;
+            return nullptr;
+        }
+        T* raw = resolve_unchecked<T>( p );
+        if ( raw == nullptr )
+            return nullptr;
         ManagerT::_last_error = PmmError::Ok;
         return raw;
     }
@@ -9403,12 +9467,31 @@ template <typename T> static pptr<T> make_pptr_from_raw( void* raw ) noexcept
         return pptr<T>();
     std::uint8_t* base     = _backend.base_ptr();
     auto*         raw_byte = static_cast<std::uint8_t*>( raw );
-    if ( base == nullptr || raw_byte < base || raw_byte >= base + _backend.total_size() )
+    if ( base == nullptr )
         return pptr<T>();
-    pmm::Block<address_traits>* blk = find_block_from_user_ptr( raw );
-    if ( blk == nullptr )
+    const std::uintptr_t base_addr = reinterpret_cast<std::uintptr_t>( base );
+    const std::uintptr_t raw_addr  = reinterpret_cast<std::uintptr_t>( raw_byte );
+    if ( raw_addr < base_addr )
         return pptr<T>();
-    index_type blk_idx = detail::block_idx_t<address_traits>( base, blk );
+    const std::size_t raw_off = static_cast<std::size_t>( raw_addr - base_addr );
+    if ( raw_off < sizeof( Block<address_traits> ) || raw_off >= _backend.total_size() )
+        return pptr<T>();
+    const std::size_t blk_off = raw_off - sizeof( Block<address_traits> );
+    if ( blk_off % address_traits::granule_size != 0 )
+        return pptr<T>();
+    const std::size_t blk_idx_raw = blk_off / address_traits::granule_size;
+    if ( blk_idx_raw > static_cast<std::size_t>( std::numeric_limits<index_type>::max() ) )
+        return pptr<T>();
+    index_type blk_idx = static_cast<index_type>( blk_idx_raw );
+    if ( !detail::validate_block_index<address_traits>( _backend.total_size(), blk_idx ) )
+        return pptr<T>();
+    const void* blk = detail::block_at<address_traits>( base, blk_idx );
+    if ( BlockStateBase<address_traits>::get_weight( blk ) == 0 ||
+         BlockStateBase<address_traits>::get_root_offset( blk ) != blk_idx )
+        return pptr<T>();
+    const std::uint16_t node_type = BlockStateBase<address_traits>::get_node_type( blk );
+    if ( node_type != pmm::kNodeReadWrite && node_type != pmm::kNodeReadOnly )
+        return pptr<T>();
     if ( blk_idx > std::numeric_limits<index_type>::max() - kBlockHdrGranules )
         return pptr<T>();
     return pptr<T>( static_cast<index_type>( blk_idx + kBlockHdrGranules ) );

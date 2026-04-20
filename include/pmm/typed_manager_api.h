@@ -238,23 +238,33 @@ template <typename ManagerT> class PersistMemoryTypedApi
     template <typename T> static T* resolve_checked( pmm::pptr<T, ManagerT> p ) noexcept
     {
         using address_traits = typename ManagerT::address_traits;
+        using index_type     = typename ManagerT::index_type;
 
-        T*          raw      = resolve_unchecked<T>( p );
-        const void* user_raw = raw;
-        if ( user_raw == nullptr )
+        if ( p.is_null() || !ManagerT::_initialized )
             return nullptr;
-        const void* blk_raw = ManagerT::find_block_from_user_ptr( user_raw );
+
+        const void* blk_raw = ManagerT::template block_raw_ptr_from_pptr<T>( p );
         if ( blk_raw == nullptr )
         {
             ManagerT::_last_error = PmmError::InvalidPointer;
             return nullptr;
         }
+        index_type blk_idx = ManagerT::template block_idx_from_pptr<T>( p );
         if ( BlockStateBase<address_traits>::get_weight( blk_raw ) == 0 ||
-             BlockStateBase<address_traits>::get_root_offset( blk_raw ) == 0 )
+             BlockStateBase<address_traits>::get_root_offset( blk_raw ) != blk_idx )
         {
             ManagerT::_last_error = PmmError::InvalidPointer;
             return nullptr;
         }
+        const std::uint16_t node_type = BlockStateBase<address_traits>::get_node_type( blk_raw );
+        if ( node_type != pmm::kNodeReadWrite && node_type != pmm::kNodeReadOnly )
+        {
+            ManagerT::_last_error = PmmError::InvalidPointer;
+            return nullptr;
+        }
+        T* raw = resolve_unchecked<T>( p );
+        if ( raw == nullptr )
+            return nullptr;
         ManagerT::_last_error = PmmError::Ok;
         return raw;
     }
