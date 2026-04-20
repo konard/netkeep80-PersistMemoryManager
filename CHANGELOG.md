@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [0.57.5] - 2026-04-20
+
+### Fixed
+- Made `save_manager()` write a locked snapshot without mutating the live CRC field, and flush the temp file plus parent directory for crash-durable saves.
+
+
 ## [0.57.4] - 2026-04-20
 
 ### Fixed
