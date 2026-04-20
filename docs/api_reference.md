@@ -777,8 +777,14 @@ namespace pmm {
 }
 ```
 
-Saves the entire managed memory image to a binary file. Since all metadata uses offsets
-from the buffer start, the image can be loaded at any base address.
+Saves the entire managed memory image to a binary file. `save_manager()` takes
+the manager lock, copies a stable snapshot, computes CRC32 on that copy, and
+does not mutate the live manager header while saving. Since all metadata uses
+offsets from the buffer start, the image can be loaded at any base address.
+
+The save path writes `filename.tmp`, flushes it to stable storage, atomically
+renames it to `filename`, and fsyncs the parent directory where the platform
+supports that operation.
 
 **Parameters:**
 - `filename` — path to output file. Must not be `nullptr`.

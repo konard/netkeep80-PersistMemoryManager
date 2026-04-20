@@ -37,6 +37,62 @@ static void cleanup_file( const char* path = TEST_FILE )
     std::remove( tmp.c_str() );
 }
 
+struct CountingLock
+{
+    static inline int shared_lock_count = 0;
+    static inline int unique_lock_count = 0;
+
+    static void reset() noexcept
+    {
+        shared_lock_count = 0;
+        unique_lock_count = 0;
+    }
+
+    struct mutex_type
+    {
+        void lock() noexcept { ++unique_lock_count; }
+        void unlock() noexcept {}
+        void lock_shared() noexcept { ++shared_lock_count; }
+        void unlock_shared() noexcept {}
+        bool try_lock() noexcept
+        {
+            lock();
+            return true;
+        }
+        bool try_lock_shared() noexcept
+        {
+            lock_shared();
+            return true;
+        }
+    };
+
+    struct shared_lock_type
+    {
+        explicit shared_lock_type( mutex_type& mutex ) noexcept : _mutex( &mutex ) { _mutex->lock_shared(); }
+        ~shared_lock_type() { _mutex->unlock_shared(); }
+
+        shared_lock_type( const shared_lock_type& )            = delete;
+        shared_lock_type& operator=( const shared_lock_type& ) = delete;
+
+      private:
+        mutex_type* _mutex;
+    };
+
+    struct unique_lock_type
+    {
+        explicit unique_lock_type( mutex_type& mutex ) noexcept : _mutex( &mutex ) { _mutex->lock(); }
+        ~unique_lock_type() { _mutex->unlock(); }
+
+        unique_lock_type( const unique_lock_type& )            = delete;
+        unique_lock_type& operator=( const unique_lock_type& ) = delete;
+
+      private:
+        mutex_type* _mutex;
+    };
+};
+
+using SaveSnapshotConfig = pmm::BasicConfig<pmm::DefaultAddressTraits, CountingLock>;
+
 // =============================================================================
 // 2.1: CRC32 checksum
 // =============================================================================
@@ -68,11 +124,22 @@ TEST_CASE( "crc32_save_load_roundtrip", "[test_issue43_phase2_persistence]" )
 
     REQUIRE( pmm::save_manager<M1>( TEST_FILE ) );
 
-    // Verify CRC32 was written to the header
+    // Verify CRC32 was written to the saved image, not to the live header.
     {
         std::uint8_t* base = M1::backend().base_ptr();
         auto*         hdr  = pmm::detail::manager_header_at<pmm::DefaultAddressTraits>( base );
-        REQUIRE( hdr->crc32 != 0 );
+        REQUIRE( hdr->crc32 == 0 );
+
+        std::FILE* f = std::fopen( TEST_FILE, "rb" );
+        REQUIRE( f != nullptr );
+        constexpr std::size_t kHdrOffset = pmm::detail::manager_header_offset_bytes_v<pmm::DefaultAddressTraits>;
+        constexpr std::size_t kCrcOffset =
+            kHdrOffset + offsetof( pmm::detail::ManagerHeader<pmm::DefaultAddressTraits>, crc32 );
+        REQUIRE( std::fseek( f, static_cast<long>( kCrcOffset ), SEEK_SET ) == 0 );
+        std::uint32_t stored_crc = 0;
+        REQUIRE( std::fread( &stored_crc, sizeof( stored_crc ), 1, f ) == 1 );
+        REQUIRE( std::fclose( f ) == 0 );
+        REQUIRE( stored_crc != 0 );
     }
     M1::destroy();
 
@@ -339,6 +406,43 @@ TEST_CASE( "image_crc32_ignores_crc_field", "[test_issue43_phase2_persistence]" 
     REQUIRE( crc_a != 0 );
 
     M::destroy();
+}
+
+/// @brief save_manager snapshots under the manager lock and does not mutate live CRC.
+TEST_CASE( "save_manager_uses_locked_snapshot_without_live_crc_mutation", "[test_issue43_phase2_persistence]" )
+{
+    using M     = pmm::PersistMemoryManager<SaveSnapshotConfig, 2301>;
+    using MLoad = pmm::PersistMemoryManager<SaveSnapshotConfig, 2302>;
+
+    cleanup_file();
+    REQUIRE( M::create( 16 * 1024 ) );
+    auto p = M::allocate_typed<std::uint8_t>( 128 );
+    REQUIRE( !p.is_null() );
+    std::memset( p.resolve(), 0x5A, 128 );
+
+    std::uint8_t* base = M::backend().base_ptr();
+    auto*         hdr  = pmm::detail::manager_header_at<pmm::DefaultAddressTraits>( base );
+    hdr->crc32         = 0xA5A5A5A5U;
+
+    CountingLock::reset();
+    REQUIRE( pmm::save_manager<M>( TEST_FILE ) );
+
+    REQUIRE( ( CountingLock::shared_lock_count + CountingLock::unique_lock_count ) > 0 );
+    REQUIRE( hdr->crc32 == 0xA5A5A5A5U );
+
+    std::FILE* f = std::fopen( TEST_FILE, "rb" );
+    REQUIRE( f != nullptr );
+    REQUIRE( std::fseek( f, 0, SEEK_END ) == 0 );
+    const long file_size = std::ftell( f );
+    REQUIRE( file_size == static_cast<long>( M::backend().total_size() ) );
+    REQUIRE( std::fclose( f ) == 0 );
+
+    M::destroy();
+    REQUIRE( MLoad::create( 16 * 1024 ) );
+    pmm::VerifyResult result;
+    REQUIRE( pmm::load_manager_from_file<MLoad>( TEST_FILE, result ) );
+    MLoad::destroy();
+    cleanup_file();
 }
 
 // =============================================================================
