@@ -138,6 +138,44 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
     using node_type    = pmap_node<_K, _V>;
     using node_pptr    = typename ManagerT::template pptr<node_type>;
 
+    struct forest_domain_descriptor
+    {
+        using index_type = typename ManagerT::index_type;
+        using node_type  = pmap_node<_K, _V>;
+        using node_pptr  = typename ManagerT::template pptr<node_type>;
+
+        index_type* root_index_slot;
+
+        constexpr explicit forest_domain_descriptor( index_type* root = nullptr ) noexcept : root_index_slot( root ) {}
+
+        static constexpr const char* name() noexcept { return "container/pmap"; }
+
+        index_type root_index() const noexcept { return root_index_slot != nullptr ? *root_index_slot : 0; }
+
+        index_type* root_index_ptr() const noexcept { return root_index_slot; }
+
+        static node_type* resolve_node( node_pptr p ) noexcept { return ManagerT::template resolve<node_type>( p ); }
+
+        static int compare_key( const _K& key, node_pptr cur ) noexcept
+        {
+            node_type* obj = resolve_node( cur );
+            if ( obj == nullptr )
+                return 0;
+            return ( key == obj->key ) ? 0 : ( ( key < obj->key ) ? -1 : 1 );
+        }
+
+        static bool less_node( node_pptr lhs, node_pptr rhs ) noexcept
+        {
+            node_type* lhs_obj = resolve_node( lhs );
+            node_type* rhs_obj = resolve_node( rhs );
+            return lhs_obj != nullptr && rhs_obj != nullptr && lhs_obj->key < rhs_obj->key;
+        }
+
+        static bool validate_node( node_pptr p ) noexcept { return resolve_node( p ) != nullptr; }
+    };
+
+    using forest_domain_policy = detail::ForestDomainOps<forest_domain_descriptor>;
+
     /// @brief Sentinel value for "no node" in TreeNode fields.
     static constexpr index_type no_block = ManagerT::address_traits::no_block;
 
@@ -150,6 +188,16 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
     pmap() noexcept : _root_idx( static_cast<index_type>( 0 ) ) {}
 
     // ─── Методы доступа ───────────────────────────────────────────────────────
+
+    forest_domain_policy forest_domain_ops() noexcept
+    {
+        return forest_domain_policy( forest_domain_descriptor( &_root_idx ) );
+    }
+
+    forest_domain_policy forest_domain_ops() const noexcept
+    {
+        return forest_domain_policy( forest_domain_descriptor( const_cast<index_type*>( &_root_idx ) ) );
+    }
 
     /// @brief Проверить, пуст ли словарь.
     bool empty() const noexcept { return _root_idx == static_cast<index_type>( 0 ); }
@@ -177,8 +225,10 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
      */
     node_pptr insert( const _K& key, const _V& val ) noexcept
     {
+        auto ops = forest_domain_ops();
+
         // Ищем существующий узел.
-        node_pptr existing = _avl_find( key );
+        node_pptr existing = ops.find( key );
         if ( !existing.is_null() )
         {
             // Ключ найден — обновляем значение.
@@ -204,7 +254,7 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
         detail::avl_init_node( new_node );
 
         // Вставляем в AVL-дерево.
-        _avl_insert( new_node );
+        ops.insert( new_node );
 
         return new_node;
     }
@@ -215,7 +265,7 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
      * @param key Ключ для поиска.
      * @return pptr на найденный узел, или нулевой pptr если не найден.
      */
-    node_pptr find( const _K& key ) const noexcept { return _avl_find( key ); }
+    node_pptr find( const _K& key ) const noexcept { return forest_domain_ops().find( key ); }
 
     /**
      * @brief Проверить, содержит ли словарь заданный ключ.
@@ -223,7 +273,7 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
      * @param key Ключ для проверки.
      * @return true если ключ найден.
      */
-    bool contains( const _K& key ) const noexcept { return !_avl_find( key ).is_null(); }
+    bool contains( const _K& key ) const noexcept { return !forest_domain_ops().find( key ).is_null(); }
 
     /**
      * @brief Удалить узел по ключу.
@@ -236,7 +286,7 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
      */
     bool erase( const _K& key ) noexcept
     {
-        node_pptr target = _avl_find( key );
+        node_pptr target = forest_domain_ops().find( key );
         if ( target.is_null() )
             return false;
 
@@ -263,7 +313,7 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
      *
      * Сбрасывает _root_idx, но не освобождает данные в ПАП.
      */
-    void reset() noexcept { _root_idx = static_cast<index_type>( 0 ); }
+    void reset() noexcept { forest_domain_ops().reset_root(); }
 
     // ─── Итератор ───────────────────────────────────────────────
 
@@ -282,43 +332,6 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
 
     /// @brief Конец итерации (sentinel = 0).
     iterator end() const noexcept { return iterator( static_cast<index_type>( 0 ) ); }
-
-    // ─── AVL-дерево (использует встроенные TreeNode-поля каждого узла) ────────
-
-  private:
-    /// @brief Найти узел AVL-дерева с заданным ключом. Возвращает null если не найден.
-    node_pptr _avl_find( const _K& key ) const noexcept
-    {
-        return detail::avl_find<node_pptr>(
-            _root_idx,
-            [&]( node_pptr cur ) -> int
-            {
-                node_type* obj = ManagerT::template resolve<node_type>( cur );
-                if ( obj == nullptr )
-                    return 0;
-                if ( key == obj->key )
-                    return 0;
-                return ( key < obj->key ) ? -1 : 1;
-            },
-            []( node_pptr p ) -> node_type* { return ManagerT::template resolve<node_type>( p ); } );
-    }
-
-    /// @brief Вставить новый узел в AVL-дерево. Предполагается, что ключ ещё не в дереве.
-    void _avl_insert( node_pptr new_node ) noexcept
-    {
-        node_type* new_obj = ManagerT::template resolve<node_type>( new_node );
-        detail::avl_insert(
-            new_node, _root_idx,
-            [&]( node_pptr cur ) -> bool
-            {
-                node_type* obj = ManagerT::template resolve<node_type>( cur );
-                return ( obj != nullptr ) && ( new_obj->key < obj->key );
-            },
-            []( node_pptr p ) -> node_type* { return ManagerT::template resolve<node_type>( p ); } );
-    }
-
-    // _subtree_count and _clear_subtree replaced by shared
-    // detail::avl_subtree_count and detail::avl_clear_subtree.
 };
 
 } // namespace pmm

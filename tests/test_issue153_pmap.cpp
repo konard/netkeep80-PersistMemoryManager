@@ -78,6 +78,40 @@ TEST_CASE( "    insert single key-value pair", "[test_issue153_pmap]" )
     TestMgr::destroy();
 }
 
+/// @brief pmap exposes the same minimal forest-domain descriptor/ops contract as other AVL-backed domains.
+TEST_CASE( "    forest-domain descriptor drives pmap dictionary", "[test_issue153_pmap][issue335]" )
+{
+    using Map    = TestMgr::pmap<int, int>;
+    using Domain = Map::forest_domain_descriptor;
+    static_assert( pmm::detail::ForestDomainDescriptor<Domain> );
+    static_assert( pmm::detail::ForestDomainDescriptorForKey<Domain, int> );
+
+    TestMgr::destroy();
+    REQUIRE( TestMgr::create( 64 * 1024 ) );
+
+    Map  map;
+    auto ops = map.forest_domain_ops();
+
+    REQUIRE( std::strcmp( ops.name(), "container/pmap" ) == 0 );
+    REQUIRE( ops.root_index() == static_cast<TestMgr::index_type>( 0 ) );
+    REQUIRE( ops.root_index_ptr() == &map._root_idx );
+
+    auto p10 = map.insert( 10, 100 );
+    auto p20 = map.insert( 20, 200 );
+    REQUIRE( ( !p10.is_null() && !p20.is_null() ) );
+
+    REQUIRE( ops.root_index() != static_cast<TestMgr::index_type>( 0 ) );
+    REQUIRE( ops.find( 10 ) == p10 );
+    REQUIRE( ops.find( 20 ) == p20 );
+    REQUIRE( ops.find( 30 ).is_null() );
+
+    REQUIRE( ops.reset_root() );
+    REQUIRE( map.empty() );
+    REQUIRE( ops.root_index() == static_cast<TestMgr::index_type>( 0 ) );
+
+    TestMgr::destroy();
+}
+
 /// @brief insert() with multiple distinct keys.
 TEST_CASE( "    insert multiple distinct keys", "[test_issue153_pmap]" )
 {

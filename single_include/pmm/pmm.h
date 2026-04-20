@@ -3181,27 +3181,33 @@ static void avl_insert( PPtr new_node, IndexType& root_idx, GoLeftFn&& go_left, 
     avl_rebalance_up( parent, root_idx, update_node );
 }
 
-// ─── Forest-domain descriptor/policy seam ────────────────────────────────────
+// ─── Forest-domain protocol ──────────────────────────────────────────────────
 
-template <typename Domain, typename Key>
-concept ForestDomainDescriptorForKey = requires( typename Domain::node_pptr p, const Key& key ) {
+template <typename Domain>
+concept ForestDomainDescriptor = requires( Domain domain, typename Domain::node_pptr p ) {
     typename Domain::index_type;
     typename Domain::node_type;
     typename Domain::node_pptr;
-    { Domain::name() } -> std::convertible_to<const char*>;
-    { Domain::root_index() } -> std::convertible_to<typename Domain::index_type>;
-    { Domain::root_index_ptr() } -> std::same_as<typename Domain::index_type*>;
-    { Domain::resolve_node( p ) } -> std::convertible_to<typename Domain::node_type*>;
-    { Domain::compare_key( key, p ) } -> std::convertible_to<int>;
-    { Domain::less_node( p, p ) } -> std::convertible_to<bool>;
+    { domain.name() } -> std::convertible_to<const char*>;
+    { domain.root_index() } -> std::convertible_to<typename Domain::index_type>;
+    { domain.root_index_ptr() } -> std::same_as<typename Domain::index_type*>;
+    { domain.resolve_node( p ) } -> std::convertible_to<typename Domain::node_type*>;
+    { domain.less_node( p, p ) } -> std::convertible_to<bool>;
 };
 
-template <typename Domain> static bool forest_domain_validate_node( typename Domain::node_pptr p ) noexcept
+template <typename Domain, typename Key>
+concept ForestDomainDescriptorForKey =
+    ForestDomainDescriptor<Domain> && requires( Domain domain, typename Domain::node_pptr p, const Key& key ) {
+        { domain.compare_key( key, p ) } -> std::convertible_to<int>;
+    };
+
+template <typename Domain>
+static bool forest_domain_validate_node( const Domain& domain, typename Domain::node_pptr p ) noexcept
 {
     if constexpr ( requires {
-                       { Domain::validate_node( p ) } -> std::convertible_to<bool>;
+                       { domain.validate_node( p ) } -> std::convertible_to<bool>;
                    } )
-        return Domain::validate_node( p );
+        return domain.validate_node( p );
     else
         return true;
 }
@@ -3209,20 +3215,25 @@ template <typename Domain> static bool forest_domain_validate_node( typename Dom
 /**
  * @brief Generic AVL-backed forest-domain operations for a concrete descriptor.
  *
- * The descriptor owns domain identity, root binding, node resolution, ordering,
- * and optional node validation. This wrapper keeps the AVL substrate reusable
- * without forcing allocator and non-allocator domains into the same runtime type.
+ * The descriptor is the canonical forest-domain protocol: domain identity, root
+ * binding, node resolution, node ordering, optional external-key comparison,
+ * and optional node validation.
  */
-template <typename Domain> struct ForestDomainOps
+template <ForestDomainDescriptor Domain> struct ForestDomainOps
 {
     using index_type = typename Domain::index_type;
+    using node_type  = typename Domain::node_type;
     using node_pptr  = typename Domain::node_pptr;
 
-    static constexpr const char* name() noexcept { return Domain::name(); }
-    static index_type            root_index() noexcept { return Domain::root_index(); }
-    static index_type*           root_index_ptr() noexcept { return Domain::root_index_ptr(); }
+    Domain domain;
 
-    static bool reset_root() noexcept
+    constexpr explicit ForestDomainOps( Domain d = Domain{} ) noexcept : domain( d ) {}
+
+    const char* name() const noexcept { return domain.name(); }
+    index_type  root_index() const noexcept { return domain.root_index(); }
+    index_type* root_index_ptr() const noexcept { return domain.root_index_ptr(); }
+
+    bool reset_root() const noexcept
     {
         index_type* root = root_index_ptr();
         if ( root == nullptr )
@@ -3233,23 +3244,23 @@ template <typename Domain> struct ForestDomainOps
 
     template <typename Key>
         requires ForestDomainDescriptorForKey<Domain, Key>
-    static node_pptr find( const Key& key ) noexcept
+    node_pptr find( const Key& key ) const noexcept
     {
         return avl_find<node_pptr>(
-            Domain::root_index(), [&]( node_pptr cur ) -> int { return Domain::compare_key( key, cur ); },
-            []( node_pptr p ) -> typename Domain::node_type* { return Domain::resolve_node( p ); } );
+            domain.root_index(), [&]( node_pptr cur ) -> int { return domain.compare_key( key, cur ); },
+            [this]( node_pptr p ) -> node_type* { return domain.resolve_node( p ); } );
     }
 
-    static void insert( node_pptr new_node ) noexcept
+    void insert( node_pptr new_node ) const noexcept
     {
-        index_type* root = Domain::root_index_ptr();
+        index_type* root = domain.root_index_ptr();
         if ( root == nullptr || new_node.is_null() )
             return;
-        if ( Domain::resolve_node( new_node ) == nullptr || !forest_domain_validate_node<Domain>( new_node ) )
+        if ( domain.resolve_node( new_node ) == nullptr || !forest_domain_validate_node( domain, new_node ) )
             return;
         avl_insert(
-            new_node, *root, [new_node]( node_pptr cur ) -> bool { return Domain::less_node( new_node, cur ); },
-            []( node_pptr p ) -> typename Domain::node_type* { return Domain::resolve_node( p ); } );
+            new_node, *root, [this, new_node]( node_pptr cur ) -> bool { return domain.less_node( new_node, cur ); },
+            [this]( node_pptr p ) -> node_type* { return domain.resolve_node( p ); } );
     }
 };
 
@@ -6050,6 +6061,44 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
     using node_type    = pmap_node<_K, _V>;
     using node_pptr    = typename ManagerT::template pptr<node_type>;
 
+    struct forest_domain_descriptor
+    {
+        using index_type = typename ManagerT::index_type;
+        using node_type  = pmap_node<_K, _V>;
+        using node_pptr  = typename ManagerT::template pptr<node_type>;
+
+        index_type* root_index_slot;
+
+        constexpr explicit forest_domain_descriptor( index_type* root = nullptr ) noexcept : root_index_slot( root ) {}
+
+        static constexpr const char* name() noexcept { return "container/pmap"; }
+
+        index_type root_index() const noexcept { return root_index_slot != nullptr ? *root_index_slot : 0; }
+
+        index_type* root_index_ptr() const noexcept { return root_index_slot; }
+
+        static node_type* resolve_node( node_pptr p ) noexcept { return ManagerT::template resolve<node_type>( p ); }
+
+        static int compare_key( const _K& key, node_pptr cur ) noexcept
+        {
+            node_type* obj = resolve_node( cur );
+            if ( obj == nullptr )
+                return 0;
+            return ( key == obj->key ) ? 0 : ( ( key < obj->key ) ? -1 : 1 );
+        }
+
+        static bool less_node( node_pptr lhs, node_pptr rhs ) noexcept
+        {
+            node_type* lhs_obj = resolve_node( lhs );
+            node_type* rhs_obj = resolve_node( rhs );
+            return lhs_obj != nullptr && rhs_obj != nullptr && lhs_obj->key < rhs_obj->key;
+        }
+
+        static bool validate_node( node_pptr p ) noexcept { return resolve_node( p ) != nullptr; }
+    };
+
+    using forest_domain_policy = detail::ForestDomainOps<forest_domain_descriptor>;
+
     /// @brief Sentinel value for "no node" in TreeNode fields.
     static constexpr index_type no_block = ManagerT::address_traits::no_block;
 
@@ -6062,6 +6111,16 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
     pmap() noexcept : _root_idx( static_cast<index_type>( 0 ) ) {}
 
     // ─── Методы доступа ───────────────────────────────────────────────────────
+
+    forest_domain_policy forest_domain_ops() noexcept
+    {
+        return forest_domain_policy( forest_domain_descriptor( &_root_idx ) );
+    }
+
+    forest_domain_policy forest_domain_ops() const noexcept
+    {
+        return forest_domain_policy( forest_domain_descriptor( const_cast<index_type*>( &_root_idx ) ) );
+    }
 
     /// @brief Проверить, пуст ли словарь.
     bool empty() const noexcept { return _root_idx == static_cast<index_type>( 0 ); }
@@ -6089,8 +6148,10 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
      */
     node_pptr insert( const _K& key, const _V& val ) noexcept
     {
+        auto ops = forest_domain_ops();
+
         // Ищем существующий узел.
-        node_pptr existing = _avl_find( key );
+        node_pptr existing = ops.find( key );
         if ( !existing.is_null() )
         {
             // Ключ найден — обновляем значение.
@@ -6116,7 +6177,7 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
         detail::avl_init_node( new_node );
 
         // Вставляем в AVL-дерево.
-        _avl_insert( new_node );
+        ops.insert( new_node );
 
         return new_node;
     }
@@ -6127,7 +6188,7 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
      * @param key Ключ для поиска.
      * @return pptr на найденный узел, или нулевой pptr если не найден.
      */
-    node_pptr find( const _K& key ) const noexcept { return _avl_find( key ); }
+    node_pptr find( const _K& key ) const noexcept { return forest_domain_ops().find( key ); }
 
     /**
      * @brief Проверить, содержит ли словарь заданный ключ.
@@ -6135,7 +6196,7 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
      * @param key Ключ для проверки.
      * @return true если ключ найден.
      */
-    bool contains( const _K& key ) const noexcept { return !_avl_find( key ).is_null(); }
+    bool contains( const _K& key ) const noexcept { return !forest_domain_ops().find( key ).is_null(); }
 
     /**
      * @brief Удалить узел по ключу.
@@ -6148,7 +6209,7 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
      */
     bool erase( const _K& key ) noexcept
     {
-        node_pptr target = _avl_find( key );
+        node_pptr target = forest_domain_ops().find( key );
         if ( target.is_null() )
             return false;
 
@@ -6175,7 +6236,7 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
      *
      * Сбрасывает _root_idx, но не освобождает данные в ПАП.
      */
-    void reset() noexcept { _root_idx = static_cast<index_type>( 0 ); }
+    void reset() noexcept { forest_domain_ops().reset_root(); }
 
     // ─── Итератор ───────────────────────────────────────────────
 
@@ -6194,43 +6255,6 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
 
     /// @brief Конец итерации (sentinel = 0).
     iterator end() const noexcept { return iterator( static_cast<index_type>( 0 ) ); }
-
-    // ─── AVL-дерево (использует встроенные TreeNode-поля каждого узла) ────────
-
-  private:
-    /// @brief Найти узел AVL-дерева с заданным ключом. Возвращает null если не найден.
-    node_pptr _avl_find( const _K& key ) const noexcept
-    {
-        return detail::avl_find<node_pptr>(
-            _root_idx,
-            [&]( node_pptr cur ) -> int
-            {
-                node_type* obj = ManagerT::template resolve<node_type>( cur );
-                if ( obj == nullptr )
-                    return 0;
-                if ( key == obj->key )
-                    return 0;
-                return ( key < obj->key ) ? -1 : 1;
-            },
-            []( node_pptr p ) -> node_type* { return ManagerT::template resolve<node_type>( p ); } );
-    }
-
-    /// @brief Вставить новый узел в AVL-дерево. Предполагается, что ключ ещё не в дереве.
-    void _avl_insert( node_pptr new_node ) noexcept
-    {
-        node_type* new_obj = ManagerT::template resolve<node_type>( new_node );
-        detail::avl_insert(
-            new_node, _root_idx,
-            [&]( node_pptr cur ) -> bool
-            {
-                node_type* obj = ManagerT::template resolve<node_type>( cur );
-                return ( obj != nullptr ) && ( new_obj->key < obj->key );
-            },
-            []( node_pptr p ) -> node_type* { return ManagerT::template resolve<node_type>( p ); } );
-    }
-
-    // _subtree_count and _clear_subtree replaced by shared
-    // detail::avl_subtree_count and detail::avl_clear_subtree.
 };
 
 } // namespace pmm
@@ -7237,13 +7261,13 @@ template <typename ManagerT> struct pstringview
         static index_type root_index() noexcept
         {
             auto* domain = ManagerT::symbol_domain_record_unlocked();
-            return ( domain != nullptr ) ? domain->root_offset : static_cast<index_type>( 0 );
+            return ManagerT::forest_domain_root_index_unlocked( domain );
         }
 
         static index_type* root_index_ptr() noexcept
         {
             auto* domain = ManagerT::symbol_domain_record_unlocked();
-            return ( domain != nullptr ) ? &domain->root_offset : nullptr;
+            return ManagerT::forest_domain_root_index_ptr_unlocked( domain );
         }
 
         static node_type* resolve_node( node_pptr p ) noexcept { return ManagerT::template resolve<node_type>( p ); }
@@ -7267,6 +7291,8 @@ template <typename ManagerT> struct pstringview
     };
 
     using forest_domain_policy = detail::ForestDomainOps<forest_domain_descriptor>;
+
+    static forest_domain_policy forest_domain_ops() noexcept { return forest_domain_policy{}; }
 
     std::uint32_t length; ///< Длина строки (без нулевого терминатора)
     char          str[1]; ///< Строковые данные (flexible array member pattern)
@@ -7364,7 +7390,7 @@ template <typename ManagerT> struct pstringview
         if ( !ManagerT::is_initialized() )
             return;
         typename ManagerT::thread_policy::unique_lock_type lock( ManagerT::_mutex );
-        forest_domain_policy::reset_root();
+        forest_domain_ops().reset_root();
     }
 
     /// @brief Текущий persistent root словаря интернирования; 0 = пустое дерево.
@@ -7373,7 +7399,7 @@ template <typename ManagerT> struct pstringview
         if ( !ManagerT::is_initialized() )
             return static_cast<index_type>( 0 );
         typename ManagerT::thread_policy::shared_lock_type lock( ManagerT::_mutex );
-        return forest_domain_policy::root_index();
+        return forest_domain_ops().root_index();
     }
 
     // Public destructor required for stack-temporary construction via pstringview<Mgr>("hello").
@@ -7389,8 +7415,10 @@ template <typename ManagerT> struct pstringview
         if ( s == nullptr )
             s = "";
 
+        auto ops = forest_domain_ops();
+
         // Ищем в AVL-дереве.
-        psview_pptr found = _avl_find( s );
+        psview_pptr found = ops.find( s );
         if ( !found.is_null() )
             return found;
 
@@ -7448,18 +7476,10 @@ template <typename ManagerT> struct pstringview
         ManagerT::lock_block_permanent( obj );
 
         // Вставляем в AVL-дерево.
-        _avl_insert( new_node );
+        ops.insert( new_node );
 
         return new_node;
     }
-
-    // ─── AVL-дерево (использует встроенные TreeNode-поля каждого pstringview-блока) ─
-
-    /// @brief Найти узел AVL-дерева с заданной строкой. Возвращает null если не найден.
-    static psview_pptr _avl_find( const char* s ) noexcept { return forest_domain_policy::find( s ); }
-
-    /// @brief Вставить новый узел в AVL-дерево. Предполагается, что строка ещё не в дереве.
-    static void _avl_insert( psview_pptr new_node ) noexcept { forest_domain_policy::insert( new_node ); }
 };
 
 } // namespace pmm
@@ -8382,7 +8402,8 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         typename thread_policy::unique_lock_type lock( _mutex );
         if ( !_initialized )
             return;
-        set_legacy_root_offset_unlocked( p.is_null() ? static_cast<index_type>( 0 ) : p.offset() );
+        set_forest_domain_root_index_unlocked( find_domain_by_name_unlocked( detail::kServiceNameLegacyRoot ),
+                                               p.is_null() ? static_cast<index_type>( 0 ) : p.offset() );
     }
 
     /**
@@ -8396,7 +8417,8 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         typename thread_policy::shared_lock_type lock( _mutex );
         if ( !_initialized )
             return pptr<T>();
-        index_type legacy_root = get_legacy_root_offset_unlocked();
+        index_type legacy_root =
+            forest_domain_root_index_unlocked( find_domain_by_name_unlocked( detail::kServiceNameLegacyRoot ) );
         if ( legacy_root == static_cast<index_type>( 0 ) )
             return pptr<T>();
         return pptr<T>( legacy_root );
@@ -8452,7 +8474,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         if ( !_initialized )
             return 0;
         const forest_domain* rec = find_domain_by_name_unlocked( name );
-        return domain_root_offset_unlocked( rec, get_header_c( _backend.base_ptr() ) );
+        return forest_domain_root_index_unlocked( rec );
     }
 
     static index_type get_domain_root_offset( index_type binding_id ) noexcept
@@ -8461,7 +8483,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         if ( !_initialized )
             return 0;
         const forest_domain* rec = find_domain_by_binding_unlocked( binding_id );
-        return domain_root_offset_unlocked( rec, get_header_c( _backend.base_ptr() ) );
+        return forest_domain_root_index_unlocked( rec );
     }
 
     static index_type get_domain_root_offset( pptr<pstringview> symbol ) noexcept
@@ -8470,7 +8492,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         if ( !_initialized )
             return 0;
         const forest_domain* rec = find_domain_by_symbol_unlocked( symbol );
-        return domain_root_offset_unlocked( rec, get_header_c( _backend.base_ptr() ) );
+        return forest_domain_root_index_unlocked( rec );
     }
 
     template <typename T> static pptr<T> get_domain_root( const char* name ) noexcept
@@ -8497,10 +8519,8 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         if ( !_initialized )
             return false;
         forest_domain* rec = find_domain_by_name_unlocked( name );
-        if ( rec == nullptr || rec->binding_kind != detail::kForestBindingDirectRoot )
-            return false;
-        rec->root_offset = root.is_null() ? static_cast<index_type>( 0 ) : root.offset();
-        return true;
+        return set_forest_domain_root_index_unlocked( rec,
+                                                      root.is_null() ? static_cast<index_type>( 0 ) : root.offset() );
     }
 
     // ─── Методы доступа к полям AVL-узла блока ─────────────
@@ -9034,9 +9054,10 @@ static forest_domain* find_domain_by_symbol_unlocked( pptr<pstringview> symbol )
     return nullptr;
 }
 
-static index_type domain_root_offset_unlocked( const forest_domain*                         rec,
-                                               const detail::ManagerHeader<address_traits>* hdr ) noexcept
+static index_type forest_domain_root_index_unlocked( const forest_domain* rec ) noexcept
 {
+    const detail::ManagerHeader<address_traits>* hdr =
+        ( _backend.base_ptr() != nullptr ) ? get_header_c( _backend.base_ptr() ) : nullptr;
     if ( rec == nullptr || hdr == nullptr )
         return 0;
     if ( rec->binding_kind == detail::kForestBindingFreeTree )
@@ -9044,32 +9065,27 @@ static index_type domain_root_offset_unlocked( const forest_domain*             
     return rec->root_offset;
 }
 
-// ─── Legacy root helpers ──────────────────────────────────────────────────────
-
-static index_type get_legacy_root_offset_unlocked() noexcept
+static index_type* forest_domain_root_index_ptr_unlocked( forest_domain* rec ) noexcept
 {
-    const forest_domain* rec = find_domain_by_name_unlocked( detail::kServiceNameLegacyRoot );
-    return domain_root_offset_unlocked( rec, get_header_c( _backend.base_ptr() ) );
+    if ( rec == nullptr || rec->binding_kind != detail::kForestBindingDirectRoot )
+        return nullptr;
+    return &rec->root_offset;
 }
 
-static void set_legacy_root_offset_unlocked( index_type off ) noexcept
+static bool set_forest_domain_root_index_unlocked( forest_domain* rec, index_type root ) noexcept
 {
-    forest_domain* rec = find_domain_by_name_unlocked( detail::kServiceNameLegacyRoot );
-    if ( rec != nullptr && rec->binding_kind == detail::kForestBindingDirectRoot )
-        rec->root_offset = off;
+    index_type* root_ptr = forest_domain_root_index_ptr_unlocked( rec );
+    if ( root_ptr == nullptr )
+        return false;
+    *root_ptr = root;
+    return true;
 }
 
-// ─── Symbol domain helpers ────────────────────────────────────────────────────
+// ─── Canonical system domain records ─────────────────────────────────────────
 
 static forest_domain* symbol_domain_record_unlocked() noexcept
 {
     return find_domain_by_name_unlocked( detail::kSystemDomainSymbols );
-}
-
-static index_type symbol_domain_root_offset_unlocked() noexcept
-{
-    forest_domain* rec = symbol_domain_record_unlocked();
-    return ( rec != nullptr ) ? rec->root_offset : static_cast<index_type>( 0 );
 }
 
 // ─── Domain registration ─────────────────────────────────────────────────────
@@ -9128,11 +9144,11 @@ static pptr<pstringview> intern_symbol_unlocked( const char* s ) noexcept
     if ( s == nullptr )
         s = "";
 
-    using symbol_policy = typename pstringview::forest_domain_policy;
-    if ( symbol_policy::root_index_ptr() == nullptr )
+    auto symbol_policy = pstringview::forest_domain_ops();
+    if ( symbol_policy.root_index_ptr() == nullptr )
         return pptr<pstringview>();
 
-    pptr<pstringview> found = symbol_policy::find( s );
+    pptr<pstringview> found = symbol_policy.find( s );
     if ( !found.is_null() )
         return found;
 
@@ -9158,7 +9174,7 @@ static pptr<pstringview> intern_symbol_unlocked( const char* s ) noexcept
     if ( !lock_block_permanent_unlocked( public_raw ) )
         return pptr<pstringview>();
 
-    symbol_policy::insert( new_node );
+    symbol_policy.insert( new_node );
 
     return new_node;
 }
@@ -9324,7 +9340,7 @@ static bool validate_bootstrap_invariants_unlocked() noexcept
     if ( free_rec->binding_kind != detail::kForestBindingFreeTree )
         return false;
     // 5. Symbol dictionary root is non-zero (at least bootstrap symbols exist)
-    if ( symbol_domain_root_offset_unlocked() == 0 )
+    if ( pstringview::forest_domain_ops().root_index() == 0 )
         return false;
     // 6. Registry domain root matches header root_offset
     const forest_domain* reg_rec = find_domain_by_name_unlocked( detail::kSystemDomainRegistry );
@@ -9353,7 +9369,8 @@ static bool validate_or_bootstrap_forest_registry_unlocked() noexcept
                                         detail::kForestBindingFreeTree, 0 ) )
             return false;
         if ( !register_domain_unlocked( detail::kSystemDomainSymbols, detail::kForestDomainFlagSystem,
-                                        detail::kForestBindingDirectRoot, symbol_domain_root_offset_unlocked() ) )
+                                        detail::kForestBindingDirectRoot,
+                                        pstringview::forest_domain_ops().root_index() ) )
             return false;
         if ( !register_domain_unlocked( detail::kSystemDomainRegistry, detail::kForestDomainFlagSystem,
                                         detail::kForestBindingDirectRoot, hdr->root_offset ) )
