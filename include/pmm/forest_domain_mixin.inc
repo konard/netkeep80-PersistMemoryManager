@@ -515,15 +515,18 @@ static pmm::Block<address_traits>* find_block_from_user_ptr( void* ptr ) noexcep
     {
         constexpr std::size_t rounded_header_size =
             static_cast<std::size_t>( kBlockHdrGranules ) * address_traits::granule_size;
+        constexpr std::size_t min_public_user_offset =
+            static_cast<std::size_t>( kFreeBlkIdxLayout + kBlockHdrGranules ) * address_traits::granule_size;
         if ( ptr != nullptr && base != nullptr )
         {
             auto* raw = static_cast<std::uint8_t*>( ptr );
-            if ( raw >= base + rounded_header_size && raw < base + static_cast<std::size_t>( hdr->total_size ) )
+            if ( raw >= base + min_public_user_offset && raw < base + static_cast<std::size_t>( hdr->total_size ) )
             {
                 std::uint8_t* cand = raw - rounded_header_size;
                 if ( ( static_cast<std::size_t>( cand - base ) % address_traits::granule_size ) == 0 &&
                      cand + sizeof( Block<address_traits> ) <= base + static_cast<std::size_t>( hdr->total_size ) &&
-                     BlockStateBase<address_traits>::get_weight( cand ) != 0 )
+                     detail::is_canonical_allocated_block_header<address_traits>(
+                         base, static_cast<std::size_t>( hdr->total_size ), cand ) )
                     return reinterpret_cast<pmm::Block<address_traits>*>( cand );
             }
         }
@@ -541,15 +544,18 @@ static const pmm::Block<address_traits>* find_block_from_user_ptr( const void* p
     {
         constexpr std::size_t rounded_header_size =
             static_cast<std::size_t>( kBlockHdrGranules ) * address_traits::granule_size;
+        constexpr std::size_t min_public_user_offset =
+            static_cast<std::size_t>( kFreeBlkIdxLayout + kBlockHdrGranules ) * address_traits::granule_size;
         if ( ptr != nullptr && base != nullptr )
         {
             const auto* raw = static_cast<const std::uint8_t*>( ptr );
-            if ( raw >= base + rounded_header_size && raw < base + static_cast<std::size_t>( hdr->total_size ) )
+            if ( raw >= base + min_public_user_offset && raw < base + static_cast<std::size_t>( hdr->total_size ) )
             {
                 const std::uint8_t* cand = raw - rounded_header_size;
                 if ( ( static_cast<std::size_t>( cand - base ) % address_traits::granule_size ) == 0 &&
                      cand + sizeof( Block<address_traits> ) <= base + static_cast<std::size_t>( hdr->total_size ) &&
-                     BlockStateBase<address_traits>::get_weight( cand ) != 0 )
+                     detail::is_canonical_allocated_block_header<address_traits>(
+                         base, static_cast<std::size_t>( hdr->total_size ), cand ) )
                     return reinterpret_cast<const pmm::Block<address_traits>*>( cand );
             }
         }
