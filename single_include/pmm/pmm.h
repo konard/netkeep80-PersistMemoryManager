@@ -2527,22 +2527,146 @@ inline void* user_ptr( pmm::Block<AddressTraitsT>* block )
     return reinterpret_cast<std::uint8_t*>( block ) + sizeof( pmm::Block<AddressTraitsT> );
 }
 
-/// @brief O(1) get Block<AddressTraitsT> from user_ptr (ptr - sizeof(Block<AddressTraitsT>)).
+// Canonical public-pointer reconstruction is a manager-structure check, not a
+// payload-byte self-consistency check. This reads first/last anchors plus
+// prev/next neighbor back-links without internal locking; callers must hold the
+// manager lock or otherwise guarantee that block links are stable while this runs.
+template <typename AddressTraitsT>
+inline bool is_block_header_linked_in_canonical_chain( const std::uint8_t*                  base,
+                                                       const ManagerHeader<AddressTraitsT>* hdr, std::size_t total_size,
+                                                       typename AddressTraitsT::index_type cand_idx ) noexcept
+{
+    using BlockState = pmm::BlockStateBase<AddressTraitsT>;
+    using IndexT     = typename AddressTraitsT::index_type;
+
+    if ( base == nullptr || hdr == nullptr )
+        return false;
+    if ( hdr->block_count == 0 || hdr->first_block_offset == AddressTraitsT::no_block )
+        return false;
+
+    if ( !validate_block_index<AddressTraitsT>( total_size, hdr->first_block_offset ) ||
+         !validate_block_index<AddressTraitsT>( total_size, hdr->last_block_offset ) )
+        return false;
+
+    const void*  cand = base + static_cast<std::size_t>( cand_idx ) * AddressTraitsT::granule_size;
+    const IndexT prev = BlockState::get_prev_offset( cand );
+    const IndexT next = BlockState::get_next_offset( cand );
+
+    if ( prev == AddressTraitsT::no_block )
+    {
+        if ( cand_idx != hdr->first_block_offset )
+            return false;
+    }
+    else
+    {
+        if ( !validate_block_index<AddressTraitsT>( total_size, prev ) || prev >= cand_idx )
+            return false;
+        const void* prev_block = base + static_cast<std::size_t>( prev ) * AddressTraitsT::granule_size;
+        if ( BlockState::get_next_offset( prev_block ) != cand_idx )
+            return false;
+    }
+
+    if ( next == AddressTraitsT::no_block )
+    {
+        if ( cand_idx != hdr->last_block_offset )
+            return false;
+    }
+    else
+    {
+        if ( !validate_block_index<AddressTraitsT>( total_size, next ) || next <= cand_idx )
+            return false;
+        const void* next_block = base + static_cast<std::size_t>( next ) * AddressTraitsT::granule_size;
+        if ( BlockState::get_prev_offset( next_block ) != cand_idx )
+            return false;
+    }
+
+    return true;
+}
+
+template <typename AddressTraitsT>
+inline bool is_canonical_allocated_block_header( const std::uint8_t* base, std::size_t total_size,
+                                                 const std::uint8_t* cand_addr ) noexcept
+{
+    using BlockState = pmm::BlockStateBase<AddressTraitsT>;
+    using IndexT     = typename AddressTraitsT::index_type;
+
+    if ( base == nullptr || cand_addr == nullptr )
+        return false;
+
+    const std::uintptr_t base_addr = reinterpret_cast<std::uintptr_t>( base );
+    const std::uintptr_t cand_raw  = reinterpret_cast<std::uintptr_t>( cand_addr );
+    if ( cand_raw < base_addr )
+        return false;
+
+    const std::size_t cand_off = static_cast<std::size_t>( cand_raw - base_addr );
+    if ( cand_off % AddressTraitsT::granule_size != 0 )
+        return false;
+    if ( cand_off / AddressTraitsT::granule_size > static_cast<std::size_t>( std::numeric_limits<IndexT>::max() ) )
+        return false;
+
+    const IndexT cand_idx = static_cast<IndexT>( cand_off / AddressTraitsT::granule_size );
+    if ( !validate_block_index<AddressTraitsT>( total_size, cand_idx ) )
+        return false;
+
+    const IndexT weight = BlockState::get_weight( cand_addr );
+    if ( weight == 0 || BlockState::get_root_offset( cand_addr ) != cand_idx )
+        return false;
+
+    const std::uint16_t node_type = BlockState::get_node_type( cand_addr );
+    if ( node_type != pmm::kNodeReadWrite && node_type != pmm::kNodeReadOnly )
+        return false;
+
+    if ( total_size < manager_header_offset_bytes_v<AddressTraitsT> + sizeof( ManagerHeader<AddressTraitsT> ) )
+        return false;
+
+    const auto* hdr = manager_header_at<AddressTraitsT>( base );
+    if ( hdr->total_size != total_size )
+        return false;
+    if ( !is_block_header_linked_in_canonical_chain<AddressTraitsT>( base, hdr, total_size, cand_idx ) )
+        return false;
+
+    constexpr std::size_t kBlockSize = sizeof( pmm::Block<AddressTraitsT> );
+    if ( cand_off > total_size - kBlockSize )
+        return false;
+    const std::size_t data_start = cand_off + kBlockSize;
+    if ( static_cast<std::size_t>( weight ) >
+         ( std::numeric_limits<std::size_t>::max )() / AddressTraitsT::granule_size )
+        return false;
+    const std::size_t data_bytes = static_cast<std::size_t>( weight ) * AddressTraitsT::granule_size;
+    if ( data_bytes > total_size - data_start )
+        return false;
+
+    return true;
+}
+
+template <typename AddressTraitsT>
+inline bool is_canonical_user_ptr( const std::uint8_t* base, std::size_t total_size, const void* ptr ) noexcept
+{
+    constexpr std::size_t kBlockSize      = sizeof( pmm::Block<AddressTraitsT> );
+    const std::size_t     min_user_offset = kBlockSize + sizeof( ManagerHeader<AddressTraitsT> ) + kBlockSize;
+    if ( !validate_user_ptr<AddressTraitsT>( base, total_size, ptr, min_user_offset ) )
+        return false;
+
+    const auto* raw_ptr   = static_cast<const std::uint8_t*>( ptr );
+    const auto* cand_addr = raw_ptr - kBlockSize;
+    if ( cand_addr + kBlockSize != raw_ptr )
+        return false;
+
+    return is_canonical_allocated_block_header<AddressTraitsT>( base, total_size, cand_addr );
+}
+
+/// @brief O(1) get Block<AddressTraitsT> from canonical user_ptr (ptr - sizeof(Block<AddressTraitsT>)).
+/// @pre Caller holds the manager lock, or block links are otherwise stable for the canonical-chain proof.
 /// Block<AddressTraitsT> is the sole block type.
 /// Unified templated helper replaces the former DefaultAddressTraits-specific overload.
 template <typename AddressTraitsT>
 inline pmm::Block<AddressTraitsT>* header_from_ptr_t( std::uint8_t* base, void* ptr, std::size_t total_size )
 {
-    using BlockState                        = pmm::BlockStateBase<AddressTraitsT>;
     static constexpr std::size_t kBlockSize = sizeof( pmm::Block<AddressTraitsT> );
 
-    const std::size_t min_user_offset = kBlockSize + sizeof( ManagerHeader<AddressTraitsT> ) + kBlockSize;
-    if ( !validate_user_ptr<AddressTraitsT>( base, total_size, ptr, min_user_offset ) )
+    if ( !is_canonical_user_ptr<AddressTraitsT>( base, total_size, ptr ) )
         return nullptr;
-
     std::uint8_t* cand_addr = static_cast<std::uint8_t*>( ptr ) - kBlockSize;
-    if ( BlockState::get_weight( cand_addr ) == 0 )
-        return nullptr;
     return reinterpret_cast<pmm::Block<AddressTraitsT>*>( cand_addr );
 }
 
@@ -7689,23 +7813,33 @@ template <typename ManagerT> class PersistMemoryTypedApi
     template <typename T> static T* resolve_checked( pmm::pptr<T, ManagerT> p ) noexcept
     {
         using address_traits = typename ManagerT::address_traits;
+        using index_type     = typename ManagerT::index_type;
 
-        T*          raw      = resolve_unchecked<T>( p );
-        const void* user_raw = raw;
-        if ( user_raw == nullptr )
+        if ( p.is_null() || !ManagerT::_initialized )
             return nullptr;
-        const void* blk_raw = ManagerT::find_block_from_user_ptr( user_raw );
+
+        const void* blk_raw = ManagerT::template block_raw_ptr_from_pptr<T>( p );
         if ( blk_raw == nullptr )
         {
             ManagerT::_last_error = PmmError::InvalidPointer;
             return nullptr;
         }
+        index_type blk_idx = ManagerT::template block_idx_from_pptr<T>( p );
         if ( BlockStateBase<address_traits>::get_weight( blk_raw ) == 0 ||
-             BlockStateBase<address_traits>::get_root_offset( blk_raw ) == 0 )
+             BlockStateBase<address_traits>::get_root_offset( blk_raw ) != blk_idx )
         {
             ManagerT::_last_error = PmmError::InvalidPointer;
             return nullptr;
         }
+        const std::uint16_t node_type = BlockStateBase<address_traits>::get_node_type( blk_raw );
+        if ( node_type != pmm::kNodeReadWrite && node_type != pmm::kNodeReadOnly )
+        {
+            ManagerT::_last_error = PmmError::InvalidPointer;
+            return nullptr;
+        }
+        T* raw = resolve_unchecked<T>( p );
+        if ( raw == nullptr )
+            return nullptr;
         ManagerT::_last_error = PmmError::Ok;
         return raw;
     }
@@ -8147,6 +8281,8 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
      * @brief Освободить блок по указателю на пользовательские данные.
      *
      * @note Если блок заблокирован навечно (lock_block_permanent), освобождение не выполняется.
+     * @note Raw-pointer reconstruction checks block-chain links; this entry point holds the manager lock so canonical
+     *       validation observes stable prev/next relationships.
      */
     static void deallocate( void* ptr ) noexcept
     {
@@ -8162,6 +8298,9 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
      *
      * @param ptr Указатель на пользовательские данные (тот же, что возвращает allocate()).
      * @return true если блок успешно заблокирован, false если блок не найден или уже свободен.
+     *
+     * @note Raw-pointer reconstruction checks block-chain links; this entry point holds the manager lock so canonical
+     *       validation observes stable prev/next relationships.
      */
     static bool lock_block_permanent( void* ptr ) noexcept
     {
@@ -8174,6 +8313,9 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
      *
      * @param ptr Указатель на пользовательские данные.
      * @return true если блок заблокирован навечно (node_type == kNodeReadOnly).
+     *
+     * @note Raw-pointer reconstruction checks block-chain links; this entry point holds a shared lock so no writer
+     *       mutates prev/next relationships during validation.
      */
     static bool is_permanently_locked( const void* ptr ) noexcept
     {
@@ -8697,6 +8839,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         return nullptr;
     }
 
+    /// @pre Caller must guarantee stable block links, normally by holding the manager lock.
     static void deallocate_unlocked( void* ptr ) noexcept
     {
         if ( !_initialized || ptr == nullptr )
@@ -8724,6 +8867,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         allocator::coalesce( base, hdr, blk_idx );
     }
 
+    /// @pre Caller must guarantee stable block links, normally by holding the manager lock.
     static bool lock_block_permanent_unlocked( void* ptr ) noexcept
     {
         if ( !_initialized || ptr == nullptr )
@@ -9267,6 +9411,7 @@ static void for_each_free_block_inorder( const std::uint8_t* base, const detail:
 }
 
 /// @brief Find the mutable block header for a user-data pointer (or nullptr).
+/// @pre Caller holds the manager lock, or block links are otherwise stable for canonical raw-pointer validation.
 static pmm::Block<address_traits>* find_block_from_user_ptr( void* ptr ) noexcept
 {
     std::uint8_t*                          base = _backend.base_ptr();
@@ -9275,15 +9420,18 @@ static pmm::Block<address_traits>* find_block_from_user_ptr( void* ptr ) noexcep
     {
         constexpr std::size_t rounded_header_size =
             static_cast<std::size_t>( kBlockHdrGranules ) * address_traits::granule_size;
+        constexpr std::size_t min_public_user_offset =
+            static_cast<std::size_t>( kFreeBlkIdxLayout + kBlockHdrGranules ) * address_traits::granule_size;
         if ( ptr != nullptr && base != nullptr )
         {
             auto* raw = static_cast<std::uint8_t*>( ptr );
-            if ( raw >= base + rounded_header_size && raw < base + static_cast<std::size_t>( hdr->total_size ) )
+            if ( raw >= base + min_public_user_offset && raw < base + static_cast<std::size_t>( hdr->total_size ) )
             {
                 std::uint8_t* cand = raw - rounded_header_size;
                 if ( ( static_cast<std::size_t>( cand - base ) % address_traits::granule_size ) == 0 &&
                      cand + sizeof( Block<address_traits> ) <= base + static_cast<std::size_t>( hdr->total_size ) &&
-                     BlockStateBase<address_traits>::get_weight( cand ) != 0 )
+                     detail::is_canonical_allocated_block_header<address_traits>(
+                         base, static_cast<std::size_t>( hdr->total_size ), cand ) )
                     return reinterpret_cast<pmm::Block<address_traits>*>( cand );
             }
         }
@@ -9292,6 +9440,7 @@ static pmm::Block<address_traits>* find_block_from_user_ptr( void* ptr ) noexcep
 }
 
 /// @brief Find the const block header for a user-data pointer.
+/// @pre Caller holds the manager lock, or block links are otherwise stable for canonical raw-pointer validation.
 /// Returns nullptr if ptr is out of range or the block header is invalid.
 static const pmm::Block<address_traits>* find_block_from_user_ptr( const void* ptr ) noexcept
 {
@@ -9301,15 +9450,18 @@ static const pmm::Block<address_traits>* find_block_from_user_ptr( const void* p
     {
         constexpr std::size_t rounded_header_size =
             static_cast<std::size_t>( kBlockHdrGranules ) * address_traits::granule_size;
+        constexpr std::size_t min_public_user_offset =
+            static_cast<std::size_t>( kFreeBlkIdxLayout + kBlockHdrGranules ) * address_traits::granule_size;
         if ( ptr != nullptr && base != nullptr )
         {
             const auto* raw = static_cast<const std::uint8_t*>( ptr );
-            if ( raw >= base + rounded_header_size && raw < base + static_cast<std::size_t>( hdr->total_size ) )
+            if ( raw >= base + min_public_user_offset && raw < base + static_cast<std::size_t>( hdr->total_size ) )
             {
                 const std::uint8_t* cand = raw - rounded_header_size;
                 if ( ( static_cast<std::size_t>( cand - base ) % address_traits::granule_size ) == 0 &&
                      cand + sizeof( Block<address_traits> ) <= base + static_cast<std::size_t>( hdr->total_size ) &&
-                     BlockStateBase<address_traits>::get_weight( cand ) != 0 )
+                     detail::is_canonical_allocated_block_header<address_traits>(
+                         base, static_cast<std::size_t>( hdr->total_size ), cand ) )
                     return reinterpret_cast<const pmm::Block<address_traits>*>( cand );
             }
         }
@@ -9329,12 +9481,31 @@ template <typename T> static pptr<T> make_pptr_from_raw( void* raw ) noexcept
         return pptr<T>();
     std::uint8_t* base     = _backend.base_ptr();
     auto*         raw_byte = static_cast<std::uint8_t*>( raw );
-    if ( base == nullptr || raw_byte < base || raw_byte >= base + _backend.total_size() )
+    if ( base == nullptr )
         return pptr<T>();
-    pmm::Block<address_traits>* blk = find_block_from_user_ptr( raw );
-    if ( blk == nullptr )
+    const std::uintptr_t base_addr = reinterpret_cast<std::uintptr_t>( base );
+    const std::uintptr_t raw_addr  = reinterpret_cast<std::uintptr_t>( raw_byte );
+    if ( raw_addr < base_addr )
         return pptr<T>();
-    index_type blk_idx = detail::block_idx_t<address_traits>( base, blk );
+    const std::size_t raw_off = static_cast<std::size_t>( raw_addr - base_addr );
+    if ( raw_off < sizeof( Block<address_traits> ) || raw_off >= _backend.total_size() )
+        return pptr<T>();
+    const std::size_t blk_off = raw_off - sizeof( Block<address_traits> );
+    if ( blk_off % address_traits::granule_size != 0 )
+        return pptr<T>();
+    const std::size_t blk_idx_raw = blk_off / address_traits::granule_size;
+    if ( blk_idx_raw > static_cast<std::size_t>( std::numeric_limits<index_type>::max() ) )
+        return pptr<T>();
+    index_type blk_idx = static_cast<index_type>( blk_idx_raw );
+    if ( !detail::validate_block_index<address_traits>( _backend.total_size(), blk_idx ) )
+        return pptr<T>();
+    const void* blk = detail::block_at<address_traits>( base, blk_idx );
+    if ( BlockStateBase<address_traits>::get_weight( blk ) == 0 ||
+         BlockStateBase<address_traits>::get_root_offset( blk ) != blk_idx )
+        return pptr<T>();
+    const std::uint16_t node_type = BlockStateBase<address_traits>::get_node_type( blk );
+    if ( node_type != pmm::kNodeReadWrite && node_type != pmm::kNodeReadOnly )
+        return pptr<T>();
     if ( blk_idx > std::numeric_limits<index_type>::max() - kBlockHdrGranules )
         return pptr<T>();
     return pptr<T>( static_cast<index_type>( blk_idx + kBlockHdrGranules ) );

@@ -306,6 +306,9 @@ target_compile_definitions(test_issue318_manager_header_compaction PRIVATE PMM_S
 # ─── Issue 325: manager-header offset consistency for CRC/save/load ─
 pmm_add_test(test_issue325_manager_header_offset test_issue325_manager_header_offset.cpp)
 
+# ─── Issue 326: forged user-pointer reconstruction guard ───────────
+pmm_add_test(test_issue326_user_ptr_validation test_issue326_user_ptr_validation.cpp)
+
 # ─── Issue 314: build graph compaction contract ─────────────────
 add_test(
     NAME test_issue314_build_graph_contract

@@ -436,6 +436,8 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
      * @brief Освободить блок по указателю на пользовательские данные.
      *
      * @note Если блок заблокирован навечно (lock_block_permanent), освобождение не выполняется.
+     * @note Raw-pointer reconstruction checks block-chain links; this entry point holds the manager lock so canonical
+     *       validation observes stable prev/next relationships.
      */
     static void deallocate( void* ptr ) noexcept
     {
@@ -451,6 +453,9 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
      *
      * @param ptr Указатель на пользовательские данные (тот же, что возвращает allocate()).
      * @return true если блок успешно заблокирован, false если блок не найден или уже свободен.
+     *
+     * @note Raw-pointer reconstruction checks block-chain links; this entry point holds the manager lock so canonical
+     *       validation observes stable prev/next relationships.
      */
     static bool lock_block_permanent( void* ptr ) noexcept
     {
@@ -463,6 +468,9 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
      *
      * @param ptr Указатель на пользовательские данные.
      * @return true если блок заблокирован навечно (node_type == kNodeReadOnly).
+     *
+     * @note Raw-pointer reconstruction checks block-chain links; this entry point holds a shared lock so no writer
+     *       mutates prev/next relationships during validation.
      */
     static bool is_permanently_locked( const void* ptr ) noexcept
     {
@@ -986,6 +994,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         return nullptr;
     }
 
+    /// @pre Caller must guarantee stable block links, normally by holding the manager lock.
     static void deallocate_unlocked( void* ptr ) noexcept
     {
         if ( !_initialized || ptr == nullptr )
@@ -1013,6 +1022,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         allocator::coalesce( base, hdr, blk_idx );
     }
 
+    /// @pre Caller must guarantee stable block links, normally by holding the manager lock.
     static bool lock_block_permanent_unlocked( void* ptr ) noexcept
     {
         if ( !_initialized || ptr == nullptr )
