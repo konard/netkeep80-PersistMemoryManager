@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <vector>
 
 namespace
 {
@@ -45,10 +46,18 @@ template <typename MgrSave, typename MgrLoad> void require_roundtrip( const char
     auto saved_offset = saved.offset();
     REQUIRE( pmm::save_manager<MgrSave>( filename ) );
 
-    using address_traits             = typename MgrSave::address_traits;
-    const std::uint8_t* data         = MgrSave::backend().base_ptr();
-    const auto*         hdr          = pmm::detail::manager_header_at<address_traits>( data );
-    std::uint32_t       computed_crc = pmm::detail::compute_image_crc32<address_traits>( data, MgrSave::total_size() );
+    using address_traits = typename MgrSave::address_traits;
+    const auto* live_hdr = pmm::detail::manager_header_at<address_traits>( MgrSave::backend().base_ptr() );
+    REQUIRE( live_hdr->crc32 == 0 );
+
+    std::vector<std::uint8_t> image( MgrSave::total_size() );
+    std::FILE*                f = std::fopen( filename, "rb" );
+    REQUIRE( f != nullptr );
+    REQUIRE( std::fread( image.data(), 1, image.size(), f ) == image.size() );
+    REQUIRE( std::fclose( f ) == 0 );
+
+    const auto*   hdr          = pmm::detail::manager_header_at<address_traits>( image.data() );
+    std::uint32_t computed_crc = pmm::detail::compute_image_crc32<address_traits>( image.data(), image.size() );
     INFO( "canonical_crc=" << hdr->crc32 );
     INFO( "computed_crc=" << computed_crc );
     REQUIRE( hdr->crc32 == computed_crc );

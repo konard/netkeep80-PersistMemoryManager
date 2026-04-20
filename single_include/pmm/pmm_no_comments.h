@@ -4920,6 +4920,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
 
     template <typename> friend struct pstringview;
     friend class detail::PersistMemoryTypedApi<manager_type>;
+    template <typename> friend bool save_manager( const char* );
 
     template <typename T> using pptr = pmm::pptr<T, manager_type>;
 
@@ -6400,6 +6401,7 @@ static void verify_forest_registry_unlocked( VerifyResult& result ) noexcept
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <vector>
 
 #if defined( _WIN32 ) || defined( _WIN64 )
 #ifndef WIN32_LEAN_AND_MEAN
@@ -6408,9 +6410,12 @@ static void verify_forest_registry_unlocked( VerifyResult& result ) noexcept
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#include <io.h>
 #include <windows.h>
 #else
 #include <cstdlib> 
+#include <fcntl.h>
+#include <unistd.h>
 #endif
 
 namespace pmm
@@ -6422,9 +6427,58 @@ namespace detail
 inline bool atomic_rename( const char* tmp_path, const char* final_path ) noexcept
 {
 #if defined( _WIN32 ) || defined( _WIN64 )
-    return MoveFileExA( tmp_path, final_path, MOVEFILE_REPLACE_EXISTING ) != 0;
+    return MoveFileExA( tmp_path, final_path, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH ) != 0;
 #else
     return std::rename( tmp_path, final_path ) == 0;
+#endif
+}
+
+inline bool flush_file_to_storage( std::FILE* file ) noexcept
+{
+    if ( file == nullptr )
+        return false;
+    if ( std::fflush( file ) != 0 )
+        return false;
+#if defined( _WIN32 ) || defined( _WIN64 )
+    int fd = ::_fileno( file );
+    return fd >= 0 && ::_commit( fd ) == 0;
+#else
+    int fd = ::fileno( file );
+    return fd >= 0 && ::fsync( fd ) == 0;
+#endif
+}
+
+#if !defined( _WIN32 ) && !defined( _WIN64 )
+inline std::string parent_directory_path( const char* path )
+{
+    std::string value( path );
+    std::size_t slash = value.find_last_of( '/' );
+    if ( slash == std::string::npos )
+        return ".";
+    if ( slash == 0 )
+        return "/";
+    return value.substr( 0, slash );
+}
+#endif
+
+inline bool flush_parent_directory( const char* path )
+{
+#if defined( _WIN32 ) || defined( _WIN64 )
+    (void)path;
+    return true;
+#else
+    std::string parent = parent_directory_path( path );
+    int         flags  = O_RDONLY;
+#ifdef O_DIRECTORY
+    flags |= O_DIRECTORY;
+#endif
+    int fd = ::open( parent.c_str(), flags );
+    if ( fd < 0 )
+        return false;
+    bool ok = ::fsync( fd ) == 0;
+    if ( ::close( fd ) != 0 )
+        ok = false;
+    return ok;
 #endif
 }
 
@@ -6434,32 +6488,39 @@ template <typename MgrT> inline bool save_manager( const char* filename )
 {
     using address_traits = typename MgrT::address_traits;
 
-    if ( filename == nullptr || !MgrT::is_initialized() )
-        return false;
-    std::uint8_t* data  = MgrT::backend().base_ptr();
-    std::size_t   total = MgrT::backend().total_size();
-    if ( data == nullptr || total == 0 )
+    if ( filename == nullptr )
         return false;
 
-    auto* hdr  = detail::manager_header_at<address_traits>( data );
-    hdr->crc32 = 0;
-    hdr->crc32 = detail::compute_image_crc32<address_traits>( data, total );
+    std::vector<std::uint8_t> snapshot;
+    {
+        typename MgrT::thread_policy::shared_lock_type lock( MgrT::_mutex );
+        if ( !MgrT::is_initialized() )
+            return false;
+        const std::uint8_t* data  = MgrT::backend().base_ptr();
+        std::size_t         total = MgrT::backend().total_size();
+        if ( data == nullptr || total == 0 )
+            return false;
+        snapshot.resize( total );
+        std::memcpy( snapshot.data(), data, total );
+    }
+
+    auto* hdr  = detail::manager_header_at<address_traits>( snapshot.data() );
+    hdr->crc32 = detail::compute_image_crc32<address_traits>( snapshot.data(), snapshot.size() );
 
     std::string tmp_path = std::string( filename ) + ".tmp";
 
     std::FILE* f = std::fopen( tmp_path.c_str(), "wb" );
     if ( f == nullptr )
         return false;
-    std::size_t written = std::fwrite( data, 1, total, f );
-    if ( std::fflush( f ) != 0 )
-    {
-        std::fclose( f );
-        std::remove( tmp_path.c_str() );
-        return false;
-    }
-    std::fclose( f );
 
-    if ( written != total )
+    std::size_t written = std::fwrite( snapshot.data(), 1, snapshot.size(), f );
+    bool        ok      = written == snapshot.size();
+    if ( ok )
+        ok = detail::flush_file_to_storage( f );
+    if ( std::fclose( f ) != 0 )
+        ok = false;
+
+    if ( !ok )
     {
         std::remove( tmp_path.c_str() );
         return false;
@@ -6470,6 +6531,8 @@ template <typename MgrT> inline bool save_manager( const char* filename )
         std::remove( tmp_path.c_str() );
         return false;
     }
+    if ( !detail::flush_parent_directory( filename ) )
+        return false;
     return true;
 }
 

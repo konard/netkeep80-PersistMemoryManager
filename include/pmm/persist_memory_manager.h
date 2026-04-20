@@ -106,6 +106,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
 
     template <typename> friend struct pstringview;
     friend class detail::PersistMemoryTypedApi<manager_type>;
+    template <typename> friend bool save_manager( const char* );
 
     /**
      * @brief Вложенный псевдоним персистентного указателя, привязанного к данному менеджеру.

@@ -104,11 +104,13 @@ load path:  read from file → [SEAM: reverse-transform] → PMM image (in-memor
 
 ```
 save_manager<MgrT>(filename):
-  1. Zero hdr->crc32
-  2. Compute CRC32 over entire image
-  3. Store CRC32 in hdr->crc32
-  4. Write image to filename.tmp
-  5. Atomic rename filename.tmp → filename
+  1. Take manager lock
+  2. Copy a stable image snapshot
+  3. Compute CRC32 over snapshot with crc32 logically zero
+  4. Store CRC32 in the snapshot header
+  5. Write and fsync filename.tmp
+  6. Atomic rename filename.tmp → filename
+  7. Fsync parent directory where supported
 
 load_manager_from_file<MgrT>(filename):
   1. Read file into backend buffer
