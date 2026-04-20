@@ -4,7 +4,7 @@
  *
  * Verifies the key requirements from this feature:
  *  1. pmap<_K,_V> implements a persistent AVL tree dictionary in PAP.
- *  2. Nodes are stored in PAP and permanently locked (cannot be freed via deallocate).
+ *  2. Nodes are stored in PAP and can be freed after removal.
  *  3. The dictionary uses built-in TreeNode AVL fields — no separate PAP structures.
  *  4. insert() creates new nodes and updates values for existing keys.
  *  5. find() returns correct pptr for existing keys, null pptr for missing keys.
@@ -44,6 +44,7 @@
 #include <cstring>
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 // ─── Test macros ──────────────────────────────────────────────────────────────
@@ -66,6 +67,9 @@ concept HasConstForestDomainResetRoot = requires( const OpsT& ops ) { ops.reset_
 
 template <typename OpsT>
 concept HasConstForestDomainRootIndexPtr = requires( const OpsT& ops ) { ops.root_index_ptr(); };
+
+template <typename MapT>
+concept HasLocalRootIndex = requires( MapT& map ) { map._root_idx; };
 
 // =============================================================================
 // I153-A: Basic insert and find with int keys
@@ -93,14 +97,15 @@ TEST_CASE( "    insert single key-value pair", "[test_issue153_pmap]" )
     TestMgr::destroy();
 }
 
-/// @brief pmap exposes the same minimal forest-domain descriptor/ops contract as other AVL-backed domains.
-TEST_CASE( "    forest-domain descriptor drives pmap dictionary", "[test_issue153_pmap][issue335]" )
+/// @brief pmap exposes the forest-domain descriptor/ops contract with a domain-owned root.
+TEST_CASE( "    forest-domain descriptor drives pmap dictionary", "[test_issue153_pmap][issue335][issue336]" )
 {
     using Map    = TestMgr::pmap<int, int>;
     using Domain = Map::forest_domain_descriptor;
     static_assert( pmm::detail::ForestDomainDescriptor<Domain> );
     static_assert( pmm::detail::ForestDomainViewDescriptor<Domain> );
     static_assert( pmm::detail::ForestDomainDescriptorForKey<Domain, int> );
+    static_assert( !HasLocalRootIndex<Map> );
     static_assert( !HasConstForestDomainOps<Map> );
     static_assert( HasConstForestDomainViewOps<Map> );
     static_assert( !HasConstForestDomainInsert<Map::forest_domain_policy, Map::node_pptr> );
@@ -113,31 +118,99 @@ TEST_CASE( "    forest-domain descriptor drives pmap dictionary", "[test_issue15
     Map  map;
     auto ops = map.forest_domain_ops();
 
-    REQUIRE( std::strcmp( ops.name(), "container/pmap" ) == 0 );
-    REQUIRE( ops.root_index() == static_cast<TestMgr::index_type>( 0 ) );
-    REQUIRE( ops.root_index_ptr() == &map._root_idx );
+    REQUIRE( std::string_view( ops.name() ).starts_with( "container/pmap/" ) );
+    REQUIRE( std::strcmp( ops.name(), map.domain_name() ) == 0 );
+    REQUIRE( ops.root_index() == 0 );
+    REQUIRE( ops.root_index_ptr() != nullptr );
+    REQUIRE( TestMgr::get_domain_root_offset( ops.name() ) == 0 );
 
     auto p10 = map.insert( 10, 100 );
     auto p20 = map.insert( 20, 200 );
     REQUIRE( ( !p10.is_null() && !p20.is_null() ) );
-
-    REQUIRE( ops.root_index() != static_cast<TestMgr::index_type>( 0 ) );
+    REQUIRE( ops.root_index() != 0 );
+    REQUIRE( TestMgr::get_domain_root_offset( ops.name() ) == ops.root_index() );
     REQUIRE( ops.find( 10 ) == p10 );
-    REQUIRE( ops.find( 20 ) == p20 );
     REQUIRE( ops.find( 30 ).is_null() );
 
-    const Map& const_map = map;
-    auto       view_ops  = const_map.forest_domain_view_ops();
-    REQUIRE( std::strcmp( view_ops.name(), "container/pmap" ) == 0 );
-    REQUIRE( view_ops.root_index() == ops.root_index() );
-    REQUIRE( view_ops.find( 10 ) == p10 );
-    REQUIRE( view_ops.find( 20 ) == p20 );
-    REQUIRE( const_map.find( 10 ) == p10 );
-    REQUIRE( const_map.contains( 20 ) );
+    Map copy = map;
+    REQUIRE( copy.forest_domain_view_ops().root_index() == ops.root_index() );
+    REQUIRE( copy.find( 20 ) == p20 );
+
+    const Map& cmap = map;
+    REQUIRE( std::strcmp( cmap.forest_domain_view_ops().name(), ops.name() ) == 0 );
+    REQUIRE( cmap.find( 10 ) == p10 );
+    REQUIRE( cmap.contains( 20 ) );
 
     REQUIRE( ops.reset_root() );
     REQUIRE( map.empty() );
-    REQUIRE( ops.root_index() == static_cast<TestMgr::index_type>( 0 ) );
+    REQUIRE( copy.empty() );
+    REQUIRE( TestMgr::get_domain_root_offset( ops.name() ) == 0 );
+
+    TestMgr::destroy();
+}
+
+namespace
+{
+// Structurally identical PODs: default trait fingerprint would collide; tag disambiguates.
+struct Issue336TagA
+{
+    std::int64_t payload;
+};
+struct Issue336TagB
+{
+    std::int64_t payload;
+};
+} // namespace
+
+namespace pmm
+{
+template <> struct pmap_type_identity<Issue336TagA>
+{
+    static constexpr const char* tag = "issue336/A";
+};
+template <> struct pmap_type_identity<Issue336TagB>
+{
+    static constexpr const char* tag = "issue336/B";
+};
+} // namespace pmm
+
+/// @brief Distinct maps, node layouts, and pinned type tags all map to distinct domain bindings.
+TEST_CASE( "    pmap domain binding separates identities", "[test_issue153_pmap][issue336]" )
+{
+    TestMgr::destroy();
+    REQUIRE( TestMgr::create( 64 * 1024 ) );
+
+    // Default-constructed facades of the same type get distinct generated bindings.
+    TestMgr::pmap<int, int> a, b;
+    auto                    a_ops = a.forest_domain_ops();
+    auto                    b_ops = b.forest_domain_ops();
+    REQUIRE( std::strcmp( a_ops.name(), b_ops.name() ) != 0 );
+    REQUIRE( !a.insert( 7, 70 ).is_null() );
+    REQUIRE( !b.insert( 7, 700 ).is_null() );
+    REQUIRE( a.root_index() != b.root_index() );
+    REQUIRE( a.find( 7 )->value == 70 );
+    REQUIRE( b.find( 7 )->value == 700 );
+
+    // Different _K/_V node layouts never share a binding, even under the same domain key.
+    TestMgr::pmap<TestMgr::pptr<TestMgr::pstringview>, int> syms;
+    REQUIRE( std::strcmp( a_ops.name(), syms.forest_domain_ops().name() ) != 0 );
+    TestMgr::pmap<int, int>                                 named_a( "issue336/shared" );
+    TestMgr::pmap<TestMgr::pptr<TestMgr::pstringview>, int> named_s( "issue336/shared" );
+    REQUIRE( std::strcmp( named_a.domain_name(), named_s.domain_name() ) != 0 );
+
+    // Same type + same domain key => same binding.
+    TestMgr::pmap<int, int> named_b( "issue336/shared" );
+    REQUIRE( std::strcmp( named_a.domain_name(), named_b.domain_name() ) == 0 );
+    REQUIRE( named_b.find( 8 ).is_null() );
+    REQUIRE( !named_a.insert( 8, 80 ).is_null() );
+    REQUIRE( named_b.find( 8 )->value == 80 );
+
+    // Structurally identical PODs with different pinned tags do NOT collide.
+    TestMgr::pmap<int, Issue336TagA> ta( "issue336/stable" );
+    TestMgr::pmap<int, Issue336TagB> tb( "issue336/stable" );
+    TestMgr::pmap<int, Issue336TagA> ta2( "issue336/stable" );
+    REQUIRE( std::strcmp( ta.domain_name(), tb.domain_name() ) != 0 );
+    REQUIRE( std::strcmp( ta.domain_name(), ta2.domain_name() ) == 0 );
 
     TestMgr::destroy();
 }
@@ -280,8 +353,8 @@ TEST_CASE( "    AVL tree via built-in TreeNode fields", "[test_issue153_pmap]" )
 
     REQUIRE( ( !p1.is_null() && !p2.is_null() && !p3.is_null() ) );
 
-    // AVL root must be non-null
-    REQUIRE( map._root_idx != static_cast<TestMgr::index_type>( 0 ) );
+    // AVL root must be held by this pmap's forest-domain binding.
+    REQUIRE( TestMgr::get_domain_root_offset( map.domain_name() ) != static_cast<TestMgr::index_type>( 0 ) );
 
     // All nodes accessible via AVL search
     REQUIRE( map.find( 1 ) == p1 );
@@ -365,7 +438,7 @@ TEST_CASE( "    empty() returns correct state", "[test_issue153_pmap]" )
 // I153-G: reset() for test isolation
 // =============================================================================
 
-/// @brief reset() clears _root_idx; subsequent inserts create fresh tree.
+/// @brief reset() clears the pmap domain root; subsequent inserts create a fresh tree.
 TEST_CASE( "    reset() clears root for test isolation", "[test_issue153_pmap]" )
 {
     TestMgr::destroy();

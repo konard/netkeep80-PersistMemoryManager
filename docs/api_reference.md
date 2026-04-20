@@ -674,6 +674,26 @@ allocated block in PAP containing a key-value pair. The built-in `TreeNode` fiel
 each block serve as AVL tree links (no separate node allocations). Inserting a duplicate
 key updates the existing value.
 
+`pmap` is a typed facade over the canonical forest-domain protocol. Its AVL root is stored
+in a manager domain binding under `container/pmap/<type>/<binding>`, not in the `pmap`
+object. The object stores only the domain identity, so separate map objects and different
+`_K`/`_V` node layouts do not share a root unless they are copied from the same facade or
+constructed with the same named domain key.
+
+The `<type>` segment is a deterministic fingerprint derived from `sizeof`, `alignof`, and
+standard `<type_traits>` categories — **not** from compiler-specific spellings such as
+`__PRETTY_FUNCTION__` or `__FUNCSIG__`. For PODs that would otherwise collide on this
+fingerprint, or any application that wants hard-pinned persistent type identity, specialize
+`pmm::pmap_type_identity<T>::tag` with a fixed ASCII string:
+
+```cpp
+namespace pmm {
+template <> struct pmap_type_identity<MyPayload> {
+    static constexpr const char* tag = "myapp/MyPayload/v1";
+};
+}
+```
+
 **Accessed via manager nested alias:**
 ```cpp
 using Mgr = pmm::PersistMemoryManager<pmm::CacheManagerConfig>;
@@ -683,16 +703,18 @@ map.insert(42, 100);
 
 **Key type requirements:** `_K` must support `operator<` and `operator==`.
 
-### Data fields
+### Root binding
 
 ```cpp
-index_type _root_idx;  // granule index of AVL tree root; 0 = empty map
+const char* domain_name() const noexcept; // actual registry domain name; empty until bound
+index_type root_index() const noexcept;   // current domain root; 0 = empty map
 ```
 
 ### Constructors
 
 ```cpp
-pmap() noexcept;  // creates an empty map (_root_idx = 0)
+pmap() noexcept;                          // generates an independent domain on first mutable access
+explicit pmap(const char* domain_key) noexcept; // stable named domain when ManagerT is initialized
 ```
 
 ### Methods

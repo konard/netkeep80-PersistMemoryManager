@@ -199,7 +199,7 @@ These are enforced by `static_assert` and are always checked at build time:
 | S3 | `TreeNode<DefaultAddressTraits>` size == 5 × `sizeof(uint32_t)` + 4 | `types.h:163` |
 | S4 | `kGranuleSize` is power of 2, equals `DefaultAddressTraits::granule_size` | `types.h:62–63` |
 | S5 | `BlockStateBase<AT>` is binary-compatible with `Block<AT>` | `block_state.h:369–372` |
-| S6 | `ForestDomainRecord` is trivially copyable; `ForestDomainRegistry` is nothrow-default-constructible | `forest_registry.h:93–96` |
+| S6 | `ForestDomainRecord` is trivially copyable; `ForestDomainRegistry` is nothrow-default-constructible | `forest_registry.h:206–209` |
 | S7 | Address traits: `IndexT` unsigned, `GranuleSz >= 4`, `GranuleSz` power of 2 | `address_traits.h:63–65` |
 
 ---
