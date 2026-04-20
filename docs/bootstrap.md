@@ -48,19 +48,19 @@ structure. This is a persistent, locked block containing:
 - Magic: `0x50465247` ("PFRG")
 - Version: 1
 - Up to 32 domain slots
-- Legacy root offset (0 for fresh images)
 
 The registry's granule index is stored in `hdr->root_offset`.
 
 ### Step 4: System Domain Registration
 
-Three system domains are registered in the forest registry:
+Four system domains are registered in the forest registry:
 
 | Domain Name              | Binding Kind       | Flags  | Purpose                    |
 |--------------------------|--------------------|--------|----------------------------|
 | `system/free_tree`       | `kForestBindingFreeTree` | System | Free block AVL tree        |
 | `system/symbols`         | `kForestBindingDirectRoot` | System | pstringview symbol dictionary |
 | `system/domain_registry` | `kForestBindingDirectRoot` | System | Self-reference to registry |
+| `service/domain_root`    | `kForestBindingDirectRoot` | System | Single-root backing for `set_root`/`get_root` |
 
 Each domain receives a unique, monotonically increasing `binding_id`.
 
@@ -75,7 +75,6 @@ persistent symbol dictionary (pstringview AVL tree):
 - `type/forest_registry`
 - `type/forest_domain_record`
 - `type/pstringview`
-- `service/legacy_root`
 - `service/domain_root`
 - `service/domain_symbol`
 
@@ -131,9 +130,7 @@ When an existing image is loaded via `load()`:
    (`validate_or_bootstrap_forest_registry_unlocked`):
    - If valid registry found: re-registers system domains, ensures symbols
      populated.
-   - If legacy root found (pre-registry image): creates new registry,
-     preserves legacy root.
-   - If neither: creates fresh registry.
+   - Otherwise: creates a fresh registry.
 6. Runs `validate_bootstrap_invariants()` to confirm the image is
    self-consistent.
 

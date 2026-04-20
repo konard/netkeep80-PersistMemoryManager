@@ -19,23 +19,23 @@ TEST_CASE( "forest registry bootstraps system domains", "[test_forest_registry]"
     REQUIRE( ForestMgr::has_domain( pmm::detail::kSystemDomainFreeTree ) );
     REQUIRE( ForestMgr::has_domain( pmm::detail::kSystemDomainSymbols ) );
     REQUIRE( ForestMgr::has_domain( pmm::detail::kSystemDomainRegistry ) );
-    REQUIRE( ForestMgr::has_domain( pmm::detail::kServiceNameLegacyRoot ) );
+    REQUIRE( ForestMgr::has_domain( pmm::detail::kServiceNameDomainRoot ) );
 
     auto free_id     = ForestMgr::find_domain_by_name( pmm::detail::kSystemDomainFreeTree );
     auto symbols_id  = ForestMgr::find_domain_by_name( pmm::detail::kSystemDomainSymbols );
     auto registry_id = ForestMgr::find_domain_by_name( pmm::detail::kSystemDomainRegistry );
-    auto legacy_id   = ForestMgr::find_domain_by_name( pmm::detail::kServiceNameLegacyRoot );
+    auto root_id     = ForestMgr::find_domain_by_name( pmm::detail::kServiceNameDomainRoot );
 
     REQUIRE( free_id != 0 );
     REQUIRE( symbols_id != 0 );
     REQUIRE( registry_id != 0 );
-    REQUIRE( legacy_id != 0 );
+    REQUIRE( root_id != 0 );
 
     REQUIRE( ForestMgr::get_domain_root_offset( pmm::detail::kSystemDomainFreeTree ) != 0 );
     REQUIRE( ForestMgr::get_domain_root_offset( free_id ) ==
              ForestMgr::get_domain_root_offset( pmm::detail::kSystemDomainFreeTree ) );
     REQUIRE( ForestMgr::get_domain_root_offset( pmm::detail::kSystemDomainSymbols ) != 0 );
-    REQUIRE( ForestMgr::get_domain_root_offset( pmm::detail::kServiceNameLegacyRoot ) == 0 );
+    REQUIRE( ForestMgr::get_domain_root_offset( pmm::detail::kServiceNameDomainRoot ) == 0 );
 
     ForestMgr::pptr<ForestMgr::pstringview> symbols_domain_symbol =
         ForestMgr::pstringview( pmm::detail::kSystemDomainSymbols );
@@ -55,7 +55,7 @@ TEST_CASE( "forest registry bootstraps system domains", "[test_forest_registry]"
     ForestMgr::destroy();
 }
 
-TEST_CASE( "forest registry persists user domains and legacy root", "[test_forest_registry]" )
+TEST_CASE( "forest registry persists user domains and root", "[test_forest_registry]" )
 {
     const char* filename = "test_forest_registry.dat";
 
@@ -120,11 +120,11 @@ TEST_CASE( "forest registry persists user domains and legacy root", "[test_fores
     REQUIRE( !alpha_symbol_after.is_null() );
     REQUIRE( ForestPersistMgr::get_domain_root_offset( alpha_symbol_after ) == alpha_offset );
 
-    auto legacy_root = ForestPersistMgr::get_root<int>();
-    REQUIRE( !legacy_root.is_null() );
-    REQUIRE( legacy_root.offset() == alpha_offset );
-    REQUIRE( *legacy_root == 11 );
-    REQUIRE( ForestPersistMgr::get_domain_root_offset( pmm::detail::kServiceNameLegacyRoot ) == alpha_offset );
+    auto root = ForestPersistMgr::get_root<int>();
+    REQUIRE( !root.is_null() );
+    REQUIRE( root.offset() == alpha_offset );
+    REQUIRE( *root == 11 );
+    REQUIRE( ForestPersistMgr::get_domain_root_offset( pmm::detail::kServiceNameDomainRoot ) == alpha_offset );
 
     REQUIRE( ForestPersistMgr::get_domain_root_offset( pmm::detail::kSystemDomainFreeTree ) != 0 );
     REQUIRE( ForestPersistMgr::pstringview::root_index() != 0 );
@@ -141,47 +141,38 @@ TEST_CASE( "forest registry persists user domains and legacy root", "[test_fores
     std::remove( filename );
 }
 
-TEST_CASE( "legacy root API is a compatibility shim over the domain registry", "[test_forest_registry][issue313]" )
+TEST_CASE( "root object API is a thin view over the service/domain_root registry record",
+           "[test_forest_registry][issue313]" )
 {
     CanonicalRootMgr::destroy();
     REQUIRE( CanonicalRootMgr::create( 128 * 1024 ) );
 
-    REQUIRE( CanonicalRootMgr::has_domain( pmm::detail::kServiceNameLegacyRoot ) );
-    auto legacy_domain_id = CanonicalRootMgr::find_domain_by_name( pmm::detail::kServiceNameLegacyRoot );
-    REQUIRE( legacy_domain_id != 0 );
+    REQUIRE( CanonicalRootMgr::has_domain( pmm::detail::kServiceNameDomainRoot ) );
+    auto root_domain_id = CanonicalRootMgr::find_domain_by_name( pmm::detail::kServiceNameDomainRoot );
+    REQUIRE( root_domain_id != 0 );
 
     REQUIRE( CanonicalRootMgr::get_root<int>().is_null() );
-    REQUIRE( CanonicalRootMgr::get_domain_root<int>( pmm::detail::kServiceNameLegacyRoot ).is_null() );
-    REQUIRE( CanonicalRootMgr::get_domain_root_offset( legacy_domain_id ) == 0 );
+    REQUIRE( CanonicalRootMgr::get_domain_root<int>( pmm::detail::kServiceNameDomainRoot ).is_null() );
+    REQUIRE( CanonicalRootMgr::get_domain_root_offset( root_domain_id ) == 0 );
 
-    using AT           = CanonicalRootMgr::address_traits;
-    std::uint8_t* base = CanonicalRootMgr::backend().base_ptr();
-    auto*         hdr  = pmm::detail::manager_header_at<AT>( base );
-    auto*         reg  = reinterpret_cast<pmm::detail::ForestDomainRegistry<AT>*>(
-        base + static_cast<std::size_t>( hdr->root_offset ) * AT::granule_size );
-    REQUIRE( reg->reserved_root_offset == 0 );
+    auto first_value  = CanonicalRootMgr::create_typed<int>( 31 );
+    auto second_value = CanonicalRootMgr::create_typed<int>( 313 );
+    REQUIRE( !first_value.is_null() );
+    REQUIRE( !second_value.is_null() );
 
-    auto legacy_value = CanonicalRootMgr::create_typed<int>( 31 );
-    auto domain_value = CanonicalRootMgr::create_typed<int>( 313 );
-    REQUIRE( !legacy_value.is_null() );
-    REQUIRE( !domain_value.is_null() );
+    CanonicalRootMgr::set_root( first_value );
+    REQUIRE( CanonicalRootMgr::get_domain_root_offset( pmm::detail::kServiceNameDomainRoot ) == first_value.offset() );
+    REQUIRE( CanonicalRootMgr::get_domain_root<int>( root_domain_id ).offset() == first_value.offset() );
 
-    CanonicalRootMgr::set_root( legacy_value );
-    REQUIRE( CanonicalRootMgr::get_domain_root_offset( pmm::detail::kServiceNameLegacyRoot ) == legacy_value.offset() );
-    REQUIRE( CanonicalRootMgr::get_domain_root<int>( legacy_domain_id ).offset() == legacy_value.offset() );
-
-    REQUIRE( CanonicalRootMgr::set_domain_root( pmm::detail::kServiceNameLegacyRoot, domain_value ) );
-    REQUIRE( CanonicalRootMgr::get_root<int>().offset() == domain_value.offset() );
+    REQUIRE( CanonicalRootMgr::set_domain_root( pmm::detail::kServiceNameDomainRoot, second_value ) );
+    REQUIRE( CanonicalRootMgr::get_root<int>().offset() == second_value.offset() );
     REQUIRE( *CanonicalRootMgr::get_root<int>() == 313 );
 
-    reg->reserved_root_offset = legacy_value.offset();
-    REQUIRE( CanonicalRootMgr::get_root<int>().offset() == domain_value.offset() );
-    reg->reserved_root_offset = 0;
     REQUIRE( CanonicalRootMgr::validate_bootstrap_invariants() );
 
     CanonicalRootMgr::set_root( CanonicalRootMgr::pptr<int>() );
     REQUIRE( CanonicalRootMgr::get_root<int>().is_null() );
-    REQUIRE( CanonicalRootMgr::get_domain_root<int>( pmm::detail::kServiceNameLegacyRoot ).is_null() );
+    REQUIRE( CanonicalRootMgr::get_domain_root<int>( pmm::detail::kServiceNameDomainRoot ).is_null() );
 
     CanonicalRootMgr::destroy();
 }

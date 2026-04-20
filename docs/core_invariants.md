@@ -103,7 +103,7 @@ Each block is an atom of the linear PAP **and** an atom of the intrusive forest.
 
 | ID | Invariant | Code checkpoint | Test |
 |----|-----------|-----------------|------|
-| C2a | The `ForestDomainRegistry` is a persistent locked block containing up to 32 domain slots. Its granule index is stored in `ManagerHeader::root_offset`. | `bootstrap_forest_registry_unlocked()` allocates and locks the registry. `validate_bootstrap_invariants_unlocked()` checks `hdr->root_offset` matches the registry domain root. | `test_issue241_bootstrap.cpp` — "bootstrap invariants hold after save/load". `test_forest_registry.cpp` — "forest registry persists user domains and legacy root". |
+| C2a | The `ForestDomainRegistry` is a persistent locked block containing up to 32 domain slots. Its granule index is stored in `ManagerHeader::root_offset`. | `bootstrap_forest_registry_unlocked()` allocates and locks the registry. `validate_bootstrap_invariants_unlocked()` checks `hdr->root_offset` matches the registry domain root. | `test_issue241_bootstrap.cpp` — "bootstrap invariants hold after save/load". `test_forest_registry.cpp` — "forest registry persists user domains and root". |
 | C2b | `ForestDomainRegistry` has magic `0x50465247` ("PFRG") and version 1. | `validate_or_bootstrap_forest_registry_unlocked()` in `forest_domain_mixin.inc:397–451` validates magic and version. `verify_forest_registry_unlocked()` in `verify_repair_mixin.inc:64–95`. | `test_issue245_verify_repair.cpp` — "verify detects forest registry corruption". |
 
 ### C3. Symbol dictionary

@@ -213,9 +213,8 @@ During bootstrap, symbols are interned in a fixed order
 4. `type/forest_registry`
 5. `type/forest_domain_record`
 6. `type/pstringview`
-7. `service/legacy_root`
-8. `service/domain_root`
-9. `service/domain_symbol`
+7. `service/domain_root`
+8. `service/domain_symbol`
 
 This order is deterministic — identical `create()` calls produce
 identical symbol layouts (invariant D1d).

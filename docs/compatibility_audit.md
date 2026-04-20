@@ -37,7 +37,7 @@ If none apply, the path is **deleted**.
 | 18 | `kMinMemorySize` (non-templated) | `types.h:249-252` | Constant | **Keep** | Used in `persist_memory_manager.h` and `io.h` for validation. Low cost. |
 | 19 | `kManagerHeaderGranules` (non-templated) | `types.h:243` | Constant | **Keep** | Low-cost constant alongside `kManagerHeaderGranules_t<AT>`. |
 | 20 | `kMinBlockSize` (non-templated) | `types.h:246` | Constant | **Keep** | Low-cost constant. |
-| 21 | `legacy_root_offset` in ForestDomainRegistry | `forest_registry.h:57` | Field + `set_root`/`get_root` API | **Keep** | Active public API (`set_root`/`get_root`) backed by forest registry. Single-root use is a supported workflow, not a dead path. |
+| 21 | `reserved_root_offset` in ForestDomainRegistry + `service/legacy_root` domain | `forest_registry.h`, `forest_domain_mixin.inc` | Migration field + domain | **Delete** (issue #339) | Transitional artifact from the pre-forest-registry root model. Removed together with the migration branch in `validate_or_bootstrap_forest_registry_unlocked()`. `set_root`/`get_root` now directly address the `service/domain_root` registry record. |
 | 22 | MSVC `_MSVC_LANG` check | `persist_memory_manager.h:15-21` | Platform detection | **Keep** | Platform-specific path required for MSVC (confirmed by CI). |
 | 23 | Windows file operations (`atomic_rename`, MMapStorage) | `io.h`, `mmap_storage.h` | Platform-specific code | **Keep** | Required for Windows support, gated by `_WIN32`/`_WIN64`. |
 | 24 | Logging policy SFINAE detection | `persist_memory_manager.h:74-85` | Config detection | **Keep** | Low-cost, non-breaking default (`NoLogging`). Part of the configuration API contract. |
@@ -46,7 +46,7 @@ If none apply, the path is **deleted**.
 
 | Seam | Justification |
 |------|---------------|
-| `legacy_root_offset` + `set_root`/`get_root` | Active public API for single-root usage. Forest registry stores it. |
+| `service/domain_root` + `set_root`/`get_root` | Active public API for single-root usage. A canonical registry record, not a migration shim. |
 | MSVC `_MSVC_LANG` | Platform-specific, confirmed by CI. |
 | Windows `_WIN32` / `_WIN64` paths | Platform-specific, mmap and atomic rename. |
 | Logging policy SFINAE | Low-cost config detection with safe default. |
