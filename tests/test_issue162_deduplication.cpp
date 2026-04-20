@@ -4,8 +4,8 @@
  *
  * Проверяет:
  *   - detail::avl_find() — новая обобщённая функция поиска в AVL-дереве
- *   - pstringview::_avl_find() делегирует в detail::avl_find()
- *   - pmap::_avl_find() делегирует в detail::avl_find()
+ *   - pstringview forest-domain ops delegate to detail::avl_find()
+ *   - pmap forest-domain ops delegate to detail::avl_find()
  *   - Корректность поиска в pstringview после рефакторинга
  *   - Корректность поиска в pmap после рефакторинга
  *   - Поиск несуществующих ключей возвращает null pptr
@@ -247,7 +247,7 @@ TEST_CASE( "I162-B5: pmap::contains() consistent with find()", "[test_issue162_d
 TEST_CASE( "I162-C1: detail::avl_find() template available and correct", "[test_issue162_deduplication]" )
 {
     // Verify that detail::avl_find() compiles and can be instantiated.
-    // We use a pmap to test it indirectly since pmap::_avl_find() delegates to it.
+    // We use a pmap to test it indirectly since pmap forest-domain ops delegate to it.
     TestMgr::create( 64 * 1024 );
 
     TestMgr::pmap<int, int> map;
@@ -271,7 +271,7 @@ TEST_CASE( "I162-C1: detail::avl_find() template available and correct", "[test_
     TestMgr::destroy();
 }
 
-/// @brief Both pstringview and pmap use detail::avl_find() from avl_tree_mixin.h.
+/// @brief Both pstringview and pmap use detail::avl_find() through forest-domain ops.
 ///        This test verifies that the shared helper works correctly for both users.
 TEST_CASE( "I162-C2: detail::avl_find() shared correctly by pstringview and pmap", "[test_issue162_deduplication]" )
 {

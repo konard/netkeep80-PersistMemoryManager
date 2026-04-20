@@ -517,7 +517,8 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         typename thread_policy::unique_lock_type lock( _mutex );
         if ( !_initialized )
             return;
-        set_legacy_root_offset_unlocked( p.is_null() ? static_cast<index_type>( 0 ) : p.offset() );
+        set_forest_domain_root_index_unlocked( find_domain_by_name_unlocked( detail::kServiceNameLegacyRoot ),
+                                               p.is_null() ? static_cast<index_type>( 0 ) : p.offset() );
     }
 
     /**
@@ -531,7 +532,8 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         typename thread_policy::shared_lock_type lock( _mutex );
         if ( !_initialized )
             return pptr<T>();
-        index_type legacy_root = get_legacy_root_offset_unlocked();
+        index_type legacy_root =
+            forest_domain_root_index_unlocked( find_domain_by_name_unlocked( detail::kServiceNameLegacyRoot ) );
         if ( legacy_root == static_cast<index_type>( 0 ) )
             return pptr<T>();
         return pptr<T>( legacy_root );
@@ -587,7 +589,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         if ( !_initialized )
             return 0;
         const forest_domain* rec = find_domain_by_name_unlocked( name );
-        return domain_root_offset_unlocked( rec, get_header_c( _backend.base_ptr() ) );
+        return forest_domain_root_index_unlocked( rec );
     }
 
     static index_type get_domain_root_offset( index_type binding_id ) noexcept
@@ -596,7 +598,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         if ( !_initialized )
             return 0;
         const forest_domain* rec = find_domain_by_binding_unlocked( binding_id );
-        return domain_root_offset_unlocked( rec, get_header_c( _backend.base_ptr() ) );
+        return forest_domain_root_index_unlocked( rec );
     }
 
     static index_type get_domain_root_offset( pptr<pstringview> symbol ) noexcept
@@ -605,7 +607,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         if ( !_initialized )
             return 0;
         const forest_domain* rec = find_domain_by_symbol_unlocked( symbol );
-        return domain_root_offset_unlocked( rec, get_header_c( _backend.base_ptr() ) );
+        return forest_domain_root_index_unlocked( rec );
     }
 
     template <typename T> static pptr<T> get_domain_root( const char* name ) noexcept
@@ -632,10 +634,8 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         if ( !_initialized )
             return false;
         forest_domain* rec = find_domain_by_name_unlocked( name );
-        if ( rec == nullptr || rec->binding_kind != detail::kForestBindingDirectRoot )
-            return false;
-        rec->root_offset = root.is_null() ? static_cast<index_type>( 0 ) : root.offset();
-        return true;
+        return set_forest_domain_root_index_unlocked( rec,
+                                                      root.is_null() ? static_cast<index_type>( 0 ) : root.offset() );
     }
 
     // ─── Методы доступа к полям AVL-узла блока ─────────────

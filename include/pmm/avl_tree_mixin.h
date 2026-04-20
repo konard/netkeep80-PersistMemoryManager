@@ -512,48 +512,95 @@ static void avl_insert( PPtr new_node, IndexType& root_idx, GoLeftFn&& go_left, 
     avl_rebalance_up( parent, root_idx, update_node );
 }
 
-// ─── Forest-domain descriptor/policy seam ────────────────────────────────────
+// ─── Forest-domain protocol ──────────────────────────────────────────────────
 
-template <typename Domain, typename Key>
-concept ForestDomainDescriptorForKey = requires( typename Domain::node_pptr p, const Key& key ) {
+template <typename Domain>
+concept ForestDomainViewDescriptor = requires( const Domain domain, typename Domain::node_pptr p ) {
     typename Domain::index_type;
     typename Domain::node_type;
     typename Domain::node_pptr;
-    { Domain::name() } -> std::convertible_to<const char*>;
-    { Domain::root_index() } -> std::convertible_to<typename Domain::index_type>;
-    { Domain::root_index_ptr() } -> std::same_as<typename Domain::index_type*>;
-    { Domain::resolve_node( p ) } -> std::convertible_to<typename Domain::node_type*>;
-    { Domain::compare_key( key, p ) } -> std::convertible_to<int>;
-    { Domain::less_node( p, p ) } -> std::convertible_to<bool>;
+    { domain.name() } -> std::convertible_to<const char*>;
+    { domain.root_index() } -> std::convertible_to<typename Domain::index_type>;
+    { domain.resolve_node( p ) } -> std::convertible_to<typename Domain::node_type*>;
 };
 
-template <typename Domain> static bool forest_domain_validate_node( typename Domain::node_pptr p ) noexcept
+template <typename Domain>
+concept ForestDomainDescriptor =
+    ForestDomainViewDescriptor<Domain> && requires( Domain domain, typename Domain::node_pptr p ) {
+        { domain.root_index_ptr() } -> std::same_as<typename Domain::index_type*>;
+        { domain.less_node( p, p ) } -> std::convertible_to<bool>;
+    };
+
+template <typename Domain, typename Key>
+concept ForestDomainDescriptorForKey = ForestDomainViewDescriptor<Domain> &&
+                                       requires( const Domain domain, typename Domain::node_pptr p, const Key& key ) {
+                                           { domain.compare_key( key, p ) } -> std::convertible_to<int>;
+                                       };
+
+template <typename Domain>
+static bool forest_domain_validate_node( const Domain& domain, typename Domain::node_pptr p ) noexcept
 {
     if constexpr ( requires {
-                       { Domain::validate_node( p ) } -> std::convertible_to<bool>;
+                       { domain.validate_node( p ) } -> std::convertible_to<bool>;
                    } )
-        return Domain::validate_node( p );
+        return domain.validate_node( p );
     else
         return true;
 }
 
 /**
- * @brief Generic AVL-backed forest-domain operations for a concrete descriptor.
+ * @brief Generic read-only AVL-backed forest-domain operations for a concrete descriptor.
  *
- * The descriptor owns domain identity, root binding, node resolution, ordering,
- * and optional node validation. This wrapper keeps the AVL substrate reusable
- * without forcing allocator and non-allocator domains into the same runtime type.
+ * The view descriptor supplies domain identity, read-only root binding, node
+ * resolution, and optional external-key comparison.
  */
-template <typename Domain> struct ForestDomainOps
+template <ForestDomainViewDescriptor Domain> struct ForestDomainViewOps
 {
     using index_type = typename Domain::index_type;
+    using node_type  = typename Domain::node_type;
     using node_pptr  = typename Domain::node_pptr;
 
-    static constexpr const char* name() noexcept { return Domain::name(); }
-    static index_type            root_index() noexcept { return Domain::root_index(); }
-    static index_type*           root_index_ptr() noexcept { return Domain::root_index_ptr(); }
+    Domain domain;
 
-    static bool reset_root() noexcept
+    constexpr explicit ForestDomainViewOps( Domain d = Domain{} ) noexcept : domain( d ) {}
+
+    const char* name() const noexcept { return domain.name(); }
+    index_type  root_index() const noexcept { return domain.root_index(); }
+
+    template <typename Key>
+        requires ForestDomainDescriptorForKey<Domain, Key>
+    node_pptr find( const Key& key ) const noexcept
+    {
+        return avl_find<node_pptr>(
+            domain.root_index(), [&]( node_pptr cur ) -> int { return domain.compare_key( key, cur ); },
+            [this]( node_pptr p ) -> node_type* { return domain.resolve_node( p ); } );
+    }
+};
+
+/**
+ * @brief Generic mutable AVL-backed forest-domain operations for a concrete descriptor.
+ *
+ * The mutable descriptor adds root-slot access and node ordering. Mutation is
+ * intentionally kept off the const surface: callers that only have a const
+ * handle can read identity/root state and perform keyed lookup, but cannot
+ * obtain or rewrite the root slot.
+ */
+template <ForestDomainDescriptor Domain> struct ForestDomainOps : ForestDomainViewOps<Domain>
+{
+    using view_base  = ForestDomainViewOps<Domain>;
+    using index_type = typename view_base::index_type;
+    using node_type  = typename view_base::node_type;
+    using node_pptr  = typename view_base::node_pptr;
+
+    using view_base::find;
+    using view_base::name;
+    using view_base::root_index;
+
+    constexpr explicit ForestDomainOps( Domain d = Domain{} ) noexcept : view_base( d ) {}
+
+    index_type* root_index_ptr() noexcept { return this->domain.root_index_ptr(); }
+
+    bool reset_root() noexcept
     {
         index_type* root = root_index_ptr();
         if ( root == nullptr )
@@ -562,25 +609,18 @@ template <typename Domain> struct ForestDomainOps
         return true;
     }
 
-    template <typename Key>
-        requires ForestDomainDescriptorForKey<Domain, Key>
-    static node_pptr find( const Key& key ) noexcept
+    void insert( node_pptr new_node ) noexcept
     {
-        return avl_find<node_pptr>(
-            Domain::root_index(), [&]( node_pptr cur ) -> int { return Domain::compare_key( key, cur ); },
-            []( node_pptr p ) -> typename Domain::node_type* { return Domain::resolve_node( p ); } );
-    }
-
-    static void insert( node_pptr new_node ) noexcept
-    {
-        index_type* root = Domain::root_index_ptr();
+        index_type* root = this->domain.root_index_ptr();
         if ( root == nullptr || new_node.is_null() )
             return;
-        if ( Domain::resolve_node( new_node ) == nullptr || !forest_domain_validate_node<Domain>( new_node ) )
+        if ( this->domain.resolve_node( new_node ) == nullptr ||
+             !forest_domain_validate_node( this->domain, new_node ) )
             return;
         avl_insert(
-            new_node, *root, [new_node]( node_pptr cur ) -> bool { return Domain::less_node( new_node, cur ); },
-            []( node_pptr p ) -> typename Domain::node_type* { return Domain::resolve_node( p ); } );
+            new_node, *root,
+            [this, new_node]( node_pptr cur ) -> bool { return this->domain.less_node( new_node, cur ); },
+            [this]( node_pptr p ) -> node_type* { return this->domain.resolve_node( p ); } );
     }
 };
 

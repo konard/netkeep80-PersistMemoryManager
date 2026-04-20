@@ -113,13 +113,13 @@ template <typename ManagerT> struct pstringview
         static index_type root_index() noexcept
         {
             auto* domain = ManagerT::symbol_domain_record_unlocked();
-            return ( domain != nullptr ) ? domain->root_offset : static_cast<index_type>( 0 );
+            return ManagerT::forest_domain_root_index_unlocked( domain );
         }
 
         static index_type* root_index_ptr() noexcept
         {
             auto* domain = ManagerT::symbol_domain_record_unlocked();
-            return ( domain != nullptr ) ? &domain->root_offset : nullptr;
+            return ManagerT::forest_domain_root_index_ptr_unlocked( domain );
         }
 
         static node_type* resolve_node( node_pptr p ) noexcept { return ManagerT::template resolve<node_type>( p ); }
@@ -143,6 +143,8 @@ template <typename ManagerT> struct pstringview
     };
 
     using forest_domain_policy = detail::ForestDomainOps<forest_domain_descriptor>;
+
+    static forest_domain_policy forest_domain_ops() noexcept { return forest_domain_policy{}; }
 
     std::uint32_t length; ///< Длина строки (без нулевого терминатора)
     char          str[1]; ///< Строковые данные (flexible array member pattern)
@@ -240,7 +242,7 @@ template <typename ManagerT> struct pstringview
         if ( !ManagerT::is_initialized() )
             return;
         typename ManagerT::thread_policy::unique_lock_type lock( ManagerT::_mutex );
-        forest_domain_policy::reset_root();
+        forest_domain_ops().reset_root();
     }
 
     /// @brief Текущий persistent root словаря интернирования; 0 = пустое дерево.
@@ -249,7 +251,7 @@ template <typename ManagerT> struct pstringview
         if ( !ManagerT::is_initialized() )
             return static_cast<index_type>( 0 );
         typename ManagerT::thread_policy::shared_lock_type lock( ManagerT::_mutex );
-        return forest_domain_policy::root_index();
+        return forest_domain_ops().root_index();
     }
 
     // Public destructor required for stack-temporary construction via pstringview<Mgr>("hello").
@@ -265,8 +267,10 @@ template <typename ManagerT> struct pstringview
         if ( s == nullptr )
             s = "";
 
+        auto ops = forest_domain_ops();
+
         // Ищем в AVL-дереве.
-        psview_pptr found = _avl_find( s );
+        psview_pptr found = ops.find( s );
         if ( !found.is_null() )
             return found;
 
@@ -324,18 +328,10 @@ template <typename ManagerT> struct pstringview
         ManagerT::lock_block_permanent( obj );
 
         // Вставляем в AVL-дерево.
-        _avl_insert( new_node );
+        ops.insert( new_node );
 
         return new_node;
     }
-
-    // ─── AVL-дерево (использует встроенные TreeNode-поля каждого pstringview-блока) ─
-
-    /// @brief Найти узел AVL-дерева с заданной строкой. Возвращает null если не найден.
-    static psview_pptr _avl_find( const char* s ) noexcept { return forest_domain_policy::find( s ); }
-
-    /// @brief Вставить новый узел в AVL-дерево. Предполагается, что строка ещё не в дереве.
-    static void _avl_insert( psview_pptr new_node ) noexcept { forest_domain_policy::insert( new_node ); }
 };
 
 } // namespace pmm

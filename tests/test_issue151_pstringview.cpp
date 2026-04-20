@@ -309,6 +309,8 @@ TEST_CASE( "    AVL root tracked by persistent symbol domain", "[test_issue151_p
 TEST_CASE( "    forest-domain descriptor drives symbol dictionary", "[test_issue151_pstringview]" )
 {
     using Domain = TestPsv::forest_domain_descriptor;
+    static_assert( pmm::detail::ForestDomainDescriptor<Domain> );
+    static_assert( pmm::detail::ForestDomainViewDescriptor<Domain> );
     static_assert( pmm::detail::ForestDomainDescriptorForKey<Domain, const char*> );
 
     TestMgr::destroy();
@@ -324,9 +326,10 @@ TEST_CASE( "    forest-domain descriptor drives symbol dictionary", "[test_issue
     TestMgr_pptr_psv beta  = TestMgr::pstringview( "descriptor_beta" );
     REQUIRE( ( !alpha.is_null() && !beta.is_null() ) );
 
-    REQUIRE( TestPsv::forest_domain_policy::find( "descriptor_alpha" ) == alpha );
-    REQUIRE( TestPsv::forest_domain_policy::find( "descriptor_beta" ) == beta );
-    REQUIRE( TestPsv::forest_domain_policy::find( "descriptor_missing" ).is_null() );
+    auto ops = TestPsv::forest_domain_ops();
+    REQUIRE( ops.find( "descriptor_alpha" ) == alpha );
+    REQUIRE( ops.find( "descriptor_beta" ) == beta );
+    REQUIRE( ops.find( "descriptor_missing" ).is_null() );
     REQUIRE( Domain::validate_node( alpha ) );
     REQUIRE( *Domain::root_index_ptr() == TestPsv::root_index() );
 

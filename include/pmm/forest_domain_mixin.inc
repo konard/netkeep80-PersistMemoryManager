@@ -85,9 +85,10 @@ static forest_domain* find_domain_by_symbol_unlocked( pptr<pstringview> symbol )
     return nullptr;
 }
 
-static index_type domain_root_offset_unlocked( const forest_domain*                         rec,
-                                               const detail::ManagerHeader<address_traits>* hdr ) noexcept
+static index_type forest_domain_root_index_unlocked( const forest_domain* rec ) noexcept
 {
+    const detail::ManagerHeader<address_traits>* hdr =
+        ( _backend.base_ptr() != nullptr ) ? get_header_c( _backend.base_ptr() ) : nullptr;
     if ( rec == nullptr || hdr == nullptr )
         return 0;
     if ( rec->binding_kind == detail::kForestBindingFreeTree )
@@ -95,32 +96,27 @@ static index_type domain_root_offset_unlocked( const forest_domain*             
     return rec->root_offset;
 }
 
-// ─── Legacy root helpers ──────────────────────────────────────────────────────
-
-static index_type get_legacy_root_offset_unlocked() noexcept
+static index_type* forest_domain_root_index_ptr_unlocked( forest_domain* rec ) noexcept
 {
-    const forest_domain* rec = find_domain_by_name_unlocked( detail::kServiceNameLegacyRoot );
-    return domain_root_offset_unlocked( rec, get_header_c( _backend.base_ptr() ) );
+    if ( rec == nullptr || rec->binding_kind != detail::kForestBindingDirectRoot )
+        return nullptr;
+    return &rec->root_offset;
 }
 
-static void set_legacy_root_offset_unlocked( index_type off ) noexcept
+static bool set_forest_domain_root_index_unlocked( forest_domain* rec, index_type root ) noexcept
 {
-    forest_domain* rec = find_domain_by_name_unlocked( detail::kServiceNameLegacyRoot );
-    if ( rec != nullptr && rec->binding_kind == detail::kForestBindingDirectRoot )
-        rec->root_offset = off;
+    index_type* root_ptr = forest_domain_root_index_ptr_unlocked( rec );
+    if ( root_ptr == nullptr )
+        return false;
+    *root_ptr = root;
+    return true;
 }
 
-// ─── Symbol domain helpers ────────────────────────────────────────────────────
+// ─── Canonical system domain records ─────────────────────────────────────────
 
 static forest_domain* symbol_domain_record_unlocked() noexcept
 {
     return find_domain_by_name_unlocked( detail::kSystemDomainSymbols );
-}
-
-static index_type symbol_domain_root_offset_unlocked() noexcept
-{
-    forest_domain* rec = symbol_domain_record_unlocked();
-    return ( rec != nullptr ) ? rec->root_offset : static_cast<index_type>( 0 );
 }
 
 // ─── Domain registration ─────────────────────────────────────────────────────
@@ -179,11 +175,11 @@ static pptr<pstringview> intern_symbol_unlocked( const char* s ) noexcept
     if ( s == nullptr )
         s = "";
 
-    using symbol_policy = typename pstringview::forest_domain_policy;
-    if ( symbol_policy::root_index_ptr() == nullptr )
+    auto symbol_policy = pstringview::forest_domain_ops();
+    if ( symbol_policy.root_index_ptr() == nullptr )
         return pptr<pstringview>();
 
-    pptr<pstringview> found = symbol_policy::find( s );
+    pptr<pstringview> found = symbol_policy.find( s );
     if ( !found.is_null() )
         return found;
 
@@ -209,7 +205,7 @@ static pptr<pstringview> intern_symbol_unlocked( const char* s ) noexcept
     if ( !lock_block_permanent_unlocked( public_raw ) )
         return pptr<pstringview>();
 
-    symbol_policy::insert( new_node );
+    symbol_policy.insert( new_node );
 
     return new_node;
 }
@@ -375,7 +371,7 @@ static bool validate_bootstrap_invariants_unlocked() noexcept
     if ( free_rec->binding_kind != detail::kForestBindingFreeTree )
         return false;
     // 5. Symbol dictionary root is non-zero (at least bootstrap symbols exist)
-    if ( symbol_domain_root_offset_unlocked() == 0 )
+    if ( pstringview::forest_domain_ops().root_index() == 0 )
         return false;
     // 6. Registry domain root matches header root_offset
     const forest_domain* reg_rec = find_domain_by_name_unlocked( detail::kSystemDomainRegistry );
@@ -404,7 +400,8 @@ static bool validate_or_bootstrap_forest_registry_unlocked() noexcept
                                         detail::kForestBindingFreeTree, 0 ) )
             return false;
         if ( !register_domain_unlocked( detail::kSystemDomainSymbols, detail::kForestDomainFlagSystem,
-                                        detail::kForestBindingDirectRoot, symbol_domain_root_offset_unlocked() ) )
+                                        detail::kForestBindingDirectRoot,
+                                        pstringview::forest_domain_ops().root_index() ) )
             return false;
         if ( !register_domain_unlocked( detail::kSystemDomainRegistry, detail::kForestDomainFlagSystem,
                                         detail::kForestBindingDirectRoot, hdr->root_offset ) )
