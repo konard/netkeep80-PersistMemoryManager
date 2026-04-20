@@ -675,7 +675,10 @@ each block serve as AVL tree links (no separate node allocations). Inserting a d
 key updates the existing value.
 
 `pmap` is a typed facade over the canonical forest-domain protocol. Its AVL root is stored
-in the manager domain binding named `container/pmap`, not in the `pmap` object.
+in a manager domain binding under `container/pmap/<type>/<binding>`, not in the `pmap`
+object. The object stores only the domain identity, so separate map objects and different
+`_K`/`_V` node layouts do not share a root unless they are copied from the same facade or
+constructed with the same named domain key.
 
 **Accessed via manager nested alias:**
 ```cpp
@@ -689,13 +692,15 @@ map.insert(42, 100);
 ### Root binding
 
 ```cpp
-static index_type root_index() noexcept;  // current container/pmap domain root; 0 = empty map
+const char* domain_name() const noexcept; // actual registry domain name; empty until bound
+index_type root_index() const noexcept;   // current domain root; 0 = empty map
 ```
 
 ### Constructors
 
 ```cpp
-pmap() noexcept;  // creates a facade bound to the container/pmap forest domain
+pmap() noexcept;                          // generates an independent domain on first mutable access
+explicit pmap(const char* domain_key) noexcept; // stable named domain when ManagerT is initialized
 ```
 
 ### Methods

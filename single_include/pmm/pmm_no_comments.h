@@ -3253,6 +3253,7 @@ using DefaultAllocatorPolicy = AllocatorPolicy<AvlFreeTree<DefaultAddressTraits>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <string_view>
 #include <type_traits>
 
 namespace pmm::detail
@@ -3276,6 +3277,117 @@ inline constexpr std::uint16_t kForestRegistryVersion        = 1;
 inline constexpr std::uint8_t  kForestBindingDirectRoot      = 0;
 inline constexpr std::uint8_t  kForestBindingFreeTree        = 1;
 inline constexpr std::uint8_t  kForestDomainFlagSystem       = 0x01;
+inline constexpr char          kPmapGeneratedDomainKind      = 'g';
+inline constexpr char          kPmapNamedDomainKind          = 'n';
+
+inline bool forest_domain_name_fits( const char* name ) noexcept;
+
+constexpr std::uint32_t pmap_fnv1a_32_append( std::uint32_t hash, std::string_view value ) noexcept
+{
+    for ( char ch : value )
+    {
+        hash ^= static_cast<std::uint8_t>( ch );
+        hash *= 16777619u;
+    }
+    return hash;
+}
+
+template <typename T> constexpr std::string_view pmap_type_signature() noexcept
+{
+#if defined( __clang__ ) || defined( __GNUC__ )
+    return __PRETTY_FUNCTION__;
+#elif defined( _MSC_VER )
+    return __FUNCSIG__;
+#else
+    return "pmm::detail::pmap_type_signature";
+#endif
+}
+
+template <typename _K, typename _V> constexpr std::uint32_t pmap_domain_type_hash() noexcept
+{
+    std::uint32_t hash = 2166136261u;
+    hash               = pmap_fnv1a_32_append( hash, pmap_type_signature<_K>() );
+    hash               = pmap_fnv1a_32_append( hash, "|" );
+    hash               = pmap_fnv1a_32_append( hash, pmap_type_signature<_V>() );
+    return hash;
+}
+
+inline std::uint64_t pmap_hash_domain_key( const char* key ) noexcept
+{
+    std::uint64_t hash = 14695981039346656037ull;
+    if ( key == nullptr )
+        key = "";
+    while ( *key != '\0' )
+    {
+        hash ^= static_cast<std::uint8_t>( *key );
+        hash *= 1099511628211ull;
+        ++key;
+    }
+    return hash;
+}
+
+inline char pmap_hex_digit( std::uint8_t value ) noexcept
+{
+    return static_cast<char>( value < 10 ? ( '0' + value ) : ( 'a' + ( value - 10 ) ) );
+}
+
+inline bool pmap_append_char( char* out, std::size_t& pos, char ch ) noexcept
+{
+    if ( out == nullptr || pos + 1 >= kForestDomainNameCapacity )
+        return false;
+    out[pos++] = ch;
+    out[pos]   = '\0';
+    return true;
+}
+
+inline bool pmap_append_literal( char* out, std::size_t& pos, const char* value ) noexcept
+{
+    if ( value == nullptr )
+        return false;
+    while ( *value != '\0' )
+    {
+        if ( !pmap_append_char( out, pos, *value ) )
+            return false;
+        ++value;
+    }
+    return true;
+}
+
+inline bool pmap_append_hex( char* out, std::size_t& pos, std::uint64_t value, unsigned digits ) noexcept
+{
+    for ( unsigned i = digits; i > 0; --i )
+    {
+        const unsigned shift = ( i - 1 ) * 4;
+        if ( !pmap_append_char( out, pos,
+                                pmap_hex_digit( static_cast<std::uint8_t>( ( value >> shift ) & 0x0full ) ) ) )
+            return false;
+    }
+    return true;
+}
+
+inline bool pmap_write_domain_name( char* out, std::uint32_t type_hash, char kind, std::uint64_t value,
+                                    unsigned value_digits ) noexcept
+{
+    if ( out == nullptr )
+        return false;
+    std::memset( out, 0, kForestDomainNameCapacity );
+
+    std::size_t pos = 0;
+    if ( !pmap_append_literal( out, pos, kContainerDomainPmap ) )
+        return false;
+    if ( !pmap_append_char( out, pos, '/' ) )
+        return false;
+    if ( !pmap_append_hex( out, pos, type_hash, 8 ) )
+        return false;
+    if ( !pmap_append_char( out, pos, '/' ) )
+        return false;
+    if ( !pmap_append_char( out, pos, kind ) )
+        return false;
+    if ( !pmap_append_hex( out, pos, value, value_digits ) )
+        return false;
+
+    return forest_domain_name_fits( out );
+}
 
 template <typename AddressTraitsT> struct ForestDomainRecord
 {
@@ -3805,23 +3917,37 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
     using node_type    = pmap_node<_K, _V>;
     using node_pptr    = typename ManagerT::template pptr<node_type>;
 
+    static constexpr std::uint32_t domain_type_hash = detail::pmap_domain_type_hash<_K, _V>();
+
     struct forest_domain_descriptor
     {
         using index_type = typename ManagerT::index_type;
         using node_type  = pmap_node<_K, _V>;
         using node_pptr  = typename ManagerT::template pptr<node_type>;
 
-        static constexpr const char* name() noexcept { return detail::kContainerDomainPmap; }
+        index_type binding_id;
 
-        static index_type root_index() noexcept
+        constexpr explicit forest_domain_descriptor( index_type id = 0 ) noexcept : binding_id( id ) {}
+
+        const char* name() const noexcept
         {
-            auto* domain = ManagerT::find_domain_by_name_unlocked( name() );
+            const auto* domain = ManagerT::find_domain_by_binding_unlocked( binding_id );
+            return domain != nullptr ? domain->name : "";
+        }
+
+        index_type root_index() const noexcept
+        {
+            if ( binding_id == 0 )
+                return 0;
+            auto* domain = ManagerT::find_domain_by_binding_unlocked( binding_id );
             return ManagerT::forest_domain_root_index_unlocked( domain );
         }
 
-        static index_type* root_index_ptr() noexcept
+        index_type* root_index_ptr() noexcept
         {
-            auto* domain = ManagerT::find_domain_by_name_unlocked( name() );
+            if ( binding_id == 0 )
+                return nullptr;
+            auto* domain = ManagerT::find_domain_by_binding_unlocked( binding_id );
             return ManagerT::forest_domain_root_index_ptr_unlocked( domain );
         }
 
@@ -3850,25 +3976,86 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
 
     static constexpr index_type no_block = ManagerT::address_traits::no_block;
 
-    static index_type root_index() noexcept { return forest_domain_view_policy{}.root_index(); }
-
   private:
-    static bool ensure_domain_registered() noexcept
+    index_type _binding_id;
+
+    static std::uint64_t next_generated_domain_sequence() noexcept
     {
-        return ManagerT::is_initialized() && ManagerT::register_domain( forest_domain_descriptor::name() );
+        static std::uint64_t next_sequence = 1;
+        return next_sequence++;
+    }
+
+    forest_domain_descriptor domain_descriptor() const noexcept { return forest_domain_descriptor( _binding_id ); }
+
+    bool bind_named_domain( const char* domain_key ) noexcept
+    {
+        if ( !ManagerT::is_initialized() || domain_key == nullptr || domain_key[0] == '\0' )
+            return false;
+
+        char candidate[detail::kForestDomainNameCapacity]{};
+        if ( !detail::pmap_write_domain_name( candidate, domain_type_hash, detail::kPmapNamedDomainKind,
+                                              detail::pmap_hash_domain_key( domain_key ), 16 ) )
+            return false;
+        if ( !ManagerT::register_domain( candidate ) )
+            return false;
+        _binding_id = ManagerT::find_domain_by_name( candidate );
+        return _binding_id != 0;
+    }
+
+    bool bind_generated_domain() noexcept
+    {
+        if ( !ManagerT::is_initialized() )
+            return false;
+
+        for ( std::size_t attempt = 0; attempt < detail::kMaxForestDomains; ++attempt )
+        {
+            char candidate[detail::kForestDomainNameCapacity]{};
+            if ( !detail::pmap_write_domain_name( candidate, domain_type_hash, detail::kPmapGeneratedDomainKind,
+                                                  next_generated_domain_sequence(), 8 ) )
+                return false;
+            if ( ManagerT::has_domain( candidate ) )
+                continue;
+            if ( !ManagerT::register_domain( candidate ) )
+                return false;
+            _binding_id = ManagerT::find_domain_by_name( candidate );
+            return _binding_id != 0;
+        }
+        return false;
+    }
+
+    bool ensure_domain_registered() noexcept
+    {
+        if ( !ManagerT::is_initialized() )
+            return false;
+        if ( _binding_id != 0 )
+        {
+            if ( ManagerT::find_domain_by_binding_unlocked( _binding_id ) != nullptr )
+                return true;
+            _binding_id = 0;
+        }
+        return bind_generated_domain();
     }
 
   public:
 
-    pmap() noexcept = default;
+    pmap() noexcept : _binding_id( 0 ) {}
+
+    explicit pmap( const char* domain_key ) noexcept : _binding_id( 0 ) { bind_named_domain( domain_key ); }
+
+    const char* domain_name() const noexcept { return domain_descriptor().name(); }
+
+    index_type root_index() const noexcept { return forest_domain_view_ops().root_index(); }
 
     forest_domain_policy forest_domain_ops() noexcept
     {
         ensure_domain_registered();
-        return forest_domain_policy{};
+        return forest_domain_policy( domain_descriptor() );
     }
 
-    forest_domain_view_policy forest_domain_view_ops() const noexcept { return forest_domain_view_policy{}; }
+    forest_domain_view_policy forest_domain_view_ops() const noexcept
+    {
+        return forest_domain_view_policy( domain_descriptor() );
+    }
 
     bool empty() const noexcept { return forest_domain_view_ops().root_index() == static_cast<index_type>( 0 ); }
 
@@ -3920,7 +4107,7 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
 
     bool erase( const _K& key ) noexcept
     {
-        auto        ops  = forest_domain_policy{};
+        auto        ops  = forest_domain_policy( domain_descriptor() );
         index_type* root = ops.root_index_ptr();
         if ( root == nullptr )
             return false;
@@ -3936,7 +4123,7 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
 
     void clear() noexcept
     {
-        auto        ops  = forest_domain_policy{};
+        auto        ops  = forest_domain_policy( domain_descriptor() );
         index_type* root = ops.root_index_ptr();
         if ( root == nullptr )
             return;
@@ -3946,7 +4133,7 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
         *root = static_cast<index_type>( 0 );
     }
 
-    void reset() noexcept { forest_domain_policy{}.reset_root(); }
+    void reset() noexcept { forest_domain_policy( domain_descriptor() ).reset_root(); }
 
     using iterator = detail::AvlInorderIterator<node_pptr>;
 

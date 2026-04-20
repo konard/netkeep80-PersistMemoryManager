@@ -9,7 +9,7 @@
  *
  * Ключевые особенности:
  *   - Персистентный: гранульные индексы адресно-независимы при перезагрузке ПАП.
- *   - Domain-rooted: корень хранится в forest-domain `container/pmap`.
+ *   - Domain-rooted: корень хранится в forest-domain binding-е `container/pmap/...`.
  *   - AVL-балансировка: O(log n) для вставки, поиска и удаления.
  *   - Встроенный AVL: узлы используют встроенные TreeNode-поля Block<AT> без
  *     дополнительных аллокаций структур дерева.
@@ -73,8 +73,9 @@ template <typename _K, typename _V> struct pmap_node
 /**
  * @brief Персистентный ассоциативный контейнер (словарь) на основе AVL-дерева.
  *
- * Объект pmap является тонким фасадом над forest-domain `container/pmap`.
- * Корень AVL-дерева хранится в domain binding менеджера, а узлы словаря
+ * Объект pmap является тонким фасадом над type-scoped forest-domain binding-ом
+ * `container/pmap/...`. В объекте хранится только binding id; корень
+ * AVL-дерева хранится в registry domain binding менеджера, а узлы словаря
  * (pmap_node) хранятся в ПАП и используют встроенные TreeNode-поля.
  *
  * Особенности:
@@ -98,23 +99,37 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
     using node_type    = pmap_node<_K, _V>;
     using node_pptr    = typename ManagerT::template pptr<node_type>;
 
+    static constexpr std::uint32_t domain_type_hash = detail::pmap_domain_type_hash<_K, _V>();
+
     struct forest_domain_descriptor
     {
         using index_type = typename ManagerT::index_type;
         using node_type  = pmap_node<_K, _V>;
         using node_pptr  = typename ManagerT::template pptr<node_type>;
 
-        static constexpr const char* name() noexcept { return detail::kContainerDomainPmap; }
+        index_type binding_id;
 
-        static index_type root_index() noexcept
+        constexpr explicit forest_domain_descriptor( index_type id = 0 ) noexcept : binding_id( id ) {}
+
+        const char* name() const noexcept
         {
-            auto* domain = ManagerT::find_domain_by_name_unlocked( name() );
+            const auto* domain = ManagerT::find_domain_by_binding_unlocked( binding_id );
+            return domain != nullptr ? domain->name : "";
+        }
+
+        index_type root_index() const noexcept
+        {
+            if ( binding_id == 0 )
+                return 0;
+            auto* domain = ManagerT::find_domain_by_binding_unlocked( binding_id );
             return ManagerT::forest_domain_root_index_unlocked( domain );
         }
 
-        static index_type* root_index_ptr() noexcept
+        index_type* root_index_ptr() noexcept
         {
-            auto* domain = ManagerT::find_domain_by_name_unlocked( name() );
+            if ( binding_id == 0 )
+                return nullptr;
+            auto* domain = ManagerT::find_domain_by_binding_unlocked( binding_id );
             return ManagerT::forest_domain_root_index_ptr_unlocked( domain );
         }
 
@@ -144,30 +159,93 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
     /// @brief Sentinel value for "no node" in TreeNode fields.
     static constexpr index_type no_block = ManagerT::address_traits::no_block;
 
-    /// @brief Текущий root binding forest-domain-а; 0 = пустое дерево.
-    static index_type root_index() noexcept { return forest_domain_view_policy{}.root_index(); }
-
   private:
-    static bool ensure_domain_registered() noexcept
+    index_type _binding_id;
+
+    static std::uint64_t next_generated_domain_sequence() noexcept
     {
-        return ManagerT::is_initialized() && ManagerT::register_domain( forest_domain_descriptor::name() );
+        static std::uint64_t next_sequence = 1;
+        return next_sequence++;
+    }
+
+    forest_domain_descriptor domain_descriptor() const noexcept { return forest_domain_descriptor( _binding_id ); }
+
+    bool bind_named_domain( const char* domain_key ) noexcept
+    {
+        if ( !ManagerT::is_initialized() || domain_key == nullptr || domain_key[0] == '\0' )
+            return false;
+
+        char candidate[detail::kForestDomainNameCapacity]{};
+        if ( !detail::pmap_write_domain_name( candidate, domain_type_hash, detail::kPmapNamedDomainKind,
+                                              detail::pmap_hash_domain_key( domain_key ), 16 ) )
+            return false;
+        if ( !ManagerT::register_domain( candidate ) )
+            return false;
+        _binding_id = ManagerT::find_domain_by_name( candidate );
+        return _binding_id != 0;
+    }
+
+    bool bind_generated_domain() noexcept
+    {
+        if ( !ManagerT::is_initialized() )
+            return false;
+
+        for ( std::size_t attempt = 0; attempt < detail::kMaxForestDomains; ++attempt )
+        {
+            char candidate[detail::kForestDomainNameCapacity]{};
+            if ( !detail::pmap_write_domain_name( candidate, domain_type_hash, detail::kPmapGeneratedDomainKind,
+                                                  next_generated_domain_sequence(), 8 ) )
+                return false;
+            if ( ManagerT::has_domain( candidate ) )
+                continue;
+            if ( !ManagerT::register_domain( candidate ) )
+                return false;
+            _binding_id = ManagerT::find_domain_by_name( candidate );
+            return _binding_id != 0;
+        }
+        return false;
+    }
+
+    bool ensure_domain_registered() noexcept
+    {
+        if ( !ManagerT::is_initialized() )
+            return false;
+        if ( _binding_id != 0 )
+        {
+            if ( ManagerT::find_domain_by_binding_unlocked( _binding_id ) != nullptr )
+                return true;
+            _binding_id = 0;
+        }
+        return bind_generated_domain();
     }
 
   public:
     // ─── Конструктор ──────────────────────────────────────────────────────────
 
     /// @brief Создать пустой словарь.
-    pmap() noexcept = default;
+    pmap() noexcept : _binding_id( 0 ) {}
+
+    /// @brief Создать фасад, привязанный к стабильному пользовательскому ключу domain-а.
+    explicit pmap( const char* domain_key ) noexcept : _binding_id( 0 ) { bind_named_domain( domain_key ); }
 
     // ─── Методы доступа ───────────────────────────────────────────────────────
+
+    /// @brief Имя forest-domain binding-а этого фасада; пустая строка, если binding ещё не создан.
+    const char* domain_name() const noexcept { return domain_descriptor().name(); }
+
+    /// @brief Текущий root binding forest-domain-а; 0 = пустое дерево.
+    index_type root_index() const noexcept { return forest_domain_view_ops().root_index(); }
 
     forest_domain_policy forest_domain_ops() noexcept
     {
         ensure_domain_registered();
-        return forest_domain_policy{};
+        return forest_domain_policy( domain_descriptor() );
     }
 
-    forest_domain_view_policy forest_domain_view_ops() const noexcept { return forest_domain_view_policy{}; }
+    forest_domain_view_policy forest_domain_view_ops() const noexcept
+    {
+        return forest_domain_view_policy( domain_descriptor() );
+    }
 
     /// @brief Проверить, пуст ли словарь.
     bool empty() const noexcept { return forest_domain_view_ops().root_index() == static_cast<index_type>( 0 ); }
@@ -259,7 +337,7 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
      */
     bool erase( const _K& key ) noexcept
     {
-        auto        ops  = forest_domain_policy{};
+        auto        ops  = forest_domain_policy( domain_descriptor() );
         index_type* root = ops.root_index_ptr();
         if ( root == nullptr )
             return false;
@@ -280,7 +358,7 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
      */
     void clear() noexcept
     {
-        auto        ops  = forest_domain_policy{};
+        auto        ops  = forest_domain_policy( domain_descriptor() );
         index_type* root = ops.root_index_ptr();
         if ( root == nullptr )
             return;
@@ -295,7 +373,7 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
      *
      * Сбрасывает root binding domain-а, но не освобождает данные в ПАП.
      */
-    void reset() noexcept { forest_domain_policy{}.reset_root(); }
+    void reset() noexcept { forest_domain_policy( domain_descriptor() ).reset_root(); }
 
     // ─── Итератор ───────────────────────────────────────────────
 

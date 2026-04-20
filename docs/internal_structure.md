@@ -51,7 +51,7 @@ Canonical map of internal modules, their responsibilities, and authoritative fil
 | `pptr.h` | 230 | `pptr<T, ManagerT>` — persistent typed pointer (granule index) |
 | `pstring.h` | 319 | `pstring<ManagerT>` — mutable persistent string (separate data block) |
 | `pstringview.h` | 300 | `pstringview<ManagerT>` — interned read-only string (deduplication via AVL) |
-| `pmap.h` | 324 | `pmap<K, V, ManagerT>` — persistent AVL-tree dictionary |
+| `pmap.h` | 398 | `pmap<K, V, ManagerT>` — persistent AVL-tree dictionary |
 | `parray.h` | 452 | `parray<T, ManagerT>` — persistent dynamic array with O(1) indexed access |
 | `ppool.h` | 337 | `ppool<T, ManagerT>` — persistent object pool (O(1) alloc/dealloc, chunked) |
 | `pallocator.h` | 155 | `pallocator<T, ManagerT>` — STL-compatible allocator adapter |
@@ -66,7 +66,7 @@ Canonical map of internal modules, their responsibilities, and authoritative fil
 | `logging_policy.h` | 128 | `NoLogging`, `StderrLogging` with callback hooks |
 | `manager_configs.h` | 354 | 9 predefined configs (Cache, Persistent, Embedded, Industrial, LargeDB, Static variants) |
 | `manager_concept.h` | 97 | C++20 concept `ManagerConcept` for compile-time validation |
-| `forest_registry.h` | 98 | `ForestDomainRegistry<AT>` — persistent domain registry for forest model |
+| `forest_registry.h` | 211 | `ForestDomainRegistry<AT>` — persistent domain registry for forest model |
 
 ### 7. Main Manager
 

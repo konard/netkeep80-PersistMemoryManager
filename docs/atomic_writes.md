@@ -515,9 +515,9 @@ User-data AVL roots are restored through their domain bindings:
    preserved in the image (they are permanently locked), and the dictionary root lives in
    the `system/symbols` domain record.
 
-2. **`pmap` dictionary**: `pmap` is a typed facade over the `container/pmap` forest domain.
-   Store application ownership through named domain roots rather than by persisting a local
-   `pmap` root field.
+2. **`pmap` dictionary**: `pmap` is a typed facade over type-scoped
+   `container/pmap/<type>/<binding>` forest domains. Store application ownership through
+   named domain identities rather than by persisting a local `pmap` root field.
 
 ### Crash consistency of user-data AVL operations
 

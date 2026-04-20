@@ -296,14 +296,15 @@ forest domain: system/symbols (persistent root in registry)
 
 ### `pmap<_K, _V, ManagerT>`
 
-A persistent AVL tree dictionary. The `pmap` object is a typed facade over the
-`container/pmap` forest domain; the AVL root is stored in that domain binding. Each node
-is an allocated block in PAP containing `pmap_node<_K, _V>`. The built-in `TreeNode`
-fields serve as AVL tree links. Nodes are **not** permanently locked (unlike
-`pstringview`), so they can be freed.
+A persistent AVL tree dictionary. The `pmap` object is a typed facade over a
+type-scoped `container/pmap/<type>/<binding>` forest domain; the AVL root is stored in
+that domain binding while the object stores only the binding identity. Each node is an
+allocated block in PAP containing `pmap_node<_K, _V>`. The built-in `TreeNode` fields
+serve as AVL tree links. Nodes are **not** permanently locked (unlike `pstringview`), so
+they can be freed.
 
 ```
-forest domain: container/pmap (persistent root in registry)
+forest domain: container/pmap/<type>/<binding> (persistent root in registry)
 │
 ├── [Block][pmap_node: key=42, value=100]
 │     left_offset → Block with key=10
