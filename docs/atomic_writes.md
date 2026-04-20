@@ -10,11 +10,13 @@ and the algorithms for verifying and recovering the image after an interrupted o
 at any stage of a write, the image can be verified, the interruption point identified, and
 the operation completed (or rolled back).
 
-**Scope:** covers the core block allocator operations. Persistent data structures
-(`pstringview`, `pmap`) build their own AVL trees using the same block headers — their
-AVL rotations follow the same "non-critical" guarantee: on `load()`, only the free-block
-AVL tree is rebuilt; user-data AVL trees (pstringview interning, pmap) are not affected
-by `rebuild_free_tree()` and must be managed by the user across process restarts.
+**Scope:** the block FSM described here is the allocator / free-tree physical mutation
+protocol (allocate / deallocate / split / coalesce), not a general forest-node lifecycle.
+Persistent data structures (`pstringview`, `pmap`) build their own AVL trees over the
+same block headers but do **not** traverse `FreeBlock ↔ AllocatedBlock`: their blocks
+remain `AllocatedBlock` from the allocator's point of view. On `load()`, only the
+free-block AVL tree is rebuilt; user-data AVL trees must be managed by the user across
+process restarts.
 
 ---
 

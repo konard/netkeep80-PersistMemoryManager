@@ -872,39 +872,15 @@ static_assert( sizeof( pmm::Block<pmm::DefaultAddressTraits> ) == 32, "Block<Def
 
 /**
  * @file pmm/block_state.h
- * @brief BlockState machine — автомат состояний блока для атомарных операций.
+ * @brief FSM allocator/free-tree domain: FreeBlock ↔ AllocatedBlock.
  *
- * Реализует state machine через наследование состояний, где каждое состояние — это
- * наследник Block<A> с доступными методами работы. Каждый метод
- * выполняет один атомарный шаг критической операции и возвращает следующего
- * наследника, соответствующего новому состоянию блока.
+ * Scope: автомат физической мутации блока (allocate/deallocate/split/coalesce).
+ * `pmap`/`pstringview` работают с уже выделенными блоками и через FSM не проходят.
+ * `BlockStateBase<AT>::*` — low-level helper layer для allocator/repair, не public API.
  *
- * Корректные состояния:
- *   - FreeBlock        — свободный блок (weight=0, root_offset=0, в AVL-дереве)
- *   - AllocatedBlock   — занятый блок (weight>0, root_offset=idx, не в AVL)
+ * Полный граф состояний и анализ восстановления — docs/atomic_writes.md.
  *
- * Переходные состояния (только во время операций):
- *   - FreeBlockRemovedAVL    — свободный, удалённый из AVL (перед allocate)
- *   - FreeBlockNotInAVL      — свободный, не в AVL (после deallocate, перед coalesce)
- *   - SplittingBlock         — блок в процессе разбиения
- *   - CoalescingBlock        — блок в процессе слияния
- *
- * Гарантии:
- *   1. Типобезопасность: компилятор запрещает вызов недоступных методов
- *   2. Восстановимость: переходные состояния детектируются при load()
- *   3. Атомарность: каждый метод выполняет один атомарный шаг
- *   4. Завершаемость: цепочка вызовов приводит к корректному состоянию
- *
- *   - reset_avl_fields_of()     — сброс AVL-полей перед rebuild_free_tree
- *   - repair_prev_offset()      — восстановление prev_offset при repair_linked_list
- *   - get_next_offset()         — чтение next_offset в repair-методах (load)
- *   - get_weight()              — чтение weight в repair-методах (load)
- *
- *   repair_block_prev_offset(), read_block_next_offset(), read_block_weight()
- *   AllocatorPolicy вызывает BlockStateBase<AT>::* напрямую.
- *
- * @see docs/atomic_writes.md «Граф состояний блока»
- * @version 0.4
+ * @version 0.5
  */
 
 /**

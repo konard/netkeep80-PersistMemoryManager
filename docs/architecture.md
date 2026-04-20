@@ -39,7 +39,8 @@ This document focuses on the low-level layout, invariants, and algorithms.
 │   recompute_counters)                                                 │
 ├───────────────────────────────────────────────────────────────────────┤
 │  BlockState machine (block_state.h)                                   │
-│  (type-safe state transitions: Free → Allocated → Free)               │
+│  Allocator / free-tree FSM: Free → Allocated → Free                   │
+│  (not a general forest-node lifecycle; pmap/pstringview do not use it)│
 ├───────────────────────────────────────────────────────────────────────┤
 │  Block<AddressTraitsT> raw memory layout                              │
 │  (LinkedListNode<A> + TreeNode<A>, granule indices)                   │
