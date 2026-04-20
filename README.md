@@ -144,17 +144,12 @@ static bool create( std::size_t initial_size ) noexcept;
 static bool create() noexcept;
 static bool load( pmm::VerifyResult& result ) noexcept;
 static void destroy() noexcept;
-static void destroy_image() noexcept;
 static bool is_initialized() noexcept;
 
 static pmm::VerifyResult verify() noexcept;
 static pmm::PmmError last_error() noexcept;
 static void clear_error() noexcept;
 ```
-
-`destroy()` сбрасывает только runtime-состояние менеджера и оставляет backend-образ
-загружаемым. Для тестов или явной симуляции повреждения используйте
-`destroy_image()`, который инвалидирует образ, очищая header magic.
 
 ### Аллокация
 

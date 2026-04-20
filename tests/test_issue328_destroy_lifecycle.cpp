@@ -76,7 +76,7 @@ TEST_CASE( "I328: destroy preserves heap backend image for direct load", "[issue
 
 TEST_CASE( "I328: destroy preserves mmap file image across reopen", "[issue328][lifecycle]" )
 {
-    static const char* kFile = "test_issue328_mmap_lifecycle.dat";
+    static const char*    kFile  = "test_issue328_mmap_lifecycle.dat";
     constexpr std::size_t kArena = 64 * 1024;
     std::remove( kFile );
 
