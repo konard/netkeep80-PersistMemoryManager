@@ -26,7 +26,7 @@ PMM отвечает за:
 - `verify()` и структурную диагностику без модификации образа;
 - root pointer и persistent forest/domain registry;
 - базовые персистентные типы: `pstring`, `pstringview`, `pmap`, `parray`,
-  `pallocator`, `ppool`.
+  `pallocator`.
 
 PMM не является JSON-хранилищем, database engine, query engine, sync layer или
 прикладным форматом данных. Граница проекта описана в
@@ -182,8 +182,8 @@ static typed_guard<T, manager_type> make_guard( Args&&... args );
 ```
 
 `create_typed` требует nothrow-конструктор, а `destroy_typed` требует
-nothrow-деструктор. Для `pstring`, `parray` и `ppool` можно использовать
-`make_guard`, чтобы автоматически вызвать `free_data()` или `free_all()` перед
+nothrow-деструктор. Для типов с `free_data()` или `free_all()` можно
+использовать `make_guard`, чтобы автоматически вызвать очистку перед
 `destroy_typed()`.
 
 ### Указатели и обход
