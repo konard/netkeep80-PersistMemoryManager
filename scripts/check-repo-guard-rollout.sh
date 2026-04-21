@@ -38,12 +38,7 @@ expected_profiles = {
     "release",
 }
 expected_size_rules = [
-    ("kernel-persist-memory-manager-max-lines", "file", "lines", "include/pmm/persist_memory_manager.h", 1147),
-    ("kernel-block-state-max-lines", "file", "lines", "include/pmm/block_state.h", 873),
-    ("kernel-allocator-policy-max-lines", "file", "lines", "include/pmm/allocator_policy.h", 777),
-    ("kernel-avl-tree-mixin-max-lines", "file", "lines", "include/pmm/avl_tree_mixin.h", 761),
-    ("kernel-types-max-lines", "file", "lines", "include/pmm/types.h", 674),
-    ("kernel-subtree-max-lines", "directory", "lines", "include/pmm/**", 10768),
+    ("kernel-subtree-max-lines", "directory", "lines", "include/pmm/**", 9000),
 ]
 required_governance_paths = {
     ".github/workflows/repo-guard.yml",
