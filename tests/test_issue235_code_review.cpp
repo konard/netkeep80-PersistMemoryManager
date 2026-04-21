@@ -27,7 +27,7 @@ namespace
 
 struct Issue235FreeAllProbe
 {
-    Issue235FreeAllProbe() noexcept = default;
+    Issue235FreeAllProbe() noexcept  = default;
     ~Issue235FreeAllProbe() noexcept = default;
 
     void free_all() noexcept { ++cleanup_calls; }
