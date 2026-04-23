@@ -52,7 +52,7 @@ template <typename C> struct config_logging_policy<C, std::void_t<typename C::lo
 /*
 # persist_memory_manager
 file:///./../../README.md#persist_memory_manager
-https://github.com/netkeep80/PersistMemoryManager/blob/main/README.md
+https://github.com/netkeep80/PersistMemoryManager/blob/main/README.md#persist_memory_manager
 */
 template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0>
 class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryManager<ConfigT, InstanceId>>
