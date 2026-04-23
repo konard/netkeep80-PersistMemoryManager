@@ -49,6 +49,10 @@ template <typename C> struct config_logging_policy<C, std::void_t<typename C::lo
 };
 } // namespace detail
 
+/*
+# persist_memory_manager
+file:///./../../README.md#persist_memory_manager
+*/
 template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0>
 class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryManager<ConfigT, InstanceId>>
 {

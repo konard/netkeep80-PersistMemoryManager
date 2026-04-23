@@ -1,5 +1,8 @@
 # PersistMemoryManager
 
+## [persist_memory_manager](./include/pmm/persist_memory_manager.h#persist_memory_manager)
+<a name="persist_memory_manager"></a>
+
 Header-only C++20 библиотека для управления персистентным адресным
 пространством (ПАП): компактное storage-kernel ядро с offset-указателями,
 AVL-based allocator, проверкой структуры и восстановлением служебных индексов
