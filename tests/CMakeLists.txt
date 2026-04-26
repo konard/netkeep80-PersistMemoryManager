@@ -222,14 +222,6 @@ target_compile_features(${target} PRIVATE cxx_std_20)
 target_link_libraries(${target} PRIVATE Catch2::Catch2WithMain Threads::Threads)
 add_test(NAME ${target} COMMAND ${target})
 
-# ─── Тест самодостаточности pmm_no_comments.h — версии без комментариев ─
-set(target test_issue170_sh_no_comments)
-add_executable(${target} test_issue170_sh_no_comments.cpp)
-target_include_directories(${target} PRIVATE ${CMAKE_SOURCE_DIR}/single_include ${CMAKE_SOURCE_DIR}/single_include/pmm)
-target_compile_features(${target} PRIVATE cxx_std_20)
-target_link_libraries(${target} PRIVATE Catch2::Catch2WithMain Threads::Threads)
-add_test(NAME ${target} COMMAND ${target})
-
 # ─── Тесты parray::insert/erase ──────────────────────────────────
 pmm_add_test(test_issue233_parray_insert_erase test_issue233_parray_insert_erase.cpp)
 

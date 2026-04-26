@@ -40,7 +40,7 @@ public:
   using BlockState = BlockStateBase<AddressTraitsT>;
 
   /*
-  ### pmm::AllocatorPolicy::AllocatorPolicy
+### pmm::AllocatorPolicy::AllocatorPolicy
   */
   AllocatorPolicy() = delete;
   AllocatorPolicy(const AllocatorPolicy &) = delete;
@@ -48,7 +48,7 @@ public:
   AllocatorPolicy &operator=(const AllocatorPolicy &) = delete;
 
   /*
-  ### pmm::AllocatorPolicy::allocate_from_block
+### pmm::AllocatorPolicy::allocate_from_block
   */
   static void *allocate_from_block(std::uint8_t *base,
                                    detail::ManagerHeader<AddressTraitsT> *hdr,
@@ -129,7 +129,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::coalesce
+### pmm::AllocatorPolicy::coalesce
   */
   static void coalesce(std::uint8_t *base,
                        detail::ManagerHeader<AddressTraitsT> *hdr,
@@ -211,7 +211,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::rebuild_free_tree
+### pmm::AllocatorPolicy::rebuild_free_tree
   */
   static void rebuild_free_tree(std::uint8_t *base,
                                 detail::ManagerHeader<AddressTraitsT> *hdr) {
@@ -240,7 +240,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::repair_linked_list
+### pmm::AllocatorPolicy::repair_linked_list
   */
   static void repair_linked_list(std::uint8_t *base,
                                  detail::ManagerHeader<AddressTraitsT> *hdr) {
@@ -262,7 +262,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::recompute_counters
+### pmm::AllocatorPolicy::recompute_counters
   */
   static void recompute_counters(std::uint8_t *base,
                                  detail::ManagerHeader<AddressTraitsT> *hdr) {
@@ -299,7 +299,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::verify_linked_list
+### pmm::AllocatorPolicy::verify_linked_list
   */
   static void
   verify_linked_list(const std::uint8_t *base,
@@ -327,7 +327,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::verify_counters
+### pmm::AllocatorPolicy::verify_counters
   */
   static void verify_counters(const std::uint8_t *base,
                               const detail::ManagerHeader<AddressTraitsT> *hdr,
@@ -364,7 +364,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::verify_block_states
+### pmm::AllocatorPolicy::verify_block_states
   */
   static void
   verify_block_states(const std::uint8_t *base,
@@ -383,7 +383,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::verify_free_tree
+### pmm::AllocatorPolicy::verify_free_tree
   */
   static void verify_free_tree(const std::uint8_t *base,
                                const detail::ManagerHeader<AddressTraitsT> *hdr,
@@ -462,7 +462,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::free_tree_block_granules
+### pmm::AllocatorPolicy::free_tree_block_granules
   */
   static index_type
   free_tree_block_granules(const std::uint8_t *base,
@@ -480,7 +480,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::free_tree_less_key
+### pmm::AllocatorPolicy::free_tree_less_key
   */
   static bool
   free_tree_less_key(const std::uint8_t *base,
@@ -493,7 +493,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::free_tree_contains
+### pmm::AllocatorPolicy::free_tree_contains
   */
   static bool
   free_tree_contains(const std::uint8_t *base,
@@ -517,7 +517,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::verify_free_tree_node
+### pmm::AllocatorPolicy::verify_free_tree_node
   */
   static std::int16_t verify_free_tree_node(
       const std::uint8_t *base,
@@ -596,7 +596,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::realloc_shrink
+### pmm::AllocatorPolicy::realloc_shrink
   */
   static void realloc_shrink(std::uint8_t *base,
                              detail::ManagerHeader<AddressTraitsT> *hdr,
@@ -635,7 +635,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::realloc_grow
+### pmm::AllocatorPolicy::realloc_grow
   */
   static bool realloc_grow(std::uint8_t *base,
                            detail::ManagerHeader<AddressTraitsT> *hdr,

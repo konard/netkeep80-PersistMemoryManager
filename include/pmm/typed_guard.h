@@ -26,7 +26,7 @@ public:
   using pptr_type = typename ManagerT::template pptr<T>;
 
   /*
-  ### pmm::typed_guard::typed_guard
+### pmm::typed_guard::typed_guard
   */
   explicit typed_guard(pptr_type p) noexcept : _ptr(p) {}
 
@@ -52,7 +52,7 @@ public:
   ~typed_guard() { reset(); }
 
   /*
-  ### pmm::typed_guard::reset
+### pmm::typed_guard::reset
   */
   void reset() noexcept {
     if (!_ptr.is_null()) {
@@ -63,7 +63,7 @@ public:
   }
 
   /*
-  ### pmm::typed_guard::release
+### pmm::typed_guard::release
   */
   pptr_type release() noexcept {
 
@@ -74,22 +74,22 @@ public:
   }
 
   /*
-  ### pmm::typed_guard::operator_arrow
+### pmm::typed_guard::operator_arrow
   */
   T *operator->() const noexcept { return &(*_ptr); }
 
   /*
-  ### pmm::typed_guard::operator_deref
+### pmm::typed_guard::operator_deref
   */
   T &operator*() const noexcept { return *_ptr; }
 
   /*
-  ### pmm::typed_guard::get
+### pmm::typed_guard::get
   */
   pptr_type get() const noexcept { return _ptr; }
 
   /*
-  ### pmm::typed_guard::operator_bool
+### pmm::typed_guard::operator_bool
   */
   explicit operator bool() const noexcept { return !_ptr.is_null(); }
 
@@ -97,7 +97,7 @@ private:
   pptr_type _ptr;
 
   /*
-  ### pmm::typed_guard::cleanup
+### pmm::typed_guard::cleanup
   */
   static void cleanup(T &obj) noexcept {
     if constexpr (HasFreeData<T>)

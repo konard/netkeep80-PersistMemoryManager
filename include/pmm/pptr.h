@@ -46,7 +46,7 @@ private:
 
 public:
   /*
-  ### pmm::pptr::pptr
+### pmm::pptr::pptr
   */
   constexpr pptr() noexcept : _idx(0) {}
   constexpr explicit pptr(index_type idx) noexcept : _idx(idx) {}
@@ -56,33 +56,33 @@ public:
   ~pptr() noexcept = default;
 
   /*
-  ### pmm::pptr::operator_increment
+### pmm::pptr::operator_increment
   */
   pptr &operator++() = delete;
   pptr operator++(int) = delete;
   /*
-  ### pmm::pptr::operator_decrement
+### pmm::pptr::operator_decrement
   */
   pptr &operator--() = delete;
   pptr operator--(int) = delete;
 
   /*
-  ### pmm::pptr::is_null
+### pmm::pptr::is_null
   */
   constexpr bool is_null() const noexcept { return _idx == 0; }
 
   /*
-  ### pmm::pptr::operator_bool
+### pmm::pptr::operator_bool
   */
   constexpr explicit operator bool() const noexcept { return _idx != 0; }
 
   /*
-  ### pmm::pptr::offset
+### pmm::pptr::offset
   */
   constexpr index_type offset() const noexcept { return _idx; }
 
   /*
-  ### pmm::pptr::byte_offset
+### pmm::pptr::byte_offset
   */
   constexpr std::size_t byte_offset() const noexcept {
     return static_cast<std::size_t>(_idx) *
@@ -98,7 +98,7 @@ public:
   }
 
   /*
-  ### pmm::pptr::operator_less
+### pmm::pptr::operator_less
   */
   bool operator<(const pptr &other) const noexcept {
 
@@ -121,35 +121,35 @@ public:
   }
 
   /*
-  ### pmm::pptr::operator_deref
+### pmm::pptr::operator_deref
   */
   T &operator*() const noexcept {
     return *ManagerT::template resolve_checked<T>(*this);
   }
 
   /*
-  ### pmm::pptr::operator_arrow
+### pmm::pptr::operator_arrow
   */
   T *operator->() const noexcept {
     return ManagerT::template resolve_checked<T>(*this);
   }
 
   /*
-  ### pmm::pptr::resolve
+### pmm::pptr::resolve
   */
   T *resolve() const noexcept {
     return ManagerT::template resolve_checked<T>(*this);
   }
 
   /*
-  ### pmm::pptr::resolve_unchecked
+### pmm::pptr::resolve_unchecked
   */
   T *resolve_unchecked() const noexcept {
     return ManagerT::template resolve_unchecked<T>(*this);
   }
 
   /*
-  ### pmm::pptr::tree_node
+### pmm::pptr::tree_node
   */
   auto &tree_node() const noexcept { return ManagerT::tree_node(*this); }
 };

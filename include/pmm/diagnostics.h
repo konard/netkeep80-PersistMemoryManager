@@ -70,7 +70,7 @@ struct VerifyResult {
   std::size_t entry_count = 0;
 
   /*
-  ### pmm::VerifyResult::add
+### pmm::VerifyResult::add
   */
   void add(ViolationType type, DiagnosticAction action,
            std::uint64_t block_index = 0, std::uint64_t expected = 0,

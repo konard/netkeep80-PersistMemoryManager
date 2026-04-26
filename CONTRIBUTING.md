@@ -159,6 +159,7 @@ touches release-owned paths, so docs-only work never inherits a forced bump.
    ```bash
    # Format check
    find . \( -name '*.cpp' -o -name '*.h' \) ! -path './third_party/*' \
+     ! -path './include/pmm/*' \
      -print0 | xargs -0 clang-format --dry-run --Werror
 
    # Static analysis

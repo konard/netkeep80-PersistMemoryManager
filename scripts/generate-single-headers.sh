@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # generate-single-headers.sh - Generate single-header files for PMM
 #
-# Usage: ./scripts/generate-single-headers.sh [--output-dir DIR] [--strip-comments]
+# Usage: ./scripts/generate-single-headers.sh [--output-dir DIR]
 #
 # Generates:
 #   1. pmm.h — the full PMM library without preset specializations.
@@ -16,10 +16,6 @@
 #      single_include/pmm/pmm_small_embedded_static_heap.h — NoLock + StaticStorage/16-bit (SmallEmbeddedStaticConfig)
 #      single_include/pmm/pmm_large_db_heap.h              — SharedMutexLock + HeapStorage/64-bit (LargeDBConfig)
 #
-#   3. (optional, --strip-comments) pmm_no_comments.h — same as pmm.h but with all C/C++
-#      comments removed.  Roughly 40-50 % smaller, suitable for embedded or size-critical
-#      environments where documentation comments are not needed at build time.
-#
 # Prerequisites: quom >= 4.0.0 (pip install quom)
 
 set -euo pipefail
@@ -29,16 +25,11 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 INCLUDE_DIR="$REPO_ROOT/include"
 
 OUTPUT_DIR="$REPO_ROOT/single_include/pmm"
-STRIP_COMMENTS=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --output-dir)
             OUTPUT_DIR="$2"
             shift 2
-            ;;
-        --strip-comments)
-            STRIP_COMMENTS=1
-            shift
             ;;
         *)
             echo "Unknown option: $1"
@@ -119,15 +110,6 @@ echo "Generating $PMM_H ..."
 quom "$TMP_ENTRY_DIR/entry_pmm.h" "$PMM_H" -I "$INCLUDE_DIR"
 PMM_H_LINES=$(wc -l < "$PMM_H")
 echo "  Done: $PMM_H ($PMM_H_LINES lines)"
-
-# ─── Step 1b (optional): Generate pmm_no_comments.h ──────────────────────────
-if [[ "$STRIP_COMMENTS" -eq 1 ]]; then
-    PMM_NC_H="$OUTPUT_DIR/pmm_no_comments.h"
-    echo "Generating $PMM_NC_H (comments stripped) ..."
-    python3 "$SCRIPT_DIR/strip-comments.py" "$PMM_H" "$PMM_NC_H"
-    PMM_NC_H_LINES=$(wc -l < "$PMM_NC_H")
-    echo "  Done: $PMM_NC_H ($PMM_NC_H_LINES lines)"
-fi
 
 # ─── Step 2: Generate thin specialization files that include pmm.h ────────────
 # Usage: make_preset <filename> <preset_type> <description> <preset_alias_code>
@@ -236,9 +218,6 @@ make_preset \
 echo ""
 echo "All files generated in $OUTPUT_DIR:"
 echo "  $OUTPUT_DIR/pmm.h ($PMM_H_LINES lines)"
-if [[ "$STRIP_COMMENTS" -eq 1 ]]; then
-    echo "  $OUTPUT_DIR/pmm_no_comments.h ($PMM_NC_H_LINES lines)"
-fi
 for f in pmm_single_threaded_heap.h pmm_multi_threaded_heap.h \
           pmm_embedded_heap.h pmm_industrial_db_heap.h \
           pmm_embedded_static_heap.h \

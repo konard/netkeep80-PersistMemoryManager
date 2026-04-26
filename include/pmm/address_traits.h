@@ -27,7 +27,7 @@ template <typename IndexT, std::size_t GranuleSz> struct AddressTraits {
   static constexpr index_type no_block = std::numeric_limits<IndexT>::max();
 
   /*
-  ### pmm::AddressTraits::bytes_to_granules
+### pmm::AddressTraits::bytes_to_granules
   */
   static constexpr index_type bytes_to_granules(std::size_t bytes) noexcept {
     if (bytes == 0)
@@ -43,21 +43,21 @@ template <typename IndexT, std::size_t GranuleSz> struct AddressTraits {
   }
 
   /*
-  ### pmm::AddressTraits::granules_to_bytes
+### pmm::AddressTraits::granules_to_bytes
   */
   static constexpr std::size_t granules_to_bytes(index_type granules) noexcept {
     return static_cast<std::size_t>(granules) * granule_size;
   }
 
   /*
-  ### pmm::AddressTraits::idx_to_byte_off
+### pmm::AddressTraits::idx_to_byte_off
   */
   static constexpr std::size_t idx_to_byte_off(index_type idx) noexcept {
     return static_cast<std::size_t>(idx) * granule_size;
   }
 
   /*
-  ### pmm::AddressTraits::byte_off_to_idx
+### pmm::AddressTraits::byte_off_to_idx
   */
   static index_type byte_off_to_idx(std::size_t byte_off) noexcept {
 

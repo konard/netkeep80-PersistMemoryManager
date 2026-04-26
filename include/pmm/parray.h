@@ -29,7 +29,7 @@ template <typename T, typename ManagerT> struct parray {
   index_type _data_idx;
 
   /*
-  ### pmm::parray::parray
+### pmm::parray::parray
   */
   parray() noexcept
       : _size(0), _capacity(0),
@@ -38,24 +38,24 @@ template <typename T, typename ManagerT> struct parray {
   ~parray() noexcept = default;
 
   /*
-  ### pmm::parray::size
+### pmm::parray::size
   */
   std::size_t size() const noexcept { return static_cast<std::size_t>(_size); }
 
   /*
-  ### pmm::parray::empty
+### pmm::parray::empty
   */
   bool empty() const noexcept { return _size == 0; }
 
   /*
-  ### pmm::parray::capacity
+### pmm::parray::capacity
   */
   std::size_t capacity() const noexcept {
     return static_cast<std::size_t>(_capacity);
   }
 
   /*
-  ### pmm::parray::at
+### pmm::parray::at
   */
   T *at(std::size_t i) noexcept {
     if (i >= static_cast<std::size_t>(_size))
@@ -73,7 +73,7 @@ template <typename T, typename ManagerT> struct parray {
   }
 
   /*
-  ### pmm::parray::operator_index
+### pmm::parray::operator_index
   */
   T operator[](std::size_t i) const noexcept {
     const T *data = resolve_data();
@@ -81,14 +81,14 @@ template <typename T, typename ManagerT> struct parray {
   }
 
   /*
-  ### pmm::parray::front
+### pmm::parray::front
   */
   T *front() noexcept { return at(0); }
 
   const T *front() const noexcept { return at(0); }
 
   /*
-  ### pmm::parray::back
+### pmm::parray::back
   */
   T *back() noexcept {
     return (_size > 0) ? at(static_cast<std::size_t>(_size) - 1) : nullptr;
@@ -99,14 +99,14 @@ template <typename T, typename ManagerT> struct parray {
   }
 
   /*
-  ### pmm::parray::data
+### pmm::parray::data
   */
   T *data() noexcept { return resolve_data(); }
 
   const T *data() const noexcept { return resolve_data(); }
 
   /*
-  ### pmm::parray::push_back
+### pmm::parray::push_back
   */
   bool push_back(const T &value) noexcept {
     if (!ensure_capacity(_size + 1))
@@ -121,7 +121,7 @@ template <typename T, typename ManagerT> struct parray {
   }
 
   /*
-  ### pmm::parray::pop_back
+### pmm::parray::pop_back
   */
   void pop_back() noexcept {
     if (_size > 0)
@@ -129,7 +129,7 @@ template <typename T, typename ManagerT> struct parray {
   }
 
   /*
-  ### pmm::parray::set
+### pmm::parray::set
   */
   bool set(std::size_t i, const T &value) noexcept {
     if (i >= static_cast<std::size_t>(_size))
@@ -143,7 +143,7 @@ template <typename T, typename ManagerT> struct parray {
   }
 
   /*
-  ### pmm::parray::reserve
+### pmm::parray::reserve
   */
   bool reserve(std::size_t n) noexcept {
     if (n > static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()))
@@ -152,7 +152,7 @@ template <typename T, typename ManagerT> struct parray {
   }
 
   /*
-  ### pmm::parray::resize
+### pmm::parray::resize
   */
   bool resize(std::size_t n) noexcept {
     if (n > static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()))
@@ -174,7 +174,7 @@ template <typename T, typename ManagerT> struct parray {
   }
 
   /*
-  ### pmm::parray::insert
+### pmm::parray::insert
   */
   bool insert(std::size_t index, const T &value) noexcept {
     if (index > static_cast<std::size_t>(_size))
@@ -196,7 +196,7 @@ template <typename T, typename ManagerT> struct parray {
   }
 
   /*
-  ### pmm::parray::erase
+### pmm::parray::erase
   */
   bool erase(std::size_t index) noexcept {
     if (index >= static_cast<std::size_t>(_size))
@@ -213,12 +213,12 @@ template <typename T, typename ManagerT> struct parray {
   }
 
   /*
-  ### pmm::parray::clear
+### pmm::parray::clear
   */
   void clear() noexcept { _size = 0; }
 
   /*
-  ### pmm::parray::free_data
+### pmm::parray::free_data
   */
   void free_data() noexcept {
     if (_data_idx != detail::kNullIdx_v<typename ManagerT::address_traits>) {
@@ -252,7 +252,7 @@ template <typename T, typename ManagerT> struct parray {
 
 private:
   /*
-  ### pmm::parray::resolve_data
+### pmm::parray::resolve_data
   */
   T *resolve_data() const noexcept {
     return reinterpret_cast<T *>(
@@ -262,7 +262,7 @@ private:
   }
 
   /*
-  ### pmm::parray::ensure_capacity
+### pmm::parray::ensure_capacity
   */
   bool ensure_capacity(std::uint32_t required) noexcept {
     if (required <= _capacity)

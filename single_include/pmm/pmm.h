@@ -65,7 +65,7 @@ template <typename IndexT, std::size_t GranuleSz> struct AddressTraits {
   static constexpr index_type no_block = std::numeric_limits<IndexT>::max();
 
   /*
-  ### pmm::AddressTraits::bytes_to_granules
+### pmm::AddressTraits::bytes_to_granules
   */
   static constexpr index_type bytes_to_granules(std::size_t bytes) noexcept {
     if (bytes == 0)
@@ -81,21 +81,21 @@ template <typename IndexT, std::size_t GranuleSz> struct AddressTraits {
   }
 
   /*
-  ### pmm::AddressTraits::granules_to_bytes
+### pmm::AddressTraits::granules_to_bytes
   */
   static constexpr std::size_t granules_to_bytes(index_type granules) noexcept {
     return static_cast<std::size_t>(granules) * granule_size;
   }
 
   /*
-  ### pmm::AddressTraits::idx_to_byte_off
+### pmm::AddressTraits::idx_to_byte_off
   */
   static constexpr std::size_t idx_to_byte_off(index_type idx) noexcept {
     return static_cast<std::size_t>(idx) * granule_size;
   }
 
   /*
-  ### pmm::AddressTraits::byte_off_to_idx
+### pmm::AddressTraits::byte_off_to_idx
   */
   static index_type byte_off_to_idx(std::size_t byte_off) noexcept {
 
@@ -138,59 +138,59 @@ struct SharedMutexLock {
 struct NoLock {
 
   /*
-  ## pmm::config::NoLock::mutex_type
+## pmm::config::NoLock::mutex_type
   */
   struct mutex_type {
 
     /*
-    ### pmm::config::NoLock::mutex_type::lock
+### pmm::config::NoLock::mutex_type::lock
     */
     void lock() {}
 
     /*
-    ### pmm::config::NoLock::mutex_type::unlock
+### pmm::config::NoLock::mutex_type::unlock
     */
     void unlock() {}
 
     /*
-    ### pmm::config::NoLock::mutex_type::lock_shared
+### pmm::config::NoLock::mutex_type::lock_shared
     */
     void lock_shared() {}
 
     /*
-    ### pmm::config::NoLock::mutex_type::unlock_shared
+### pmm::config::NoLock::mutex_type::unlock_shared
     */
     void unlock_shared() {}
 
     /*
-    ### pmm::config::NoLock::mutex_type::try_lock
+### pmm::config::NoLock::mutex_type::try_lock
     */
     bool try_lock() { return true; }
 
     /*
-    ### pmm::config::NoLock::mutex_type::try_lock_shared
+### pmm::config::NoLock::mutex_type::try_lock_shared
     */
     bool try_lock_shared() { return true; }
   };
 
   /*
-  ## pmm::config::NoLock::shared_lock_type
+## pmm::config::NoLock::shared_lock_type
   */
   struct shared_lock_type {
 
     /*
-    ### pmm::config::NoLock::shared_lock_type::shared_lock_type
+### pmm::config::NoLock::shared_lock_type::shared_lock_type
     */
     explicit shared_lock_type(mutex_type &) {}
   };
 
   /*
-  ## pmm::config::NoLock::unique_lock_type
+## pmm::config::NoLock::unique_lock_type
   */
   struct unique_lock_type {
 
     /*
-    ### pmm::config::NoLock::unique_lock_type::unique_lock_type
+### pmm::config::NoLock::unique_lock_type::unique_lock_type
     */
     explicit unique_lock_type(mutex_type &) {}
   };
@@ -450,7 +450,7 @@ template <typename AddressTraitsT> struct TreeNode {
   using index_type = typename AddressTraitsT::index_type;
 
   /*
-  ### pmm::TreeNode::get_left
+### pmm::TreeNode::get_left
   */
   index_type get_left() const noexcept {
     return detail::read_block_field<AddressTraitsT,
@@ -458,7 +458,7 @@ template <typename AddressTraitsT> struct TreeNode {
   }
 
   /*
-  ### pmm::TreeNode::get_right
+### pmm::TreeNode::get_right
   */
   index_type get_right() const noexcept {
     return detail::read_block_field<AddressTraitsT,
@@ -466,7 +466,7 @@ template <typename AddressTraitsT> struct TreeNode {
   }
 
   /*
-  ### pmm::TreeNode::get_parent
+### pmm::TreeNode::get_parent
   */
   index_type get_parent() const noexcept {
     return detail::read_block_field<AddressTraitsT,
@@ -474,7 +474,7 @@ template <typename AddressTraitsT> struct TreeNode {
   }
 
   /*
-  ### pmm::TreeNode::get_root
+### pmm::TreeNode::get_root
   */
   index_type get_root() const noexcept {
     return detail::read_block_field<AddressTraitsT,
@@ -482,7 +482,7 @@ template <typename AddressTraitsT> struct TreeNode {
   }
 
   /*
-  ### pmm::TreeNode::get_weight
+### pmm::TreeNode::get_weight
   */
   index_type get_weight() const noexcept {
     return detail::read_block_field<AddressTraitsT, detail::BlockWeightField>(
@@ -490,7 +490,7 @@ template <typename AddressTraitsT> struct TreeNode {
   }
 
   /*
-  ### pmm::TreeNode::get_height
+### pmm::TreeNode::get_height
   */
   std::int16_t get_height() const noexcept {
     return detail::read_block_field<AddressTraitsT,
@@ -498,7 +498,7 @@ template <typename AddressTraitsT> struct TreeNode {
   }
 
   /*
-  ### pmm::TreeNode::get_node_type
+### pmm::TreeNode::get_node_type
   */
   std::uint16_t get_node_type() const noexcept {
     return detail::read_block_field<AddressTraitsT, detail::BlockNodeTypeField>(
@@ -506,7 +506,7 @@ template <typename AddressTraitsT> struct TreeNode {
   }
 
   /*
-  ### pmm::TreeNode::set_left
+### pmm::TreeNode::set_left
   */
   void set_left(index_type v) noexcept {
 
@@ -515,7 +515,7 @@ template <typename AddressTraitsT> struct TreeNode {
   }
 
   /*
-  ### pmm::TreeNode::set_right
+### pmm::TreeNode::set_right
   */
   void set_right(index_type v) noexcept {
 
@@ -524,7 +524,7 @@ template <typename AddressTraitsT> struct TreeNode {
   }
 
   /*
-  ### pmm::TreeNode::set_parent
+### pmm::TreeNode::set_parent
   */
   void set_parent(index_type v) noexcept {
 
@@ -533,7 +533,7 @@ template <typename AddressTraitsT> struct TreeNode {
   }
 
   /*
-  ### pmm::TreeNode::set_root
+### pmm::TreeNode::set_root
   */
   void set_root(index_type v) noexcept {
 
@@ -542,7 +542,7 @@ template <typename AddressTraitsT> struct TreeNode {
   }
 
   /*
-  ### pmm::TreeNode::set_weight
+### pmm::TreeNode::set_weight
   */
   void set_weight(index_type v) noexcept {
 
@@ -551,7 +551,7 @@ template <typename AddressTraitsT> struct TreeNode {
   }
 
   /*
-  ### pmm::TreeNode::set_height
+### pmm::TreeNode::set_height
   */
   void set_height(std::int16_t v) noexcept {
 
@@ -560,7 +560,7 @@ template <typename AddressTraitsT> struct TreeNode {
   }
 
   /*
-  ### pmm::TreeNode::set_node_type
+### pmm::TreeNode::set_node_type
   */
   void set_node_type(std::uint16_t v) noexcept {
 
@@ -685,7 +685,7 @@ struct VerifyResult {
   std::size_t entry_count = 0;
 
   /*
-  ### pmm::VerifyResult::add
+### pmm::VerifyResult::add
   */
   void add(ViolationType type, DiagnosticAction action,
            std::uint64_t block_index = 0, std::uint64_t expected = 0,
@@ -758,14 +758,14 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::is_free_raw
+### pmm::BlockStateBase::is_free_raw
   */
   static bool is_free_raw(const void *raw_blk) noexcept {
     return get_weight(raw_blk) == 0 && get_root_offset(raw_blk) == 0;
   }
 
   /*
-  ### pmm::BlockStateBase::is_allocated_raw
+### pmm::BlockStateBase::is_allocated_raw
   */
   static bool is_allocated_raw(const void *raw_blk,
                                index_type own_idx) noexcept {
@@ -807,76 +807,76 @@ public:
                 "Block field descriptors must match Block layout");
 
   /*
-  ### pmm::BlockStateBase::BlockStateBase
+### pmm::BlockStateBase::BlockStateBase
   */
   BlockStateBase() = delete;
 
   /*
-  ### pmm::BlockStateBase::weight
+### pmm::BlockStateBase::weight
   */
   index_type weight() const noexcept { return get_weight(this); }
 
   /*
-  ### pmm::BlockStateBase::prev_offset
+### pmm::BlockStateBase::prev_offset
   */
   index_type prev_offset() const noexcept { return get_prev_offset(this); }
 
   /*
-  ### pmm::BlockStateBase::next_offset
+### pmm::BlockStateBase::next_offset
   */
   index_type next_offset() const noexcept { return get_next_offset(this); }
 
   /*
-  ### pmm::BlockStateBase::left_offset
+### pmm::BlockStateBase::left_offset
   */
   index_type left_offset() const noexcept { return get_left_offset(this); }
 
   /*
-  ### pmm::BlockStateBase::right_offset
+### pmm::BlockStateBase::right_offset
   */
   index_type right_offset() const noexcept { return get_right_offset(this); }
 
   /*
-  ### pmm::BlockStateBase::parent_offset
+### pmm::BlockStateBase::parent_offset
   */
   index_type parent_offset() const noexcept { return get_parent_offset(this); }
 
   /*
-  ### pmm::BlockStateBase::avl_height
+### pmm::BlockStateBase::avl_height
   */
   std::int16_t avl_height() const noexcept { return get_avl_height(this); }
 
   /*
-  ### pmm::BlockStateBase::root_offset
+### pmm::BlockStateBase::root_offset
   */
   index_type root_offset() const noexcept { return get_root_offset(this); }
 
   /*
-  ### pmm::BlockStateBase::node_type
+### pmm::BlockStateBase::node_type
   */
   std::uint16_t node_type() const noexcept { return get_node_type(this); }
 
   /*
-  ### pmm::BlockStateBase::is_free
+### pmm::BlockStateBase::is_free
   */
   bool is_free() const noexcept { return is_free_raw(this); }
 
   /*
-  ### pmm::BlockStateBase::is_allocated
+### pmm::BlockStateBase::is_allocated
   */
   bool is_allocated(index_type own_idx) const noexcept {
     return is_allocated_raw(this, own_idx);
   }
 
   /*
-  ### pmm::BlockStateBase::is_permanently_locked
+### pmm::BlockStateBase::is_permanently_locked
   */
   bool is_permanently_locked() const noexcept {
     return node_type() == pmm::kNodeReadOnly;
   }
 
   /*
-  ### pmm::BlockStateBase::recover_state
+### pmm::BlockStateBase::recover_state
   */
   static void recover_state(void *raw_blk, index_type own_idx) noexcept {
 
@@ -893,7 +893,7 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::verify_state
+### pmm::BlockStateBase::verify_state
   */
   static void verify_state(const void *raw_blk, index_type own_idx,
                            VerifyResult &result) noexcept {
@@ -915,7 +915,7 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::reset_avl_fields_of
+### pmm::BlockStateBase::reset_avl_fields_of
   */
   static void reset_avl_fields_of(void *raw_blk) noexcept {
 
@@ -929,7 +929,7 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::repair_prev_offset
+### pmm::BlockStateBase::repair_prev_offset
   */
   static void repair_prev_offset(void *raw_blk, index_type prev_idx) noexcept {
 
@@ -937,28 +937,28 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::get_prev_offset
+### pmm::BlockStateBase::get_prev_offset
   */
   static index_type get_prev_offset(const void *raw_blk) noexcept {
     return get_field_of<detail::BlockPrevOffsetField>(raw_blk);
   }
 
   /*
-  ### pmm::BlockStateBase::get_next_offset
+### pmm::BlockStateBase::get_next_offset
   */
   static index_type get_next_offset(const void *raw_blk) noexcept {
     return get_field_of<detail::BlockNextOffsetField>(raw_blk);
   }
 
   /*
-  ### pmm::BlockStateBase::get_weight
+### pmm::BlockStateBase::get_weight
   */
   static index_type get_weight(const void *raw_blk) noexcept {
     return get_field_of<detail::BlockWeightField>(raw_blk);
   }
 
   /*
-  ### pmm::BlockStateBase::init_fields
+### pmm::BlockStateBase::init_fields
   */
   static void init_fields(void *raw_blk, index_type prev_idx,
                           index_type next_idx, std::int16_t avl_height_val,
@@ -977,7 +977,7 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::set_next_offset_of
+### pmm::BlockStateBase::set_next_offset_of
   */
   static void set_next_offset_of(void *raw_blk, index_type next_idx) noexcept {
 
@@ -985,35 +985,35 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::get_left_offset
+### pmm::BlockStateBase::get_left_offset
   */
   static index_type get_left_offset(const void *b) noexcept {
     return get_field_of<detail::BlockLeftOffsetField>(b);
   }
 
   /*
-  ### pmm::BlockStateBase::get_right_offset
+### pmm::BlockStateBase::get_right_offset
   */
   static index_type get_right_offset(const void *b) noexcept {
     return get_field_of<detail::BlockRightOffsetField>(b);
   }
 
   /*
-  ### pmm::BlockStateBase::get_parent_offset
+### pmm::BlockStateBase::get_parent_offset
   */
   static index_type get_parent_offset(const void *b) noexcept {
     return get_field_of<detail::BlockParentOffsetField>(b);
   }
 
   /*
-  ### pmm::BlockStateBase::get_root_offset
+### pmm::BlockStateBase::get_root_offset
   */
   static index_type get_root_offset(const void *b) noexcept {
     return get_field_of<detail::BlockRootOffsetField>(b);
   }
 
   /*
-  ### pmm::BlockStateBase::set_left_offset_of
+### pmm::BlockStateBase::set_left_offset_of
   */
   static void set_left_offset_of(void *b, index_type v) noexcept {
 
@@ -1021,7 +1021,7 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::set_right_offset_of
+### pmm::BlockStateBase::set_right_offset_of
   */
   static void set_right_offset_of(void *b, index_type v) noexcept {
 
@@ -1029,7 +1029,7 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::set_parent_offset_of
+### pmm::BlockStateBase::set_parent_offset_of
   */
   static void set_parent_offset_of(void *b, index_type v) noexcept {
 
@@ -1037,7 +1037,7 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::set_prev_offset_of
+### pmm::BlockStateBase::set_prev_offset_of
   */
   static void set_prev_offset_of(void *b, index_type v) noexcept {
 
@@ -1045,14 +1045,14 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::set_weight_of
+### pmm::BlockStateBase::set_weight_of
   */
   static void set_weight_of(void *b, index_type v) noexcept {
     set_field_of<detail::BlockWeightField>(b, v);
   }
 
   /*
-  ### pmm::BlockStateBase::set_root_offset_of
+### pmm::BlockStateBase::set_root_offset_of
   */
   static void set_root_offset_of(void *b, index_type v) noexcept {
 
@@ -1060,14 +1060,14 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::get_avl_height
+### pmm::BlockStateBase::get_avl_height
   */
   static std::int16_t get_avl_height(const void *raw_blk) noexcept {
     return get_field_of<detail::BlockAvlHeightField>(raw_blk);
   }
 
   /*
-  ### pmm::BlockStateBase::set_avl_height_of
+### pmm::BlockStateBase::set_avl_height_of
   */
   static void set_avl_height_of(void *raw_blk, std::int16_t v) noexcept {
 
@@ -1075,14 +1075,14 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::get_node_type
+### pmm::BlockStateBase::get_node_type
   */
   static std::uint16_t get_node_type(const void *raw_blk) noexcept {
     return get_field_of<detail::BlockNodeTypeField>(raw_blk);
   }
 
   /*
-  ### pmm::BlockStateBase::set_node_type_of
+### pmm::BlockStateBase::set_node_type_of
   */
   static void set_node_type_of(void *raw_blk, std::uint16_t v) noexcept {
 
@@ -1104,54 +1104,54 @@ protected:
   }
 
   /*
-  ### pmm::BlockStateBase::set_weight
+### pmm::BlockStateBase::set_weight
   */
   void set_weight(index_type v) noexcept { set_weight_of(this, v); }
 
   /*
-  ### pmm::BlockStateBase::set_prev_offset
+### pmm::BlockStateBase::set_prev_offset
   */
   void set_prev_offset(index_type v) noexcept { set_prev_offset_of(this, v); }
 
   /*
-  ### pmm::BlockStateBase::set_next_offset
+### pmm::BlockStateBase::set_next_offset
   */
   void set_next_offset(index_type v) noexcept { set_next_offset_of(this, v); }
 
   /*
-  ### pmm::BlockStateBase::set_left_offset
+### pmm::BlockStateBase::set_left_offset
   */
   void set_left_offset(index_type v) noexcept { set_left_offset_of(this, v); }
 
   /*
-  ### pmm::BlockStateBase::set_right_offset
+### pmm::BlockStateBase::set_right_offset
   */
   void set_right_offset(index_type v) noexcept { set_right_offset_of(this, v); }
 
   /*
-  ### pmm::BlockStateBase::set_parent_offset
+### pmm::BlockStateBase::set_parent_offset
   */
   void set_parent_offset(index_type v) noexcept {
     set_parent_offset_of(this, v);
   }
 
   /*
-  ### pmm::BlockStateBase::set_avl_height
+### pmm::BlockStateBase::set_avl_height
   */
   void set_avl_height(std::int16_t v) noexcept { set_avl_height_of(this, v); }
 
   /*
-  ### pmm::BlockStateBase::set_root_offset
+### pmm::BlockStateBase::set_root_offset
   */
   void set_root_offset(index_type v) noexcept { set_root_offset_of(this, v); }
 
   /*
-  ### pmm::BlockStateBase::set_node_type
+### pmm::BlockStateBase::set_node_type
   */
   void set_node_type(std::uint16_t v) noexcept { set_node_type_of(this, v); }
 
   /*
-  ### pmm::BlockStateBase::reset_avl_fields
+### pmm::BlockStateBase::reset_avl_fields
   */
   void reset_avl_fields() noexcept {
 
@@ -1182,7 +1182,7 @@ public:
   using index_type = typename AddressTraitsT::index_type;
 
   /*
-  ### pmm::FreeBlock::cast_from_raw
+### pmm::FreeBlock::cast_from_raw
   */
   static FreeBlock *cast_from_raw(void *raw) noexcept {
     if (raw == nullptr)
@@ -1207,12 +1207,12 @@ public:
   }
 
   /*
-  ### pmm::FreeBlock::verify_invariants
+### pmm::FreeBlock::verify_invariants
   */
   bool verify_invariants() const noexcept { return Base::is_free(); }
 
   /*
-  ### pmm::FreeBlock::remove_from_avl
+### pmm::FreeBlock::remove_from_avl
   */
   FreeBlockRemovedAVL<AddressTraitsT> *remove_from_avl() noexcept {
 
@@ -1231,7 +1231,7 @@ public:
   using index_type = typename AddressTraitsT::index_type;
 
   /*
-  ### pmm::FreeBlockRemovedAVL::cast_from_raw
+### pmm::FreeBlockRemovedAVL::cast_from_raw
   */
   static FreeBlockRemovedAVL *cast_from_raw(void *raw) noexcept {
     return Base::template state_from_raw<FreeBlockRemovedAVL<AddressTraitsT>>(
@@ -1239,7 +1239,7 @@ public:
   }
 
   /*
-  ### pmm::FreeBlockRemovedAVL::mark_as_allocated
+### pmm::FreeBlockRemovedAVL::mark_as_allocated
   */
   AllocatedBlock<AddressTraitsT> *
   mark_as_allocated(index_type data_granules, index_type own_idx) noexcept {
@@ -1253,14 +1253,14 @@ public:
   }
 
   /*
-  ### pmm::FreeBlockRemovedAVL::begin_splitting
+### pmm::FreeBlockRemovedAVL::begin_splitting
   */
   SplittingBlock<AddressTraitsT> *begin_splitting() noexcept {
     return this->template state_as<SplittingBlock<AddressTraitsT>>();
   }
 
   /*
-  ### pmm::FreeBlockRemovedAVL::insert_to_avl
+### pmm::FreeBlockRemovedAVL::insert_to_avl
   */
   FreeBlock<AddressTraitsT> *insert_to_avl() noexcept {
     return this->template state_as<FreeBlock<AddressTraitsT>>();
@@ -1278,14 +1278,14 @@ public:
   using index_type = typename AddressTraitsT::index_type;
 
   /*
-  ### pmm::SplittingBlock::cast_from_raw
+### pmm::SplittingBlock::cast_from_raw
   */
   static SplittingBlock *cast_from_raw(void *raw) noexcept {
     return Base::template state_from_raw<SplittingBlock<AddressTraitsT>>(raw);
   }
 
   /*
-  ### pmm::SplittingBlock::initialize_new_block
+### pmm::SplittingBlock::initialize_new_block
   */
   void initialize_new_block(void *new_blk_ptr,
                             [[maybe_unused]] index_type new_idx,
@@ -1297,7 +1297,7 @@ public:
   }
 
   /*
-  ### pmm::SplittingBlock::link_new_block
+### pmm::SplittingBlock::link_new_block
   */
   void link_new_block(void *old_next_blk, index_type new_idx) noexcept {
     if (old_next_blk != nullptr) {
@@ -1308,7 +1308,7 @@ public:
   }
 
   /*
-  ### pmm::SplittingBlock::finalize_split
+### pmm::SplittingBlock::finalize_split
   */
   AllocatedBlock<AddressTraitsT> *finalize_split(index_type data_granules,
                                                  index_type own_idx) noexcept {
@@ -1333,7 +1333,7 @@ public:
   using index_type = typename AddressTraitsT::index_type;
 
   /*
-  ### pmm::AllocatedBlock::cast_from_raw
+### pmm::AllocatedBlock::cast_from_raw
   */
   static AllocatedBlock *cast_from_raw(void *raw) noexcept {
     if (raw == nullptr)
@@ -1360,14 +1360,14 @@ public:
   }
 
   /*
-  ### pmm::AllocatedBlock::verify_invariants
+### pmm::AllocatedBlock::verify_invariants
   */
   bool verify_invariants(index_type own_idx) const noexcept {
     return Base::is_allocated(own_idx);
   }
 
   /*
-  ### pmm::AllocatedBlock::user_ptr
+### pmm::AllocatedBlock::user_ptr
   */
   void *user_ptr() noexcept {
     return reinterpret_cast<std::uint8_t *>(this) +
@@ -1380,7 +1380,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatedBlock::mark_as_free
+### pmm::AllocatedBlock::mark_as_free
   */
   FreeBlockNotInAVL<AddressTraitsT> *mark_as_free() noexcept {
 
@@ -1402,7 +1402,7 @@ public:
   using index_type = typename AddressTraitsT::index_type;
 
   /*
-  ### pmm::FreeBlockNotInAVL::cast_from_raw
+### pmm::FreeBlockNotInAVL::cast_from_raw
   */
   static FreeBlockNotInAVL *cast_from_raw(void *raw) noexcept {
     return Base::template state_from_raw<FreeBlockNotInAVL<AddressTraitsT>>(
@@ -1410,14 +1410,14 @@ public:
   }
 
   /*
-  ### pmm::FreeBlockNotInAVL::begin_coalescing
+### pmm::FreeBlockNotInAVL::begin_coalescing
   */
   CoalescingBlock<AddressTraitsT> *begin_coalescing() noexcept {
     return this->template state_as<CoalescingBlock<AddressTraitsT>>();
   }
 
   /*
-  ### pmm::FreeBlockNotInAVL::insert_to_avl
+### pmm::FreeBlockNotInAVL::insert_to_avl
   */
   FreeBlock<AddressTraitsT> *insert_to_avl() noexcept {
 
@@ -1437,14 +1437,14 @@ public:
   using index_type = typename AddressTraitsT::index_type;
 
   /*
-  ### pmm::CoalescingBlock::cast_from_raw
+### pmm::CoalescingBlock::cast_from_raw
   */
   static CoalescingBlock *cast_from_raw(void *raw) noexcept {
     return Base::template state_from_raw<CoalescingBlock<AddressTraitsT>>(raw);
   }
 
   /*
-  ### pmm::CoalescingBlock::coalesce_with_next
+### pmm::CoalescingBlock::coalesce_with_next
   */
   void coalesce_with_next(void *next_blk, void *next_next_blk,
                           index_type own_idx) noexcept {
@@ -1458,7 +1458,7 @@ public:
   }
 
   /*
-  ### pmm::CoalescingBlock::coalesce_with_prev
+### pmm::CoalescingBlock::coalesce_with_prev
   */
   CoalescingBlock<AddressTraitsT> *
   coalesce_with_prev(void *prev_blk, void *next_blk,
@@ -1477,7 +1477,7 @@ public:
   }
 
   /*
-  ### pmm::CoalescingBlock::finalize_coalesce
+### pmm::CoalescingBlock::finalize_coalesce
   */
   FreeBlock<AddressTraitsT> *finalize_coalesce() noexcept {
 
@@ -2635,18 +2635,18 @@ template <ForestDomainViewDescriptor Domain> struct ForestDomainViewOps {
   Domain domain;
 
   /*
-  ### pmm::detail::ForestDomainViewOps::ForestDomainViewOps
+### pmm::detail::ForestDomainViewOps::ForestDomainViewOps
   */
   constexpr explicit ForestDomainViewOps(Domain d = Domain{}) noexcept
       : domain(d) {}
 
   /*
-  ### pmm::detail::ForestDomainViewOps::name
+### pmm::detail::ForestDomainViewOps::name
   */
   const char *name() const noexcept { return domain.name(); }
 
   /*
-  ### pmm::detail::ForestDomainViewOps::root_index
+### pmm::detail::ForestDomainViewOps::root_index
   */
   index_type root_index() const noexcept { return domain.root_index(); }
 
@@ -2654,7 +2654,7 @@ template <ForestDomainViewDescriptor Domain> struct ForestDomainViewOps {
     requires ForestDomainDescriptorForKey<Domain, Key>
 
   /*
-  ### pmm::detail::ForestDomainViewOps::find
+### pmm::detail::ForestDomainViewOps::find
   */
   node_pptr find(const Key &key) const noexcept {
     return avl_find<node_pptr>(
@@ -2685,20 +2685,20 @@ struct ForestDomainOps : ForestDomainViewOps<Domain> {
   using view_base::root_index;
 
   /*
-  ### pmm::detail::ForestDomainOps::ForestDomainOps
+### pmm::detail::ForestDomainOps::ForestDomainOps
   */
   constexpr explicit ForestDomainOps(Domain d = Domain{}) noexcept
       : view_base(d) {}
 
   /*
-  ### pmm::detail::ForestDomainOps::root_index_ptr
+### pmm::detail::ForestDomainOps::root_index_ptr
   */
   index_type *root_index_ptr() noexcept {
     return this->domain.root_index_ptr();
   }
 
   /*
-  ### pmm::detail::ForestDomainOps::reset_root
+### pmm::detail::ForestDomainOps::reset_root
   */
   bool reset_root() noexcept {
 
@@ -2711,7 +2711,7 @@ struct ForestDomainOps : ForestDomainViewOps<Domain> {
   }
 
   /*
-  ### pmm::detail::ForestDomainOps::insert
+### pmm::detail::ForestDomainOps::insert
   */
   void insert(node_pptr new_node) noexcept {
     index_type *root = this->domain.root_index_ptr();
@@ -2754,61 +2754,61 @@ template <typename AddressTraitsT> struct BlockTreeNodeProxy {
   void *_blk;
 
   /*
-  ### pmm::detail::BlockTreeNodeProxy::BlockTreeNodeProxy
+### pmm::detail::BlockTreeNodeProxy::BlockTreeNodeProxy
   */
   explicit BlockTreeNodeProxy(void *blk) noexcept : _blk(blk) {}
 
   /*
-  ### pmm::detail::BlockTreeNodeProxy::get_left
+### pmm::detail::BlockTreeNodeProxy::get_left
   */
   index_type get_left() const noexcept {
     return BlockStateBase<AddressTraitsT>::get_left_offset(_blk);
   }
 
   /*
-  ### pmm::detail::BlockTreeNodeProxy::get_right
+### pmm::detail::BlockTreeNodeProxy::get_right
   */
   index_type get_right() const noexcept {
     return BlockStateBase<AddressTraitsT>::get_right_offset(_blk);
   }
 
   /*
-  ### pmm::detail::BlockTreeNodeProxy::get_parent
+### pmm::detail::BlockTreeNodeProxy::get_parent
   */
   index_type get_parent() const noexcept {
     return BlockStateBase<AddressTraitsT>::get_parent_offset(_blk);
   }
 
   /*
-  ### pmm::detail::BlockTreeNodeProxy::get_height
+### pmm::detail::BlockTreeNodeProxy::get_height
   */
   std::int16_t get_height() const noexcept {
     return BlockStateBase<AddressTraitsT>::get_avl_height(_blk);
   }
 
   /*
-  ### pmm::detail::BlockTreeNodeProxy::set_left
+### pmm::detail::BlockTreeNodeProxy::set_left
   */
   void set_left(index_type v) noexcept {
     BlockStateBase<AddressTraitsT>::set_left_offset_of(_blk, v);
   }
 
   /*
-  ### pmm::detail::BlockTreeNodeProxy::set_right
+### pmm::detail::BlockTreeNodeProxy::set_right
   */
   void set_right(index_type v) noexcept {
     BlockStateBase<AddressTraitsT>::set_right_offset_of(_blk, v);
   }
 
   /*
-  ### pmm::detail::BlockTreeNodeProxy::set_parent
+### pmm::detail::BlockTreeNodeProxy::set_parent
   */
   void set_parent(index_type v) noexcept {
     BlockStateBase<AddressTraitsT>::set_parent_offset_of(_blk, v);
   }
 
   /*
-  ### pmm::detail::BlockTreeNodeProxy::set_height
+### pmm::detail::BlockTreeNodeProxy::set_height
   */
   void set_height(std::int16_t v) noexcept {
     BlockStateBase<AddressTraitsT>::set_avl_height_of(_blk, v);
@@ -2829,7 +2829,7 @@ template <typename AddressTraitsT> struct BlockPPtr {
   index_type _idx;
 
   /*
-  ### pmm::detail::BlockPPtr::BlockPPtr
+### pmm::detail::BlockPPtr::BlockPPtr
   */
   BlockPPtr() noexcept : _base(nullptr), _idx(AddressTraitsT::no_block) {}
 
@@ -2837,12 +2837,12 @@ template <typename AddressTraitsT> struct BlockPPtr {
       : _base(base), _idx(idx) {}
 
   /*
-  ### pmm::detail::BlockPPtr::is_null
+### pmm::detail::BlockPPtr::is_null
   */
   bool is_null() const noexcept { return _idx == AddressTraitsT::no_block; }
 
   /*
-  ### pmm::detail::BlockPPtr::offset
+### pmm::detail::BlockPPtr::offset
   */
   index_type offset() const noexcept { return _idx; }
 
@@ -2855,7 +2855,7 @@ template <typename AddressTraitsT> struct BlockPPtr {
   }
 
   /*
-  ### pmm::detail::BlockPPtr::tree_node
+### pmm::detail::BlockPPtr::tree_node
   */
   BlockTreeNodeProxy<AddressTraitsT> tree_node() const noexcept {
     return BlockTreeNodeProxy<AddressTraitsT>(
@@ -2887,7 +2887,7 @@ template <typename NodePPtr> struct AvlInorderIterator {
   index_type _current_idx;
 
   /*
-  ### pmm::detail::AvlInorderIterator::AvlInorderIterator
+### pmm::detail::AvlInorderIterator::AvlInorderIterator
   */
   AvlInorderIterator() noexcept : _current_idx(static_cast<index_type>(0)) {}
   explicit AvlInorderIterator(index_type idx) noexcept : _current_idx(idx) {}
@@ -2901,7 +2901,7 @@ template <typename NodePPtr> struct AvlInorderIterator {
   }
 
   /*
-  ### pmm::detail::AvlInorderIterator::operator_deref
+### pmm::detail::AvlInorderIterator::operator_deref
   */
   NodePPtr operator*() const noexcept {
     if (_current_idx == static_cast<index_type>(0) || _current_idx == no_block)
@@ -2910,7 +2910,7 @@ template <typename NodePPtr> struct AvlInorderIterator {
   }
 
   /*
-  ### pmm::detail::AvlInorderIterator::operator_increment
+### pmm::detail::AvlInorderIterator::operator_increment
   */
   AvlInorderIterator &operator++() noexcept {
     if (_current_idx == static_cast<index_type>(0) || _current_idx == no_block)
@@ -2961,7 +2961,7 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree {
   static constexpr const char *kForestDomainName = "system/free_tree";
 
   /*
-  ### pmm::AvlFreeTree::AvlFreeTree
+### pmm::AvlFreeTree::AvlFreeTree
   */
   AvlFreeTree() = delete;
   AvlFreeTree(const AvlFreeTree &) = delete;
@@ -2969,7 +2969,7 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree {
   AvlFreeTree &operator=(const AvlFreeTree &) = delete;
 
   /*
-  ### pmm::AvlFreeTree::insert
+### pmm::AvlFreeTree::insert
   */
   static void insert(std::uint8_t *base,
                      detail::ManagerHeader<AddressTraitsT> *hdr,
@@ -3026,7 +3026,7 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree {
   }
 
   /*
-  ### pmm::AvlFreeTree::remove
+### pmm::AvlFreeTree::remove
   */
   static void remove(std::uint8_t *base,
                      detail::ManagerHeader<AddressTraitsT> *hdr,
@@ -3088,7 +3088,7 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree {
   }
 
   /*
-  ### pmm::AvlFreeTree::find_best_fit
+### pmm::AvlFreeTree::find_best_fit
   */
   static index_type find_best_fit(std::uint8_t *base,
                                   detail::ManagerHeader<AddressTraitsT> *hdr,
@@ -3116,7 +3116,7 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree {
 
 private:
   /*
-  ### pmm::AvlFreeTree::set_child
+### pmm::AvlFreeTree::set_child
   */
   static void set_child(std::uint8_t *base,
                         detail::ManagerHeader<AddressTraitsT> *hdr,
@@ -3179,7 +3179,7 @@ public:
   using address_traits = AddressTraitsT;
 
   /*
-  ### pmm::HeapStorage::HeapStorage
+### pmm::HeapStorage::HeapStorage
   */
   HeapStorage() noexcept = default;
 
@@ -3236,7 +3236,7 @@ public:
   }
 
   /*
-  ### pmm::HeapStorage::attach
+### pmm::HeapStorage::attach
   */
   void attach(void *memory, std::size_t size) noexcept {
     if (_owns_memory && _buffer != nullptr)
@@ -3247,18 +3247,18 @@ public:
   }
 
   /*
-  ### pmm::HeapStorage::base_ptr
+### pmm::HeapStorage::base_ptr
   */
   std::uint8_t *base_ptr() noexcept { return _buffer; }
   const std::uint8_t *base_ptr() const noexcept { return _buffer; }
 
   /*
-  ### pmm::HeapStorage::total_size
+### pmm::HeapStorage::total_size
   */
   std::size_t total_size() const noexcept { return _size; }
 
   /*
-  ### pmm::HeapStorage::expand
+### pmm::HeapStorage::expand
   */
   bool expand(std::size_t additional_bytes) noexcept {
     if (additional_bytes == 0)
@@ -3291,7 +3291,7 @@ public:
   }
 
   /*
-  ### pmm::HeapStorage::owns_memory
+### pmm::HeapStorage::owns_memory
   */
   bool owns_memory() const noexcept { return _owns_memory; }
 
@@ -3319,32 +3319,32 @@ namespace logging {
 struct NoLogging {
 
   /*
-  ### pmm::logging::NoLogging::on_allocation_failure
+### pmm::logging::NoLogging::on_allocation_failure
   */
   static void on_allocation_failure(std::size_t, PmmError) noexcept {}
 
   /*
-  ### pmm::logging::NoLogging::on_expand
+### pmm::logging::NoLogging::on_expand
   */
   static void on_expand(std::size_t, std::size_t) noexcept {}
 
   /*
-  ### pmm::logging::NoLogging::on_corruption_detected
+### pmm::logging::NoLogging::on_corruption_detected
   */
   static void on_corruption_detected(PmmError) noexcept {}
 
   /*
-  ### pmm::logging::NoLogging::on_create
+### pmm::logging::NoLogging::on_create
   */
   static void on_create(std::size_t) noexcept {}
 
   /*
-  ### pmm::logging::NoLogging::on_destroy
+### pmm::logging::NoLogging::on_destroy
   */
   static void on_destroy() noexcept {}
 
   /*
-  ### pmm::logging::NoLogging::on_load
+### pmm::logging::NoLogging::on_load
   */
   static void on_load() noexcept {}
 };
@@ -3355,7 +3355,7 @@ struct NoLogging {
 struct StderrLogging {
 
   /*
-  ### pmm::logging::StderrLogging::on_allocation_failure
+### pmm::logging::StderrLogging::on_allocation_failure
   */
   static void on_allocation_failure(std::size_t user_size,
                                     PmmError err) noexcept {
@@ -3365,14 +3365,14 @@ struct StderrLogging {
   }
 
   /*
-  ### pmm::logging::StderrLogging::on_expand
+### pmm::logging::StderrLogging::on_expand
   */
   static void on_expand(std::size_t old_size, std::size_t new_size) noexcept {
     std::fprintf(stderr, "[pmm] expand: %zu -> %zu\n", old_size, new_size);
   }
 
   /*
-  ### pmm::logging::StderrLogging::on_corruption_detected
+### pmm::logging::StderrLogging::on_corruption_detected
   */
   static void on_corruption_detected(PmmError err) noexcept {
     std::fprintf(stderr, "[pmm] corruption_detected: error=%d\n",
@@ -3380,19 +3380,19 @@ struct StderrLogging {
   }
 
   /*
-  ### pmm::logging::StderrLogging::on_create
+### pmm::logging::StderrLogging::on_create
   */
   static void on_create(std::size_t initial_size) noexcept {
     std::fprintf(stderr, "[pmm] create: size=%zu\n", initial_size);
   }
 
   /*
-  ### pmm::logging::StderrLogging::on_destroy
+### pmm::logging::StderrLogging::on_destroy
   */
   static void on_destroy() noexcept { std::fprintf(stderr, "[pmm] destroy\n"); }
 
   /*
-  ### pmm::logging::StderrLogging::on_load
+### pmm::logging::StderrLogging::on_load
   */
   static void on_load() noexcept { std::fprintf(stderr, "[pmm] load\n"); }
 };
@@ -3418,7 +3418,7 @@ public:
   using address_traits = AddressTraitsT;
 
   /*
-  ### pmm::StaticStorage::StaticStorage
+### pmm::StaticStorage::StaticStorage
   */
   StaticStorage() noexcept = default;
   StaticStorage(const StaticStorage &) = delete;
@@ -3428,23 +3428,23 @@ public:
   StaticStorage &operator=(StaticStorage &&) = delete;
 
   /*
-  ### pmm::StaticStorage::base_ptr
+### pmm::StaticStorage::base_ptr
   */
   std::uint8_t *base_ptr() noexcept { return _buffer; }
   const std::uint8_t *base_ptr() const noexcept { return _buffer; }
 
   /*
-  ### pmm::StaticStorage::total_size
+### pmm::StaticStorage::total_size
   */
   constexpr std::size_t total_size() const noexcept { return Size; }
 
   /*
-  ### pmm::StaticStorage::expand
+### pmm::StaticStorage::expand
   */
   bool expand(std::size_t) noexcept { return false; }
 
   /*
-  ### pmm::StaticStorage::owns_memory
+### pmm::StaticStorage::owns_memory
   */
   constexpr bool owns_memory() const noexcept { return false; }
 
@@ -3604,7 +3604,7 @@ public:
   using BlockState = BlockStateBase<AddressTraitsT>;
 
   /*
-  ### pmm::AllocatorPolicy::AllocatorPolicy
+### pmm::AllocatorPolicy::AllocatorPolicy
   */
   AllocatorPolicy() = delete;
   AllocatorPolicy(const AllocatorPolicy &) = delete;
@@ -3612,7 +3612,7 @@ public:
   AllocatorPolicy &operator=(const AllocatorPolicy &) = delete;
 
   /*
-  ### pmm::AllocatorPolicy::allocate_from_block
+### pmm::AllocatorPolicy::allocate_from_block
   */
   static void *allocate_from_block(std::uint8_t *base,
                                    detail::ManagerHeader<AddressTraitsT> *hdr,
@@ -3693,7 +3693,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::coalesce
+### pmm::AllocatorPolicy::coalesce
   */
   static void coalesce(std::uint8_t *base,
                        detail::ManagerHeader<AddressTraitsT> *hdr,
@@ -3775,7 +3775,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::rebuild_free_tree
+### pmm::AllocatorPolicy::rebuild_free_tree
   */
   static void rebuild_free_tree(std::uint8_t *base,
                                 detail::ManagerHeader<AddressTraitsT> *hdr) {
@@ -3804,7 +3804,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::repair_linked_list
+### pmm::AllocatorPolicy::repair_linked_list
   */
   static void repair_linked_list(std::uint8_t *base,
                                  detail::ManagerHeader<AddressTraitsT> *hdr) {
@@ -3826,7 +3826,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::recompute_counters
+### pmm::AllocatorPolicy::recompute_counters
   */
   static void recompute_counters(std::uint8_t *base,
                                  detail::ManagerHeader<AddressTraitsT> *hdr) {
@@ -3863,7 +3863,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::verify_linked_list
+### pmm::AllocatorPolicy::verify_linked_list
   */
   static void
   verify_linked_list(const std::uint8_t *base,
@@ -3891,7 +3891,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::verify_counters
+### pmm::AllocatorPolicy::verify_counters
   */
   static void verify_counters(const std::uint8_t *base,
                               const detail::ManagerHeader<AddressTraitsT> *hdr,
@@ -3928,7 +3928,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::verify_block_states
+### pmm::AllocatorPolicy::verify_block_states
   */
   static void
   verify_block_states(const std::uint8_t *base,
@@ -3947,7 +3947,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::verify_free_tree
+### pmm::AllocatorPolicy::verify_free_tree
   */
   static void verify_free_tree(const std::uint8_t *base,
                                const detail::ManagerHeader<AddressTraitsT> *hdr,
@@ -4026,7 +4026,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::free_tree_block_granules
+### pmm::AllocatorPolicy::free_tree_block_granules
   */
   static index_type
   free_tree_block_granules(const std::uint8_t *base,
@@ -4044,7 +4044,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::free_tree_less_key
+### pmm::AllocatorPolicy::free_tree_less_key
   */
   static bool
   free_tree_less_key(const std::uint8_t *base,
@@ -4057,7 +4057,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::free_tree_contains
+### pmm::AllocatorPolicy::free_tree_contains
   */
   static bool
   free_tree_contains(const std::uint8_t *base,
@@ -4081,7 +4081,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::verify_free_tree_node
+### pmm::AllocatorPolicy::verify_free_tree_node
   */
   static std::int16_t verify_free_tree_node(
       const std::uint8_t *base,
@@ -4160,7 +4160,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::realloc_shrink
+### pmm::AllocatorPolicy::realloc_shrink
   */
   static void realloc_shrink(std::uint8_t *base,
                              detail::ManagerHeader<AddressTraitsT> *hdr,
@@ -4199,7 +4199,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatorPolicy::realloc_grow
+### pmm::AllocatorPolicy::realloc_grow
   */
   static bool realloc_grow(std::uint8_t *base,
                            detail::ManagerHeader<AddressTraitsT> *hdr,
@@ -4312,7 +4312,7 @@ template <typename AddressTraitsT> struct ForestDomainRecord {
   char name[kForestDomainNameCapacity];
 
   /*
-  ### pmm::detail::ForestDomainRecord::ForestDomainRecord
+### pmm::detail::ForestDomainRecord::ForestDomainRecord
   */
   constexpr ForestDomainRecord() noexcept
       : binding_id(0), root_offset(0), symbol_offset(0),
@@ -4335,7 +4335,7 @@ template <typename AddressTraitsT> struct ForestDomainRegistry {
   ForestDomainRecord<AddressTraitsT> domains[kMaxForestDomains];
 
   /*
-  ### pmm::detail::ForestDomainRegistry::ForestDomainRegistry
+### pmm::detail::ForestDomainRegistry::ForestDomainRegistry
   */
   constexpr ForestDomainRegistry() noexcept
       : magic(kForestRegistryMagic), version(kForestRegistryVersion),
@@ -4400,7 +4400,7 @@ template <typename ManagerAccess> struct ManagerLayoutOps {
   using BlockState = BlockStateBase<address_traits>;
 
   /*
-  ### pmm::detail::ManagerLayoutOps::init_layout
+### pmm::detail::ManagerLayoutOps::init_layout
   */
   static bool init_layout(storage_backend &backend, std::uint8_t *base,
                           std::size_t size) noexcept {
@@ -4465,7 +4465,7 @@ template <typename ManagerAccess> struct ManagerLayoutOps {
   }
 
   /*
-  ### pmm::detail::ManagerLayoutOps::do_expand
+### pmm::detail::ManagerLayoutOps::do_expand
   */
   static bool do_expand(storage_backend &backend, bool initialized,
                         std::size_t user_size) noexcept {
@@ -4578,7 +4578,7 @@ template <typename T, typename ManagerT> struct pallocator {
   using is_always_equal = std::true_type;
 
   /*
-  ### pmm::pallocator::pallocator
+### pmm::pallocator::pallocator
   */
   constexpr pallocator() noexcept = default;
 
@@ -4588,7 +4588,7 @@ template <typename T, typename ManagerT> struct pallocator {
   constexpr pallocator(const pallocator<U, ManagerT> &) noexcept {}
 
   /*
-  ### pmm::pallocator::allocate
+### pmm::pallocator::allocate
   */
   [[nodiscard]] T *allocate(std::size_t n) {
     if (n == 0)
@@ -4606,14 +4606,14 @@ template <typename T, typename ManagerT> struct pallocator {
   }
 
   /*
-  ### pmm::pallocator::deallocate
+### pmm::pallocator::deallocate
   */
   void deallocate(T *p, std::size_t) noexcept {
     ManagerT::deallocate(static_cast<void *>(p));
   }
 
   /*
-  ### pmm::pallocator::max_size
+### pmm::pallocator::max_size
   */
   std::size_t max_size() const noexcept {
     return (std::numeric_limits<std::size_t>::max)() / sizeof(T);
@@ -4659,7 +4659,7 @@ template <typename T, typename ManagerT> struct parray {
   index_type _data_idx;
 
   /*
-  ### pmm::parray::parray
+### pmm::parray::parray
   */
   parray() noexcept
       : _size(0), _capacity(0),
@@ -4668,24 +4668,24 @@ template <typename T, typename ManagerT> struct parray {
   ~parray() noexcept = default;
 
   /*
-  ### pmm::parray::size
+### pmm::parray::size
   */
   std::size_t size() const noexcept { return static_cast<std::size_t>(_size); }
 
   /*
-  ### pmm::parray::empty
+### pmm::parray::empty
   */
   bool empty() const noexcept { return _size == 0; }
 
   /*
-  ### pmm::parray::capacity
+### pmm::parray::capacity
   */
   std::size_t capacity() const noexcept {
     return static_cast<std::size_t>(_capacity);
   }
 
   /*
-  ### pmm::parray::at
+### pmm::parray::at
   */
   T *at(std::size_t i) noexcept {
     if (i >= static_cast<std::size_t>(_size))
@@ -4703,7 +4703,7 @@ template <typename T, typename ManagerT> struct parray {
   }
 
   /*
-  ### pmm::parray::operator_index
+### pmm::parray::operator_index
   */
   T operator[](std::size_t i) const noexcept {
     const T *data = resolve_data();
@@ -4711,14 +4711,14 @@ template <typename T, typename ManagerT> struct parray {
   }
 
   /*
-  ### pmm::parray::front
+### pmm::parray::front
   */
   T *front() noexcept { return at(0); }
 
   const T *front() const noexcept { return at(0); }
 
   /*
-  ### pmm::parray::back
+### pmm::parray::back
   */
   T *back() noexcept {
     return (_size > 0) ? at(static_cast<std::size_t>(_size) - 1) : nullptr;
@@ -4729,14 +4729,14 @@ template <typename T, typename ManagerT> struct parray {
   }
 
   /*
-  ### pmm::parray::data
+### pmm::parray::data
   */
   T *data() noexcept { return resolve_data(); }
 
   const T *data() const noexcept { return resolve_data(); }
 
   /*
-  ### pmm::parray::push_back
+### pmm::parray::push_back
   */
   bool push_back(const T &value) noexcept {
     if (!ensure_capacity(_size + 1))
@@ -4751,7 +4751,7 @@ template <typename T, typename ManagerT> struct parray {
   }
 
   /*
-  ### pmm::parray::pop_back
+### pmm::parray::pop_back
   */
   void pop_back() noexcept {
     if (_size > 0)
@@ -4759,7 +4759,7 @@ template <typename T, typename ManagerT> struct parray {
   }
 
   /*
-  ### pmm::parray::set
+### pmm::parray::set
   */
   bool set(std::size_t i, const T &value) noexcept {
     if (i >= static_cast<std::size_t>(_size))
@@ -4773,7 +4773,7 @@ template <typename T, typename ManagerT> struct parray {
   }
 
   /*
-  ### pmm::parray::reserve
+### pmm::parray::reserve
   */
   bool reserve(std::size_t n) noexcept {
     if (n > static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()))
@@ -4782,7 +4782,7 @@ template <typename T, typename ManagerT> struct parray {
   }
 
   /*
-  ### pmm::parray::resize
+### pmm::parray::resize
   */
   bool resize(std::size_t n) noexcept {
     if (n > static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()))
@@ -4804,7 +4804,7 @@ template <typename T, typename ManagerT> struct parray {
   }
 
   /*
-  ### pmm::parray::insert
+### pmm::parray::insert
   */
   bool insert(std::size_t index, const T &value) noexcept {
     if (index > static_cast<std::size_t>(_size))
@@ -4826,7 +4826,7 @@ template <typename T, typename ManagerT> struct parray {
   }
 
   /*
-  ### pmm::parray::erase
+### pmm::parray::erase
   */
   bool erase(std::size_t index) noexcept {
     if (index >= static_cast<std::size_t>(_size))
@@ -4843,12 +4843,12 @@ template <typename T, typename ManagerT> struct parray {
   }
 
   /*
-  ### pmm::parray::clear
+### pmm::parray::clear
   */
   void clear() noexcept { _size = 0; }
 
   /*
-  ### pmm::parray::free_data
+### pmm::parray::free_data
   */
   void free_data() noexcept {
     if (_data_idx != detail::kNullIdx_v<typename ManagerT::address_traits>) {
@@ -4882,7 +4882,7 @@ template <typename T, typename ManagerT> struct parray {
 
 private:
   /*
-  ### pmm::parray::resolve_data
+### pmm::parray::resolve_data
   */
   T *resolve_data() const noexcept {
     return reinterpret_cast<T *>(
@@ -4892,7 +4892,7 @@ private:
   }
 
   /*
-  ### pmm::parray::ensure_capacity
+### pmm::parray::ensure_capacity
   */
   bool ensure_capacity(std::uint32_t required) noexcept {
     if (required <= _capacity)
@@ -5053,13 +5053,13 @@ template <typename _K, typename _V, typename ManagerT> struct pmap {
   static constexpr std::uint32_t domain_type_hash = detail::pmap_fnv1a(
 
       /*
-      ### pmm::pmap::pmap_fnv1a
+### pmm::pmap::pmap_fnv1a
       */
       detail::pmap_fnv1a(2166136261u, detail::pmap_type_fp<_K>(), 4),
       detail::pmap_type_fp<_V>(), 4);
 
   /*
-  ## pmm::pmap::forest_domain_descriptor
+## pmm::pmap::forest_domain_descriptor
   */
   struct forest_domain_descriptor {
 
@@ -5072,13 +5072,13 @@ template <typename _K, typename _V, typename ManagerT> struct pmap {
     index_type binding_id;
 
     /*
-    ### pmm::pmap::forest_domain_descriptor::forest_domain_descriptor
+### pmm::pmap::forest_domain_descriptor::forest_domain_descriptor
     */
     constexpr explicit forest_domain_descriptor(index_type id = 0) noexcept
         : binding_id(id) {}
 
     /*
-    ### pmm::pmap::forest_domain_descriptor::name
+### pmm::pmap::forest_domain_descriptor::name
     */
     const char *name() const noexcept {
 
@@ -5087,7 +5087,7 @@ template <typename _K, typename _V, typename ManagerT> struct pmap {
     }
 
     /*
-    ### pmm::pmap::forest_domain_descriptor::root_index
+### pmm::pmap::forest_domain_descriptor::root_index
     */
     index_type root_index() const noexcept {
       return ManagerT::forest_domain_root_index_unlocked(
@@ -5095,7 +5095,7 @@ template <typename _K, typename _V, typename ManagerT> struct pmap {
     }
 
     /*
-    ### pmm::pmap::forest_domain_descriptor::root_index_ptr
+### pmm::pmap::forest_domain_descriptor::root_index_ptr
     */
     index_type *root_index_ptr() noexcept {
       return binding_id == 0
@@ -5106,14 +5106,14 @@ template <typename _K, typename _V, typename ManagerT> struct pmap {
     }
 
     /*
-    ### pmm::pmap::forest_domain_descriptor::resolve_node
+### pmm::pmap::forest_domain_descriptor::resolve_node
     */
     static node_type *resolve_node(node_pptr p) noexcept {
       return ManagerT::template resolve<node_type>(p);
     }
 
     /*
-    ### pmm::pmap::forest_domain_descriptor::compare_key
+### pmm::pmap::forest_domain_descriptor::compare_key
     */
     static int compare_key(const _K &key, node_pptr cur) noexcept {
 
@@ -5124,7 +5124,7 @@ template <typename _K, typename _V, typename ManagerT> struct pmap {
     }
 
     /*
-    ### pmm::pmap::forest_domain_descriptor::less_node
+### pmm::pmap::forest_domain_descriptor::less_node
     */
     static bool less_node(node_pptr lhs, node_pptr rhs) noexcept {
       node_type *l = resolve_node(lhs);
@@ -5133,7 +5133,7 @@ template <typename _K, typename _V, typename ManagerT> struct pmap {
     }
 
     /*
-    ### pmm::pmap::forest_domain_descriptor::validate_node
+### pmm::pmap::forest_domain_descriptor::validate_node
     */
     static bool validate_node(node_pptr p) noexcept {
       return resolve_node(p) != nullptr;
@@ -5152,7 +5152,7 @@ private:
   index_type _binding_id;
 
   /*
-  ### pmm::pmap::bind
+### pmm::pmap::bind
   */
   bool bind(const char *domain_key) noexcept {
     if (!ManagerT::is_initialized())
@@ -5178,7 +5178,7 @@ private:
   }
 
   /*
-  ### pmm::pmap::descriptor
+### pmm::pmap::descriptor
   */
   forest_domain_descriptor descriptor() const noexcept {
     return forest_domain_descriptor(_binding_id);
@@ -5186,7 +5186,7 @@ private:
 
 public:
   /*
-  ### pmm::pmap::pmap
+### pmm::pmap::pmap
   */
   pmap() noexcept : _binding_id(0) {}
 
@@ -5195,17 +5195,17 @@ public:
   }
 
   /*
-  ### pmm::pmap::domain_name
+### pmm::pmap::domain_name
   */
   const char *domain_name() const noexcept { return descriptor().name(); }
 
   /*
-  ### pmm::pmap::root_index
+### pmm::pmap::root_index
   */
   index_type root_index() const noexcept { return descriptor().root_index(); }
 
   /*
-  ### pmm::pmap::forest_domain_ops
+### pmm::pmap::forest_domain_ops
   */
   forest_domain_policy forest_domain_ops() noexcept {
     if (_binding_id == 0 ||
@@ -5216,21 +5216,21 @@ public:
   }
 
   /*
-  ### pmm::pmap::forest_domain_view_ops
+### pmm::pmap::forest_domain_view_ops
   */
   forest_domain_view_policy forest_domain_view_ops() const noexcept {
     return forest_domain_view_policy(descriptor());
   }
 
   /*
-  ### pmm::pmap::empty
+### pmm::pmap::empty
   */
   bool empty() const noexcept {
     return root_index() == static_cast<index_type>(0);
   }
 
   /*
-  ### pmm::pmap::size
+### pmm::pmap::size
   */
   std::size_t size() const noexcept {
 
@@ -5241,7 +5241,7 @@ public:
   }
 
   /*
-  ### pmm::pmap::insert
+### pmm::pmap::insert
   */
   node_pptr insert(const _K &key, const _V &val) noexcept {
 
@@ -5276,19 +5276,19 @@ public:
   }
 
   /*
-  ### pmm::pmap::find
+### pmm::pmap::find
   */
   node_pptr find(const _K &key) const noexcept {
     return forest_domain_view_ops().find(key);
   }
 
   /*
-  ### pmm::pmap::contains
+### pmm::pmap::contains
   */
   bool contains(const _K &key) const noexcept { return !find(key).is_null(); }
 
   /*
-  ### pmm::pmap::erase
+### pmm::pmap::erase
   */
   bool erase(const _K &key) noexcept {
 
@@ -5306,7 +5306,7 @@ public:
   }
 
   /*
-  ### pmm::pmap::clear
+### pmm::pmap::clear
   */
   void clear() noexcept {
     auto ops = forest_domain_policy(descriptor());
@@ -5324,14 +5324,14 @@ public:
   }
 
   /*
-  ### pmm::pmap::reset
+### pmm::pmap::reset
   */
   void reset() noexcept { forest_domain_policy(descriptor()).reset_root(); }
 
   using iterator = detail::AvlInorderIterator<node_pptr>;
 
   /*
-  ### pmm::pmap::begin
+### pmm::pmap::begin
   */
   iterator begin() const noexcept {
     const index_type root = root_index();
@@ -5341,7 +5341,7 @@ public:
   }
 
   /*
-  ### pmm::pmap::end
+### pmm::pmap::end
   */
   iterator end() const noexcept { return iterator(static_cast<index_type>(0)); }
 };
@@ -5394,7 +5394,7 @@ private:
 
 public:
   /*
-  ### pmm::pptr::pptr
+### pmm::pptr::pptr
   */
   constexpr pptr() noexcept : _idx(0) {}
   constexpr explicit pptr(index_type idx) noexcept : _idx(idx) {}
@@ -5404,33 +5404,33 @@ public:
   ~pptr() noexcept = default;
 
   /*
-  ### pmm::pptr::operator_increment
+### pmm::pptr::operator_increment
   */
   pptr &operator++() = delete;
   pptr operator++(int) = delete;
   /*
-  ### pmm::pptr::operator_decrement
+### pmm::pptr::operator_decrement
   */
   pptr &operator--() = delete;
   pptr operator--(int) = delete;
 
   /*
-  ### pmm::pptr::is_null
+### pmm::pptr::is_null
   */
   constexpr bool is_null() const noexcept { return _idx == 0; }
 
   /*
-  ### pmm::pptr::operator_bool
+### pmm::pptr::operator_bool
   */
   constexpr explicit operator bool() const noexcept { return _idx != 0; }
 
   /*
-  ### pmm::pptr::offset
+### pmm::pptr::offset
   */
   constexpr index_type offset() const noexcept { return _idx; }
 
   /*
-  ### pmm::pptr::byte_offset
+### pmm::pptr::byte_offset
   */
   constexpr std::size_t byte_offset() const noexcept {
     return static_cast<std::size_t>(_idx) *
@@ -5446,7 +5446,7 @@ public:
   }
 
   /*
-  ### pmm::pptr::operator_less
+### pmm::pptr::operator_less
   */
   bool operator<(const pptr &other) const noexcept {
 
@@ -5469,35 +5469,35 @@ public:
   }
 
   /*
-  ### pmm::pptr::operator_deref
+### pmm::pptr::operator_deref
   */
   T &operator*() const noexcept {
     return *ManagerT::template resolve_checked<T>(*this);
   }
 
   /*
-  ### pmm::pptr::operator_arrow
+### pmm::pptr::operator_arrow
   */
   T *operator->() const noexcept {
     return ManagerT::template resolve_checked<T>(*this);
   }
 
   /*
-  ### pmm::pptr::resolve
+### pmm::pptr::resolve
   */
   T *resolve() const noexcept {
     return ManagerT::template resolve_checked<T>(*this);
   }
 
   /*
-  ### pmm::pptr::resolve_unchecked
+### pmm::pptr::resolve_unchecked
   */
   T *resolve_unchecked() const noexcept {
     return ManagerT::template resolve_unchecked<T>(*this);
   }
 
   /*
-  ### pmm::pptr::tree_node
+### pmm::pptr::tree_node
   */
   auto &tree_node() const noexcept { return ManagerT::tree_node(*this); }
 };
@@ -5526,7 +5526,7 @@ template <typename ManagerT> struct pstring {
   index_type _data_idx;
 
   /*
-  ### pmm::pstring::pstring
+### pmm::pstring::pstring
   */
   pstring() noexcept
       : _length(0), _capacity(0),
@@ -5535,7 +5535,7 @@ template <typename ManagerT> struct pstring {
   ~pstring() noexcept = default;
 
   /*
-  ### pmm::pstring::c_str
+### pmm::pstring::c_str
   */
   const char *c_str() const noexcept {
     if (_data_idx == detail::kNullIdx_v<typename ManagerT::address_traits>)
@@ -5546,19 +5546,19 @@ template <typename ManagerT> struct pstring {
   }
 
   /*
-  ### pmm::pstring::size
+### pmm::pstring::size
   */
   std::size_t size() const noexcept {
     return static_cast<std::size_t>(_length);
   }
 
   /*
-  ### pmm::pstring::empty
+### pmm::pstring::empty
   */
   bool empty() const noexcept { return _length == 0; }
 
   /*
-  ### pmm::pstring::operator_index
+### pmm::pstring::operator_index
   */
   char operator[](std::size_t i) const noexcept {
     char *data = resolve_data();
@@ -5566,7 +5566,7 @@ template <typename ManagerT> struct pstring {
   }
 
   /*
-  ### pmm::pstring::assign
+### pmm::pstring::assign
   */
   bool assign(const char *s) noexcept {
     if (s == nullptr)
@@ -5587,7 +5587,7 @@ template <typename ManagerT> struct pstring {
   }
 
   /*
-  ### pmm::pstring::append
+### pmm::pstring::append
   */
   bool append(const char *s) noexcept {
     if (s == nullptr)
@@ -5610,7 +5610,7 @@ template <typename ManagerT> struct pstring {
   }
 
   /*
-  ### pmm::pstring::clear
+### pmm::pstring::clear
   */
   void clear() noexcept {
     _length = 0;
@@ -5622,7 +5622,7 @@ template <typename ManagerT> struct pstring {
   }
 
   /*
-  ### pmm::pstring::free_data
+### pmm::pstring::free_data
   */
   void free_data() noexcept {
     if (_data_idx != detail::kNullIdx_v<typename ManagerT::address_traits>) {
@@ -5659,7 +5659,7 @@ template <typename ManagerT> struct pstring {
   }
 
   /*
-  ### pmm::pstring::operator_less
+### pmm::pstring::operator_less
   */
   bool operator<(const pstring &other) const noexcept {
     return std::strcmp(c_str(), other.c_str()) < 0;
@@ -5667,7 +5667,7 @@ template <typename ManagerT> struct pstring {
 
 private:
   /*
-  ### pmm::pstring::resolve_data
+### pmm::pstring::resolve_data
   */
   char *resolve_data() const noexcept {
     return reinterpret_cast<char *>(
@@ -5677,7 +5677,7 @@ private:
   }
 
   /*
-  ### pmm::pstring::ensure_capacity
+### pmm::pstring::ensure_capacity
   */
   bool ensure_capacity(std::uint32_t required) noexcept {
     if (required <= _capacity)
@@ -5746,7 +5746,7 @@ template <typename ManagerT> struct pstringview {
   using psview_pptr = typename ManagerT::template pptr<pstringview>;
 
   /*
-  ## pmm::pstringview::forest_domain_descriptor
+## pmm::pstringview::forest_domain_descriptor
   */
   struct forest_domain_descriptor {
 
@@ -5759,14 +5759,14 @@ template <typename ManagerT> struct pstringview {
     using node_pptr = psview_pptr;
 
     /*
-    ### pmm::pstringview::forest_domain_descriptor::name
+### pmm::pstringview::forest_domain_descriptor::name
     */
     static constexpr const char *name() noexcept {
       return detail::kSystemDomainSymbols;
     }
 
     /*
-    ### pmm::pstringview::forest_domain_descriptor::root_index
+### pmm::pstringview::forest_domain_descriptor::root_index
     */
     static index_type root_index() noexcept {
 
@@ -5775,7 +5775,7 @@ template <typename ManagerT> struct pstringview {
     }
 
     /*
-    ### pmm::pstringview::forest_domain_descriptor::root_index_ptr
+### pmm::pstringview::forest_domain_descriptor::root_index_ptr
     */
     static index_type *root_index_ptr() noexcept {
       auto *domain = ManagerT::symbol_domain_record_unlocked();
@@ -5783,14 +5783,14 @@ template <typename ManagerT> struct pstringview {
     }
 
     /*
-    ### pmm::pstringview::forest_domain_descriptor::resolve_node
+### pmm::pstringview::forest_domain_descriptor::resolve_node
     */
     static node_type *resolve_node(node_pptr p) noexcept {
       return ManagerT::template resolve<node_type>(p);
     }
 
     /*
-    ### pmm::pstringview::forest_domain_descriptor::compare_key
+### pmm::pstringview::forest_domain_descriptor::compare_key
     */
     static int compare_key(const char *key, node_pptr cur) noexcept {
       if (key == nullptr)
@@ -5802,7 +5802,7 @@ template <typename ManagerT> struct pstringview {
     }
 
     /*
-    ### pmm::pstringview::forest_domain_descriptor::less_node
+### pmm::pstringview::forest_domain_descriptor::less_node
     */
     static bool less_node(node_pptr lhs, node_pptr rhs) noexcept {
       node_type *lhs_obj = resolve_node(lhs);
@@ -5812,7 +5812,7 @@ template <typename ManagerT> struct pstringview {
     }
 
     /*
-    ### pmm::pstringview::forest_domain_descriptor::validate_node
+### pmm::pstringview::forest_domain_descriptor::validate_node
     */
     static bool validate_node(node_pptr p) noexcept {
       return resolve_node(p) != nullptr;
@@ -5823,7 +5823,7 @@ template <typename ManagerT> struct pstringview {
       detail::ForestDomainOps<forest_domain_descriptor>;
 
   /*
-  ### pmm::pstringview::forest_domain_ops
+### pmm::pstringview::forest_domain_ops
   */
   static forest_domain_policy forest_domain_ops() noexcept {
     return forest_domain_policy{};
@@ -5834,29 +5834,29 @@ template <typename ManagerT> struct pstringview {
   char str[1];
 
   /*
-  ### pmm::pstringview::pstringview
+### pmm::pstringview::pstringview
   */
   explicit pstringview(const char *s) noexcept : length(0), str{'\0'} {
     _interned = _intern(s);
   }
 
   /*
-  ### pmm::pstringview::operator_psview_pptr
+### pmm::pstringview::operator_psview_pptr
   */
   operator psview_pptr() const noexcept { return _interned; }
 
   /*
-  ### pmm::pstringview::c_str
+### pmm::pstringview::c_str
   */
   const char *c_str() const noexcept { return str; }
 
   /*
-  ### pmm::pstringview::size
+### pmm::pstringview::size
   */
   std::size_t size() const noexcept { return static_cast<std::size_t>(length); }
 
   /*
-  ### pmm::pstringview::empty
+### pmm::pstringview::empty
   */
   bool empty() const noexcept { return length == 0; }
 
@@ -5883,19 +5883,19 @@ template <typename ManagerT> struct pstringview {
   }
 
   /*
-  ### pmm::pstringview::operator_less
+### pmm::pstringview::operator_less
   */
   bool operator<(const pstringview &other) const noexcept {
     return std::strcmp(c_str(), other.c_str()) < 0;
   }
 
   /*
-  ### pmm::pstringview::intern
+### pmm::pstringview::intern
   */
   static psview_pptr intern(const char *s) noexcept { return _intern(s); }
 
   /*
-  ### pmm::pstringview::reset
+### pmm::pstringview::reset
   */
   static void reset() noexcept {
     if (!ManagerT::is_initialized())
@@ -5908,7 +5908,7 @@ template <typename ManagerT> struct pstringview {
   }
 
   /*
-  ### pmm::pstringview::root_index
+### pmm::pstringview::root_index
   */
   static index_type root_index() noexcept {
     if (!ManagerT::is_initialized())
@@ -5923,7 +5923,7 @@ private:
   psview_pptr _interned;
 
   /*
-  ### pmm::pstringview::_intern
+### pmm::pstringview::_intern
   */
   static psview_pptr _intern(const char *s) noexcept {
     if (!ManagerT::is_initialized())
@@ -5961,7 +5961,7 @@ public:
   using pptr_type = typename ManagerT::template pptr<T>;
 
   /*
-  ### pmm::typed_guard::typed_guard
+### pmm::typed_guard::typed_guard
   */
   explicit typed_guard(pptr_type p) noexcept : _ptr(p) {}
 
@@ -5987,7 +5987,7 @@ public:
   ~typed_guard() { reset(); }
 
   /*
-  ### pmm::typed_guard::reset
+### pmm::typed_guard::reset
   */
   void reset() noexcept {
     if (!_ptr.is_null()) {
@@ -5998,7 +5998,7 @@ public:
   }
 
   /*
-  ### pmm::typed_guard::release
+### pmm::typed_guard::release
   */
   pptr_type release() noexcept {
 
@@ -6009,22 +6009,22 @@ public:
   }
 
   /*
-  ### pmm::typed_guard::operator_arrow
+### pmm::typed_guard::operator_arrow
   */
   T *operator->() const noexcept { return &(*_ptr); }
 
   /*
-  ### pmm::typed_guard::operator_deref
+### pmm::typed_guard::operator_deref
   */
   T &operator*() const noexcept { return *_ptr; }
 
   /*
-  ### pmm::typed_guard::get
+### pmm::typed_guard::get
   */
   pptr_type get() const noexcept { return _ptr; }
 
   /*
-  ### pmm::typed_guard::operator_bool
+### pmm::typed_guard::operator_bool
   */
   explicit operator bool() const noexcept { return !_ptr.is_null(); }
 
@@ -6032,7 +6032,7 @@ private:
   pptr_type _ptr;
 
   /*
-  ### pmm::typed_guard::cleanup
+### pmm::typed_guard::cleanup
   */
   static void cleanup(T &obj) noexcept {
     if constexpr (HasFreeData<T>)
@@ -6096,7 +6096,7 @@ public:
   template <typename T>
 
   /*
-  ### pmm::detail::PersistMemoryTypedApi::reallocate_typed
+### pmm::detail::PersistMemoryTypedApi::reallocate_typed
   */
   static pmm::pptr<T, ManagerT>
   reallocate_typed(pmm::pptr<T, ManagerT> p, std::size_t old_count,
@@ -6450,22 +6450,22 @@ public:
   template <typename T> using pallocator = pmm::pallocator<T, manager_type>;
 
   /*
-  ### pmm::PersistMemoryManager::last_error
+### pmm::PersistMemoryManager::last_error
   */
   static PmmError last_error() noexcept { return _last_error; }
 
   /*
-  ### pmm::PersistMemoryManager::clear_error
+### pmm::PersistMemoryManager::clear_error
   */
   static void clear_error() noexcept { _last_error = PmmError::Ok; }
 
   /*
-  ### pmm::PersistMemoryManager::set_last_error
+### pmm::PersistMemoryManager::set_last_error
   */
   static void set_last_error(PmmError err) noexcept { _last_error = err; }
 
   /*
-  ### pmm::PersistMemoryManager::create
+### pmm::PersistMemoryManager::create
   */
   static bool create(std::size_t initial_size) noexcept {
 
@@ -6534,7 +6534,7 @@ public:
   }
 
   /*
-  ### pmm::PersistMemoryManager::load
+### pmm::PersistMemoryManager::load
   */
   static bool load(VerifyResult &result) noexcept {
 
@@ -6657,7 +6657,7 @@ public:
   }
 
   /*
-  ### pmm::PersistMemoryManager::destroy
+### pmm::PersistMemoryManager::destroy
   */
   static void destroy() noexcept {
     typename thread_policy::unique_lock_type lock(_mutex);
@@ -6670,7 +6670,7 @@ public:
   }
 
   /*
-  ### pmm::PersistMemoryManager::destroy_image
+### pmm::PersistMemoryManager::destroy_image
   */
   static void destroy_image() noexcept {
     typename thread_policy::unique_lock_type lock(_mutex);
@@ -6682,14 +6682,14 @@ public:
   }
 
   /*
-  ### pmm::PersistMemoryManager::is_initialized
+### pmm::PersistMemoryManager::is_initialized
   */
   static bool is_initialized() noexcept {
     return _initialized.load(std::memory_order_acquire);
   }
 
   /*
-  ### pmm::PersistMemoryManager::allocate
+### pmm::PersistMemoryManager::allocate
   */
   static void *allocate(std::size_t user_size) noexcept {
     typename thread_policy::unique_lock_type lock(_mutex);
@@ -6697,7 +6697,7 @@ public:
   }
 
   /*
-  ### pmm::PersistMemoryManager::deallocate
+### pmm::PersistMemoryManager::deallocate
   */
   static void deallocate(void *ptr) noexcept {
     typename thread_policy::unique_lock_type lock(_mutex);
@@ -6706,7 +6706,7 @@ public:
   }
 
   /*
-  ### pmm::PersistMemoryManager::lock_block_permanent
+### pmm::PersistMemoryManager::lock_block_permanent
   */
   static bool lock_block_permanent(void *ptr) noexcept {
     typename thread_policy::unique_lock_type lock(_mutex);
@@ -6714,7 +6714,7 @@ public:
   }
 
   /*
-  ### pmm::PersistMemoryManager::is_permanently_locked
+### pmm::PersistMemoryManager::is_permanently_locked
   */
   static bool is_permanently_locked(const void *ptr) noexcept {
     typename thread_policy::shared_lock_type lock(_mutex);
@@ -6753,7 +6753,7 @@ public:
   }
 
   /*
-  ### pmm::PersistMemoryManager::find_domain_by_name
+### pmm::PersistMemoryManager::find_domain_by_name
   */
   static index_type find_domain_by_name(const char *name) noexcept {
     typename thread_policy::shared_lock_type lock(_mutex);
@@ -6765,7 +6765,7 @@ public:
   }
 
   /*
-  ### pmm::PersistMemoryManager::find_domain_by_symbol
+### pmm::PersistMemoryManager::find_domain_by_symbol
   */
   static index_type find_domain_by_symbol(pptr<pstringview> symbol) noexcept {
     typename thread_policy::shared_lock_type lock(_mutex);
@@ -6777,14 +6777,14 @@ public:
   }
 
   /*
-  ### pmm::PersistMemoryManager::has_domain
+### pmm::PersistMemoryManager::has_domain
   */
   static bool has_domain(const char *name) noexcept {
     return find_domain_by_name(name) != 0;
   }
 
   /*
-  ### pmm::PersistMemoryManager::validate_bootstrap_invariants
+### pmm::PersistMemoryManager::validate_bootstrap_invariants
   */
   static bool validate_bootstrap_invariants() noexcept {
     typename thread_policy::shared_lock_type lock(_mutex);
@@ -6792,7 +6792,7 @@ public:
   }
 
   /*
-  ### pmm::PersistMemoryManager::register_domain
+### pmm::PersistMemoryManager::register_domain
   */
   static bool register_domain(const char *name) noexcept {
     typename thread_policy::unique_lock_type lock(_mutex);
@@ -6803,7 +6803,7 @@ public:
   }
 
   /*
-  ### pmm::PersistMemoryManager::register_system_domain
+### pmm::PersistMemoryManager::register_system_domain
   */
   static bool register_system_domain(const char *name) noexcept {
     typename thread_policy::unique_lock_type lock(_mutex);
@@ -6814,7 +6814,7 @@ public:
   }
 
   /*
-  ### pmm::PersistMemoryManager::get_domain_root_offset
+### pmm::PersistMemoryManager::get_domain_root_offset
   */
   static index_type get_domain_root_offset(const char *name) noexcept {
     typename thread_policy::shared_lock_type lock(_mutex);
@@ -6874,7 +6874,7 @@ private:
   template <typename T>
 
   /*
-  ### pmm::PersistMemoryManager::get_tree_idx_field
+### pmm::PersistMemoryManager::get_tree_idx_field
   */
   static index_type
   get_tree_idx_field(pptr<T> p, index_type (*getter)(const void *)) noexcept {
@@ -6894,7 +6894,7 @@ private:
   template <typename T>
 
   /*
-  ### pmm::PersistMemoryManager::set_tree_idx_field
+### pmm::PersistMemoryManager::set_tree_idx_field
   */
   static void set_tree_idx_field(pptr<T> p, void (*setter)(void *, index_type),
                                  index_type val) noexcept {
@@ -7020,7 +7020,7 @@ private:
 
 public:
   /*
-  ### pmm::PersistMemoryManager::total_size
+### pmm::PersistMemoryManager::total_size
   */
   static std::size_t total_size() noexcept {
     if (!_initialized.load(std::memory_order_acquire))
@@ -7031,7 +7031,7 @@ public:
   }
 
   /*
-  ### pmm::PersistMemoryManager::used_size
+### pmm::PersistMemoryManager::used_size
   */
   static std::size_t used_size() noexcept {
     return read_stat([](const auto *h) {
@@ -7040,7 +7040,7 @@ public:
   }
 
   /*
-  ### pmm::PersistMemoryManager::free_size
+### pmm::PersistMemoryManager::free_size
   */
   static std::size_t free_size() noexcept {
     return read_stat([](const auto *h) {
@@ -7050,7 +7050,7 @@ public:
   }
 
   /*
-  ### pmm::PersistMemoryManager::block_count
+### pmm::PersistMemoryManager::block_count
   */
   static std::size_t block_count() noexcept {
     return read_stat(
@@ -7058,7 +7058,7 @@ public:
   }
 
   /*
-  ### pmm::PersistMemoryManager::free_block_count
+### pmm::PersistMemoryManager::free_block_count
   */
   static std::size_t free_block_count() noexcept {
     return read_stat(
@@ -7066,7 +7066,7 @@ public:
   }
 
   /*
-  ### pmm::PersistMemoryManager::alloc_block_count
+### pmm::PersistMemoryManager::alloc_block_count
   */
   static std::size_t alloc_block_count() noexcept {
     return read_stat(
@@ -7074,7 +7074,7 @@ public:
   }
 
   /*
-  ### pmm::PersistMemoryManager::verify
+### pmm::PersistMemoryManager::verify
   */
   static VerifyResult verify() noexcept {
 
@@ -7146,7 +7146,7 @@ public:
   }
 
   /*
-  ### pmm::PersistMemoryManager::backend
+### pmm::PersistMemoryManager::backend
   */
   static storage_backend &backend() noexcept { return _backend; }
 
@@ -7160,7 +7160,7 @@ private:
   static inline thread_local PmmError _last_error{PmmError::Ok};
 
   /*
-  ### pmm::PersistMemoryManager::is_valid_user_offset_unlocked
+### pmm::PersistMemoryManager::is_valid_user_offset_unlocked
   */
   static bool is_valid_user_offset_unlocked(index_type off,
                                             std::size_t size_bytes) noexcept {
@@ -7174,7 +7174,7 @@ private:
   }
 
   /*
-  ### pmm::PersistMemoryManager::allocate_unlocked
+### pmm::PersistMemoryManager::allocate_unlocked
   */
   static void *allocate_unlocked(std::size_t user_size) noexcept {
     if (!_initialized) {
@@ -7233,7 +7233,7 @@ private:
   }
 
   /*
-  ### pmm::PersistMemoryManager::deallocate_unlocked
+### pmm::PersistMemoryManager::deallocate_unlocked
   */
   static void deallocate_unlocked(void *ptr) noexcept {
     if (!_initialized || ptr == nullptr)
@@ -7269,7 +7269,7 @@ private:
   }
 
   /*
-  ### pmm::PersistMemoryManager::lock_block_permanent_unlocked
+### pmm::PersistMemoryManager::lock_block_permanent_unlocked
   */
   static bool lock_block_permanent_unlocked(void *ptr) noexcept {
     if (!_initialized || ptr == nullptr)
@@ -8004,7 +8004,7 @@ static void verify_forest_registry_unlocked(VerifyResult &result) noexcept {
       kBlockHdrGranules + kMgrHdrGranules;
 
   /*
-  ### pmm::PersistMemoryManager::get_header
+### pmm::PersistMemoryManager::get_header
   */
   static detail::ManagerHeader<address_traits> *
   get_header(std::uint8_t *base) noexcept {
@@ -8013,7 +8013,7 @@ static void verify_forest_registry_unlocked(VerifyResult &result) noexcept {
   }
 
   /*
-  ### pmm::PersistMemoryManager::get_header_c
+### pmm::PersistMemoryManager::get_header_c
   */
   static const detail::ManagerHeader<address_traits> *
   get_header_c(const std::uint8_t *base) noexcept {
@@ -8021,7 +8021,7 @@ static void verify_forest_registry_unlocked(VerifyResult &result) noexcept {
   }
 
   /*
-  ## pmm::PersistMemoryManager::layout_access
+## pmm::PersistMemoryManager::layout_access
   */
   struct layout_access {
 
@@ -8048,7 +8048,7 @@ static void verify_forest_registry_unlocked(VerifyResult &result) noexcept {
         manager_type::kFreeBlkIdxLayout;
 
     /*
-    ### pmm::PersistMemoryManager::layout_access::get_header
+### pmm::PersistMemoryManager::layout_access::get_header
     */
     static detail::ManagerHeader<address_traits> *
     get_header(std::uint8_t *base) noexcept {
@@ -8056,7 +8056,7 @@ static void verify_forest_registry_unlocked(VerifyResult &result) noexcept {
     }
 
     /*
-    ### pmm::PersistMemoryManager::layout_access::set_initialized
+### pmm::PersistMemoryManager::layout_access::set_initialized
     */
     static void set_initialized() noexcept {
       manager_type::_initialized = true;
@@ -8064,7 +8064,7 @@ static void verify_forest_registry_unlocked(VerifyResult &result) noexcept {
   };
 
   /*
-  ### pmm::PersistMemoryManager::init_layout
+### pmm::PersistMemoryManager::init_layout
   */
   static bool init_layout(std::uint8_t *base, std::size_t size) noexcept {
     return detail::ManagerLayoutOps<layout_access>::init_layout(_backend, base,
@@ -8072,7 +8072,7 @@ static void verify_forest_registry_unlocked(VerifyResult &result) noexcept {
   }
 
   /*
-  ### pmm::PersistMemoryManager::do_expand
+### pmm::PersistMemoryManager::do_expand
   */
   static bool do_expand(std::size_t user_size) noexcept {
     return detail::ManagerLayoutOps<layout_access>::do_expand(
@@ -8302,7 +8302,7 @@ public:
   using address_traits = AddressTraitsT;
 
   /*
-  ### pmm::MMapStorage::MMapStorage
+### pmm::MMapStorage::MMapStorage
   */
   MMapStorage() noexcept = default;
 
@@ -8340,7 +8340,7 @@ public:
   ~MMapStorage() { close(); }
 
   /*
-  ### pmm::MMapStorage::open
+### pmm::MMapStorage::open
   */
   bool open(const char *path, std::size_t size_bytes) noexcept {
     if (_mapped)
@@ -8356,7 +8356,7 @@ public:
   }
 
   /*
-  ### pmm::MMapStorage::close
+### pmm::MMapStorage::close
   */
   void close() noexcept {
     if (!_mapped)
@@ -8370,23 +8370,23 @@ public:
   }
 
   /*
-  ### pmm::MMapStorage::is_open
+### pmm::MMapStorage::is_open
   */
   bool is_open() const noexcept { return _mapped; }
 
   /*
-  ### pmm::MMapStorage::base_ptr
+### pmm::MMapStorage::base_ptr
   */
   std::uint8_t *base_ptr() noexcept { return _base; }
   const std::uint8_t *base_ptr() const noexcept { return _base; }
 
   /*
-  ### pmm::MMapStorage::total_size
+### pmm::MMapStorage::total_size
   */
   std::size_t total_size() const noexcept { return _size; }
 
   /*
-  ### pmm::MMapStorage::expand
+### pmm::MMapStorage::expand
   */
   bool expand(std::size_t additional_bytes) noexcept {
     if (!_mapped || additional_bytes == 0)
@@ -8404,7 +8404,7 @@ public:
   }
 
   /*
-  ### pmm::MMapStorage::owns_memory
+### pmm::MMapStorage::owns_memory
   */
   bool owns_memory() const noexcept { return false; }
 
@@ -8420,7 +8420,7 @@ private:
   HANDLE _map_handle = nullptr;
 
   /*
-  ### pmm::MMapStorage::open_impl
+### pmm::MMapStorage::open_impl
   */
   bool open_impl(const char *path, std::size_t size_bytes) noexcept {
 
@@ -8477,7 +8477,7 @@ private:
   }
 
   /*
-  ### pmm::MMapStorage::close_impl
+### pmm::MMapStorage::close_impl
   */
   void close_impl() noexcept {
     if (_base != nullptr) {
@@ -8495,7 +8495,7 @@ private:
   }
 
   /*
-  ### pmm::MMapStorage::expand_impl
+### pmm::MMapStorage::expand_impl
   */
   bool expand_impl(std::size_t new_size) noexcept {
 
@@ -8562,7 +8562,7 @@ private:
       return false;
 
     /*
-    ## pmm::MMapStorage::stat
+## pmm::MMapStorage::stat
     */
     struct stat st {};
     if (::fstat(_fd, &st) != 0) {

@@ -47,7 +47,7 @@ template <typename AddressTraitsT> struct ForestDomainRecord {
   char name[kForestDomainNameCapacity];
 
   /*
-  ### pmm::detail::ForestDomainRecord::ForestDomainRecord
+### pmm::detail::ForestDomainRecord::ForestDomainRecord
   */
   constexpr ForestDomainRecord() noexcept
       : binding_id(0), root_offset(0), symbol_offset(0),
@@ -70,7 +70,7 @@ template <typename AddressTraitsT> struct ForestDomainRegistry {
   ForestDomainRecord<AddressTraitsT> domains[kMaxForestDomains];
 
   /*
-  ### pmm::detail::ForestDomainRegistry::ForestDomainRegistry
+### pmm::detail::ForestDomainRegistry::ForestDomainRegistry
   */
   constexpr ForestDomainRegistry() noexcept
       : magic(kForestRegistryMagic), version(kForestRegistryVersion),

@@ -21,7 +21,7 @@ public:
   using address_traits = AddressTraitsT;
 
   /*
-  ### pmm::StaticStorage::StaticStorage
+### pmm::StaticStorage::StaticStorage
   */
   StaticStorage() noexcept = default;
   StaticStorage(const StaticStorage &) = delete;
@@ -31,23 +31,23 @@ public:
   StaticStorage &operator=(StaticStorage &&) = delete;
 
   /*
-  ### pmm::StaticStorage::base_ptr
+### pmm::StaticStorage::base_ptr
   */
   std::uint8_t *base_ptr() noexcept { return _buffer; }
   const std::uint8_t *base_ptr() const noexcept { return _buffer; }
 
   /*
-  ### pmm::StaticStorage::total_size
+### pmm::StaticStorage::total_size
   */
   constexpr std::size_t total_size() const noexcept { return Size; }
 
   /*
-  ### pmm::StaticStorage::expand
+### pmm::StaticStorage::expand
   */
   bool expand(std::size_t) noexcept { return false; }
 
   /*
-  ### pmm::StaticStorage::owns_memory
+### pmm::StaticStorage::owns_memory
   */
   constexpr bool owns_memory() const noexcept { return false; }
 

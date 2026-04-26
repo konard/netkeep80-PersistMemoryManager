@@ -55,7 +55,7 @@ public:
   template <typename T>
 
   /*
-  ### pmm::detail::PersistMemoryTypedApi::reallocate_typed
+### pmm::detail::PersistMemoryTypedApi::reallocate_typed
   */
   static pmm::pptr<T, ManagerT>
   reallocate_typed(pmm::pptr<T, ManagerT> p, std::size_t old_count,

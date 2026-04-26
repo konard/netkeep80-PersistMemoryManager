@@ -32,7 +32,7 @@ public:
   using address_traits = AddressTraitsT;
 
   /*
-  ### pmm::MMapStorage::MMapStorage
+### pmm::MMapStorage::MMapStorage
   */
   MMapStorage() noexcept = default;
 
@@ -70,7 +70,7 @@ public:
   ~MMapStorage() { close(); }
 
   /*
-  ### pmm::MMapStorage::open
+### pmm::MMapStorage::open
   */
   bool open(const char *path, std::size_t size_bytes) noexcept {
     if (_mapped)
@@ -86,7 +86,7 @@ public:
   }
 
   /*
-  ### pmm::MMapStorage::close
+### pmm::MMapStorage::close
   */
   void close() noexcept {
     if (!_mapped)
@@ -100,23 +100,23 @@ public:
   }
 
   /*
-  ### pmm::MMapStorage::is_open
+### pmm::MMapStorage::is_open
   */
   bool is_open() const noexcept { return _mapped; }
 
   /*
-  ### pmm::MMapStorage::base_ptr
+### pmm::MMapStorage::base_ptr
   */
   std::uint8_t *base_ptr() noexcept { return _base; }
   const std::uint8_t *base_ptr() const noexcept { return _base; }
 
   /*
-  ### pmm::MMapStorage::total_size
+### pmm::MMapStorage::total_size
   */
   std::size_t total_size() const noexcept { return _size; }
 
   /*
-  ### pmm::MMapStorage::expand
+### pmm::MMapStorage::expand
   */
   bool expand(std::size_t additional_bytes) noexcept {
     if (!_mapped || additional_bytes == 0)
@@ -134,7 +134,7 @@ public:
   }
 
   /*
-  ### pmm::MMapStorage::owns_memory
+### pmm::MMapStorage::owns_memory
   */
   bool owns_memory() const noexcept { return false; }
 
@@ -150,7 +150,7 @@ private:
   HANDLE _map_handle = nullptr;
 
   /*
-  ### pmm::MMapStorage::open_impl
+### pmm::MMapStorage::open_impl
   */
   bool open_impl(const char *path, std::size_t size_bytes) noexcept {
 
@@ -207,7 +207,7 @@ private:
   }
 
   /*
-  ### pmm::MMapStorage::close_impl
+### pmm::MMapStorage::close_impl
   */
   void close_impl() noexcept {
     if (_base != nullptr) {
@@ -225,7 +225,7 @@ private:
   }
 
   /*
-  ### pmm::MMapStorage::expand_impl
+### pmm::MMapStorage::expand_impl
   */
   bool expand_impl(std::size_t new_size) noexcept {
 
@@ -292,7 +292,7 @@ private:
       return false;
 
     /*
-    ## pmm::MMapStorage::stat
+## pmm::MMapStorage::stat
     */
     struct stat st {};
     if (::fstat(_fd, &st) != 0) {

@@ -40,7 +40,7 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree {
   static constexpr const char *kForestDomainName = "system/free_tree";
 
   /*
-  ### pmm::AvlFreeTree::AvlFreeTree
+### pmm::AvlFreeTree::AvlFreeTree
   */
   AvlFreeTree() = delete;
   AvlFreeTree(const AvlFreeTree &) = delete;
@@ -48,7 +48,7 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree {
   AvlFreeTree &operator=(const AvlFreeTree &) = delete;
 
   /*
-  ### pmm::AvlFreeTree::insert
+### pmm::AvlFreeTree::insert
   */
   static void insert(std::uint8_t *base,
                      detail::ManagerHeader<AddressTraitsT> *hdr,
@@ -105,7 +105,7 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree {
   }
 
   /*
-  ### pmm::AvlFreeTree::remove
+### pmm::AvlFreeTree::remove
   */
   static void remove(std::uint8_t *base,
                      detail::ManagerHeader<AddressTraitsT> *hdr,
@@ -167,7 +167,7 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree {
   }
 
   /*
-  ### pmm::AvlFreeTree::find_best_fit
+### pmm::AvlFreeTree::find_best_fit
   */
   static index_type find_best_fit(std::uint8_t *base,
                                   detail::ManagerHeader<AddressTraitsT> *hdr,
@@ -195,7 +195,7 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree {
 
 private:
   /*
-  ### pmm::AvlFreeTree::set_child
+### pmm::AvlFreeTree::set_child
   */
   static void set_child(std::uint8_t *base,
                         detail::ManagerHeader<AddressTraitsT> *hdr,

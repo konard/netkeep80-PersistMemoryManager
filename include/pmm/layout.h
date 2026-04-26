@@ -28,7 +28,7 @@ template <typename ManagerAccess> struct ManagerLayoutOps {
   using BlockState = BlockStateBase<address_traits>;
 
   /*
-  ### pmm::detail::ManagerLayoutOps::init_layout
+### pmm::detail::ManagerLayoutOps::init_layout
   */
   static bool init_layout(storage_backend &backend, std::uint8_t *base,
                           std::size_t size) noexcept {
@@ -93,7 +93,7 @@ template <typename ManagerAccess> struct ManagerLayoutOps {
   }
 
   /*
-  ### pmm::detail::ManagerLayoutOps::do_expand
+### pmm::detail::ManagerLayoutOps::do_expand
   */
   static bool do_expand(storage_backend &backend, bool initialized,
                         std::size_t user_size) noexcept {

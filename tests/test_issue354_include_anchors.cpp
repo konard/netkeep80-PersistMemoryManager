@@ -35,7 +35,7 @@ std::size_t line_number_at( std::string_view text, std::size_t pos )
 bool is_anchor_comment( std::string_view comment )
 {
     static const std::regex anchor_pattern(
-        R"re(^/\*\n\s*(##|###) [A-Za-z_][A-Za-z0-9_]*(::[A-Za-z_~][A-Za-z0-9_~]*)*\n\s*\*/$)re" );
+        R"re(^/\*\n(##|###) [A-Za-z_][A-Za-z0-9_]*(::[A-Za-z_~][A-Za-z0-9_~]*)*\n\s*\*/$)re" );
     return std::regex_match( std::string( comment ), anchor_pattern );
 }
 
@@ -100,6 +100,37 @@ std::vector<std::filesystem::path> markdown_files_under( const std::filesystem::
     return files;
 }
 
+bool has_path_component( const std::filesystem::path& path, std::string_view component )
+{
+    for ( const auto& part : path )
+    {
+        if ( part.string() == component )
+            return true;
+    }
+    return false;
+}
+
+std::vector<std::filesystem::path> repository_files_under( const std::filesystem::path& root )
+{
+    std::vector<std::filesystem::path> files;
+    for ( std::filesystem::recursive_directory_iterator it( root ), end; it != end; ++it )
+    {
+        const auto path     = it->path();
+        const auto filename = path.filename().string();
+        if ( it->is_directory() )
+        {
+            if ( filename == ".git" || filename == "build" || filename == ".cmake-fetchcontent" ||
+                 filename == "third_party" )
+                it.disable_recursion_pending();
+            continue;
+        }
+
+        if ( it->is_regular_file() && !has_path_component( path, ".git" ) )
+            files.push_back( path );
+    }
+    return files;
+}
+
 std::vector<std::string> validate_comments_are_anchors( const std::filesystem::path& path )
 {
     const auto               text = read_file( path );
@@ -159,7 +190,7 @@ std::vector<std::string> validate_comments_are_anchors( const std::filesystem::p
 std::vector<std::string> anchors_in( const std::string& text )
 {
     static const std::regex anchor_pattern(
-        R"re(/\*\n\s*(?:##|###) ([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_~][A-Za-z0-9_~]*)*)\n\s*\*/)re" );
+        R"re(/\*\n(?:##|###) ([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_~][A-Za-z0-9_~]*)*)\n\s*\*/)re" );
     std::vector<std::string> anchors;
     for ( std::sregex_iterator it( text.begin(), text.end(), anchor_pattern ), end; it != end; ++it )
         anchors.push_back( ( *it )[1].str() );
@@ -209,6 +240,33 @@ std::vector<std::string> validate_markdown_include_links( const std::filesystem:
     return failures;
 }
 
+std::vector<std::string> validate_removed_secondary_single_header( const std::filesystem::path& repo_root )
+{
+    const std::string        removed_header = std::string( "pmm" ) + "_no" + "_comments" + ".h";
+    std::vector<std::string> failures;
+
+    const auto removed_path = repo_root / "single_include" / "pmm" / removed_header;
+    if ( std::filesystem::exists( removed_path ) )
+    {
+        std::ostringstream failure;
+        failure << removed_path << ": removed single-header variant still exists";
+        failures.push_back( failure.str() );
+    }
+
+    for ( const auto& path : repository_files_under( repo_root ) )
+    {
+        const auto text = read_file( path );
+        if ( text.find( removed_header ) == std::string::npos )
+            continue;
+
+        std::ostringstream failure;
+        failure << path << ": removed single-header variant is still referenced";
+        failures.push_back( failure.str() );
+    }
+
+    return failures;
+}
+
 } // namespace
 
 TEST_CASE( "issue354: include comments are limited to code anchors", "[issue354][docs]" )
@@ -222,6 +280,23 @@ TEST_CASE( "issue354: include comments are limited to code anchors", "[issue354]
         failures.insert( failures.end(), file_failures.begin(), file_failures.end() );
     }
 
+    INFO( "Failures:\n"
+          <<
+          [&failures]
+          {
+              std::ostringstream out;
+              for ( const auto& failure : failures )
+                  out << failure << '\n';
+              return out.str();
+          }() );
+    REQUIRE( failures.empty() );
+}
+
+TEST_CASE( "issue354: removed secondary single header is absent", "[issue354][single-header]" )
+{
+    const std::filesystem::path repo_root = PMM_SOURCE_DIR;
+
+    const auto failures = validate_removed_secondary_single_header( repo_root );
     INFO( "Failures:\n"
           <<
           [&failures]

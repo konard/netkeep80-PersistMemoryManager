@@ -57,14 +57,14 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::is_free_raw
+### pmm::BlockStateBase::is_free_raw
   */
   static bool is_free_raw(const void *raw_blk) noexcept {
     return get_weight(raw_blk) == 0 && get_root_offset(raw_blk) == 0;
   }
 
   /*
-  ### pmm::BlockStateBase::is_allocated_raw
+### pmm::BlockStateBase::is_allocated_raw
   */
   static bool is_allocated_raw(const void *raw_blk,
                                index_type own_idx) noexcept {
@@ -106,76 +106,76 @@ public:
                 "Block field descriptors must match Block layout");
 
   /*
-  ### pmm::BlockStateBase::BlockStateBase
+### pmm::BlockStateBase::BlockStateBase
   */
   BlockStateBase() = delete;
 
   /*
-  ### pmm::BlockStateBase::weight
+### pmm::BlockStateBase::weight
   */
   index_type weight() const noexcept { return get_weight(this); }
 
   /*
-  ### pmm::BlockStateBase::prev_offset
+### pmm::BlockStateBase::prev_offset
   */
   index_type prev_offset() const noexcept { return get_prev_offset(this); }
 
   /*
-  ### pmm::BlockStateBase::next_offset
+### pmm::BlockStateBase::next_offset
   */
   index_type next_offset() const noexcept { return get_next_offset(this); }
 
   /*
-  ### pmm::BlockStateBase::left_offset
+### pmm::BlockStateBase::left_offset
   */
   index_type left_offset() const noexcept { return get_left_offset(this); }
 
   /*
-  ### pmm::BlockStateBase::right_offset
+### pmm::BlockStateBase::right_offset
   */
   index_type right_offset() const noexcept { return get_right_offset(this); }
 
   /*
-  ### pmm::BlockStateBase::parent_offset
+### pmm::BlockStateBase::parent_offset
   */
   index_type parent_offset() const noexcept { return get_parent_offset(this); }
 
   /*
-  ### pmm::BlockStateBase::avl_height
+### pmm::BlockStateBase::avl_height
   */
   std::int16_t avl_height() const noexcept { return get_avl_height(this); }
 
   /*
-  ### pmm::BlockStateBase::root_offset
+### pmm::BlockStateBase::root_offset
   */
   index_type root_offset() const noexcept { return get_root_offset(this); }
 
   /*
-  ### pmm::BlockStateBase::node_type
+### pmm::BlockStateBase::node_type
   */
   std::uint16_t node_type() const noexcept { return get_node_type(this); }
 
   /*
-  ### pmm::BlockStateBase::is_free
+### pmm::BlockStateBase::is_free
   */
   bool is_free() const noexcept { return is_free_raw(this); }
 
   /*
-  ### pmm::BlockStateBase::is_allocated
+### pmm::BlockStateBase::is_allocated
   */
   bool is_allocated(index_type own_idx) const noexcept {
     return is_allocated_raw(this, own_idx);
   }
 
   /*
-  ### pmm::BlockStateBase::is_permanently_locked
+### pmm::BlockStateBase::is_permanently_locked
   */
   bool is_permanently_locked() const noexcept {
     return node_type() == pmm::kNodeReadOnly;
   }
 
   /*
-  ### pmm::BlockStateBase::recover_state
+### pmm::BlockStateBase::recover_state
   */
   static void recover_state(void *raw_blk, index_type own_idx) noexcept {
 
@@ -192,7 +192,7 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::verify_state
+### pmm::BlockStateBase::verify_state
   */
   static void verify_state(const void *raw_blk, index_type own_idx,
                            VerifyResult &result) noexcept {
@@ -214,7 +214,7 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::reset_avl_fields_of
+### pmm::BlockStateBase::reset_avl_fields_of
   */
   static void reset_avl_fields_of(void *raw_blk) noexcept {
 
@@ -228,7 +228,7 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::repair_prev_offset
+### pmm::BlockStateBase::repair_prev_offset
   */
   static void repair_prev_offset(void *raw_blk, index_type prev_idx) noexcept {
 
@@ -236,28 +236,28 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::get_prev_offset
+### pmm::BlockStateBase::get_prev_offset
   */
   static index_type get_prev_offset(const void *raw_blk) noexcept {
     return get_field_of<detail::BlockPrevOffsetField>(raw_blk);
   }
 
   /*
-  ### pmm::BlockStateBase::get_next_offset
+### pmm::BlockStateBase::get_next_offset
   */
   static index_type get_next_offset(const void *raw_blk) noexcept {
     return get_field_of<detail::BlockNextOffsetField>(raw_blk);
   }
 
   /*
-  ### pmm::BlockStateBase::get_weight
+### pmm::BlockStateBase::get_weight
   */
   static index_type get_weight(const void *raw_blk) noexcept {
     return get_field_of<detail::BlockWeightField>(raw_blk);
   }
 
   /*
-  ### pmm::BlockStateBase::init_fields
+### pmm::BlockStateBase::init_fields
   */
   static void init_fields(void *raw_blk, index_type prev_idx,
                           index_type next_idx, std::int16_t avl_height_val,
@@ -276,7 +276,7 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::set_next_offset_of
+### pmm::BlockStateBase::set_next_offset_of
   */
   static void set_next_offset_of(void *raw_blk, index_type next_idx) noexcept {
 
@@ -284,35 +284,35 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::get_left_offset
+### pmm::BlockStateBase::get_left_offset
   */
   static index_type get_left_offset(const void *b) noexcept {
     return get_field_of<detail::BlockLeftOffsetField>(b);
   }
 
   /*
-  ### pmm::BlockStateBase::get_right_offset
+### pmm::BlockStateBase::get_right_offset
   */
   static index_type get_right_offset(const void *b) noexcept {
     return get_field_of<detail::BlockRightOffsetField>(b);
   }
 
   /*
-  ### pmm::BlockStateBase::get_parent_offset
+### pmm::BlockStateBase::get_parent_offset
   */
   static index_type get_parent_offset(const void *b) noexcept {
     return get_field_of<detail::BlockParentOffsetField>(b);
   }
 
   /*
-  ### pmm::BlockStateBase::get_root_offset
+### pmm::BlockStateBase::get_root_offset
   */
   static index_type get_root_offset(const void *b) noexcept {
     return get_field_of<detail::BlockRootOffsetField>(b);
   }
 
   /*
-  ### pmm::BlockStateBase::set_left_offset_of
+### pmm::BlockStateBase::set_left_offset_of
   */
   static void set_left_offset_of(void *b, index_type v) noexcept {
 
@@ -320,7 +320,7 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::set_right_offset_of
+### pmm::BlockStateBase::set_right_offset_of
   */
   static void set_right_offset_of(void *b, index_type v) noexcept {
 
@@ -328,7 +328,7 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::set_parent_offset_of
+### pmm::BlockStateBase::set_parent_offset_of
   */
   static void set_parent_offset_of(void *b, index_type v) noexcept {
 
@@ -336,7 +336,7 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::set_prev_offset_of
+### pmm::BlockStateBase::set_prev_offset_of
   */
   static void set_prev_offset_of(void *b, index_type v) noexcept {
 
@@ -344,14 +344,14 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::set_weight_of
+### pmm::BlockStateBase::set_weight_of
   */
   static void set_weight_of(void *b, index_type v) noexcept {
     set_field_of<detail::BlockWeightField>(b, v);
   }
 
   /*
-  ### pmm::BlockStateBase::set_root_offset_of
+### pmm::BlockStateBase::set_root_offset_of
   */
   static void set_root_offset_of(void *b, index_type v) noexcept {
 
@@ -359,14 +359,14 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::get_avl_height
+### pmm::BlockStateBase::get_avl_height
   */
   static std::int16_t get_avl_height(const void *raw_blk) noexcept {
     return get_field_of<detail::BlockAvlHeightField>(raw_blk);
   }
 
   /*
-  ### pmm::BlockStateBase::set_avl_height_of
+### pmm::BlockStateBase::set_avl_height_of
   */
   static void set_avl_height_of(void *raw_blk, std::int16_t v) noexcept {
 
@@ -374,14 +374,14 @@ public:
   }
 
   /*
-  ### pmm::BlockStateBase::get_node_type
+### pmm::BlockStateBase::get_node_type
   */
   static std::uint16_t get_node_type(const void *raw_blk) noexcept {
     return get_field_of<detail::BlockNodeTypeField>(raw_blk);
   }
 
   /*
-  ### pmm::BlockStateBase::set_node_type_of
+### pmm::BlockStateBase::set_node_type_of
   */
   static void set_node_type_of(void *raw_blk, std::uint16_t v) noexcept {
 
@@ -403,54 +403,54 @@ protected:
   }
 
   /*
-  ### pmm::BlockStateBase::set_weight
+### pmm::BlockStateBase::set_weight
   */
   void set_weight(index_type v) noexcept { set_weight_of(this, v); }
 
   /*
-  ### pmm::BlockStateBase::set_prev_offset
+### pmm::BlockStateBase::set_prev_offset
   */
   void set_prev_offset(index_type v) noexcept { set_prev_offset_of(this, v); }
 
   /*
-  ### pmm::BlockStateBase::set_next_offset
+### pmm::BlockStateBase::set_next_offset
   */
   void set_next_offset(index_type v) noexcept { set_next_offset_of(this, v); }
 
   /*
-  ### pmm::BlockStateBase::set_left_offset
+### pmm::BlockStateBase::set_left_offset
   */
   void set_left_offset(index_type v) noexcept { set_left_offset_of(this, v); }
 
   /*
-  ### pmm::BlockStateBase::set_right_offset
+### pmm::BlockStateBase::set_right_offset
   */
   void set_right_offset(index_type v) noexcept { set_right_offset_of(this, v); }
 
   /*
-  ### pmm::BlockStateBase::set_parent_offset
+### pmm::BlockStateBase::set_parent_offset
   */
   void set_parent_offset(index_type v) noexcept {
     set_parent_offset_of(this, v);
   }
 
   /*
-  ### pmm::BlockStateBase::set_avl_height
+### pmm::BlockStateBase::set_avl_height
   */
   void set_avl_height(std::int16_t v) noexcept { set_avl_height_of(this, v); }
 
   /*
-  ### pmm::BlockStateBase::set_root_offset
+### pmm::BlockStateBase::set_root_offset
   */
   void set_root_offset(index_type v) noexcept { set_root_offset_of(this, v); }
 
   /*
-  ### pmm::BlockStateBase::set_node_type
+### pmm::BlockStateBase::set_node_type
   */
   void set_node_type(std::uint16_t v) noexcept { set_node_type_of(this, v); }
 
   /*
-  ### pmm::BlockStateBase::reset_avl_fields
+### pmm::BlockStateBase::reset_avl_fields
   */
   void reset_avl_fields() noexcept {
 
@@ -481,7 +481,7 @@ public:
   using index_type = typename AddressTraitsT::index_type;
 
   /*
-  ### pmm::FreeBlock::cast_from_raw
+### pmm::FreeBlock::cast_from_raw
   */
   static FreeBlock *cast_from_raw(void *raw) noexcept {
     if (raw == nullptr)
@@ -506,12 +506,12 @@ public:
   }
 
   /*
-  ### pmm::FreeBlock::verify_invariants
+### pmm::FreeBlock::verify_invariants
   */
   bool verify_invariants() const noexcept { return Base::is_free(); }
 
   /*
-  ### pmm::FreeBlock::remove_from_avl
+### pmm::FreeBlock::remove_from_avl
   */
   FreeBlockRemovedAVL<AddressTraitsT> *remove_from_avl() noexcept {
 
@@ -530,7 +530,7 @@ public:
   using index_type = typename AddressTraitsT::index_type;
 
   /*
-  ### pmm::FreeBlockRemovedAVL::cast_from_raw
+### pmm::FreeBlockRemovedAVL::cast_from_raw
   */
   static FreeBlockRemovedAVL *cast_from_raw(void *raw) noexcept {
     return Base::template state_from_raw<FreeBlockRemovedAVL<AddressTraitsT>>(
@@ -538,7 +538,7 @@ public:
   }
 
   /*
-  ### pmm::FreeBlockRemovedAVL::mark_as_allocated
+### pmm::FreeBlockRemovedAVL::mark_as_allocated
   */
   AllocatedBlock<AddressTraitsT> *
   mark_as_allocated(index_type data_granules, index_type own_idx) noexcept {
@@ -552,14 +552,14 @@ public:
   }
 
   /*
-  ### pmm::FreeBlockRemovedAVL::begin_splitting
+### pmm::FreeBlockRemovedAVL::begin_splitting
   */
   SplittingBlock<AddressTraitsT> *begin_splitting() noexcept {
     return this->template state_as<SplittingBlock<AddressTraitsT>>();
   }
 
   /*
-  ### pmm::FreeBlockRemovedAVL::insert_to_avl
+### pmm::FreeBlockRemovedAVL::insert_to_avl
   */
   FreeBlock<AddressTraitsT> *insert_to_avl() noexcept {
     return this->template state_as<FreeBlock<AddressTraitsT>>();
@@ -577,14 +577,14 @@ public:
   using index_type = typename AddressTraitsT::index_type;
 
   /*
-  ### pmm::SplittingBlock::cast_from_raw
+### pmm::SplittingBlock::cast_from_raw
   */
   static SplittingBlock *cast_from_raw(void *raw) noexcept {
     return Base::template state_from_raw<SplittingBlock<AddressTraitsT>>(raw);
   }
 
   /*
-  ### pmm::SplittingBlock::initialize_new_block
+### pmm::SplittingBlock::initialize_new_block
   */
   void initialize_new_block(void *new_blk_ptr,
                             [[maybe_unused]] index_type new_idx,
@@ -596,7 +596,7 @@ public:
   }
 
   /*
-  ### pmm::SplittingBlock::link_new_block
+### pmm::SplittingBlock::link_new_block
   */
   void link_new_block(void *old_next_blk, index_type new_idx) noexcept {
     if (old_next_blk != nullptr) {
@@ -607,7 +607,7 @@ public:
   }
 
   /*
-  ### pmm::SplittingBlock::finalize_split
+### pmm::SplittingBlock::finalize_split
   */
   AllocatedBlock<AddressTraitsT> *finalize_split(index_type data_granules,
                                                  index_type own_idx) noexcept {
@@ -632,7 +632,7 @@ public:
   using index_type = typename AddressTraitsT::index_type;
 
   /*
-  ### pmm::AllocatedBlock::cast_from_raw
+### pmm::AllocatedBlock::cast_from_raw
   */
   static AllocatedBlock *cast_from_raw(void *raw) noexcept {
     if (raw == nullptr)
@@ -659,14 +659,14 @@ public:
   }
 
   /*
-  ### pmm::AllocatedBlock::verify_invariants
+### pmm::AllocatedBlock::verify_invariants
   */
   bool verify_invariants(index_type own_idx) const noexcept {
     return Base::is_allocated(own_idx);
   }
 
   /*
-  ### pmm::AllocatedBlock::user_ptr
+### pmm::AllocatedBlock::user_ptr
   */
   void *user_ptr() noexcept {
     return reinterpret_cast<std::uint8_t *>(this) +
@@ -679,7 +679,7 @@ public:
   }
 
   /*
-  ### pmm::AllocatedBlock::mark_as_free
+### pmm::AllocatedBlock::mark_as_free
   */
   FreeBlockNotInAVL<AddressTraitsT> *mark_as_free() noexcept {
 
@@ -701,7 +701,7 @@ public:
   using index_type = typename AddressTraitsT::index_type;
 
   /*
-  ### pmm::FreeBlockNotInAVL::cast_from_raw
+### pmm::FreeBlockNotInAVL::cast_from_raw
   */
   static FreeBlockNotInAVL *cast_from_raw(void *raw) noexcept {
     return Base::template state_from_raw<FreeBlockNotInAVL<AddressTraitsT>>(
@@ -709,14 +709,14 @@ public:
   }
 
   /*
-  ### pmm::FreeBlockNotInAVL::begin_coalescing
+### pmm::FreeBlockNotInAVL::begin_coalescing
   */
   CoalescingBlock<AddressTraitsT> *begin_coalescing() noexcept {
     return this->template state_as<CoalescingBlock<AddressTraitsT>>();
   }
 
   /*
-  ### pmm::FreeBlockNotInAVL::insert_to_avl
+### pmm::FreeBlockNotInAVL::insert_to_avl
   */
   FreeBlock<AddressTraitsT> *insert_to_avl() noexcept {
 
@@ -736,14 +736,14 @@ public:
   using index_type = typename AddressTraitsT::index_type;
 
   /*
-  ### pmm::CoalescingBlock::cast_from_raw
+### pmm::CoalescingBlock::cast_from_raw
   */
   static CoalescingBlock *cast_from_raw(void *raw) noexcept {
     return Base::template state_from_raw<CoalescingBlock<AddressTraitsT>>(raw);
   }
 
   /*
-  ### pmm::CoalescingBlock::coalesce_with_next
+### pmm::CoalescingBlock::coalesce_with_next
   */
   void coalesce_with_next(void *next_blk, void *next_next_blk,
                           index_type own_idx) noexcept {
@@ -757,7 +757,7 @@ public:
   }
 
   /*
-  ### pmm::CoalescingBlock::coalesce_with_prev
+### pmm::CoalescingBlock::coalesce_with_prev
   */
   CoalescingBlock<AddressTraitsT> *
   coalesce_with_prev(void *prev_blk, void *next_blk,
@@ -776,7 +776,7 @@ public:
   }
 
   /*
-  ### pmm::CoalescingBlock::finalize_coalesce
+### pmm::CoalescingBlock::finalize_coalesce
   */
   FreeBlock<AddressTraitsT> *finalize_coalesce() noexcept {
 

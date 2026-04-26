@@ -277,7 +277,6 @@ static bool set_domain_root( const char* name, pptr<T> root ) noexcept;
 | `pmm_multi_threaded_heap.h` | `pmm::presets::MultiThreadedHeap` |
 | `pmm_industrial_db_heap.h` | `pmm::presets::IndustrialDBHeap` |
 | `pmm_large_db_heap.h` | `pmm::presets::LargeDBHeap` |
-| `pmm_no_comments.h` | Комментарии удалены, preset aliases не добавлены |
 
 `single_include/` генерируется из `include/` скриптом
 `scripts/generate-single-headers.sh`; вручную эти файлы не редактируются.
