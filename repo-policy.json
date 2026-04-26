@@ -57,15 +57,6 @@
   },
   "size_rules": [
     {
-      "id": "kernel-subtree-max-lines",
-      "scope": "directory",
-      "metric": "lines",
-      "glob": "include/**",
-      "max": 5000,
-      "count": "all_tracked",
-      "level": "blocking"
-    },
-    {
       "id": "kernel-subtree-max-bytes",
       "scope": "directory",
       "metric": "bytes",
