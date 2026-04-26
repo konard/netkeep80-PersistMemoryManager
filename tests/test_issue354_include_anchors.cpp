@@ -36,17 +36,17 @@ std::size_t anchor_segment_count( std::string_view anchor )
 {
     std::size_t count = 1;
     std::size_t pos   = 0;
-    while ( ( pos = anchor.find( "::", pos ) ) != std::string_view::npos )
+    while ( ( pos = anchor.find( "-", pos ) ) != std::string_view::npos )
     {
         ++count;
-        pos += 2;
+        pos += 1;
     }
     return count;
 }
 
 bool is_anchor_name( std::string_view anchor )
 {
-    static const std::regex anchor_pattern( R"re(^[a-z_~][a-z0-9_~]*(::[a-z_~][a-z0-9_~]*)*$)re" );
+    static const std::regex anchor_pattern( R"re(^[a-z_~][a-z0-9_~]*(-[a-z_~][a-z0-9_~]*)*$)re" );
     return std::regex_match( std::string( anchor ), anchor_pattern );
 }
 
@@ -62,11 +62,11 @@ std::string validate_anchor_comment_format( std::string_view comment )
     const auto heading_depth = match[1].str().size();
     const auto anchor        = match[2].str();
     if ( !is_anchor_name( anchor ) )
-        return "anchor name must contain only lowercase ASCII segments";
+        return "anchor name must contain only lowercase ASCII hyphen-separated segments";
 
     const auto segment_count = anchor_segment_count( anchor );
     if ( heading_depth != segment_count )
-        return "anchor heading depth must match the number of ::-separated name segments";
+        return "anchor heading depth must match the number of hyphen-separated name segments";
 
     return {};
 }
@@ -222,7 +222,7 @@ std::vector<std::string> validate_comments_are_anchors( const std::filesystem::p
 
 std::vector<std::string> anchors_in( const std::string& text )
 {
-    static const std::regex  anchor_pattern( R"re(/\*\n(#+) ([a-z_~][a-z0-9_~]*(?:::[a-z_~][a-z0-9_~]*)*)\n\s*\*/)re" );
+    static const std::regex  anchor_pattern( R"re(/\*\n(#+) ([a-z_~][a-z0-9_~]*(?:-[a-z_~][a-z0-9_~]*)*)\n\s*\*/)re" );
     std::vector<std::string> anchors;
     for ( std::sregex_iterator it( text.begin(), text.end(), anchor_pattern ), end; it != end; ++it )
     {
@@ -313,7 +313,7 @@ std::vector<std::string> validate_removed_secondary_single_header( const std::fi
 
 } // namespace
 
-TEST_CASE( "issue354: include comments are lowercase depth-matched code anchors", "[issue354][docs]" )
+TEST_CASE( "issue354: include comments are lowercase hyphen-separated code anchors", "[issue354][docs]" )
 {
     const std::filesystem::path repo_root = PMM_SOURCE_DIR;
 

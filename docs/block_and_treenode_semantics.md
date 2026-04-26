@@ -3,7 +3,7 @@
 ## Статус документа
 
 Этот документ фиксирует **каноническую семантику полей `Block<AddressTraitsT>` и
-`TreeNode<AddressTraitsT>`** для [PersistMemoryManager](../include/pmm/persist_memory_manager.h#pmm::persistmemorymanager).
+`TreeNode<AddressTraitsT>`** для [PersistMemoryManager](../include/pmm/persist_memory_manager.h#pmm-persistmemorymanager).
 
 Это документ уровня **storage kernel / AVL-forest substrate**. Он определяет,
 как следует понимать поля блока и встроенного intrusive tree-slot,
@@ -38,7 +38,7 @@
 
 ## 1. Базовое разбиение на два слоя
 
-Канонически [Block](../include/pmm/block.h#pmm::block) состоит из двух смысловых слоёв:
+Канонически [Block](../include/pmm/block.h#pmm-block) состоит из двух смысловых слоёв:
 
 1. **Линейный слой ПАП**.
    Это физический порядок блоков в persistent address space.
@@ -47,14 +47,14 @@
 
 Отсюда следует базовое правило:
 
-- поля [Block](../include/pmm/block.h#pmm::block) описывают **физическую линейную топологию ПАП**;
-- поля [TreeNode](../include/pmm/tree_node.h#pmm::treenode) описывают **участие блока в одном текущем intrusive AVL-дереве**.
+- поля [Block](../include/pmm/block.h#pmm-block) описывают **физическую линейную топологию ПАП**;
+- поля [TreeNode](../include/pmm/tree_node.h#pmm-treenode) описывают **участие блока в одном текущем intrusive AVL-дереве**.
 
 Эти два слоя сосуществуют одновременно и не должны подменять друг друга.
 
-## 2. Каноническая семантика [Block](../include/pmm/block.h#pmm::block)
+## 2. Каноническая семантика [Block](../include/pmm/block.h#pmm-block)
 
-[Block](../include/pmm/block.h#pmm::block) отвечает за физический, а не логический порядок памяти.
+[Block](../include/pmm/block.h#pmm-block) отвечает за физический, а не логический порядок памяти.
 
 ### `prev_offset`
 
@@ -103,7 +103,7 @@
 
 `next_offset` несёт физическую семантику, и allocator/recovery полагаются именно на неё.
 
-### Почему поля [Block](../include/pmm/block.h#pmm::block) нельзя перегружать forest/meta/type-смыслами
+### Почему поля [Block](../include/pmm/block.h#pmm-block) нельзя перегружать forest/meta/type-смыслами
 
 `prev_offset` и `next_offset` задают **материальный линейный скелет ПАП**.
 Если перегружать их логическими значениями, ломаются:
@@ -113,11 +113,11 @@
 - repair linked list;
 - проверка корректности линейного адресного пространства.
 
-Следовательно, [Block](../include/pmm/block.h#pmm::block)-поля являются **неприкосновенным physical layer** PMM.
+Следовательно, [Block](../include/pmm/block.h#pmm-block)-поля являются **неприкосновенным physical layer** PMM.
 
-## 3. Каноническая семантика [TreeNode](../include/pmm/tree_node.h#pmm::treenode)
+## 3. Каноническая семантика [TreeNode](../include/pmm/tree_node.h#pmm-treenode)
 
-[TreeNode](../include/pmm/tree_node.h#pmm::treenode) — это **один встроенный intrusive AVL-slot** текущего forest-домена.
+[TreeNode](../include/pmm/tree_node.h#pmm-treenode) — это **один встроенный intrusive AVL-slot** текущего forest-домена.
 
 Общее правило для всех его полей:
 
@@ -302,11 +302,11 @@ See [free_tree_forest_policy.md](free_tree_forest_policy.md) for the full orderi
 - `left_offset`, `right_offset`, `parent_offset` относятся только к активному slot;
 - `avl_height == 0` означает, что slot структурно неактивен;
 - смысл `weight`, `root_offset`, `node_type` при этом всё равно остаётся семантикой slot-а,
-  а не линейного [Block](../include/pmm/block.h#pmm::block).
+  а не линейного [Block](../include/pmm/block.h#pmm-block).
 
 ## 5. One Intrusive Tree-Slot Per Block
 
-Один [Block](../include/pmm/block.h#pmm::block) содержит **ровно один встроенный intrusive tree-slot**, потому что у него есть
+Один [Block](../include/pmm/block.h#pmm-block) содержит **ровно один встроенный intrusive tree-slot**, потому что у него есть
 ровно один набор полей:
 
 - `left_offset`;
@@ -397,5 +397,5 @@ owner-domain / owner-tree marker встроенного slot-а.
 `TreeNode::node_type`:
 coarse-grained type/subtype/mode layer блока.
 
-[Block](../include/pmm/block.h#pmm::block):
+[Block](../include/pmm/block.h#pmm-block):
 атом линейного ПАП с одним встроенным intrusive tree-slot.

@@ -37,8 +37,8 @@ Issue: [#239](https://github.com/netkeep80/PersistMemoryManager/issues/239)
 - **Заголовок блока** (Block\<AT\>, 32 байта / 2 гранулы): TreeNode-поля AVL-дерева
   (`weight`, `left_offset`, `right_offset`, `parent_offset`, `root_offset`, `avl_height`,
   `node_type`) + поля связного списка (`prev_offset`, `next_offset`).
-- **Данные блока** (N гранул): пользовательские данные — содержимое [pstring](../../include/pmm/pstring.h#pmm::pstring), элементы
-  [parray](../../include/pmm/parray.h#pmm::parray), узлы [pmap](../../include/pmm/pmap.h#pmm::pmap), и т.д.
+- **Данные блока** (N гранул): пользовательские данные — содержимое [pstring](../../include/pmm/pstring.h#pmm-pstring), элементы
+  [parray](../../include/pmm/parray.h#pmm-parray), узлы [pmap](../../include/pmm/pmap.h#pmm-pmap), и т.д.
 
 ### Текущая защита целостности
 
@@ -84,7 +84,7 @@ Issue: [#239](https://github.com/netkeep80/PersistMemoryManager/issues/239)
 
 1. **Полная перезапись при любом изменении**: изменение 1 байта → перезапись всего образа.
    Для образа 1 GB это ~1 GB записи на диск
-2. **Невозможность частичного обновления**: несовместимо с [MMapStorage](../../include/pmm/mmap_storage.h#pmm::mmapstorage) при online-записи.
+2. **Невозможность частичного обновления**: несовместимо с [MMapStorage](../../include/pmm/mmap_storage.h#pmm-mmapstorage) при online-записи.
    Нужно загрузить весь образ в память, расшифровать, работать, зашифровать и записать
 3. **Задержка при загрузке**: весь образ нужно расшифровать и распаковать до начала работы
 4. **Невозможность binary diff**: BinDiffSynchronizer не может вычислять diff между
@@ -215,7 +215,7 @@ IV = HMAC-SHA256(master_key, block_granule_index || block_generation_counter)
 
 **Структура pjson в ПАП:**
 - Каждый JSON-узел — отдельный блок через `ppool<T>` (пулы фиксированного размера)
-- JSON-строки — блоки через [pstring](../../include/pmm/pstring.h#pmm::pstring) (мутабельные строки, данные в отдельном блоке)
+- JSON-строки — блоки через [pstring](../../include/pmm/pstring.h#pmm-pstring) (мутабельные строки, данные в отдельном блоке)
 - JSON-объекты — `pmap<pstringview, pjson_node>` (AVL-дерево ключ-значение)
 - JSON-массивы — `parray<pjson_node>` (динамический массив)
 
@@ -223,12 +223,12 @@ IV = HMAC-SHA256(master_key, block_granule_index || block_generation_counter)
 
 1. **Количество JSON-узлов**: по `alloc_count` и размерам блоков можно оценить количество
    узлов в JSON-документе
-2. **Глубина вложенности**: размеры блоков [pmap](../../include/pmm/pmap.h#pmm::pmap)-узлов косвенно отражают количество ключей
+2. **Глубина вложенности**: размеры блоков [pmap](../../include/pmm/pmap.h#pmm-pmap)-узлов косвенно отражают количество ключей
    на каждом уровне
-3. **Длины строк**: размер блока данных [pstring](../../include/pmm/pstring.h#pmm::pstring) = `ceil(length / granule_size)` гранул,
+3. **Длины строк**: размер блока данных [pstring](../../include/pmm/pstring.h#pmm-pstring) = `ceil(length / granule_size)` гранул,
    что даёт верхнюю оценку длины строки с точностью до `granule_size` (16 байт)
 4. **Тип структуры**: блоки пула (`ppool`) имеют характерный фиксированный размер,
-   отличающийся от блоков [parray](../../include/pmm/parray.h#pmm::parray) или [pstring](../../include/pmm/pstring.h#pmm::pstring)
+   отличающийся от блоков [parray](../../include/pmm/parray.h#pmm-parray) или [pstring](../../include/pmm/pstring.h#pmm-pstring)
 5. **Паттерн доступа**: при наблюдении за последовательными образами — какие блоки менялись
 
 ### Оценка рисков
@@ -240,7 +240,7 @@ IV = HMAC-SHA256(master_key, block_granule_index || block_generation_counter)
 
 **Средний риск** (для чувствительных данных):
 - Если атакующий знает **схему** JSON-документа (например, всегда `{"password": "...", "token": "..."}`),
-  он может определить длину пароля/токена с точностью до 16 байт по размеру блока [pstring](../../include/pmm/pstring.h#pmm::pstring)
+  он может определить длину пароля/токена с точностью до 16 байт по размеру блока [pstring](../../include/pmm/pstring.h#pmm-pstring)
 - Наблюдая за изменениями между образами, можно определить какие именно поля изменились
 
 **Высокий риск** (при длительном наблюдении):
@@ -429,10 +429,10 @@ struct ManagerHeader
 
 ### Этап 1: Инфраструктура (оценка: средняя сложность)
 
-1. Определить `encryption_policy` как шаблонный параметр в [BasicConfig](../../include/pmm/manager_configs.h#pmm::basicconfig)
+1. Определить `encryption_policy` как шаблонный параметр в [BasicConfig](../../include/pmm/manager_configs.h#pmm-basicconfig)
 2. Добавить SFINAE-детекцию `encryption_policy` для обратной совместимости
    (аналогично `logging_policy`)
-3. Добавить `encryption_algo` в [ManagerHeader](../../include/pmm/types.h#pmm::detail::managerheader) (использовать резервные байты)
+3. Добавить `encryption_algo` в [ManagerHeader](../../include/pmm/types.h#pmm-detail-managerheader) (использовать резервные байты)
 4. Реализовать `NoEncryption` политику (нулевые накладные расходы)
 
 ### Этап 2: Реализация шифрования блоков (оценка: средняя сложность)

@@ -11,7 +11,7 @@ Canonical map of internal modules, their responsibilities, and authoritative fil
 | `address_traits.h` | 144 | `AddressTraits<IndexT, GranuleSz>` template; predefined Small/Default/Large aliases |
 | `block.h` | 80 | `Block<AT>` composite type (TreeNode + prev/next linked-list fields) |
 | `tree_node.h` | 170 | `TreeNode<AT>` intrusive AVL slot (weight, left/right/parent, root_offset, avl_height, node_type) |
-| `types.h` | 464 | `ManagerHeader<AT>`, [PmmError](../include/pmm/types.h#pmm::pmmerror), [MemoryStats](../include/pmm/types.h#pmm::memorystats), [BlockView](../include/pmm/types.h#pmm::blockview), [FreeBlockView](../include/pmm/types.h#pmm::freeblockview); CRC32; byte↔granule conversion; `block_at()`, `user_ptr()`, `resolve_granule_ptr()`; `kNullIdx_v<AT>` null sentinel |
+| `types.h` | 464 | `ManagerHeader<AT>`, [PmmError](../include/pmm/types.h#pmm-pmmerror), [MemoryStats](../include/pmm/types.h#pmm-memorystats), [BlockView](../include/pmm/types.h#pmm-blockview), [FreeBlockView](../include/pmm/types.h#pmm-freeblockview); CRC32; byte↔granule conversion; `block_at()`, `user_ptr()`, `resolve_granule_ptr()`; `kNullIdx_v<AT>` null sentinel |
 
 **Authoritative path:** `address_traits.h``block.h` / `tree_node.h``types.h` (constants & helpers).
 
@@ -29,9 +29,9 @@ Canonical map of internal modules, their responsibilities, and authoritative fil
 |------|-------|----------------|
 | `allocator_policy.h` | 632 | `AllocatorPolicy<FreeBlockTreeT, AT>` — allocate, coalesce, split, rebuild, verify |
 | `free_block_tree.h` | 255 | `AvlFreeTree<AT>` — AVL forest-policy for free blocks (insert/remove/find_best_fit) |
-| `avl_tree_mixin.h` | 648 | Shared AVL operations (rotate, rebalance, insert, remove, find); `BlockPPtr<AT>` adapter; [AvlInorderIterator](../include/pmm/avl_tree_mixin.h#pmm::detail::avlinorderiterator) |
+| `avl_tree_mixin.h` | 648 | Shared AVL operations (rotate, rebalance, insert, remove, find); `BlockPPtr<AT>` adapter; [AvlInorderIterator](../include/pmm/avl_tree_mixin.h#pmm-detail-avlinorderiterator) |
 
-**Authoritative path:** [AvlFreeTree](../include/pmm/free_block_tree.h#pmm::avlfreetree)[AllocatorPolicy](../include/pmm/allocator_policy.h#pmm::allocatorpolicy)[PersistMemoryManager](../include/pmm/persist_memory_manager.h#pmm::persistmemorymanager). One implementation path for each: allocation, deallocation, coalescing, tree rebuild.
+**Authoritative path:** [AvlFreeTree](../include/pmm/free_block_tree.h#pmm-avlfreetree)[AllocatorPolicy](../include/pmm/allocator_policy.h#pmm-allocatorpolicy)[PersistMemoryManager](../include/pmm/persist_memory_manager.h#pmm-persistmemorymanager). One implementation path for each: allocation, deallocation, coalescing, tree rebuild.
 
 ### 4. Storage Backends
 
@@ -61,8 +61,8 @@ Canonical map of internal modules, their responsibilities, and authoritative fil
 
 | File | Lines | Responsibility |
 |------|-------|----------------|
-| `config.h` | 74 | Lock policies: [SharedMutexLock](../include/pmm/config.h#pmm::config::sharedmutexlock), [NoLock](../include/pmm/config.h#pmm::config::nolock); grow ratio constants |
-| `logging_policy.h` | 128 | [NoLogging](../include/pmm/logging_policy.h#pmm::logging::nologging), [StderrLogging](../include/pmm/logging_policy.h#pmm::logging::stderrlogging) with callback hooks |
+| `config.h` | 74 | Lock policies: [SharedMutexLock](../include/pmm/config.h#pmm-config-sharedmutexlock), [NoLock](../include/pmm/config.h#pmm-config-nolock); grow ratio constants |
+| `logging_policy.h` | 128 | [NoLogging](../include/pmm/logging_policy.h#pmm-logging-nologging), [StderrLogging](../include/pmm/logging_policy.h#pmm-logging-stderrlogging) with callback hooks |
 | `manager_configs.h` | 354 | 9 predefined configs (Cache, Persistent, Embedded, Industrial, LargeDB, Static variants) |
 | `manager_concept.h` | 97 | C++20 concept `ManagerConcept` for compile-time validation |
 | `forest_registry.h` | 211 | `ForestDomainRegistry<AT>` — persistent domain registry for forest model |
@@ -76,14 +76,14 @@ Canonical map of internal modules, their responsibilities, and authoritative fil
 | `forest_domain_mixin.inc` | 498 | Forest domain registry methods — extracted for file-size limit |
 | `verify_repair_mixin.inc` | 95 | `verify_image_unlocked()` — extracted for file-size limit |
 
-**Authoritative path:** All public API goes through [PersistMemoryManager](../include/pmm/persist_memory_manager.h#pmm::persistmemorymanager). Internal helpers use `read_stat()` for statistics, `get_tree_idx_field()`/`set_tree_idx_field()` for tree accessors.
+**Authoritative path:** All public API goes through [PersistMemoryManager](../include/pmm/persist_memory_manager.h#pmm-persistmemorymanager). Internal helpers use `read_stat()` for statistics, `get_tree_idx_field()`/`set_tree_idx_field()` for tree accessors.
 
 ### 8. I/O & Diagnostics
 
 | File | Lines | Responsibility |
 |------|-------|----------------|
 | `io.h` | 224 | `save_manager<MgrT>()`, `load_manager_from_file<MgrT>()` with CRC32 |
-| `diagnostics.h` | 107 | [RecoveryMode](../include/pmm/diagnostics.h#pmm::recoverymode), [ViolationType](../include/pmm/diagnostics.h#pmm::violationtype), [DiagnosticEntry](../include/pmm/diagnostics.h#pmm::diagnosticentry), [VerifyResult](../include/pmm/diagnostics.h#pmm::verifyresult) |
+| `diagnostics.h` | 107 | [RecoveryMode](../include/pmm/diagnostics.h#pmm-recoverymode), [ViolationType](../include/pmm/diagnostics.h#pmm-violationtype), [DiagnosticEntry](../include/pmm/diagnostics.h#pmm-diagnosticentry), [VerifyResult](../include/pmm/diagnostics.h#pmm-verifyresult) |
 | `typed_guard.h` | 137 | RAII scope-guards for allocate/deallocate pairs |
 | `pmm_presets.h` | 190 | Preset manager aliases (SingleThreadedHeap, MultiThreadedHeap, etc.) |
 
@@ -129,4 +129,4 @@ pmm::                           Public API surface
 2. **Shared AVL mixin.** All AVL trees (free tree, pstringview, pmap) share `avl_tree_mixin.h` via template metaprogramming.
 3. **State machine for block transitions.** All block metadata writes go through `BlockStateBase<AT>` to ensure atomicity and recoverability.
 4. **Modular headers as source of truth.** `single_include/pmm.h` is generated from modular headers via `scripts/generate-single-headers.sh`.
-5. **Unified field access.** [BlockStateBase](../include/pmm/block_state.h#pmm::blockstatebase) uses `field_read_idx`/`field_write_idx` with compile-time offsets for all block field access.
+5. **Unified field access.** [BlockStateBase](../include/pmm/block_state.h#pmm-blockstatebase) uses `field_read_idx`/`field_write_idx` with compile-time offsets for all block field access.

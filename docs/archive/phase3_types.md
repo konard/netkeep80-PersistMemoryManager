@@ -11,7 +11,7 @@
 ### Описание
 
 `pstring<ManagerT>` — мутабельная строка, хранящаяся в персистентном адресном пространстве (ПАП).
-В отличие от [pstringview](../../include/pmm/pstringview.h#pmm::pstringview) (read-only, interned), [pstring](../../include/pmm/pstring.h#pmm::pstring) поддерживает изменение содержимого.
+В отличие от [pstringview](../../include/pmm/pstringview.h#pmm-pstringview) (read-only, interned), [pstring](../../include/pmm/pstring.h#pmm-pstring) поддерживает изменение содержимого.
 
 ### Архитектура
 
@@ -84,7 +84,7 @@ Mgr::destroy();
 ### Описание
 
 `parray<T, ManagerT>` — динамический массив в персистентном адресном пространстве (ПАП)
-с O(1) произвольным доступом. [parray](../../include/pmm/parray.h#pmm::parray) хранит элементы в непрерывном блоке памяти,
+с O(1) произвольным доступом. [parray](../../include/pmm/parray.h#pmm-parray) хранит элементы в непрерывном блоке памяти,
 аналогично `std::vector`.
 
 ### Архитектура
@@ -209,12 +209,12 @@ Mgr::destroy();
   sentinel вместо 0 для корректной работы итератора и AVL-операций
 
 > **Примечание (Issue #188):** Все AVL-операции в pmap делегированы общим шаблонным
-> функциям из `avl_tree_mixin.h`. pmap использует стандартный [AvlUpdateHeightOnly](../../include/pmm/avl_tree_mixin.h#pmm::detail::avlupdateheightonly)
+> функциям из `avl_tree_mixin.h`. pmap использует стандартный [AvlUpdateHeightOnly](../../include/pmm/avl_tree_mixin.h#pmm-detail-avlupdateheightonly)
 > callback (обновление только высоты).
 
 ## ~~3.4 Доработка `pvector<T>` — метод `erase(index)`~~ УДАЛЕНО (#224)
 
-> Тип `pvector` удалён, так как полностью заменён [parray](../../include/pmm/parray.h#pmm::parray) (Issue #224).
+> Тип `pvector` удалён, так как полностью заменён [parray](../../include/pmm/parray.h#pmm-parray) (Issue #224).
 
 ## 3.5 STL-совместимый аллокатор `pallocator<T, ManagerT>` ✅
 
@@ -373,7 +373,7 @@ Mgr::destroy();
 
 ### Описание
 
-Единственный именованный указатель `root_offset` в [ManagerHeader](../../include/pmm/types.h#pmm::detail::managerheader), позволяющий хранить
+Единственный именованный указатель `root_offset` в [ManagerHeader](../../include/pmm/types.h#pmm-detail-managerheader), позволяющий хранить
 корневой объект (например, `pmap<pstringview, pptr<void>>`) и находить его после загрузки
 образа. Заменяет паттерн `pam_pmm.h` из BinDiffSynchronizer.
 
@@ -426,5 +426,5 @@ Mgr::destroy();
 - Один корневой указатель на менеджер (мультитон — у каждого экземпляра свой)
 - Типобезопасность: `set_root<T>()` / `get_root<T>()` — тип T должен совпадать
 - Потокобезопасность: `set_root` под `unique_lock`, `get_root` под `shared_lock`
-- Персистентность: корень сохраняется в образе через `root_offset` в [ManagerHeader](../../include/pmm/types.h#pmm::detail::managerheader)
+- Персистентность: корень сохраняется в образе через `root_offset` в [ManagerHeader](../../include/pmm/types.h#pmm-detail-managerheader)
 - Работает со всеми address traits: `SmallAddressTraits`, `DefaultAddressTraits`, `LargeAddressTraits`

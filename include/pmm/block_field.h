@@ -11,7 +11,7 @@ namespace pmm {
 namespace detail {
 
 /*
-### pmm::detail::blockfieldlayout
+### pmm-detail-blockfieldlayout
 */
 template <typename IndexT> struct BlockFieldLayout {
 
@@ -37,54 +37,54 @@ static_assert(std::is_standard_layout<BlockFieldLayout<std::uint32_t>>::value,
               "BlockFieldLayout must remain standard-layout");
 
 /*
-### pmm::detail::blockweightfield
+### pmm-detail-blockweightfield
 */
 struct BlockWeightField {};
 
 /*
-### pmm::detail::blockleftoffsetfield
+### pmm-detail-blockleftoffsetfield
 */
 struct BlockLeftOffsetField {};
 
 /*
-### pmm::detail::blockrightoffsetfield
+### pmm-detail-blockrightoffsetfield
 */
 struct BlockRightOffsetField {};
 
 /*
-### pmm::detail::blockparentoffsetfield
+### pmm-detail-blockparentoffsetfield
 */
 struct BlockParentOffsetField {};
 
 /*
-### pmm::detail::blockrootoffsetfield
+### pmm-detail-blockrootoffsetfield
 */
 struct BlockRootOffsetField {};
 
 /*
-### pmm::detail::blockavlheightfield
+### pmm-detail-blockavlheightfield
 */
 struct BlockAvlHeightField {};
 
 /*
-### pmm::detail::blocknodetypefield
+### pmm-detail-blocknodetypefield
 */
 struct BlockNodeTypeField {};
 
 /*
-### pmm::detail::blockprevoffsetfield
+### pmm-detail-blockprevoffsetfield
 */
 struct BlockPrevOffsetField {};
 
 /*
-### pmm::detail::blocknextoffsetfield
+### pmm-detail-blocknextoffsetfield
 */
 struct BlockNextOffsetField {};
 
 template <typename AddressTraitsT, typename FieldTag> struct BlockFieldTraits;
 
 /*
-### pmm::detail::blockfieldtraits
+### pmm-detail-blockfieldtraits
 */
 template <typename AddressTraitsT>
 struct BlockFieldTraits<AddressTraitsT, BlockWeightField> {
@@ -180,7 +180,7 @@ inline constexpr std::size_t block_field_offset_v =
     BlockFieldTraits<AddressTraitsT, FieldTag>::offset;
 
 /*
-### pmm::detail::blockfieldbyteaccess
+### pmm-detail-blockfieldbyteaccess
 */
 struct BlockFieldByteAccess {
   template <typename ValueT>

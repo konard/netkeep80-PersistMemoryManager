@@ -15,12 +15,12 @@ Their responsibilities do not overlap.
 
 | Operation | Entry point | Lock | Modifies image | Reports diagnostics |
 |-----------|-------------|------|----------------|---------------------|
-| **Verify** | `Mgr::verify()` | shared (read) | **No** | [VerifyResult](../include/pmm/diagnostics.h#pmm::verifyresult) with `NoAction` entries |
-| **Repair** | `Mgr::load(VerifyResult&)` | unique (write) | **Yes** | [VerifyResult](../include/pmm/diagnostics.h#pmm::verifyresult) with `Repaired` / `Rebuilt` / `Aborted` entries |
-| **Load** | `Mgr::load(VerifyResult&)` | unique (write) | **Yes** (repair phase) | Same [VerifyResult](../include/pmm/diagnostics.h#pmm::verifyresult) as repair |
+| **Verify** | `Mgr::verify()` | shared (read) | **No** | [VerifyResult](../include/pmm/diagnostics.h#pmm-verifyresult) with `NoAction` entries |
+| **Repair** | `Mgr::load(VerifyResult&)` | unique (write) | **Yes** | [VerifyResult](../include/pmm/diagnostics.h#pmm-verifyresult) with `Repaired` / `Rebuilt` / `Aborted` entries |
+| **Load** | `Mgr::load(VerifyResult&)` | unique (write) | **Yes** (repair phase) | Same [VerifyResult](../include/pmm/diagnostics.h#pmm-verifyresult) as repair |
 
 **Key principle:** repair is never hidden. Every structural modification during
-`load()` is recorded in [VerifyResult](../include/pmm/diagnostics.h#pmm::verifyresult) with an explicit [DiagnosticAction](../include/pmm/diagnostics.h#pmm::diagnosticaction).
+`load()` is recorded in [VerifyResult](../include/pmm/diagnostics.h#pmm-verifyresult) with an explicit [DiagnosticAction](../include/pmm/diagnostics.h#pmm-diagnosticaction).
 
 ---
 
@@ -36,8 +36,8 @@ Their responsibilities do not overlap.
    - Counter consistency (block_count, free_count, alloc_count, used_size).
    - Free tree root consistency (root presence vs. free block count).
    - Forest registry and system domain presence/flags.
-3. Populates [VerifyResult](../include/pmm/diagnostics.h#pmm::verifyresult) with `DiagnosticAction::NoAction` for all findings.
-4. Returns [VerifyResult](../include/pmm/diagnostics.h#pmm::verifyresult) with `ok == true` if no violations found.
+3. Populates [VerifyResult](../include/pmm/diagnostics.h#pmm-verifyresult) with `DiagnosticAction::NoAction` for all findings.
+4. Returns [VerifyResult](../include/pmm/diagnostics.h#pmm-verifyresult) with `ok == true` if no violations found.
 
 ### What verify does NOT do
 
@@ -83,7 +83,7 @@ standalone operation — it always runs as part of `load(VerifyResult&)`.
    - `Repaired` — field-level fix (block state, prev_offset).
    - `Rebuilt` — structure rebuilt from scratch (counters, free tree).
 4. **Applies** all fixes in a deterministic order.
-5. Records every fix in [VerifyResult](../include/pmm/diagnostics.h#pmm::verifyresult) — no silent modifications.
+5. Records every fix in [VerifyResult](../include/pmm/diagnostics.h#pmm-verifyresult) — no silent modifications.
 
 ### Repair phases (deterministic order)
 
@@ -111,7 +111,7 @@ standalone operation — it always runs as part of `load(VerifyResult&)`.
 - **Never repairs** corrupted magic, unsupported image_version, granule_size, or total_size — these are
   non-recoverable and cause `Aborted`.
 - **Never repairs** user data inside allocated blocks.
-- **Never repairs** user-level AVL trees ([pmap](../include/pmm/pmap.h#pmm::pmap), [pstringview](../include/pmm/pstringview.h#pmm::pstringview)).
+- **Never repairs** user-level AVL trees ([pmap](../include/pmm/pmap.h#pmm-pmap), [pstringview](../include/pmm/pstringview.h#pmm-pstringview)).
 - **Never runs** outside of `load()` — no "quiet repair" on normal paths.
 
 ### Test coverage
@@ -130,12 +130,12 @@ standalone operation — it always runs as part of `load(VerifyResult&)`.
 
 `load(VerifyResult&)` is the sole entry point for restoring a persisted image.
 It combines verification and repair in a single atomic operation under a write
-lock. The [VerifyResult](../include/pmm/diagnostics.h#pmm::verifyresult) parameter receives a complete audit trail.
+lock. The [VerifyResult](../include/pmm/diagnostics.h#pmm-verifyresult) parameter receives a complete audit trail.
 
 ### What load does NOT do
 
 - **No hidden repair** — every structural modification is recorded in
-  [VerifyResult](../include/pmm/diagnostics.h#pmm::verifyresult) with an explicit [DiagnosticAction](../include/pmm/diagnostics.h#pmm::diagnosticaction).
+  [VerifyResult](../include/pmm/diagnostics.h#pmm-verifyresult) with an explicit [DiagnosticAction](../include/pmm/diagnostics.h#pmm-diagnosticaction).
 - **No silent normalization** — runtime fields (`owns_memory`,
   `prev_total_size`) are reset to safe defaults, but these are runtime-only
   fields that are never persisted.
@@ -179,12 +179,12 @@ These violations cause `load()` to return `false` with `Aborted` action:
    [diagnostics_taxonomy.md](diagnostics_taxonomy.md)).
 
 4. **Diagnostics are structured and uniform.**
-   Every violation is reported as a [DiagnosticEntry](../include/pmm/diagnostics.h#pmm::diagnosticentry) with type, affected block,
+   Every violation is reported as a [DiagnosticEntry](../include/pmm/diagnostics.h#pmm-diagnosticentry) with type, affected block,
    expected/actual values, and action.
 
 5. **Tasks 08–10 can rely on this contract.**
    The verify/repair boundary is frozen. New violation types or repair policies
-   must be added to [ViolationType](../include/pmm/diagnostics.h#pmm::violationtype) enum and documented in
+   must be added to [ViolationType](../include/pmm/diagnostics.h#pmm-violationtype) enum and documented in
    [diagnostics_taxonomy.md](diagnostics_taxonomy.md).
 
 ---

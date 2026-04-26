@@ -5,7 +5,7 @@
 
 ## Назначение документа
 
-Этот документ описывает **расширенную концептуальную модель `AVL-forest` для [PersistMemoryManager](../../include/pmm/persist_memory_manager.h#pmm::persistmemorymanager)** как
+Этот документ описывает **расширенную концептуальную модель `AVL-forest` для [PersistMemoryManager](../../include/pmm/persist_memory_manager.h#pmm-persistmemorymanager)** как
 основы глобального проекта:
 
 - `PMM` как persistent address space manager;
@@ -98,8 +98,8 @@
 
 Для `DefaultAddressTraits` layout таков:
 
-- [TreeNode](../../include/pmm/tree_node.h#pmm::treenode) = 24 байта;
-- [Block](../../include/pmm/block.h#pmm::block) = 32 байта;
+- [TreeNode](../../include/pmm/tree_node.h#pmm-treenode) = 24 байта;
+- [Block](../../include/pmm/block.h#pmm-block) = 32 байта;
 - блок идеально укладывается в 2 гранулы по 16 байт.
 
 Это важное архитектурное ограничение:
@@ -136,7 +136,7 @@
    Тогда дерево свободного ПАП балансируется по размеру блока,
    а поиск best-fit работает как поиск минимального подходящего размера.
 
-2. **В словаре [pstringview](../../include/pmm/pstringview.h#pmm::pstringview)**:
+2. **В словаре [pstringview](../../include/pmm/pstringview.h#pmm-pstringview)**:
    `weight` может означать гранульный индекс строки или производный ключ,
    по которому дерево индексируется лексикографически или через внешний comparator.
 
@@ -216,7 +216,7 @@
 - в блоке лежит не просто payload;
 - у payload есть тип;
 - этот тип тоже живёт в ПАП;
-- тип может быть описан через [pstringview](../../include/pmm/pstringview.h#pmm::pstringview) или через специальный type-node;
+- тип может быть описан через [pstringview](../../include/pmm/pstringview.h#pmm-pstringview) или через специальный type-node;
 - следовательно, `node_type` должен быть частью **самоописательности ПАП**.
 
 Именно здесь находится важное поле для будущего сближения с `pjson`,
@@ -303,7 +303,7 @@
 При инициализации ПАП должны создаваться как минимум:
 
 1. **корневой блок дерева свободных блоков**;
-2. **базовый словарь символов / имён** ([pstringview](../../include/pmm/pstringview.h#pmm::pstringview) tree или его канонический преемник);
+2. **базовый словарь символов / имён** ([pstringview](../../include/pmm/pstringview.h#pmm-pstringview) tree или его канонический преемник);
 3. **служебные записи о доменах и типах**, описывающие базовые системные деревья.
 
 То есть `PMM` с самого начала должен создавать не пустую арену,
@@ -319,7 +319,7 @@
 - имена типов блоков;
 - системные reserved symbols.
 
-Это может быть отдельное AVL-дерево на [pstringview](../../include/pmm/pstringview.h#pmm::pstringview) или на более общей symbol-node модели.
+Это может быть отдельное AVL-дерево на [pstringview](../../include/pmm/pstringview.h#pmm-pstringview) или на более общей symbol-node модели.
 
 Минимально там должны быть сущности, обозначающие, например:
 - free-block-tree;

@@ -1,6 +1,6 @@
 # PersistMemoryManager
 
-## [PersistMemoryManager](./include/pmm/persist_memory_manager.h#pmm::persistmemorymanager)
+## [PersistMemoryManager](./include/pmm/persist_memory_manager.h#pmm-persistmemorymanager)
 <a name="persist_memory_manager"></a>
 
 Header-only C++20 библиотека для управления персистентным адресным
@@ -28,8 +28,8 @@ PMM отвечает за:
 - восстановление служебных структур при `load(VerifyResult&)`;
 - `verify()` и структурную диагностику без модификации образа;
 - root pointer и persistent forest/domain registry;
-- базовые персистентные типы: [pstring](./include/pmm/pstring.h#pmm::pstring), [pstringview](./include/pmm/pstringview.h#pmm::pstringview), [pmap](./include/pmm/pmap.h#pmm::pmap), [parray](./include/pmm/parray.h#pmm::parray),
-  [pallocator](./include/pmm/pallocator.h#pmm::pallocator).
+- базовые персистентные типы: [pstring](./include/pmm/pstring.h#pmm-pstring), [pstringview](./include/pmm/pstringview.h#pmm-pstringview), [pmap](./include/pmm/pmap.h#pmm-pmap), [parray](./include/pmm/parray.h#pmm-parray),
+  [pallocator](./include/pmm/pallocator.h#pmm-pallocator).
 
 PMM не является JSON-хранилищем, database engine, query engine, sync layer или
 прикладным форматом данных. Граница проекта описана в
@@ -105,7 +105,7 @@ int main()
 ## Сохранение и загрузка
 
 Файловые helper-функции находятся в `pmm/io.h`. Загрузка через файл принимает
-[VerifyResult](./include/pmm/diagnostics.h#pmm::verifyresult), потому что текущий `load` выполняет проверку и документированное
+[VerifyResult](./include/pmm/diagnostics.h#pmm-verifyresult), потому что текущий `load` выполняет проверку и документированное
 восстановление служебных структур.
 
 ```cpp
@@ -253,15 +253,15 @@ static bool set_domain_root( const char* name, pptr<T> root ) noexcept;
 
 | Preset | Storage | Индекс | Granule | Lock | Рост | Сценарий |
 |--------|---------|--------|---------|------|------|----------|
-| `SmallEmbeddedStaticHeap<N>` | [StaticStorage](./include/pmm/static_storage.h#pmm::staticstorage) | `uint16_t` | 16 B | [NoLock](./include/pmm/config.h#pmm::config::nolock) | нет | Малые embedded-системы без heap |
-| `EmbeddedStaticHeap<N>` | [StaticStorage](./include/pmm/static_storage.h#pmm::staticstorage) | `uint32_t` | 16 B | [NoLock](./include/pmm/config.h#pmm::config::nolock) | нет | Bare-metal/RTOS с фиксированным пулом |
-| `EmbeddedHeap` | [HeapStorage](./include/pmm/heap_storage.h#pmm::heapstorage) | `uint32_t` | 16 B | [NoLock](./include/pmm/config.h#pmm::config::nolock) | 50% | Embedded-среды с heap |
-| `SingleThreadedHeap` | [HeapStorage](./include/pmm/heap_storage.h#pmm::heapstorage) | `uint32_t` | 16 B | [NoLock](./include/pmm/config.h#pmm::config::nolock) | 25% | Однопоточные утилиты и кэши |
-| `MultiThreadedHeap` | [HeapStorage](./include/pmm/heap_storage.h#pmm::heapstorage) | `uint32_t` | 16 B | [SharedMutexLock](./include/pmm/config.h#pmm::config::sharedmutexlock) | 25% | Многопоточные сервисы |
-| `IndustrialDBHeap` | [HeapStorage](./include/pmm/heap_storage.h#pmm::heapstorage) | `uint32_t` | 16 B | [SharedMutexLock](./include/pmm/config.h#pmm::config::sharedmutexlock) | 100% | Нагрузочные storage-сценарии |
-| `LargeDBHeap` | [HeapStorage](./include/pmm/heap_storage.h#pmm::heapstorage) | `uint64_t` | 64 B | [SharedMutexLock](./include/pmm/config.h#pmm::config::sharedmutexlock) | 100% | Очень большие 64-bit адресные пространства |
+| `SmallEmbeddedStaticHeap<N>` | [StaticStorage](./include/pmm/static_storage.h#pmm-staticstorage) | `uint16_t` | 16 B | [NoLock](./include/pmm/config.h#pmm-config-nolock) | нет | Малые embedded-системы без heap |
+| `EmbeddedStaticHeap<N>` | [StaticStorage](./include/pmm/static_storage.h#pmm-staticstorage) | `uint32_t` | 16 B | [NoLock](./include/pmm/config.h#pmm-config-nolock) | нет | Bare-metal/RTOS с фиксированным пулом |
+| `EmbeddedHeap` | [HeapStorage](./include/pmm/heap_storage.h#pmm-heapstorage) | `uint32_t` | 16 B | [NoLock](./include/pmm/config.h#pmm-config-nolock) | 50% | Embedded-среды с heap |
+| `SingleThreadedHeap` | [HeapStorage](./include/pmm/heap_storage.h#pmm-heapstorage) | `uint32_t` | 16 B | [NoLock](./include/pmm/config.h#pmm-config-nolock) | 25% | Однопоточные утилиты и кэши |
+| `MultiThreadedHeap` | [HeapStorage](./include/pmm/heap_storage.h#pmm-heapstorage) | `uint32_t` | 16 B | [SharedMutexLock](./include/pmm/config.h#pmm-config-sharedmutexlock) | 25% | Многопоточные сервисы |
+| `IndustrialDBHeap` | [HeapStorage](./include/pmm/heap_storage.h#pmm-heapstorage) | `uint32_t` | 16 B | [SharedMutexLock](./include/pmm/config.h#pmm-config-sharedmutexlock) | 100% | Нагрузочные storage-сценарии |
+| `LargeDBHeap` | [HeapStorage](./include/pmm/heap_storage.h#pmm-heapstorage) | `uint64_t` | 64 B | [SharedMutexLock](./include/pmm/config.h#pmm-config-sharedmutexlock) | 100% | Очень большие 64-bit адресные пространства |
 
-Пользовательские конфигурации задаются через [BasicConfig](./include/pmm/manager_configs.h#pmm::basicconfig), [StaticConfig](./include/pmm/manager_configs.h#pmm::staticconfig) или
+Пользовательские конфигурации задаются через [BasicConfig](./include/pmm/manager_configs.h#pmm-basicconfig), [StaticConfig](./include/pmm/manager_configs.h#pmm-staticconfig) или
 собственный `ConfigT` с типами `address_traits`, `storage_backend`,
 `free_block_tree`, `lock_policy` и опциональным `logging_policy`.
 

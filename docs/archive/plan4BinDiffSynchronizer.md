@@ -40,7 +40,7 @@ JSON-базу данных поверх PMM. Текущая архитектур
 |------------|-------------------------------|
 | 3.1 `pstring<ManagerT>` | `pstring_pmm` |
 | 3.2 `parray<T, ManagerT>` | `pmem_array_pmm` |
-| 3.3 [pmap::erase()](../../include/pmm/pmap.h#pmm::pmap::erase) + итератор | `pmap_pmm` (частично) |
+| 3.3 [pmap::erase()](../../include/pmm/pmap.h#pmm-pmap-erase) + итератор | `pmap_pmm` (частично) |
 | 3.5 `pallocator<T, ManagerT>` | `pallocator_pmm` |
 | 3.6 `ppool<T, ManagerT>` | `pjson_pool_pmm` |
 | 3.7 Корневой объект | `pam_pmm_root` в `pam_pmm.h` |
@@ -55,7 +55,7 @@ JSON-базу данных поверх PMM. Текущая архитектур
 **Текущая ситуация:** `pam_adapter.h` конвертирует между `pptr<T>` (гранульные индексы)
 и `uintptr_t` (байтовые смещения).
 
-**После pmm 4.4:** pmm будет предоставлять [pptr::byte_offset()](../../include/pmm/pptr.h#pmm::pptr::byte_offset) и
+**После pmm 4.4:** pmm будет предоставлять [pptr::byte_offset()](../../include/pmm/pptr.h#pmm-pptr-byte_offset) и
 `PersistMemoryManager::pptr_from_byte_offset<T>()`.
 
 **Действия:**
@@ -104,7 +104,7 @@ JSON-базу данных поверх PMM. Текущая архитектур
 
 **Действия:**
 - Заменить `pstring_pmm` на `Mgr::pstring` (вложенный alias в PersistMemoryManager)
-- Обновить `pjson_node` — тип `node_tag::string` использует [pstring](../../include/pmm/pstring.h#pmm::pstring) вместо `pstring_pmm`
+- Обновить `pjson_node` — тип `node_tag::string` использует [pstring](../../include/pmm/pstring.h#pmm-pstring) вместо `pstring_pmm`
 - Удалить `pstring_pmm.h`
 
 ### 2.2 Замена pmem_array_pmm на pmm::parray
@@ -149,10 +149,10 @@ JSON-базу данных поверх PMM. Текущая архитектур
 ### 2.5 Упрощение pstringview_pmm
 
 **Текущая ситуация:** `pstringview_pmm` кэширует `length` и `chars_offset` и оборачивает
-[pmm::pstringview](../../include/pmm/pstringview.h#pmm::pstringview).
+[pmm::pstringview](../../include/pmm/pstringview.h#pmm-pstringview).
 
 **Действия:**
-- Оценить, можно ли использовать [pmm::pstringview](../../include/pmm/pstringview.h#pmm::pstringview) напрямую
+- Оценить, можно ли использовать [pmm::pstringview](../../include/pmm/pstringview.h#pmm-pstringview) напрямую
 - Если кэширование необходимо для производительности — оставить как тонкую обёртку
 - Удалить дублирование логики интернирования
 
@@ -164,7 +164,7 @@ JSON-базу данных поверх PMM. Текущая архитектур
 
 **Действия:**
 - Обновить union в `pjson_node` для использования типов pmm:
-  - `node_tag::string` → [pmm::pstring](../../include/pmm/pstring.h#pmm::pstring) вместо `pstring_pmm`
+  - `node_tag::string` → [pmm::pstring](../../include/pmm/pstring.h#pmm-pstring) вместо `pstring_pmm`
   - `node_tag::array` → `pmm::parray<node_id>` вместо `pvector_pmm<node_id>`
   - `node_tag::object` → `pmm::pmap<pstringview, node_id>` или `pmm::parray<entry>` вместо `pmap_pmm`
   - `node_tag::binary` → `pmm::parray<uint8_t>` вместо `pvector_pmm<uint8_t>`
