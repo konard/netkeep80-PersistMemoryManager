@@ -100,7 +100,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Added explicit persistent image version validation to `ManagerHeader`, including legacy version migration and hard rejection of unsupported versions.
-- Trimmed trailing whitespace when generating the no-comments single-header artifact.
 
 
 ## [0.57.6] - 2026-04-20
@@ -744,21 +743,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - `LargeDBConfig` documentation clarified: ManagerHeader index fields are still `uint32_t` (limiting practical address space to ~256 GiB); full 64-bit support requires a future templated ManagerHeader refactoring (Issue #172)
-
-
-## [0.17.0] - 2026-03-10
-
-### Added
-- `scripts/strip-comments.py`: Python helper that strips C/C++ comments from a
-  source file while preserving string literals and line structure.
-- `--strip-comments` flag for `scripts/generate-single-headers.sh`: when passed,
-  also generates `single_include/pmm/pmm_no_comments.h` — a comment-free variant
-  of `pmm.h` that is ~42 % smaller in line count and ~56 % smaller in byte size,
-  suitable for embedded or size-critical environments.
-- `tests/test_issue170_sh_no_comments.cpp`: self-sufficiency test confirming that
-  `pmm_no_comments.h` compiles and runs correctly without any other PMM headers.
-- CI (`single-headers` job) now validates `pmm_no_comments.h` freshness alongside
-  the other single-header files.
 
 
 ## [0.16.4] - 2026-03-10

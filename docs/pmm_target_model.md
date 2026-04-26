@@ -3,7 +3,7 @@
 ## Document status
 
 This is the **canonical top-level document** that fixes the target model of
-`PersistMemoryManager`. It is normative: subsequent issues, repo-guard policy,
+[PersistMemoryManager](../include/pmm/persist_memory_manager.h#pmm::PersistMemoryManager). It is normative: subsequent issues, repo-guard policy,
 transformation rules, and review criteria must be consistent with it.
 
 It does not duplicate lower-level documents. Architectural detail lives in

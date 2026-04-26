@@ -2,7 +2,7 @@
 
 ## Overview
 
-`PersistMemoryManager` is a header-only C++20 library for persistent address space management.
+[PersistMemoryManager](../include/pmm/persist_memory_manager.h#pmm::PersistMemoryManager) is a header-only C++20 library for persistent address space management.
 All metadata is stored inside the managed memory region, which allows saving and restoring
 a memory image from a file or shared memory. Interaction with data is done through
 persistent typed pointers `pptr<T, ManagerT>`.
@@ -13,7 +13,7 @@ coexist through the `InstanceId` template parameter (multiton pattern).
 
 The canonical high-level model of PMM as a linear persistent address space plus an intrusive
 AVL-forest is documented in [pmm_avl_forest.md](pmm_avl_forest.md). The canonical semantics
-of `Block` / `TreeNode` fields is documented in [block_and_treenode_semantics.md](block_and_treenode_semantics.md).
+of [Block](../include/pmm/block.h#pmm::Block) / [TreeNode](../include/pmm/tree_node.h#pmm::TreeNode) fields is documented in [block_and_treenode_semantics.md](block_and_treenode_semantics.md).
 The frozen invariant set with traceability to code and tests is in [core_invariants.md](core_invariants.md).
 This document focuses on the low-level layout, invariants, and algorithms.
 
@@ -61,7 +61,7 @@ This document focuses on the low-level layout, invariants, and algorithms.
 [Block<A>_N][free space....]
 ```
 
-`ManagerHeader` is stored as the user data of `Block<A>_0` (granule 0, byte offset 32).
+[ManagerHeader](../include/pmm/types.h#pmm::detail::ManagerHeader) is stored as the user data of `Block<A>_0` (granule 0, byte offset 32).
 The memory layout is homogeneous: every region is a block. `Block<A>_0` has
 `root_offset=0` (its own index) and `weight=kManagerHeaderGranules`.
 
@@ -232,10 +232,10 @@ All blocks are aligned to the granule size. User data starts immediately after t
 
 Thread safety is controlled by the `lock_policy` configuration field:
 
-- **`SharedMutexLock`**: uses `std::shared_mutex`.
+- **[SharedMutexLock](../include/pmm/config.h#pmm::config::SharedMutexLock)**: uses `std::shared_mutex`.
   - Read operations: `shared_lock` (concurrent execution allowed).
   - Write operations: `unique_lock` (exclusive access).
-- **`NoLock`**: no-op locks (zero overhead, single-threaded use only).
+- **[NoLock](../include/pmm/config.h#pmm::config::NoLock)**: no-op locks (zero overhead, single-threaded use only).
 
 ---
 
@@ -279,7 +279,7 @@ space limit.
 ### `pstringview<ManagerT>`
 
 An interned read-only persistent string. Multiple calls with the same content return the
-same `pptr` (deduplication). Uses the built-in `TreeNode` fields of each allocated block
+same [pptr](../include/pmm/pptr.h#pmm::pptr) (deduplication). Uses the built-in [TreeNode](../include/pmm/tree_node.h#pmm::TreeNode) fields of each allocated block
 as AVL tree links — no separate AVL node allocations. Blocks are permanently locked via
 `lock_block_permanent()`.
 
@@ -297,11 +297,11 @@ forest domain: system/symbols (persistent root in registry)
 
 ### `pmap<_K, _V, ManagerT>`
 
-A persistent AVL tree dictionary. The `pmap` object is a typed facade over a
+A persistent AVL tree dictionary. The [pmap](../include/pmm/pmap.h#pmm::pmap) object is a typed facade over a
 type-scoped `container/pmap/<type>/<binding>` forest domain; the AVL root is stored in
 that domain binding while the object stores only the binding identity. Each node is an
-allocated block in PAP containing `pmap_node<_K, _V>`. The built-in `TreeNode` fields
-serve as AVL tree links. Nodes are **not** permanently locked (unlike `pstringview`), so
+allocated block in PAP containing `pmap_node<_K, _V>`. The built-in [TreeNode](../include/pmm/tree_node.h#pmm::TreeNode) fields
+serve as AVL tree links. Nodes are **not** permanently locked (unlike [pstringview](../include/pmm/pstringview.h#pmm::pstringview)), so
 they can be freed.
 
 The `<type>` segment of the domain name is a stable fingerprint derived from `sizeof`,
@@ -325,8 +325,8 @@ forest domain: container/pmap/<type>/<binding> (persistent root in registry)
 
 ### Shared AVL operations (`avl_tree_mixin.h`)
 
-All persistent containers (`pstringview`, `pmap`) and the free block tree
-(`AvlFreeTree`) share a single AVL implementation via free template functions in
+All persistent containers ([pstringview](../include/pmm/pstringview.h#pmm::pstringview), [pmap](../include/pmm/pmap.h#pmm::pmap)) and the free block tree
+([AvlFreeTree](../include/pmm/free_block_tree.h#pmm::AvlFreeTree)) share a single AVL implementation via free template functions in
 `pmm::detail`. This eliminates ~250 lines of previously duplicated code through
 C++ template metaprogramming.
 
@@ -356,18 +356,18 @@ All rotation and rebalancing functions accept an optional `NodeUpdateFn` callbac
 invoked after structural changes. This enables different containers to maintain
 different node invariants:
 
-- **`pmap`, `pstringview`**: use default `AvlUpdateHeightOnly` (height field only)
-- **`AvlFreeTree`**: uses `AvlUpdateHeightOnly` via `BlockPPtr` adapter
+- **[pmap](../include/pmm/pmap.h#pmm::pmap), [pstringview](../include/pmm/pstringview.h#pmm::pstringview)**: use default [AvlUpdateHeightOnly](../include/pmm/avl_tree_mixin.h#pmm::detail::AvlUpdateHeightOnly) (height field only)
+- **[AvlFreeTree](../include/pmm/free_block_tree.h#pmm::AvlFreeTree)**: uses [AvlUpdateHeightOnly](../include/pmm/avl_tree_mixin.h#pmm::detail::AvlUpdateHeightOnly) via [BlockPPtr](../include/pmm/avl_tree_mixin.h#pmm::detail::BlockPPtr) adapter
 
 #### `BlockPPtr<AT>` adapter (for free block tree)
 
 `BlockPPtr<AddressTraitsT>` is a lightweight adapter wrapping raw `(base_ptr, block_index)`
-pairs, making them behave like `pptr` for the shared AVL functions. This enables
-`AvlFreeTree` to reuse shared rotation, rebalancing, and min_node operations instead
+pairs, making them behave like [pptr](../include/pmm/pptr.h#pmm::pptr) for the shared AVL functions. This enables
+[AvlFreeTree](../include/pmm/free_block_tree.h#pmm::AvlFreeTree) to reuse shared rotation, rebalancing, and min_node operations instead
 of maintaining ~120 lines of duplicate code.
 
 - `BlockPPtrManagerTag<AT>` — provides `address_traits` for template resolution
-- `BlockTreeNodeProxy<AT>` — proxy for `TreeNode`-like interface, delegating to `BlockStateBase`
+- `BlockTreeNodeProxy<AT>` — proxy for [TreeNode](../include/pmm/tree_node.h#pmm::TreeNode)-like interface, delegating to [BlockStateBase](../include/pmm/block_state.h#pmm::BlockStateBase)
 - `pptr_make(BlockPPtr, idx)` — specialization propagating `base_ptr`
 
 #### `AvlInorderIterator<NodePPtr>`
@@ -420,8 +420,8 @@ recovery analysis.
 
 | State | `weight` | `root_offset` | In AVL tree |
 |-------|----------|---------------|-------------|
-| `FreeBlock` | 0 | 0 | Yes |
-| `AllocatedBlock` | >0 | own index | No |
+| [FreeBlock](../include/pmm/block_state.h#pmm::FreeBlock) | 0 | 0 | Yes |
+| [AllocatedBlock](../include/pmm/block_state.h#pmm::AllocatedBlock) | >0 | own index | No |
 
 ### Forbidden states
 

@@ -21,7 +21,7 @@ block layout, binding IDs, and symbol offsets.
 ### Step 1: Manager Header (Block\_0)
 
 `init_layout()` writes the first block header at offset 0. This block "owns" the
-`ManagerHeader` structure, which stores:
+[ManagerHeader](../include/pmm/types.h#pmm::detail::ManagerHeader) structure, which stores:
 
 | Field            | Value                       |
 |------------------|-----------------------------|
@@ -42,7 +42,7 @@ satisfy requests.
 
 ### Step 3: Forest / Domain Registry
 
-`bootstrap_forest_registry_unlocked()` allocates a `ForestDomainRegistry`
+`bootstrap_forest_registry_unlocked()` allocates a [ForestDomainRegistry](../include/pmm/forest_registry.h#pmm::detail::ForestDomainRegistry)
 structure. This is a persistent, locked block containing:
 
 - Magic: `0x50465247` ("PFRG")

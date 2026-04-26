@@ -4,7 +4,7 @@
 
 > **Canonical invariant reference:** [core_invariants.md](core_invariants.md) §E (Free-Tree Policy).
 
-This document defines the **canonical forest-policy for the free-tree domain** in `PersistMemoryManager`.
+This document defines the **canonical forest-policy for the free-tree domain** in [PersistMemoryManager](../include/pmm/persist_memory_manager.h#pmm::PersistMemoryManager).
 
 It resolves the semantic gap between:
 
@@ -24,7 +24,7 @@ The free-tree is the **primary system domain** of the AVL-forest.
 It indexes free blocks of the persistent address space (PAP) for best-fit allocation.
 
 Within the general forest model, the free-tree is a **specialized forest-policy**:
-it shares the same AVL tree substrate (`TreeNode` fields, shared rotations and rebalancing
+it shares the same AVL tree substrate ([TreeNode](../include/pmm/tree_node.h#pmm::TreeNode) fields, shared rotations and rebalancing
 from `avl_tree_mixin.h`), but has its own domain-specific ordering rules
 and its own interpretation of block header fields.
 
@@ -71,7 +71,7 @@ Instead, `weight == 0` is used as part of the block state encoding:
 - `weight > 0 && root_offset == own_idx` — block is allocated
 
 This encoding is a fundamental invariant of the block state machine
-(see `block_state.h`: `FreeBlock`, `AllocatedBlock` and their transitions).
+(see `block_state.h`: [FreeBlock](../include/pmm/block_state.h#pmm::FreeBlock), [AllocatedBlock](../include/pmm/block_state.h#pmm::AllocatedBlock) and their transitions).
 
 The free-tree derives its ordering key from linear geometry because:
 
@@ -115,9 +115,9 @@ The free-tree domain is consistent with this principle:
 - The domain determines the ordering policy → the free-tree domain derives
   its ordering key from linear PAP geometry.
 - The domain uses the same AVL substrate → shared rotations, rebalancing,
-  and min_node operations via `BlockPPtr` adapter.
+  and min_node operations via [BlockPPtr](../include/pmm/avl_tree_mixin.h#pmm::detail::BlockPPtr) adapter.
 
-Other forest domains (e.g., `pstringview`, `pmap`, user domains)
+Other forest domains (e.g., [pstringview](../include/pmm/pstringview.h#pmm::pstringview), [pmap](../include/pmm/pmap.h#pmm::pmap), user domains)
 use `weight` as their actual sort key. The free-tree's use of `weight`
 as a state discriminator rather than a sort key is a domain-specific policy choice
 within the general forest model, not a departure from it.
@@ -178,7 +178,7 @@ architecturally sound and consistent with the forest model.
 
 If bucketed allocation is needed, it should be implemented as a set of
 forest domains (one per bucket) managed by the allocator policy,
-using the existing `ForestDomainRegistry` infrastructure.
+using the existing [ForestDomainRegistry](../include/pmm/forest_registry.h#pmm::detail::ForestDomainRegistry) infrastructure.
 
 ## 7. Canonical summary
 
@@ -192,5 +192,5 @@ using the existing `ForestDomainRegistry` infrastructure.
 | **Search** | Best-fit, O(log n) |
 | **Binding kind** | `kForestBindingFreeTree` (special binding in forest registry) |
 | **Root storage** | `ManagerHeader::free_tree_root` |
-| **AVL substrate** | Shared rotations/rebalancing via `BlockPPtr` adapter |
+| **AVL substrate** | Shared rotations/rebalancing via [BlockPPtr](../include/pmm/avl_tree_mixin.h#pmm::detail::BlockPPtr) adapter |
 | **Key derivation** | Computed at traversal time from `next_offset` / `total_granules` |

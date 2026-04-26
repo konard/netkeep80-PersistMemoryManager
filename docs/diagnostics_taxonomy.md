@@ -15,7 +15,7 @@ detection method, severity level, and repair policy.
 
 ### Class 1: Header corruption
 
-Corruption of the image header (`ManagerHeader`) fields that anchor all
+Corruption of the image header ([ManagerHeader](../include/pmm/types.h#pmm::detail::ManagerHeader)) fields that anchor all
 addressing. Non-recoverable — the image cannot be trusted.
 
 | ViolationType | Trigger | Severity | Verify action | Repair action |
@@ -43,9 +43,9 @@ during allocation or deallocation.
 | `BlockStateInconsistent` | `weight == 0 && root_offset != 0` | **Recoverable** | `NoAction` | `Repaired` |
 
 **Detection:** `verify_block_states()` (`allocator_policy.h:491–503`),
-`BlockStateBase::verify_state()` (`block_state.h:184–198`).
+[BlockStateBase::verify_state()](../include/pmm/block_state.h#pmm::BlockStateBase::verify_state) (`block_state.h:184–198`).
 
-**Repair:** `BlockStateBase::recover_state()` (`block_state.h:163–172`) —
+**Repair:** [BlockStateBase::recover_state()](../include/pmm/block_state.h#pmm::BlockStateBase::recover_state) (`block_state.h:163–172`) —
 deterministic: `weight` determines the correct `root_offset`.
 
 **DiagnosticEntry fields:**
@@ -145,7 +145,7 @@ or domains. If bootstrap fails, entries are marked `Aborted` and load fails.
 
 **Required system domains:**
 - `system/free_tree` — free block AVL tree domain.
-- `system/symbols` — symbol dictionary (`pstringview`) domain.
+- `system/symbols` — symbol dictionary ([pstringview](../include/pmm/pstringview.h#pmm::pstringview)) domain.
 - `system/domain_registry` — domain registry meta-domain.
 
 **DiagnosticEntry fields:**
@@ -178,7 +178,7 @@ or domains. If bootstrap fails, entries are marked `Aborted` and load fails.
 
 ## Diagnostic entry format
 
-Every violation is reported as a `DiagnosticEntry` (`diagnostics.h:59–66`):
+Every violation is reported as a [DiagnosticEntry](../include/pmm/diagnostics.h#pmm::DiagnosticEntry) (`diagnostics.h:59–66`):
 
 ```cpp
 struct DiagnosticEntry {
@@ -190,7 +190,7 @@ struct DiagnosticEntry {
 };
 ```
 
-**Aggregated result** (`VerifyResult`, `diagnostics.h:75–105`):
+**Aggregated result** ([VerifyResult](../include/pmm/diagnostics.h#pmm::VerifyResult), `diagnostics.h:75–105`):
 
 ```cpp
 struct VerifyResult {
@@ -226,11 +226,11 @@ but additional entries are not stored (overflow is silent but counted).
 
 New violation types for tasks 08–10 must:
 
-1. Add a value to `ViolationType` enum in `diagnostics.h`.
+1. Add a value to [ViolationType](../include/pmm/diagnostics.h#pmm::ViolationType) enum in `diagnostics.h`.
 2. Implement a `verify_*()` read-only detection function.
 3. Implement a repair function (if recoverable) or document as fatal.
 4. Add detection to `verify_image_unlocked()`.
-5. Add repair to `load()` with proper `DiagnosticAction` marking.
+5. Add repair to `load()` with proper [DiagnosticAction](../include/pmm/diagnostics.h#pmm::DiagnosticAction) marking.
 6. Add entries to this taxonomy.
 7. Add test cases covering both verify and repair paths.
 

@@ -16,7 +16,7 @@ For types with throwing constructors, use `allocate_typed<T>()` followed by manu
 
 ## 1.2 Bounds Check in `resolve()`
 
-**Problem:** `resolve()` and `resolve_at()` did not verify that the computed offset was within the managed heap. A corrupted `pptr` could lead to out-of-bounds memory access.
+**Problem:** `resolve()` and `resolve_at()` did not verify that the computed offset was within the managed heap. A corrupted [pptr](../../include/pmm/pptr.h#pmm::pptr) could lead to out-of-bounds memory access.
 
 **Solution:**
 - Added `assert(byte_off + sizeof(T) <= total_size)` in `resolve()` for debug builds
@@ -42,13 +42,13 @@ if (data_gran > std::numeric_limits<index_type>::max() - kBlkHdrGran)
     return nullptr; // overflow protection
 ```
 
-The same protection was added in `PersistMemoryManager::allocate()` for the `kBlockHdrGranules + data_gran` computation.
+The same protection was added in [PersistMemoryManager::allocate()](../../include/pmm/persist_memory_manager.h#pmm::PersistMemoryManager::allocate) for the `kBlockHdrGranules + data_gran` computation.
 
 **Files:** `include/pmm/allocator_policy.h`, `include/pmm/persist_memory_manager.h`
 
 ## 1.4 Runtime Checks for Critical State Transitions
 
-**Problem:** `assert()` is disabled in Release builds. Critical block state checks in `FreeBlock::cast_from_raw()` and `AllocatedBlock::cast_from_raw()` relied solely on `assert`, meaning corrupted block state would go undetected in production.
+**Problem:** `assert()` is disabled in Release builds. Critical block state checks in [FreeBlock::cast_from_raw()](../../include/pmm/block_state.h#pmm::FreeBlock::cast_from_raw) and [AllocatedBlock::cast_from_raw()](../../include/pmm/block_state.h#pmm::AllocatedBlock::cast_from_raw) relied solely on `assert`, meaning corrupted block state would go undetected in production.
 
 **Solution:** Replaced assert-only checks with runtime checks that return `nullptr` in both Debug and Release builds:
 - `FreeBlock::cast_from_raw(nullptr)` returns `nullptr` (was: `assert(false)` + UB)

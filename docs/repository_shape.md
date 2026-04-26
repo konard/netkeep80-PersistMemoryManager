@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Этот документ фиксирует **целевую форму** репозитория `PersistMemoryManager`.
+Этот документ фиксирует **целевую форму** репозитория [PersistMemoryManager](../include/pmm/persist_memory_manager.h#pmm::PersistMemoryManager).
 Любое добавление нового top-level элемента или нового каталога должно соответствовать
 описанным здесь правилам, иначе оно считается нарушением target shape.
 

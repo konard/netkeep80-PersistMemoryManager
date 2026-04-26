@@ -2,7 +2,7 @@
 
 ## Document status
 
-This is the **canonical operational rulebook** that governs how `PersistMemoryManager`
+This is the **canonical operational rulebook** that governs how [PersistMemoryManager](../include/pmm/persist_memory_manager.h#pmm::PersistMemoryManager)
 may be transformed. It is normative: every issue, PR, review decision, and future
 `repo-guard` policy must be consistent with it.
 
