@@ -49,6 +49,10 @@ namespace pmm{using std::size_t;using std::uint8_t;using std::uint16_t;using std
 */
 template<typename IndexT,size_t GranuleSz>struct AddressTraits{static_assert(std::is_unsigned<IndexT>::value,"");static_assert(GranuleSz>=4,"");static_assert((GranuleSz&(GranuleSz-1))==0,"");using index_type=IndexT;static constexpr size_t granule_size=GranuleSz;static constexpr index_type no_block=std::numeric_limits<IndexT>::max();static constexpr index_type bytes_to_granules(size_t bytes)noexcept{if(bytes==0)return static_cast<index_type>(0);if(bytes>std::numeric_limits<size_t>::max()-(granule_size-1))return static_cast<index_type>(0);size_t granules=(bytes+granule_size-1)/granule_size;if(granules>static_cast<size_t>(std::numeric_limits<IndexT>::max()))return static_cast<index_type>(0);return static_cast<index_type>(granules);}static constexpr size_t granules_to_bytes(index_type granules)noexcept{return static_cast<size_t>(granules)*granule_size;}static constexpr size_t idx_to_byte_off(index_type idx)noexcept{return static_cast<size_t>(idx)*granule_size;}static index_type byte_off_to_idx(size_t byte_off)noexcept{assert(byte_off%granule_size==0);assert(byte_off/granule_size<=static_cast<size_t>(std::numeric_limits<IndexT>::max()));return static_cast<index_type>(byte_off/granule_size);}};using SmallAddressTraits=AddressTraits<uint16_t,16>;using DefaultAddressTraits=AddressTraits<uint32_t,16>;using LargeAddressTraits=AddressTraits<uint64_t,64>;}
 
+/*
+## pmm-addresstraits
+*/
+
 #include <mutex>
 #include <shared_mutex>
 namespace pmm{namespace config{
@@ -60,6 +64,13 @@ struct SharedMutexLock{using mutex_type=std::shared_mutex;using shared_lock_type
 ### pmm-config-nolock
 */
 struct NoLock{struct mutex_type{void lock(){}void unlock(){}void lock_shared(){}void unlock_shared(){}bool try_lock(){return true;}bool try_lock_shared(){return true;}};struct shared_lock_type{explicit shared_lock_type(mutex_type&){}};struct unique_lock_type{explicit unique_lock_type(mutex_type&){}};};inline constexpr size_t kDefaultGrowNumerator=5;inline constexpr size_t kDefaultGrowDenominator=4;}}
+
+/*
+### pmm-config-sharedmutexlock
+*/
+/*
+### pmm-config-nolock
+*/
 
 #include <cstddef>
 #include <cstdint>
@@ -83,6 +94,10 @@ namespace pmm{enum:uint16_t{kNodeReadWrite=0,kNodeReadOnly=1,};
 */
 template<typename AT>struct TreeNode{using address_traits=AT;using index_type=typename AT::index_type;index_type get_left()const noexcept{return detail::read_block_field<AT,detail::BlockLeftOffsetField>(this);}index_type get_right()const noexcept{return detail::read_block_field<AT,detail::BlockRightOffsetField>(this);}index_type get_parent()const noexcept{return detail::read_block_field<AT,detail::BlockParentOffsetField>(this);}index_type get_root()const noexcept{return detail::read_block_field<AT,detail::BlockRootOffsetField>(this);}index_type get_weight()const noexcept{return detail::read_block_field<AT,detail::BlockWeightField>(this);}std::int16_t get_height()const noexcept{return detail::read_block_field<AT,detail::BlockAvlHeightField>(this);}uint16_t get_node_type()const noexcept{return detail::read_block_field<AT,detail::BlockNodeTypeField>(this);}void set_left(index_type v)noexcept{detail::write_block_field<AT,detail::BlockLeftOffsetField>(this,v);}void set_right(index_type v)noexcept{detail::write_block_field<AT,detail::BlockRightOffsetField>(this,v);}void set_parent(index_type v)noexcept{detail::write_block_field<AT,detail::BlockParentOffsetField>(this,v);}void set_root(index_type v)noexcept{detail::write_block_field<AT,detail::BlockRootOffsetField>(this,v);}void set_weight(index_type v)noexcept{detail::write_block_field<AT,detail::BlockWeightField>(this,v);}void set_height(std::int16_t v)noexcept{detail::write_block_field<AT,detail::BlockAvlHeightField>(this,v);}void set_node_type(uint16_t v)noexcept{detail::write_block_field<AT,detail::BlockNodeTypeField>(this,v);}protected:index_type weight;index_type left_offset;index_type right_offset;index_type parent_offset;index_type root_offset;std::int16_t avl_height;uint16_t node_type;};static_assert(std::is_standard_layout<pmm::TreeNode<pmm::DefaultAddressTraits>>::value,"");}
 
+/*
+## pmm-treenode
+*/
+
 #include <cstdint>
 #include <type_traits>
 namespace pmm{
@@ -90,6 +105,10 @@ namespace pmm{
 ## pmm-block
 */
 template<typename AT>struct Block:TreeNode<AT>{using address_traits=AT;using index_type=typename AT::index_type;protected:index_type prev_offset;index_type next_offset;};static_assert(sizeof(pmm::Block<pmm::DefaultAddressTraits>)==32,"");}
+
+/*
+## pmm-block
+*/
 
 #include <cstddef>
 #include <cstdint>
@@ -114,6 +133,22 @@ struct DiagnosticEntry{ViolationType type=ViolationType::None;DiagnosticAction a
 ## pmm-verifyresult
 */
 struct VerifyResult{RecoveryMode mode=RecoveryMode::Verify;bool ok=true;size_t violation_count=0;DiagnosticEntry entries[kMaxDiagnosticEntries]={};size_t entry_count=0;void add(ViolationType type,DiagnosticAction action,uint64_t block_index=0,uint64_t expected=0,uint64_t actual=0)noexcept{ok=false;violation_count++;if(entry_count<kMaxDiagnosticEntries){entries[entry_count].type=type;entries[entry_count].action=action;entries[entry_count].block_index=block_index;entries[entry_count].expected=expected;entries[entry_count].actual=actual;entry_count++;}}};}
+
+/*
+## pmm-recoverymode
+*/
+/*
+## pmm-violationtype
+*/
+/*
+## pmm-diagnosticaction
+*/
+/*
+## pmm-diagnosticentry
+*/
+/*
+## pmm-verifyresult
+*/
 
 #include <cassert>
 #include <cstdint>
@@ -177,6 +212,49 @@ template<typename AT>class FreeBlockNotInAVL:public BlockStateBase<AT>{public:us
 */
 template<typename AT>class CoalescingBlock:public BlockStateBase<AT>{public:using Base=BlockStateBase<AT>;using index_type=typename AT::index_type;static CoalescingBlock*cast_from_raw(void*raw)noexcept{return Base::template state_from_raw<CoalescingBlock<AT>>(raw);}void coalesce_with_next(void*next_blk,void*next_next_blk,index_type own_idx)noexcept{Base::set_next_offset(Base::get_next_offset(next_blk));if(next_next_blk!=nullptr){Base::set_prev_offset_of(next_next_blk,own_idx);}std::memset(next_blk,0,sizeof(Block<AT>));}CoalescingBlock<AT>*coalesce_with_prev(void*prev_blk,void*next_blk,index_type prev_idx)noexcept{Base::set_next_offset_of(prev_blk,Base::next_offset());if(next_blk!=nullptr){Base::set_prev_offset_of(next_blk,prev_idx);}std::memset(this,0,sizeof(Block<AT>));return Base::template state_from_raw<CoalescingBlock<AT>>(prev_blk);}FreeBlock<AT>*finalize_coalesce()noexcept{Base::set_avl_height(1);return this->template state_as<FreeBlock<AT>>();}};template<typename AT>int detect_block_state(const void*raw_blk,typename AT::index_type own_idx)noexcept{using BlockState=BlockStateBase<AT>;if(BlockState::is_free_raw(raw_blk))return 0;if(BlockState::is_allocated_raw(raw_blk,own_idx))return 1;return-1;}template<typename AT>inline void recover_block_state(void*raw_blk,typename AT::index_type own_idx)noexcept{BlockStateBase<AT>::recover_state(raw_blk,own_idx);}template<typename AT>inline void verify_block_state(const void*raw_blk,typename AT::index_type own_idx,VerifyResult&result)noexcept{BlockStateBase<AT>::verify_state(raw_blk,own_idx,result);}}
 
+/*
+## pmm-blockstatebase
+*/
+/*
+### pmm-blockstatebase-is_free
+*/
+/*
+### pmm-blockstatebase-recover_state
+*/
+/*
+### pmm-blockstatebase-verify_state
+*/
+/*
+## pmm-freeblock
+*/
+/*
+### pmm-freeblock-cast_from_raw
+*/
+/*
+### pmm-freeblock-verify_invariants
+*/
+/*
+## pmm-freeblockremovedavl
+*/
+/*
+## pmm-splittingblock
+*/
+/*
+## pmm-allocatedblock
+*/
+/*
+### pmm-allocatedblock-cast_from_raw
+*/
+/*
+### pmm-allocatedblock-verify_invariants
+*/
+/*
+## pmm-freeblocknotinavl
+*/
+/*
+## pmm-coalescingblock
+*/
+
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -210,6 +288,22 @@ struct FreeBlockView{std::ptrdiff_t offset;size_t total_size;size_t free_size;st
 */
 template<typename AT=DefaultAddressTraits>struct ManagerHeader{using index_type=typename AT::index_type;uint64_t magic;uint64_t total_size;index_type used_size;index_type block_count;index_type free_count;index_type alloc_count;index_type first_block_offset;index_type last_block_offset;index_type free_tree_root;bool owns_memory;uint8_t image_version;uint16_t granule_size;uint64_t prev_total_size;uint32_t crc32;index_type root_offset;};static_assert(sizeof(ManagerHeader<DefaultAddressTraits>)==64,"");static_assert(sizeof(ManagerHeader<DefaultAddressTraits>)%kGranuleSize==0,"");template<typename AT>inline constexpr typename AT::index_type kBlockHeaderGranules_t=static_cast<typename AT::index_type>((sizeof(pmm::Block<AT>)+AT::granule_size-1)/AT::granule_size);template<typename AT>inline constexpr size_t manager_header_offset_bytes_v=static_cast<size_t>(kBlockHeaderGranules_t<AT>)*AT::granule_size;template<typename AT>inline ManagerHeader<AT>*manager_header_at(uint8_t*base)noexcept{return reinterpret_cast<ManagerHeader<AT>*>(base+manager_header_offset_bytes_v<AT>);}template<typename AT>inline const ManagerHeader<AT>*manager_header_at(const uint8_t*base)noexcept{return reinterpret_cast<const ManagerHeader<AT>*>(base+manager_header_offset_bytes_v<AT>);}template<typename AT>inline uint32_t compute_image_crc32(const uint8_t*data,size_t length)noexcept{constexpr size_t kHdrOffset=manager_header_offset_bytes_v<AT>;constexpr size_t kCrcOffset=kHdrOffset+offsetof(ManagerHeader<AT>,crc32);constexpr size_t kCrcSize=sizeof(uint32_t);constexpr size_t kAfterCrc=kCrcOffset+kCrcSize;uint32_t crc=0xFFFFFFFFU;for(size_t i=0;i<kCrcOffset&&i<length;++i)crc=crc32_accumulate_byte(crc,data[i]);for(size_t i=0;i<kCrcSize;++i)crc=crc32_accumulate_byte(crc,0x00U);for(size_t i=kAfterCrc;i<length;++i)crc=crc32_accumulate_byte(crc,data[i]);return crc^0xFFFFFFFFU;}inline constexpr uint32_t kManagerHeaderGranules=sizeof(ManagerHeader<DefaultAddressTraits>)/kGranuleSize;inline constexpr size_t kMinBlockSize=sizeof(pmm::Block<pmm::DefaultAddressTraits>)+kGranuleSize;inline constexpr size_t kMinMemorySize=sizeof(pmm::Block<pmm::DefaultAddressTraits>)+sizeof(ManagerHeader<pmm::DefaultAddressTraits>)+sizeof(pmm::Block<pmm::DefaultAddressTraits>)+kMinBlockSize;template<typename AT>inline typename AT::index_type bytes_to_granules_t(size_t bytes){using IndexT=typename AT::index_type;static constexpr size_t kGranSz=AT::granule_size;if(bytes>std::numeric_limits<size_t>::max()-(kGranSz-1))return static_cast<IndexT>(0);size_t granules=(bytes+kGranSz-1)/kGranSz;if(granules>static_cast<size_t>(std::numeric_limits<IndexT>::max()))return static_cast<IndexT>(0);return static_cast<IndexT>(granules);}template<typename AT>inline typename AT::index_type bytes_to_idx_t(size_t bytes){static constexpr size_t kGranSz=AT::granule_size;using IndexT=typename AT::index_type;if(bytes==0)return static_cast<IndexT>(0);if(bytes>std::numeric_limits<size_t>::max()-(kGranSz-1))return AT::no_block;size_t granules=(bytes+kGranSz-1)/kGranSz;if(granules>static_cast<size_t>(std::numeric_limits<IndexT>::max()))return AT::no_block;return static_cast<IndexT>(granules);}template<typename AT>inline size_t idx_to_byte_off_t(typename AT::index_type idx){return static_cast<size_t>(idx)*AT::granule_size;}template<typename AT>inline typename AT::index_type byte_off_to_idx_t(size_t byte_off){using IndexT=typename AT::index_type;assert(byte_off%AT::granule_size==0);assert(byte_off/AT::granule_size<=static_cast<size_t>(std::numeric_limits<IndexT>::max()));return static_cast<IndexT>(byte_off/AT::granule_size);}inline bool is_valid_alignment(size_t align){return align==kGranuleSize;}template<typename AT=pmm::DefaultAddressTraits>inline pmm::Block<AT>*block_at(uint8_t*base,typename AT::index_type idx){assert(idx!=kNoBlock_v<AT>);return reinterpret_cast<pmm::Block<AT>*>(base+static_cast<size_t>(idx)*AT::granule_size);}template<typename AT=pmm::DefaultAddressTraits>inline const pmm::Block<AT>*block_at(const uint8_t*base,typename AT::index_type idx){assert(idx!=kNoBlock_v<AT>);return reinterpret_cast<const pmm::Block<AT>*>(base+static_cast<size_t>(idx)*AT::granule_size);}template<typename AT=pmm::DefaultAddressTraits>inline pmm::Block<AT>*block_at_checked(uint8_t*base,size_t total_size,typename AT::index_type idx)noexcept{if(!validate_block_index<AT>(total_size,idx))return nullptr;return reinterpret_cast<pmm::Block<AT>*>(base+static_cast<size_t>(idx)*AT::granule_size);}template<typename AT=pmm::DefaultAddressTraits>inline const pmm::Block<AT>*block_at_checked(const uint8_t*base,size_t total_size,typename AT::index_type idx)noexcept{if(!validate_block_index<AT>(total_size,idx))return nullptr;return reinterpret_cast<const pmm::Block<AT>*>(base+static_cast<size_t>(idx)*AT::granule_size);}template<typename AT>inline typename AT::index_type block_idx_t(const uint8_t*base,const pmm::Block<AT>*block){size_t byte_off=reinterpret_cast<const uint8_t*>(block)-base;assert(byte_off%AT::granule_size==0);return static_cast<typename AT::index_type>(byte_off/AT::granule_size);}template<typename AT>inline constexpr typename AT::index_type kManagerHeaderGranules_t=static_cast<typename AT::index_type>((sizeof(ManagerHeader<AT>)+AT::granule_size-1)/AT::granule_size);template<typename AT>inline typename AT::index_type block_total_granules(const uint8_t*base,const ManagerHeader<AT>*hdr,const pmm::Block<AT>*blk){using BlockState=pmm::BlockStateBase<AT>;static constexpr size_t kGranSz=AT::granule_size;using IndexT=typename AT::index_type;static constexpr IndexT kNoBlk=AT::no_block;size_t byte_off=reinterpret_cast<const uint8_t*>(blk)-base;IndexT this_idx=static_cast<IndexT>(byte_off/kGranSz);IndexT next_off=BlockState::get_next_offset(blk);IndexT total_gran=static_cast<IndexT>(hdr->total_size/kGranSz);if(next_off!=kNoBlk)return static_cast<IndexT>(next_off-this_idx);return static_cast<IndexT>(total_gran-this_idx);}template<typename AT>inline void*resolve_granule_ptr(uint8_t*base,typename AT::index_type idx)noexcept{return(idx==static_cast<typename AT::index_type>(0))?nullptr:base+static_cast<size_t>(idx)*AT::granule_size;}template<typename AT>inline void*resolve_granule_ptr_checked(uint8_t*base,size_t total_size,typename AT::index_type idx)noexcept{if(idx==static_cast<typename AT::index_type>(0))return nullptr;size_t byte_off=static_cast<size_t>(idx)*AT::granule_size;if(byte_off>=total_size)return nullptr;return base+byte_off;}template<typename AT>inline typename AT::index_type ptr_to_granule_idx(const uint8_t*base,const void*ptr)noexcept{return static_cast<typename AT::index_type>((static_cast<const uint8_t*>(ptr)-base)/AT::granule_size);}template<typename AT>inline typename AT::index_type ptr_to_granule_idx_checked(const uint8_t*base,size_t total_size,const void*ptr)noexcept{using IndexT=typename AT::index_type;if(ptr==nullptr||base==nullptr)return AT::no_block;const auto*raw=static_cast<const uint8_t*>(ptr);if(raw<base||raw>=base+total_size)return AT::no_block;size_t byte_off=static_cast<size_t>(raw-base);if(byte_off%AT::granule_size!=0)return AT::no_block;size_t idx=byte_off/AT::granule_size;if(idx>static_cast<size_t>(std::numeric_limits<IndexT>::max()))return AT::no_block;return static_cast<IndexT>(idx);}template<typename AT=pmm::DefaultAddressTraits>inline void*user_ptr(pmm::Block<AT>*block){return reinterpret_cast<uint8_t*>(block)+sizeof(pmm::Block<AT>);}template<typename AT>inline bool is_block_header_linked_in_canonical_chain(const uint8_t*base,const ManagerHeader<AT>*hdr,size_t total_size,typename AT::index_type cand_idx)noexcept{using BlockState=pmm::BlockStateBase<AT>;using IndexT=typename AT::index_type;if(base==nullptr||hdr==nullptr)return false;if(hdr->block_count==0||hdr->first_block_offset==AT::no_block)return false;if(!validate_block_index<AT>(total_size,hdr->first_block_offset)||!validate_block_index<AT>(total_size,hdr->last_block_offset))return false;const void*cand=base+static_cast<size_t>(cand_idx)*AT::granule_size;const IndexT prev=BlockState::get_prev_offset(cand);const IndexT next=BlockState::get_next_offset(cand);if(prev==AT::no_block){if(cand_idx!=hdr->first_block_offset)return false;}else{if(!validate_block_index<AT>(total_size,prev)||prev>=cand_idx)return false;const void*prev_block=base+static_cast<size_t>(prev)*AT::granule_size;if(BlockState::get_next_offset(prev_block)!=cand_idx)return false;}if(next==AT::no_block){if(cand_idx!=hdr->last_block_offset)return false;}else{if(!validate_block_index<AT>(total_size,next)||next<=cand_idx)return false;const void*next_block=base+static_cast<size_t>(next)*AT::granule_size;if(BlockState::get_prev_offset(next_block)!=cand_idx)return false;}return true;}template<typename AT>inline bool is_canonical_allocated_block_header(const uint8_t*base,size_t total_size,const uint8_t*cand_addr)noexcept{using BlockState=pmm::BlockStateBase<AT>;using IndexT=typename AT::index_type;if(base==nullptr||cand_addr==nullptr)return false;const std::uintptr_t base_addr=reinterpret_cast<std::uintptr_t>(base);const std::uintptr_t cand_raw=reinterpret_cast<std::uintptr_t>(cand_addr);if(cand_raw<base_addr)return false;const size_t cand_off=static_cast<size_t>(cand_raw-base_addr);if(cand_off%AT::granule_size!=0)return false;if(cand_off/AT::granule_size>static_cast<size_t>(std::numeric_limits<IndexT>::max()))return false;const IndexT cand_idx=static_cast<IndexT>(cand_off/AT::granule_size);if(!validate_block_index<AT>(total_size,cand_idx))return false;const IndexT weight=BlockState::get_weight(cand_addr);if(weight==0||BlockState::get_root_offset(cand_addr)!=cand_idx)return false;const uint16_t node_type=BlockState::get_node_type(cand_addr);if(node_type!=pmm::kNodeReadWrite&&node_type!=pmm::kNodeReadOnly)return false;if(total_size<manager_header_offset_bytes_v<AT>+sizeof(ManagerHeader<AT>))return false;const auto*hdr=manager_header_at<AT>(base);if(hdr->total_size!=total_size)return false;if(!is_block_header_linked_in_canonical_chain<AT>(base,hdr,total_size,cand_idx))return false;constexpr size_t kBlockSize=sizeof(pmm::Block<AT>);if(cand_off>total_size-kBlockSize)return false;const size_t data_start=cand_off+kBlockSize;if(static_cast<size_t>(weight)>(std::numeric_limits<size_t>::max)()/AT::granule_size)return false;const size_t data_bytes=static_cast<size_t>(weight)*AT::granule_size;if(data_bytes>total_size-data_start)return false;return true;}template<typename AT>inline bool is_canonical_user_ptr(const uint8_t*base,size_t total_size,const void*ptr)noexcept{constexpr size_t kBlockSize=sizeof(pmm::Block<AT>);const size_t min_user_offset=kBlockSize+sizeof(ManagerHeader<AT>)+kBlockSize;if(!validate_user_ptr<AT>(base,total_size,ptr,min_user_offset))return false;const auto*raw_ptr=static_cast<const uint8_t*>(ptr);const auto*cand_addr=raw_ptr-kBlockSize;if(cand_addr+kBlockSize!=raw_ptr)return false;return is_canonical_allocated_block_header<AT>(base,total_size,cand_addr);}template<typename AT>inline pmm::Block<AT>*header_from_ptr_t(uint8_t*base,void*ptr,size_t total_size){static constexpr size_t kBlockSize=sizeof(pmm::Block<AT>);if(!is_canonical_user_ptr<AT>(base,total_size,ptr))return nullptr;uint8_t*cand_addr=static_cast<uint8_t*>(ptr)-kBlockSize;return reinterpret_cast<pmm::Block<AT>*>(cand_addr);}template<typename AT>inline typename AT::index_type required_block_granules_t(size_t user_bytes){using index_type=typename AT::index_type;index_type data_granules=bytes_to_granules_t<AT>(user_bytes);if(data_granules==0)data_granules=1;return kBlockHeaderGranules_t<AT>+data_granules;}}}
 
+/*
+## pmm-pmmerror
+*/
+/*
+## pmm-memorystats
+*/
+/*
+## pmm-blockview
+*/
+/*
+## pmm-freeblockview
+*/
+/*
+### pmm-detail-managerheader
+*/
+
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -231,6 +325,19 @@ template<typename AT>struct BlockPPtr{using manager_type=BlockPPtrManagerTag<AT>
 */
 template<typename NodePPtr>struct AvlInorderIterator{using index_type=typename NodePPtr::index_type;using value_type=typename NodePPtr::element_type;using pointer=NodePPtr;static constexpr index_type no_block=NodePPtr::manager_type::address_traits::no_block;index_type _current_idx;AvlInorderIterator()noexcept:_current_idx(static_cast<index_type>(0)){}explicit AvlInorderIterator(index_type idx)noexcept:_current_idx(idx){}bool operator==(const AvlInorderIterator&other)const noexcept{return _current_idx==other._current_idx;}bool operator!=(const AvlInorderIterator&other)const noexcept{return _current_idx!=other._current_idx;}NodePPtr operator*()const noexcept{if(_current_idx==static_cast<index_type>(0)||_current_idx==no_block)return NodePPtr();return NodePPtr(_current_idx);}AvlInorderIterator&operator++()noexcept{if(_current_idx==static_cast<index_type>(0)||_current_idx==no_block)return*this;NodePPtr next=avl_inorder_successor(NodePPtr(_current_idx));_current_idx=next.is_null()?static_cast<index_type>(0):next.offset();return*this;}};}}
 
+/*
+### pmm-detail-avlupdateheightonly
+*/
+/*
+### pmm-detail-blocktreenodeproxy
+*/
+/*
+### pmm-detail-blockpptr
+*/
+/*
+### pmm-detail-avlinorderiterator
+*/
+
 #include <concepts>
 #include <cstdint>
 #include <type_traits>
@@ -243,6 +350,13 @@ template<typename AT=DefaultAddressTraits>struct AvlFreeTree{using address_trait
 ### pmm-avlfreetree-find_best_fit
 */
 static index_type find_best_fit(uint8_t*base,detail::ManagerHeader<AT>*hdr,index_type needed_granules){index_type total_gran=detail::byte_off_to_idx_t<AT>(hdr->total_size);index_type cur=hdr->free_tree_root,result=AT::no_block;while(cur!=AT::no_block){const void*node=detail::block_at<AT>(base,cur);index_type node_next=BlockState::get_next_offset(node);index_type cur_gran=(node_next!=AT::no_block)?(node_next-cur):(total_gran-cur);if(cur_gran>=needed_granules){result=cur;cur=BlockState::get_left_offset(node);}else{cur=BlockState::get_right_offset(node);}}return result;}private:static void set_child(uint8_t*base,detail::ManagerHeader<AT>*hdr,index_type parent,index_type old_child,index_type new_child){if(parent==AT::no_block){hdr->free_tree_root=new_child;return;}void*p=detail::block_at<AT>(base,parent);if(BlockState::get_left_offset(p)==old_child)BlockState::set_left_offset_of(p,new_child);else BlockState::set_right_offset_of(p,new_child);}};static_assert(FreeBlockTreePolicyForTraitsConcept<AvlFreeTree<DefaultAddressTraits>,DefaultAddressTraits>,"");}
+
+/*
+## pmm-avlfreetree
+*/
+/*
+### pmm-avlfreetree-find_best_fit
+*/
 
 #include <concepts>
 #include <cstddef>
@@ -262,6 +376,10 @@ namespace pmm{
 */
 template<typename AT=DefaultAddressTraits>class HeapStorage{public:using address_traits=AT;HeapStorage()noexcept=default;explicit HeapStorage(size_t initial_size)noexcept{if(initial_size==0)return;size_t aligned=((initial_size+AT::granule_size-1)/AT::granule_size)*AT::granule_size;_buffer=static_cast<uint8_t*>(std::malloc(aligned));if(_buffer!=nullptr){_size=aligned;_owns_memory=true;}}HeapStorage(const HeapStorage&)=delete;HeapStorage&operator=(const HeapStorage&)=delete;HeapStorage(HeapStorage&&other)noexcept:_buffer(other._buffer),_size(other._size),_owns_memory(other._owns_memory){other._buffer=nullptr;other._size=0;other._owns_memory=false;}HeapStorage&operator=(HeapStorage&&other)noexcept{if(this!=&other){if(_owns_memory&&_buffer!=nullptr)std::free(_buffer);_buffer=other._buffer;_size=other._size;_owns_memory=other._owns_memory;other._buffer=nullptr;other._size=0;other._owns_memory=false;}return*this;}~HeapStorage(){if(_owns_memory&&_buffer!=nullptr)std::free(_buffer);}void attach(void*memory,size_t size)noexcept{if(_owns_memory&&_buffer!=nullptr)std::free(_buffer);_buffer=static_cast<uint8_t*>(memory);_size=size;_owns_memory=false;}uint8_t*base_ptr()noexcept{return _buffer;}const uint8_t*base_ptr()const noexcept{return _buffer;}size_t total_size()const noexcept{return _size;}bool expand(size_t additional_bytes)noexcept{if(additional_bytes==0)return _size>0;static constexpr size_t kMinInitialSize=4096;size_t growth=(_size>0)?(_size/4+additional_bytes):std::max(additional_bytes,kMinInitialSize);size_t new_size=_size+growth;new_size=((new_size+AT::granule_size-1)/AT::granule_size)*AT::granule_size;if(new_size<=_size)return false;void*new_buf=std::malloc(new_size);if(new_buf==nullptr)return false;if(_buffer!=nullptr)std::memcpy(new_buf,_buffer,_size);if(_owns_memory&&_buffer!=nullptr)std::free(_buffer);_buffer=static_cast<uint8_t*>(new_buf);_size=new_size;_owns_memory=true;return true;}bool owns_memory()const noexcept{return _owns_memory;}private:uint8_t*_buffer=nullptr;size_t _size=0;bool _owns_memory=false;};static_assert(is_storage_backend_v<HeapStorage<>>,"");}
 
+/*
+## pmm-heapstorage
+*/
+
 #include <cstddef>
 #include <cstdio>
 namespace pmm{namespace logging{
@@ -273,6 +391,13 @@ struct NoLogging{static void on_allocation_failure(size_t,PmmError)noexcept{}sta
 ### pmm-logging-stderrlogging
 */
 struct StderrLogging{static void on_allocation_failure(size_t user_size,PmmError err)noexcept{std::fprintf(stderr,"[pmm] allocation_failure: size=%zu error=%d\n",user_size,static_cast<int>(err));}static void on_expand(size_t old_size,size_t new_size)noexcept{std::fprintf(stderr,"[pmm] expand: %zu -> %zu\n",old_size,new_size);}static void on_corruption_detected(PmmError err)noexcept{std::fprintf(stderr,"[pmm] corruption_detected: error=%d\n",static_cast<int>(err));}static void on_create(size_t initial_size)noexcept{std::fprintf(stderr,"[pmm] create: size=%zu\n",initial_size);}static void on_destroy()noexcept{std::fprintf(stderr,"[pmm] destroy\n");}static void on_load()noexcept{std::fprintf(stderr,"[pmm] load\n");}};}}
+
+/*
+### pmm-logging-nologging
+*/
+/*
+### pmm-logging-stderrlogging
+*/
 
 #include <cstddef>
 #include <cstdint>
@@ -286,6 +411,13 @@ template<size_t Size,typename AT=DefaultAddressTraits>class StaticStorage{static
 */
 bool expand(size_t)noexcept{return false;}constexpr bool owns_memory()const noexcept{return false;}private:alignas(AT::granule_size)uint8_t _buffer[Size]{};};static_assert(is_storage_backend_v<StaticStorage<64>>,"");}
 
+/*
+## pmm-staticstorage
+*/
+/*
+### pmm-staticstorage-expand
+*/
+
 #include <concepts>
 #include <cstddef>
 namespace pmm{inline constexpr size_t kMinGranuleSize=4;template<typename AT>concept ValidPmmAddressTraits=(AT::granule_size>=kMinGranuleSize)&&((AT::granule_size&(AT::granule_size-1))==0);static_assert(ValidPmmAddressTraits<DefaultAddressTraits>,"");static_assert(ValidPmmAddressTraits<SmallAddressTraits>,"");static_assert(ValidPmmAddressTraits<LargeAddressTraits>,"");template<typename AT=DefaultAddressTraits,typename LockPolicyT=config::NoLock,size_t GrowNum=config::kDefaultGrowNumerator,size_t GrowDen=config::kDefaultGrowDenominator,size_t MaxMemoryGB=64,typename LoggingPolicyT=logging::NoLogging>
@@ -297,6 +429,13 @@ struct BasicConfig{static_assert(ValidPmmAddressTraits<AT>,"");using address_tra
 ## pmm-staticconfig
 */
 struct StaticConfig{static_assert(ValidPmmAddressTraits<AT>,"");using address_traits=AT;using storage_backend=StaticStorage<BufferSize,AT>;using free_block_tree=AvlFreeTree<AT>;using lock_policy=config::NoLock;using logging_policy=logging::NoLogging;static constexpr size_t granule_size=AT::granule_size;static constexpr size_t max_memory_gb=0;static constexpr size_t grow_numerator=GrowNum;static constexpr size_t grow_denominator=GrowDen;};template<size_t BufferSize=1024>using SmallEmbeddedStaticConfig=StaticConfig<SmallAddressTraits,BufferSize>;template<size_t BufferSize=4096>using EmbeddedStaticConfig=StaticConfig<DefaultAddressTraits,BufferSize>;using CacheManagerConfig=BasicConfig<DefaultAddressTraits,config::NoLock,config::kDefaultGrowNumerator,config::kDefaultGrowDenominator,64>;using PersistentDataConfig=BasicConfig<DefaultAddressTraits,config::SharedMutexLock,config::kDefaultGrowNumerator,config::kDefaultGrowDenominator,64>;using EmbeddedManagerConfig=BasicConfig<DefaultAddressTraits,config::NoLock,3,2,64>;using IndustrialDBConfig=BasicConfig<DefaultAddressTraits,config::SharedMutexLock,2,1,64>;using LargeDBConfig=BasicConfig<LargeAddressTraits,config::SharedMutexLock,2,1,0>;}
+
+/*
+## pmm-basicconfig
+*/
+/*
+## pmm-staticconfig
+*/
 
 #if defined(_MSVC_LANG)
 #if _MSVC_LANG < 202002L
@@ -317,6 +456,10 @@ namespace pmm{template<typename FT=AvlFreeTree<DefaultAddressTraits>,typename AT
 */
 class AllocatorPolicy{static_assert(FreeBlockTreePolicyForTraitsConcept<FT,AT>,"");public:using address_traits=AT;using free_block_tree=FT;using index_type=typename AT::index_type;using BlockT=Block<AT>;using BlockState=BlockStateBase<AT>;AllocatorPolicy()=delete;AllocatorPolicy(const AllocatorPolicy&)=delete;AllocatorPolicy&operator=(const AllocatorPolicy&)=delete;static void*allocate_from_block(uint8_t*base,detail::ManagerHeader<AT>*hdr,index_type blk_idx,size_t user_size){FT::remove(base,hdr,blk_idx);FreeBlock<AT>*fb=FreeBlock<AT>::cast_from_raw(detail::block_at<AT>(base,blk_idx));FreeBlockRemovedAVL<AT>*removed=fb->remove_from_avl();static constexpr index_type kBlkHdrGran=detail::kBlockHeaderGranules_t<AT>;index_type blk_total_gran=detail::block_total_granules(base,hdr,detail::block_at<AT>(base,blk_idx));index_type data_gran=detail::bytes_to_granules_t<AT>(user_size);if(data_gran>std::numeric_limits<index_type>::max()-kBlkHdrGran)return nullptr;index_type needed_gran=kBlkHdrGran+data_gran;index_type min_rem_gran=kBlkHdrGran+1;bool can_split=false;if(needed_gran<=std::numeric_limits<index_type>::max()-min_rem_gran)can_split=(blk_total_gran>=needed_gran+min_rem_gran);if(can_split){SplittingBlock<AT>*splitting=removed->begin_splitting();index_type new_idx=blk_idx+needed_gran;void*new_blk_ptr=detail::block_at<AT>(base,new_idx);index_type curr_next=splitting->next_offset();BlockT*old_next=(curr_next!=AT::no_block)?detail::block_at<AT>(base,curr_next):nullptr;splitting->initialize_new_block(new_blk_ptr,new_idx,blk_idx);splitting->link_new_block(old_next,new_idx);if(old_next==nullptr)hdr->last_block_offset=new_idx;hdr->block_count++;hdr->free_count++;hdr->used_size+=kBlkHdrGran;FT::insert(base,hdr,new_idx);AllocatedBlock<AT>*alloc=splitting->finalize_split(data_gran,blk_idx);(void)alloc;}else{AllocatedBlock<AT>*alloc=removed->mark_as_allocated(data_gran,blk_idx);(void)alloc;}hdr->alloc_count++;hdr->free_count--;hdr->used_size+=data_gran;return detail::user_ptr<AT>(detail::block_at<AT>(base,blk_idx));}static void coalesce(uint8_t*base,detail::ManagerHeader<AT>*hdr,index_type blk_idx){FreeBlockNotInAVL<AT>*not_avl=FreeBlockNotInAVL<AT>::cast_from_raw(detail::block_at<AT>(base,blk_idx));CoalescingBlock<AT>*coalescing=not_avl->begin_coalescing();static constexpr index_type kBlkHdrGran=detail::kBlockHeaderGranules_t<AT>;index_type b_idx=blk_idx;index_type curr_next=coalescing->next_offset();if(curr_next!=AT::no_block){void*nxt_raw=detail::block_at<AT>(base,curr_next);if(BlockState::get_weight(nxt_raw)==0){index_type nxt_idx=curr_next;index_type nxt_next=BlockState::get_next_offset(nxt_raw);BlockT*nxt_nxt_blk=(nxt_next!=AT::no_block)?detail::block_at<AT>(base,nxt_next):nullptr;FT::remove(base,hdr,nxt_idx);coalescing->coalesce_with_next(detail::block_at<AT>(base,nxt_idx),nxt_nxt_blk,b_idx);if(nxt_nxt_blk==nullptr)hdr->last_block_offset=b_idx;hdr->block_count--;hdr->free_count--;if(hdr->used_size>=kBlkHdrGran)hdr->used_size-=kBlkHdrGran;}}index_type curr_prev=coalescing->prev_offset();if(curr_prev!=AT::no_block){void*prv_raw=detail::block_at<AT>(base,curr_prev);if(BlockState::get_weight(prv_raw)==0){index_type prv_idx=curr_prev;index_type blk_next=coalescing->next_offset();BlockT*next_blk=(blk_next!=AT::no_block)?detail::block_at<AT>(base,blk_next):nullptr;FT::remove(base,hdr,prv_idx);CoalescingBlock<AT>*result_coalescing=coalescing->coalesce_with_prev(prv_raw,next_blk,prv_idx);if(next_blk==nullptr)hdr->last_block_offset=prv_idx;hdr->block_count--;hdr->free_count--;if(hdr->used_size>=kBlkHdrGran)hdr->used_size-=kBlkHdrGran;FreeBlock<AT>*fb=result_coalescing->finalize_coalesce();(void)fb;FT::insert(base,hdr,prv_idx);return;}}FreeBlock<AT>*fb=coalescing->finalize_coalesce();(void)fb;FT::insert(base,hdr,b_idx);}static void rebuild_free_tree(uint8_t*base,detail::ManagerHeader<AT>*hdr){hdr->free_tree_root=AT::no_block;hdr->last_block_offset=AT::no_block;index_type idx=hdr->first_block_offset;while(idx!=AT::no_block){void*blk_ptr=detail::block_at<AT>(base,idx);BlockState::recover_state(blk_ptr,idx);if(BlockState::get_weight(blk_ptr)==0){BlockState::reset_avl_fields_of(blk_ptr);FT::insert(base,hdr,idx);}index_type next_idx=BlockState::get_next_offset(blk_ptr);if(next_idx==AT::no_block)hdr->last_block_offset=idx;idx=next_idx;}}static void repair_linked_list(uint8_t*base,detail::ManagerHeader<AT>*hdr){index_type idx=hdr->first_block_offset;index_type prev=AT::no_block;while(idx!=AT::no_block){if(static_cast<size_t>(idx)*AT::granule_size+sizeof(BlockT)>hdr->total_size)break;void*blk_ptr=detail::block_at<AT>(base,idx);BlockState::repair_prev_offset(blk_ptr,prev);prev=idx;index_type next_offset=BlockState::get_next_offset(blk_ptr);idx=next_offset;}}static void recompute_counters(uint8_t*base,detail::ManagerHeader<AT>*hdr){static constexpr index_type kBlkHdrGran=detail::kBlockHeaderGranules_t<AT>;index_type block_count=0,free_count=0,alloc_count=0;index_type used_gran=0;index_type idx=hdr->first_block_offset;while(idx!=AT::no_block){if(static_cast<size_t>(idx)*AT::granule_size+sizeof(BlockT)>hdr->total_size)break;const void*blk_ptr=detail::block_at<AT>(base,idx);block_count++;used_gran+=kBlkHdrGran;index_type w=BlockState::get_weight(blk_ptr);if(w>0){alloc_count++;used_gran+=w;}else{free_count++;}idx=BlockState::get_next_offset(blk_ptr);}hdr->block_count=block_count;hdr->free_count=free_count;hdr->alloc_count=alloc_count;hdr->used_size=used_gran;}static void verify_linked_list(const uint8_t*base,const detail::ManagerHeader<AT>*hdr,VerifyResult&result)noexcept{index_type idx=hdr->first_block_offset;index_type prev=AT::no_block;while(idx!=AT::no_block){if(static_cast<size_t>(idx)*AT::granule_size+sizeof(BlockT)>hdr->total_size)break;const void*blk_ptr=detail::block_at<AT>(base,idx);index_type stored_prev=BlockState::get_prev_offset(blk_ptr);if(stored_prev!=prev){result.add(ViolationType::PrevOffsetMismatch,DiagnosticAction::NoAction,static_cast<uint64_t>(idx),static_cast<uint64_t>(prev),static_cast<uint64_t>(stored_prev));}prev=idx;index_type next_offset=BlockState::get_next_offset(blk_ptr);idx=next_offset;}}static void verify_counters(const uint8_t*base,const detail::ManagerHeader<AT>*hdr,VerifyResult&result)noexcept{static constexpr index_type kBlkHdrGran=detail::kBlockHeaderGranules_t<AT>;index_type block_count=0,free_count=0,alloc_count=0;index_type used_gran=0;index_type idx=hdr->first_block_offset;while(idx!=AT::no_block){if(static_cast<size_t>(idx)*AT::granule_size+sizeof(BlockT)>hdr->total_size)break;const void*blk_ptr=detail::block_at<AT>(base,idx);block_count++;used_gran+=kBlkHdrGran;index_type w=BlockState::get_weight(blk_ptr);if(w>0){alloc_count++;used_gran+=w;}else{free_count++;}idx=BlockState::get_next_offset(blk_ptr);}if(hdr->block_count!=block_count||hdr->free_count!=free_count||hdr->alloc_count!=alloc_count||hdr->used_size!=used_gran){result.add(ViolationType::CounterMismatch,DiagnosticAction::NoAction,0,static_cast<uint64_t>(block_count),static_cast<uint64_t>(hdr->block_count));}}static void verify_block_states(const uint8_t*base,const detail::ManagerHeader<AT>*hdr,VerifyResult&result)noexcept{index_type idx=hdr->first_block_offset;while(idx!=AT::no_block){if(static_cast<size_t>(idx)*AT::granule_size+sizeof(BlockT)>hdr->total_size)break;const void*blk_ptr=detail::block_at<AT>(base,idx);BlockState::verify_state(blk_ptr,idx,result);idx=BlockState::get_next_offset(blk_ptr);}}static void verify_free_tree(const uint8_t*base,const detail::ManagerHeader<AT>*hdr,VerifyResult&result)noexcept{size_t expected_count=0;index_type idx=hdr->first_block_offset;while(idx!=AT::no_block){if(static_cast<size_t>(idx)*AT::granule_size+sizeof(BlockT)>hdr->total_size)break;const void*blk_ptr=detail::block_at<AT>(base,idx);if(BlockState::get_weight(blk_ptr)==0)++expected_count;idx=BlockState::get_next_offset(blk_ptr);}const bool root_present=(hdr->free_tree_root!=AT::no_block);if(expected_count==0){if(root_present){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,0,0,static_cast<uint64_t>(hdr->free_tree_root));}return;}if(!root_present){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,0,static_cast<uint64_t>(expected_count),static_cast<uint64_t>(hdr->free_tree_root));return;}if(!detail::validate_block_index<AT>(hdr->total_size,hdr->free_tree_root)){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,static_cast<uint64_t>(hdr->free_tree_root),1,0);return;}const void*root=detail::block_at<AT>(base,hdr->free_tree_root);if(BlockState::get_weight(root)!=0||BlockState::get_parent_offset(root)!=AT::no_block){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,static_cast<uint64_t>(hdr->free_tree_root),0,static_cast<uint64_t>(BlockState::get_parent_offset(root)));}size_t visited_count=0;verify_free_tree_node(base,hdr,hdr->free_tree_root,AT::no_block,{},false,{},false,expected_count,visited_count,result);idx=hdr->first_block_offset;while(idx!=AT::no_block){if(static_cast<size_t>(idx)*AT::granule_size+sizeof(BlockT)>hdr->total_size)break;const void*blk_ptr=detail::block_at<AT>(base,idx);if(BlockState::get_weight(blk_ptr)==0&&!free_tree_contains(base,hdr,hdr->free_tree_root,idx,expected_count)){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,static_cast<uint64_t>(idx),1,0);}idx=BlockState::get_next_offset(blk_ptr);}if(visited_count!=expected_count){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,0,static_cast<uint64_t>(expected_count),static_cast<uint64_t>(visited_count));}}static index_type free_tree_block_granules(const uint8_t*base,const detail::ManagerHeader<AT>*hdr,index_type block_idx)noexcept{const void*n=detail::block_at<AT>(base,block_idx);index_type n_next=BlockState::get_next_offset(n);index_type total=detail::byte_off_to_idx_t<AT>(hdr->total_size);return(n_next!=AT::no_block)?static_cast<index_type>(n_next-block_idx):static_cast<index_type>(total-block_idx);}static bool free_tree_less_key(const uint8_t*base,const detail::ManagerHeader<AT>*hdr,index_type a,index_type b)noexcept{index_type a_gran=free_tree_block_granules(base,hdr,a);index_type b_gran=free_tree_block_granules(base,hdr,b);return(a_gran<b_gran)||(a_gran==b_gran&&a<b);}static bool free_tree_contains(const uint8_t*base,const detail::ManagerHeader<AT>*hdr,index_type node_idx,index_type target,size_t step_limit)noexcept{while(node_idx!=AT::no_block&&step_limit-->0){if(!detail::validate_block_index<AT>(hdr->total_size,node_idx))return false;const void*node=detail::block_at<AT>(base,node_idx);if(BlockState::get_weight(node)!=0)return false;if(node_idx==target)return true;node_idx=free_tree_less_key(base,hdr,target,node_idx)?BlockState::get_left_offset(node):BlockState::get_right_offset(node);}return false;}static std::int16_t verify_free_tree_node(const uint8_t*base,const detail::ManagerHeader<AT>*hdr,index_type node_idx,index_type parent,index_type lower,bool has_lower,index_type upper,bool has_upper,size_t expected_count,size_t&visited_count,VerifyResult&result)noexcept{if(node_idx==AT::no_block)return 0;if(visited_count>=expected_count){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,static_cast<uint64_t>(node_idx),1,2);return 0;}++visited_count;if(!detail::validate_block_index<AT>(hdr->total_size,node_idx)){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,static_cast<uint64_t>(parent),0,static_cast<uint64_t>(node_idx));return 0;}const void*node=detail::block_at<AT>(base,node_idx);if(BlockState::get_weight(node)!=0){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,static_cast<uint64_t>(node_idx),0,static_cast<uint64_t>(BlockState::get_weight(node)));return 0;}if(BlockState::get_parent_offset(node)!=parent){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,static_cast<uint64_t>(node_idx),static_cast<uint64_t>(parent),static_cast<uint64_t>(BlockState::get_parent_offset(node)));}if(has_lower&&!free_tree_less_key(base,hdr,lower,node_idx)){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,static_cast<uint64_t>(node_idx),static_cast<uint64_t>(lower),static_cast<uint64_t>(node_idx));}if(has_upper&&!free_tree_less_key(base,hdr,node_idx,upper)){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,static_cast<uint64_t>(node_idx),static_cast<uint64_t>(node_idx),static_cast<uint64_t>(upper));}index_type left=BlockState::get_left_offset(node);index_type right=BlockState::get_right_offset(node);std::int16_t left_h=verify_free_tree_node(base,hdr,left,node_idx,lower,has_lower,node_idx,true,expected_count,visited_count,result);std::int16_t right_h=verify_free_tree_node(base,hdr,right,node_idx,node_idx,true,upper,has_upper,expected_count,visited_count,result);std::int16_t expected_h=static_cast<std::int16_t>(1+(left_h>right_h?left_h:right_h));std::int16_t stored_h=BlockState::get_avl_height(node);if(stored_h!=expected_h||left_h-right_h>1||right_h-left_h>1){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,static_cast<uint64_t>(node_idx),static_cast<uint64_t>(expected_h),static_cast<uint64_t>(stored_h));}return expected_h;}static void realloc_shrink(uint8_t*base,detail::ManagerHeader<AT>*hdr,index_type blk_idx,void*blk_raw,index_type old_data_gran,index_type new_data_gran)noexcept{static constexpr index_type kBlkHdrGran=detail::kBlockHeaderGranules_t<AT>;index_type remainder=old_data_gran-new_data_gran;if(remainder>=kBlkHdrGran+1){index_type new_free_idx=blk_idx+kBlkHdrGran+new_data_gran;void*new_free_blk=detail::block_at<AT>(base,new_free_idx);index_type old_next=BlockState::get_next_offset(blk_raw);auto*old_next_blk=(old_next!=AT::no_block)?detail::block_at<AT>(base,old_next):nullptr;std::memset(new_free_blk,0,sizeof(BlockT));BlockState::init_fields(new_free_blk,blk_idx,old_next,1,0,0);BlockState::set_next_offset_of(blk_raw,new_free_idx);if(old_next_blk!=nullptr)BlockState::set_prev_offset_of(old_next_blk,new_free_idx);else hdr->last_block_offset=new_free_idx;BlockState::set_weight_of(blk_raw,new_data_gran);hdr->block_count++;hdr->free_count++;hdr->used_size+=kBlkHdrGran;hdr->used_size-=(old_data_gran-new_data_gran);coalesce(base,hdr,new_free_idx);}else{BlockState::set_weight_of(blk_raw,new_data_gran);hdr->used_size-=(old_data_gran-new_data_gran);}}static bool realloc_grow(uint8_t*base,detail::ManagerHeader<AT>*hdr,index_type blk_idx,void*blk_raw,index_type old_data_gran,index_type new_data_gran)noexcept{static constexpr index_type kBlkHdrGran=detail::kBlockHeaderGranules_t<AT>;index_type next_idx=BlockState::get_next_offset(blk_raw);if(next_idx==AT::no_block)return false;void*next_blk=detail::block_at<AT>(base,next_idx);if(BlockState::get_weight(next_blk)!=0)return false;index_type next_total=detail::block_total_granules(base,hdr,detail::block_at<AT>(base,next_idx));index_type available=old_data_gran+next_total;if(available<new_data_gran)return false;FT::remove(base,hdr,next_idx);index_type next_next=BlockState::get_next_offset(next_blk);BlockState::set_next_offset_of(blk_raw,next_next);if(next_next!=AT::no_block)BlockState::set_prev_offset_of(detail::block_at<AT>(base,next_next),blk_idx);else hdr->last_block_offset=blk_idx;std::memset(next_blk,0,sizeof(BlockT));hdr->block_count--;hdr->free_count--;if(hdr->used_size>=kBlkHdrGran)hdr->used_size-=kBlkHdrGran;index_type rem=available-new_data_gran;if(rem>=kBlkHdrGran+1){index_type rem_idx=blk_idx+kBlkHdrGran+new_data_gran;void*rem_blk=detail::block_at<AT>(base,rem_idx);index_type blk_new_next=BlockState::get_next_offset(blk_raw);std::memset(rem_blk,0,sizeof(BlockT));BlockState::init_fields(rem_blk,blk_idx,blk_new_next,1,0,0);BlockState::set_next_offset_of(blk_raw,rem_idx);if(blk_new_next!=AT::no_block)BlockState::set_prev_offset_of(detail::block_at<AT>(base,blk_new_next),rem_idx);else hdr->last_block_offset=rem_idx;hdr->block_count++;hdr->free_count++;hdr->used_size+=kBlkHdrGran;FT::insert(base,hdr,rem_idx);}BlockState::set_weight_of(blk_raw,new_data_gran);hdr->used_size+=(new_data_gran-old_data_gran);return true;}};using DefaultAllocatorPolicy=AllocatorPolicy<AvlFreeTree<DefaultAddressTraits>,DefaultAddressTraits>;}
 
+/*
+## pmm-allocatorpolicy
+*/
+
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -330,6 +473,13 @@ template<typename AT>struct ForestDomainRecord{using index_type=typename AT::ind
 ### pmm-detail-forestdomainregistry
 */
 template<typename AT>struct ForestDomainRegistry{using index_type=typename AT::index_type;uint32_t magic;uint16_t version;uint16_t domain_count;index_type next_binding_id;ForestDomainRecord<AT>domains[kMaxForestDomains];constexpr ForestDomainRegistry()noexcept:magic(kForestRegistryMagic),version(kForestRegistryVersion),domain_count(0),next_binding_id(1),domains{}{}};template<typename AT>inline bool forest_domain_name_equals(const ForestDomainRecord<AT>&rec,const char*name)noexcept{if(name==nullptr)return false;return std::strncmp(rec.name,name,kForestDomainNameCapacity)==0;}inline bool forest_domain_name_fits(const char*name)noexcept{if(name==nullptr||name[0]=='\0')return false;return std::strlen(name)<kForestDomainNameCapacity;}template<typename AT>inline bool forest_domain_name_copy(ForestDomainRecord<AT>&rec,const char*name)noexcept{if(!forest_domain_name_fits(name))return false;std::memset(rec.name,0,sizeof(rec.name));std::memcpy(rec.name,name,std::strlen(name));return true;}static_assert(std::is_trivially_copyable_v<ForestDomainRecord<DefaultAddressTraits>>,"");static_assert(std::is_nothrow_default_constructible_v<ForestDomainRegistry<DefaultAddressTraits>>,"");}
+
+/*
+### pmm-detail-forestdomainrecord
+*/
+/*
+### pmm-detail-forestdomainregistry
+*/
 
 #include <cstddef>
 #include <cstdint>
@@ -345,6 +495,10 @@ namespace pmm{
 */
 template<typename T,typename ManagerT>struct pallocator{using value_type=T;using size_type=size_t;using difference_type=std::ptrdiff_t;using propagate_on_container_copy_assignment=std::true_type;using propagate_on_container_move_assignment=std::true_type;using propagate_on_container_swap=std::true_type;using is_always_equal=std::true_type;constexpr pallocator()noexcept=default;constexpr pallocator(const pallocator&)noexcept=default;template<typename U>constexpr pallocator(const pallocator<U,ManagerT>&)noexcept{}[[nodiscard]]T*allocate(size_t n){if(n==0)throw std::bad_alloc();if(n>max_size())throw std::bad_alloc();void*raw=ManagerT::allocate(n*sizeof(T));if(raw==nullptr)throw std::bad_alloc();return static_cast<T*>(raw);}void deallocate(T*p,size_t)noexcept{ManagerT::deallocate(static_cast<void*>(p));}size_t max_size()const noexcept{return(std::numeric_limits<size_t>::max)()/sizeof(T);}template<typename U>bool operator==(const pallocator<U,ManagerT>&)const noexcept{return true;}template<typename U>bool operator!=(const pallocator<U,ManagerT>&)const noexcept{return false;}};}
 
+/*
+## pmm-pallocator
+*/
+
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -355,6 +509,10 @@ namespace pmm{
 ## pmm-parray
 */
 template<typename T,typename ManagerT>struct parray{static_assert(std::is_trivially_copyable_v<T>,"");using manager_type=ManagerT;using index_type=typename ManagerT::index_type;using value_type=T;uint32_t _size;uint32_t _capacity;index_type _data_idx;parray()noexcept:_size(0),_capacity(0),_data_idx(detail::kNullIdx_v<typename ManagerT::address_traits>){}~parray()noexcept=default;size_t size()const noexcept{return static_cast<size_t>(_size);}bool empty()const noexcept{return _size==0;}size_t capacity()const noexcept{return static_cast<size_t>(_capacity);}T*at(size_t i)noexcept{if(i>=static_cast<size_t>(_size))return nullptr;T*data=resolve_data();return(data!=nullptr)?(data+i):nullptr;}const T*at(size_t i)const noexcept{if(i>=static_cast<size_t>(_size))return nullptr;const T*data=resolve_data();return(data!=nullptr)?(data+i):nullptr;}T operator[](size_t i)const noexcept{const T*data=resolve_data();return(data!=nullptr)?data[i]:T{};}T*front()noexcept{return at(0);}const T*front()const noexcept{return at(0);}T*back()noexcept{return(_size>0)?at(static_cast<size_t>(_size)-1):nullptr;}const T*back()const noexcept{return(_size>0)?at(static_cast<size_t>(_size)-1):nullptr;}T*data()noexcept{return resolve_data();}const T*data()const noexcept{return resolve_data();}bool push_back(const T&value)noexcept{if(!ensure_capacity(_size+1))return false;T*d=resolve_data();if(d==nullptr)return false;d[_size]=value;++_size;return true;}void pop_back()noexcept{if(_size>0)--_size;}bool set(size_t i,const T&value)noexcept{if(i>=static_cast<size_t>(_size))return false;T*d=resolve_data();if(d==nullptr)return false;d[i]=value;return true;}bool reserve(size_t n)noexcept{if(n>static_cast<size_t>(std::numeric_limits<uint32_t>::max()))return false;return ensure_capacity(static_cast<uint32_t>(n));}bool resize(size_t n)noexcept{if(n>static_cast<size_t>(std::numeric_limits<uint32_t>::max()))return false;auto new_size=static_cast<uint32_t>(n);if(new_size>_size){if(!ensure_capacity(new_size))return false;T*d=resolve_data();if(d==nullptr)return false;std::memset(d+_size,0,static_cast<size_t>(new_size-_size)*sizeof(T));}_size=new_size;return true;}bool insert(size_t index,const T&value)noexcept{if(index>static_cast<size_t>(_size))return false;if(!ensure_capacity(_size+1))return false;T*d=resolve_data();if(d==nullptr)return false;if(index<static_cast<size_t>(_size))std::memmove(d+index+1,d+index,(static_cast<size_t>(_size)-index)*sizeof(T));d[index]=value;++_size;return true;}bool erase(size_t index)noexcept{if(index>=static_cast<size_t>(_size))return false;T*d=resolve_data();if(d==nullptr)return false;if(index+1<static_cast<size_t>(_size))std::memmove(d+index,d+index+1,(static_cast<size_t>(_size)-index-1)*sizeof(T));--_size;return true;}void clear()noexcept{_size=0;}void free_data()noexcept{if(_data_idx!=detail::kNullIdx_v<typename ManagerT::address_traits>){ManagerT::deallocate(detail::resolve_granule_ptr<typename ManagerT::address_traits>(ManagerT::backend().base_ptr(),_data_idx));_data_idx=detail::kNullIdx_v<typename ManagerT::address_traits>;}_size=0;_capacity=0;}bool operator==(const parray&other)const noexcept{if(this==&other)return true;if(_size!=other._size)return false;if(_size==0)return true;const T*a=resolve_data();const T*b=other.resolve_data();if(a==nullptr||b==nullptr)return(a==b);return std::memcmp(a,b,static_cast<size_t>(_size)*sizeof(T))==0;}bool operator!=(const parray&other)const noexcept{return!(*this==other);}private:T*resolve_data()const noexcept{return reinterpret_cast<T*>(detail::resolve_granule_ptr<typename ManagerT::address_traits>(ManagerT::backend().base_ptr(),_data_idx));}bool ensure_capacity(uint32_t required)noexcept{if(required<=_capacity)return true;uint32_t new_cap=_capacity*2;if(new_cap<required)new_cap=required;if(new_cap<4)new_cap=4;size_t alloc_size=static_cast<size_t>(new_cap)*sizeof(T);if(sizeof(T)>0&&alloc_size/sizeof(T)!=static_cast<size_t>(new_cap))return false;void*new_raw=ManagerT::allocate(alloc_size);if(new_raw==nullptr)return false;uint8_t*base=ManagerT::backend().base_ptr();index_type new_dat_idx=detail::ptr_to_granule_idx<typename ManagerT::address_traits>(base,new_raw);if(_size>0&&_data_idx!=detail::kNullIdx_v<typename ManagerT::address_traits>){T*old_data=resolve_data();if(old_data!=nullptr)std::memcpy(new_raw,old_data,static_cast<size_t>(_size)*sizeof(T));}if(_data_idx!=detail::kNullIdx_v<typename ManagerT::address_traits>)ManagerT::deallocate(detail::resolve_granule_ptr<typename ManagerT::address_traits>(base,_data_idx));_data_idx=new_dat_idx;_capacity=new_cap;return true;}};}
+
+/*
+## pmm-parray
+*/
 
 #include <cstddef>
 #include <cstdint>
@@ -385,6 +543,25 @@ void clear()noexcept{auto ops=forest_domain_policy(descriptor());index_type*root
 */
 iterator begin()const noexcept{const index_type root=root_index();if(root==static_cast<index_type>(0))return iterator();return iterator(detail::avl_min_node(node_pptr(root)).offset());}iterator end()const noexcept{return iterator(static_cast<index_type>(0));}};}
 
+/*
+## pmm-pmap
+*/
+/*
+### pmm-pmap-size
+*/
+/*
+### pmm-pmap-insert
+*/
+/*
+### pmm-pmap-erase
+*/
+/*
+### pmm-pmap-clear
+*/
+/*
+### pmm-pmap-begin
+*/
+
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -399,6 +576,13 @@ class pptr{public:using element_type=T;using manager_type=ManagerT;using index_t
 */
 constexpr size_t byte_offset()const noexcept{return static_cast<size_t>(_idx)*ManagerT::address_traits::granule_size;}constexpr bool operator==(const pptr&other)const noexcept{return _idx==other._idx;}constexpr bool operator!=(const pptr&other)const noexcept{return _idx!=other._idx;}bool operator<(const pptr&other)const noexcept{static_assert(requires(const T&a,const T&b){{a<b}->std::convertible_to<bool>;},"");if(is_null()&&!other.is_null())return true;if(!is_null()&&other.is_null())return false;if(is_null()&&other.is_null())return false;return**this<*other;}T&operator*()const noexcept{return*ManagerT::template resolve_checked<T>(*this);}T*operator->()const noexcept{return ManagerT::template resolve_checked<T>(*this);}T*resolve()const noexcept{return ManagerT::template resolve_checked<T>(*this);}T*resolve_unchecked()const noexcept{return ManagerT::template resolve_unchecked<T>(*this);}auto&tree_node()const noexcept{return ManagerT::tree_node(*this);}};}
 
+/*
+## pmm-pptr
+*/
+/*
+### pmm-pptr-byte_offset
+*/
+
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -408,6 +592,10 @@ namespace pmm{
 ## pmm-pstring
 */
 template<typename ManagerT>struct pstring{using manager_type=ManagerT;using index_type=typename ManagerT::index_type;uint32_t _length;uint32_t _capacity;index_type _data_idx;pstring()noexcept:_length(0),_capacity(0),_data_idx(detail::kNullIdx_v<typename ManagerT::address_traits>){}~pstring()noexcept=default;const char*c_str()const noexcept{if(_data_idx==detail::kNullIdx_v<typename ManagerT::address_traits>)return "";char*data=resolve_data();return(data!=nullptr)?data:"";}size_t size()const noexcept{return static_cast<size_t>(_length);}bool empty()const noexcept{return _length==0;}char operator[](size_t i)const noexcept{char*data=resolve_data();return(data!=nullptr)?data[i]:'\0';}bool assign(const char*s)noexcept{if(s==nullptr)s="";auto len=static_cast<uint32_t>(std::strlen(s));if(!ensure_capacity(len))return false;char*data=resolve_data();if(data==nullptr)return false;std::memcpy(data,s,static_cast<size_t>(len)+1);_length=len;return true;}bool append(const char*s)noexcept{if(s==nullptr)s="";auto add_len=static_cast<uint32_t>(std::strlen(s));if(add_len==0)return true;uint32_t new_len=_length+add_len;if(new_len<_length)return false;if(!ensure_capacity(new_len))return false;char*data=resolve_data();if(data==nullptr)return false;std::memcpy(data+_length,s,static_cast<size_t>(add_len)+1);_length=new_len;return true;}void clear()noexcept{_length=0;if(_data_idx!=detail::kNullIdx_v<typename ManagerT::address_traits>){char*data=resolve_data();if(data!=nullptr)data[0]='\0';}}void free_data()noexcept{if(_data_idx!=detail::kNullIdx_v<typename ManagerT::address_traits>){ManagerT::deallocate(detail::resolve_granule_ptr<typename ManagerT::address_traits>(ManagerT::backend().base_ptr(),_data_idx));_data_idx=detail::kNullIdx_v<typename ManagerT::address_traits>;}_length=0;_capacity=0;}bool operator==(const char*s)const noexcept{if(s==nullptr)return _length==0;return std::strcmp(c_str(),s)==0;}bool operator!=(const char*s)const noexcept{return!(*this==s);}bool operator==(const pstring&other)const noexcept{if(this==&other)return true;if(_length!=other._length)return false;if(_length==0)return true;return std::strcmp(c_str(),other.c_str())==0;}bool operator!=(const pstring&other)const noexcept{return!(*this==other);}bool operator<(const pstring&other)const noexcept{return std::strcmp(c_str(),other.c_str())<0;}private:char*resolve_data()const noexcept{return reinterpret_cast<char*>(detail::resolve_granule_ptr<typename ManagerT::address_traits>(ManagerT::backend().base_ptr(),_data_idx));}bool ensure_capacity(uint32_t required)noexcept{if(required<=_capacity)return true;uint32_t new_cap=_capacity*2;if(new_cap<required)new_cap=required;if(new_cap<16)new_cap=16;size_t alloc_size=static_cast<size_t>(new_cap)+1;void*new_raw=ManagerT::allocate(alloc_size);if(new_raw==nullptr)return false;uint8_t*base=ManagerT::backend().base_ptr();index_type new_dat_idx=detail::ptr_to_granule_idx<typename ManagerT::address_traits>(base,new_raw);if(_length>0&&_data_idx!=detail::kNullIdx_v<typename ManagerT::address_traits>){char*old_data=resolve_data();if(old_data!=nullptr)std::memcpy(new_raw,old_data,static_cast<size_t>(_length)+1);}else{static_cast<char*>(new_raw)[0]='\0';}if(_data_idx!=detail::kNullIdx_v<typename ManagerT::address_traits>)ManagerT::deallocate(detail::resolve_granule_ptr<typename ManagerT::address_traits>(base,_data_idx));_data_idx=new_dat_idx;_capacity=new_cap;return true;}};}
+
+/*
+## pmm-pstring
+*/
 
 #include <cstddef>
 #include <cstdint>
@@ -421,6 +609,13 @@ template<typename ManagerT>struct pstringview{using manager_type=ManagerT;using 
 ### pmm-pstringview-intern
 */
 static psview_pptr intern(const char*s)noexcept{return _intern(s);}static void reset()noexcept{if(!ManagerT::is_initialized())return;typename ManagerT::thread_policy::unique_lock_type lock(ManagerT::_mutex);forest_domain_ops().reset_root();}static index_type root_index()noexcept{if(!ManagerT::is_initialized())return static_cast<index_type>(0);typename ManagerT::thread_policy::shared_lock_type lock(ManagerT::_mutex);return forest_domain_ops().root_index();}~pstringview()=default;private:psview_pptr _interned;static psview_pptr _intern(const char*s)noexcept{if(!ManagerT::is_initialized())return psview_pptr();typename ManagerT::thread_policy::unique_lock_type lock(ManagerT::_mutex);return ManagerT::intern_symbol_unlocked(s);}};}
+
+/*
+## pmm-pstringview
+*/
+/*
+### pmm-pstringview-intern
+*/
 
 #include <type_traits>
 #include <utility>
@@ -556,6 +751,13 @@ uint8_t*_base=nullptr;size_t _size=0;bool _mapped=false;HANDLE _file_handle=INVA
 uint8_t*_base=nullptr;size_t _size=0;bool _mapped=false;int _fd=-1;bool open_impl(const char*path,size_t size_bytes)noexcept{_fd=::open(path,O_RDWR|O_CREAT,0600);if(_fd<0)return false;struct stat st{};if(::fstat(_fd,&st)!=0){::close(_fd);_fd=-1;return false;}if(static_cast<size_t>(st.st_size)<size_bytes){if(::ftruncate(_fd,static_cast<off_t>(size_bytes))!=0){::close(_fd);_fd=-1;return false;}}void*addr=::mmap(nullptr,size_bytes,PROT_READ|PROT_WRITE,MAP_SHARED,_fd,0);if(addr==MAP_FAILED){::close(_fd);_fd=-1;return false;}_base=static_cast<uint8_t*>(addr);_size=size_bytes;_mapped=true;return true;}void close_impl()noexcept{if(_base!=nullptr)::munmap(_base,_size);if(_fd>=0){::close(_fd);_fd=-1;}}bool expand_impl(size_t new_size)noexcept{if(_base!=nullptr){::munmap(_base,_size);_base=nullptr;}if(::ftruncate(_fd,static_cast<off_t>(new_size))!=0){void*addr=::mmap(nullptr,_size,PROT_READ|PROT_WRITE,MAP_SHARED,_fd,0);if(addr!=MAP_FAILED)_base=static_cast<uint8_t*>(addr);return false;}void*addr=::mmap(nullptr,new_size,PROT_READ|PROT_WRITE,MAP_SHARED,_fd,0);if(addr==MAP_FAILED)return false;_base=static_cast<uint8_t*>(addr);_size=new_size;return true;}
 #endif
 };static_assert(is_storage_backend_v<MMapStorage<>>,"");}
+
+/*
+## pmm-mmapstorage
+*/
+/*
+### pmm-mmapstorage-expand
+*/
 
 #include <concepts>
 #include <cstddef>
