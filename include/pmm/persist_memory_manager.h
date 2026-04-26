@@ -39,33 +39,47 @@ namespace pmm
 
 namespace detail
 {
+
+/*
+## pmm::detail::config_logging_policy
+*/
 template <typename C, typename = void> struct config_logging_policy
 {
+
     using type = logging::NoLogging;
 };
 template <typename C> struct config_logging_policy<C, std::void_t<typename C::logging_policy>>
 {
+
     using type = typename C::logging_policy;
 };
-} // namespace detail
+}
+
+template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0>
 
 /*
-# persist_memory_manager
-file:///./../../README.md#persist_memory_manager
-https://github.com/netkeep80/PersistMemoryManager/blob/main/README.md#persist_memory_manager
+## pmm::PersistMemoryManager
 */
-template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0>
 class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryManager<ConfigT, InstanceId>>
 {
   public:
+
     using address_traits  = typename ConfigT::address_traits;
+
     using storage_backend = typename ConfigT::storage_backend;
+
     using free_block_tree = typename ConfigT::free_block_tree;
+
     using thread_policy   = typename ConfigT::lock_policy;
+
     using logging_policy  = typename detail::config_logging_policy<ConfigT>::type;
+
     using allocator       = AllocatorPolicy<free_block_tree, address_traits>;
+
     using index_type      = typename address_traits::index_type;
+
     using forest_registry = detail::ForestDomainRegistry<address_traits>;
+
     using forest_domain   = detail::ForestDomainRecord<address_traits>;
 
     using manager_type = PersistMemoryManager<ConfigT, InstanceId>;
@@ -87,14 +101,27 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
 
     template <typename T> using pallocator = pmm::pallocator<T, manager_type>;
 
+/*
+### pmm::PersistMemoryManager::last_error
+*/
     static PmmError last_error() noexcept { return _last_error; }
 
+/*
+### pmm::PersistMemoryManager::clear_error
+*/
     static void clear_error() noexcept { _last_error = PmmError::Ok; }
 
+/*
+### pmm::PersistMemoryManager::set_last_error
+*/
     static void set_last_error( PmmError err ) noexcept { _last_error = err; }
 
+/*
+### pmm::PersistMemoryManager::create
+*/
     static bool create( std::size_t initial_size ) noexcept
     {
+
         typename thread_policy::unique_lock_type lock( _mutex );
         if ( initial_size < detail::kMinMemorySize )
         {
@@ -108,6 +135,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             _last_error = PmmError::Overflow;
             return false;
         }
+
         std::size_t aligned = ( ( initial_size + kGranSzCreate - 1 ) / kGranSzCreate ) * kGranSzCreate;
         if ( _backend.base_ptr() == nullptr || _backend.total_size() < aligned )
         {
@@ -125,10 +153,13 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             _last_error = PmmError::BackendError;
             return false;
         }
+
         bool ok = init_layout( _backend.base_ptr(), _backend.total_size() );
         if ( ok )
+
             ok = bootstrap_forest_registry_unlocked();
         if ( ok )
+
             ok = validate_bootstrap_invariants_unlocked();
         if ( ok )
         {
@@ -159,9 +190,14 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         return ok;
     }
 
+/*
+### pmm::PersistMemoryManager::load
+*/
     static bool load( VerifyResult& result ) noexcept
     {
+
         result.mode = RecoveryMode::Repair;
+
         result.ok   = true;
         typename thread_policy::unique_lock_type lock( _mutex );
         if ( _backend.base_ptr() == nullptr || _backend.total_size() < detail::kMinMemorySize )
@@ -170,7 +206,9 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             result.add( ViolationType::HeaderCorruption, DiagnosticAction::Aborted );
             return false;
         }
+
         std::uint8_t*                          base = _backend.base_ptr();
+
         detail::ManagerHeader<address_traits>* hdr  = get_header( base );
         if ( hdr->magic != kMagic )
         {
@@ -211,25 +249,37 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
                 r.entries[i].action = act;
         };
         std::size_t pre = result.entry_count;
+
         allocator::verify_block_states( base, hdr, result );
         mark_entries( result, pre, DiagnosticAction::Repaired );
+
         pre = result.entry_count;
+
         allocator::verify_linked_list( base, hdr, result );
         mark_entries( result, pre, DiagnosticAction::Repaired );
         pre = result.entry_count;
+
         allocator::verify_counters( base, hdr, result );
         mark_entries( result, pre, DiagnosticAction::Rebuilt );
         pre = result.entry_count;
+
         allocator::verify_free_tree( base, hdr, result );
         mark_entries( result, pre, DiagnosticAction::Rebuilt );
 
         if ( detail::image_version_requires_migration( hdr->image_version ) )
+
             hdr->image_version = detail::kCurrentImageVersion;
+
         hdr->owns_memory     = false;
+
         hdr->prev_total_size = 0;
+
         allocator::repair_linked_list( base, hdr );
+
         allocator::recompute_counters( base, hdr );
+
         allocator::rebuild_free_tree( base, hdr );
+
         _initialized = true;
 
         {
@@ -258,20 +308,30 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             _initialized = false;
             return false;
         }
+
         _last_error = PmmError::Ok;
+
         logging_policy::on_load();
         return true;
     }
 
+/*
+### pmm::PersistMemoryManager::destroy
+*/
     static void destroy() noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
         if ( !_initialized )
+
             return;
         _initialized = false;
+
         logging_policy::on_destroy();
     }
 
+/*
+### pmm::PersistMemoryManager::destroy_image
+*/
     static void destroy_image() noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
@@ -282,31 +342,48 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         logging_policy::on_destroy();
     }
 
+/*
+### pmm::PersistMemoryManager::is_initialized
+*/
     static bool is_initialized() noexcept { return _initialized.load( std::memory_order_acquire ); }
 
+/*
+### pmm::PersistMemoryManager::allocate
+*/
     static void* allocate( std::size_t user_size ) noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
         return allocate_unlocked( user_size );
     }
 
+/*
+### pmm::PersistMemoryManager::deallocate
+*/
     static void deallocate( void* ptr ) noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
+
         deallocate_unlocked( ptr );
     }
 
+/*
+### pmm::PersistMemoryManager::lock_block_permanent
+*/
     static bool lock_block_permanent( void* ptr ) noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
         return lock_block_permanent_unlocked( ptr );
     }
 
+/*
+### pmm::PersistMemoryManager::is_permanently_locked
+*/
     static bool is_permanently_locked( const void* ptr ) noexcept
     {
         typename thread_policy::shared_lock_type lock( _mutex );
         if ( !_initialized || ptr == nullptr )
             return false;
+
         const pmm::Block<address_traits>* blk = find_block_from_user_ptr( ptr );
         if ( blk == nullptr )
             return false;
@@ -318,7 +395,9 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         typename thread_policy::unique_lock_type lock( _mutex );
         if ( !_initialized )
             return;
+
         set_forest_domain_root_index_unlocked( find_domain_by_name_unlocked( detail::kServiceNameDomainRoot ),
+
                                                p.is_null() ? static_cast<index_type>( 0 ) : p.offset() );
     }
 
@@ -328,38 +407,56 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         if ( !_initialized )
             return pptr<T>();
         index_type root =
+
             forest_domain_root_index_unlocked( find_domain_by_name_unlocked( detail::kServiceNameDomainRoot ) );
         if ( root == static_cast<index_type>( 0 ) )
             return pptr<T>();
         return pptr<T>( root );
     }
 
+/*
+### pmm::PersistMemoryManager::find_domain_by_name
+*/
     static index_type find_domain_by_name( const char* name ) noexcept
     {
         typename thread_policy::shared_lock_type lock( _mutex );
         if ( !_initialized )
             return 0;
+
         const forest_domain* rec = find_domain_by_name_unlocked( name );
         return ( rec != nullptr ) ? rec->binding_id : static_cast<index_type>( 0 );
     }
 
+/*
+### pmm::PersistMemoryManager::find_domain_by_symbol
+*/
     static index_type find_domain_by_symbol( pptr<pstringview> symbol ) noexcept
     {
         typename thread_policy::shared_lock_type lock( _mutex );
         if ( !_initialized )
             return 0;
+
         const forest_domain* rec = find_domain_by_symbol_unlocked( symbol );
         return ( rec != nullptr ) ? rec->binding_id : static_cast<index_type>( 0 );
     }
 
+/*
+### pmm::PersistMemoryManager::has_domain
+*/
     static bool has_domain( const char* name ) noexcept { return find_domain_by_name( name ) != 0; }
 
+/*
+### pmm::PersistMemoryManager::validate_bootstrap_invariants
+*/
     static bool validate_bootstrap_invariants() noexcept
     {
         typename thread_policy::shared_lock_type lock( _mutex );
         return validate_bootstrap_invariants_unlocked();
     }
 
+/*
+### pmm::PersistMemoryManager::register_domain
+*/
     static bool register_domain( const char* name ) noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
@@ -368,6 +465,9 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         return register_domain_unlocked( name, 0, detail::kForestBindingDirectRoot, 0 );
     }
 
+/*
+### pmm::PersistMemoryManager::register_system_domain
+*/
     static bool register_system_domain( const char* name ) noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
@@ -376,6 +476,9 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         return register_domain_unlocked( name, detail::kForestDomainFlagSystem, detail::kForestBindingDirectRoot, 0 );
     }
 
+/*
+### pmm::PersistMemoryManager::get_domain_root_offset
+*/
     static index_type get_domain_root_offset( const char* name ) noexcept
     {
         typename thread_policy::shared_lock_type lock( _mutex );
@@ -390,6 +493,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         typename thread_policy::shared_lock_type lock( _mutex );
         if ( !_initialized )
             return 0;
+
         const forest_domain* rec = find_domain_by_binding_unlocked( binding_id );
         return forest_domain_root_index_unlocked( rec );
     }
@@ -405,6 +509,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
 
     template <typename T> static pptr<T> get_domain_root( const char* name ) noexcept
     {
+
         index_type root = get_domain_root_offset( name );
         return ( root == 0 ) ? pptr<T>() : pptr<T>( root );
     }
@@ -433,31 +538,43 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
 
   private:
     template <typename T>
+
+/*
+### pmm::PersistMemoryManager::get_tree_idx_field
+*/
     static index_type get_tree_idx_field( pptr<T> p, index_type ( *getter )( const void* ) ) noexcept
     {
         if ( p.is_null() || !_initialized )
             return 0;
+
         const void* blk = block_raw_ptr_from_pptr( p );
         if ( blk == nullptr )
         {
             _last_error = PmmError::InvalidPointer;
             return 0;
         }
+
         index_type v = getter( blk );
         return ( v == address_traits::no_block ) ? static_cast<index_type>( 0 ) : v;
     }
 
     template <typename T>
+
+/*
+### pmm::PersistMemoryManager::set_tree_idx_field
+*/
     static void set_tree_idx_field( pptr<T> p, void ( *setter )( void*, index_type ), index_type val ) noexcept
     {
         if ( p.is_null() || !_initialized )
             return;
+
         void* blk = block_raw_mut_ptr_from_pptr( p );
         if ( blk == nullptr )
         {
             _last_error = PmmError::InvalidPointer;
             return;
         }
+
         setter( blk, ( val == 0 ) ? address_traits::no_block : val );
     }
 
@@ -477,6 +594,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
 
     template <typename T> static void set_tree_left_offset( pptr<T> p, index_type v ) noexcept
     {
+
         set_tree_idx_field( p, &BlockStateBase<address_traits>::set_left_offset_of, v );
     }
     template <typename T> static void set_tree_right_offset( pptr<T> p, index_type v ) noexcept
@@ -510,6 +628,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             _last_error = PmmError::InvalidPointer;
             return;
         }
+
         BlockStateBase<address_traits>::set_weight_of( blk, w );
     }
 
@@ -535,11 +654,13 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             _last_error = PmmError::InvalidPointer;
             return;
         }
+
         BlockStateBase<address_traits>::set_avl_height_of( blk, h );
     }
 
     template <typename T> static TreeNode<address_traits>& tree_node( pptr<T> p ) noexcept
     {
+
         assert( !p.is_null() && "tree_node: pptr must not be null" );
         assert( _initialized && "tree_node: manager must be initialized before calling tree_node" );
         void* blk = block_raw_mut_ptr_from_pptr( p );
@@ -566,6 +687,10 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     }
 
   public:
+
+/*
+### pmm::PersistMemoryManager::total_size
+*/
     static std::size_t total_size() noexcept
     {
         if ( !_initialized.load( std::memory_order_acquire ) )
@@ -573,10 +698,18 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         typename thread_policy::shared_lock_type lock( _mutex );
         return _initialized.load( std::memory_order_relaxed ) ? _backend.total_size() : 0;
     }
+
+/*
+### pmm::PersistMemoryManager::used_size
+*/
     static std::size_t used_size() noexcept
     {
         return read_stat( []( const auto* h ) { return address_traits::granules_to_bytes( h->used_size ); } );
     }
+
+/*
+### pmm::PersistMemoryManager::free_size
+*/
     static std::size_t free_size() noexcept
     {
         return read_stat(
@@ -586,21 +719,37 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
                 return ( h->total_size > used ) ? ( h->total_size - used ) : std::size_t( 0 );
             } );
     }
+
+/*
+### pmm::PersistMemoryManager::block_count
+*/
     static std::size_t block_count() noexcept
     {
         return read_stat( []( const auto* h ) { return static_cast<std::size_t>( h->block_count ); } );
     }
+
+/*
+### pmm::PersistMemoryManager::free_block_count
+*/
     static std::size_t free_block_count() noexcept
     {
         return read_stat( []( const auto* h ) { return static_cast<std::size_t>( h->free_count ); } );
     }
+
+/*
+### pmm::PersistMemoryManager::alloc_block_count
+*/
     static std::size_t alloc_block_count() noexcept
     {
         return read_stat( []( const auto* h ) { return static_cast<std::size_t>( h->alloc_count ); } );
     }
 
+/*
+### pmm::PersistMemoryManager::verify
+*/
     static VerifyResult verify() noexcept
     {
+
         VerifyResult                             result;
         typename thread_policy::shared_lock_type lock( _mutex );
         if ( !_initialized || _backend.base_ptr() == nullptr )
@@ -608,6 +757,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             result.add( ViolationType::HeaderCorruption, DiagnosticAction::Aborted );
             return result;
         }
+
         verify_image_unlocked( result );
         return result;
     }
@@ -618,8 +768,11 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         if ( !_initialized )
             return false;
         const std::uint8_t* base                         = _backend.base_ptr();
+
         using BlockState                                 = BlockStateBase<address_traits>;
+
         const detail::ManagerHeader<address_traits>* hdr = get_header_c( base );
+
         index_type                                   idx = hdr->first_block_offset;
 
         static constexpr std::size_t kGranSz = address_traits::granule_size;
@@ -656,13 +809,18 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             return false;
         const std::uint8_t*                          base = _backend.base_ptr();
         const detail::ManagerHeader<address_traits>* hdr  = get_header_c( base );
+
         for_each_free_block_inorder( base, hdr, hdr->free_tree_root, 0, callback );
         return true;
     }
 
+/*
+### pmm::PersistMemoryManager::backend
+*/
     static storage_backend& backend() noexcept { return _backend; }
 
   private:
+
     static inline storage_backend _backend{};
 
     static inline std::atomic<bool> _initialized{ false };
@@ -671,14 +829,21 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
 
     static inline thread_local PmmError _last_error{ PmmError::Ok };
 
+/*
+### pmm::PersistMemoryManager::is_valid_user_offset_unlocked
+*/
     static bool is_valid_user_offset_unlocked( index_type off, std::size_t size_bytes ) noexcept
     {
         if ( off == 0 || _backend.base_ptr() == nullptr || _backend.total_size() == 0 )
             return false;
+
         std::size_t byte_off = static_cast<std::size_t>( off ) * address_traits::granule_size;
         return byte_off + size_bytes <= _backend.total_size();
     }
 
+/*
+### pmm::PersistMemoryManager::allocate_unlocked
+*/
     static void* allocate_unlocked( std::size_t user_size ) noexcept
     {
         if ( !_initialized )
@@ -696,8 +861,10 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
 
         std::uint8_t*                          base      = _backend.base_ptr();
         detail::ManagerHeader<address_traits>* hdr       = get_header( base );
+
         index_type                             data_gran = detail::bytes_to_granules_t<address_traits>( user_size );
         if ( data_gran == 0 )
+
             data_gran = 1;
         if ( data_gran > std::numeric_limits<index_type>::max() - kBlockHdrGranules )
         {
@@ -707,6 +874,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         }
 
         index_type needed = kBlockHdrGranules + data_gran;
+
         index_type idx    = free_block_tree::find_best_fit( base, hdr, needed );
         if ( idx != address_traits::no_block )
         {
@@ -731,10 +899,14 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         }
 
         _last_error = PmmError::OutOfMemory;
+
         logging_policy::on_allocation_failure( user_size, PmmError::OutOfMemory );
         return nullptr;
     }
 
+/*
+### pmm::PersistMemoryManager::deallocate_unlocked
+*/
     static void deallocate_unlocked( void* ptr ) noexcept
     {
         if ( !_initialized || ptr == nullptr )
@@ -742,6 +914,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         pmm::Block<address_traits>* blk = find_block_from_user_ptr( ptr );
         if ( blk == nullptr )
             return;
+
         index_type freed = BlockStateBase<address_traits>::get_weight( blk );
         if ( freed == 0 )
             return;
@@ -753,15 +926,22 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         index_type                             blk_idx = detail::block_idx_t<address_traits>( base, blk );
 
         AllocatedBlock<address_traits>* alloc = AllocatedBlock<address_traits>::cast_from_raw( blk );
+
         alloc->mark_as_free();
 
         hdr->alloc_count--;
+
         hdr->free_count++;
         if ( hdr->used_size >= freed )
+
             hdr->used_size -= freed;
+
         allocator::coalesce( base, hdr, blk_idx );
     }
 
+/*
+### pmm::PersistMemoryManager::lock_block_permanent_unlocked
+*/
     static bool lock_block_permanent_unlocked( void* ptr ) noexcept
     {
         if ( !_initialized || ptr == nullptr )
@@ -772,6 +952,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         index_type w = BlockStateBase<address_traits>::get_weight( blk );
         if ( w == 0 )
             return false;
+
         BlockStateBase<address_traits>::set_node_type_of( blk, pmm::kNodeReadOnly );
         return true;
     }
@@ -779,7 +960,9 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     template <typename T, typename... Args> static pptr<T> create_typed_unlocked( Args&&... args ) noexcept
     {
         static_assert( std::is_nothrow_constructible_v<T, Args...>,
+
                        "create_typed_unlocked<T>: T must be nothrow-constructible" );
+
         void* raw = allocate_unlocked( sizeof( T ) );
         if ( raw == nullptr )
             return pptr<T>();
@@ -790,6 +973,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             deallocate_unlocked( raw );
             return pptr<T>();
         }
+
         ::new ( obj ) T( static_cast<Args&&>( args )... );
         return p;
     }
@@ -801,51 +985,87 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     static constexpr std::size_t kBlockHdrByteSize = detail::manager_header_offset_bytes_v<address_traits>;
 
     static constexpr index_type kBlockHdrGranules =
+
+/*
+### pmm::PersistMemoryManager::index_type
+*/
         static_cast<index_type>( kBlockHdrByteSize / address_traits::granule_size );
 
     static constexpr index_type kMgrHdrGranules = detail::kManagerHeaderGranules_t<address_traits>;
 
     static constexpr index_type kFreeBlkIdxLayout = kBlockHdrGranules + kMgrHdrGranules;
 
+/*
+### pmm::PersistMemoryManager::get_header
+*/
     static detail::ManagerHeader<address_traits>* get_header( std::uint8_t* base ) noexcept
     {
 
         return detail::manager_header_at<address_traits>( base );
     }
 
+/*
+### pmm::PersistMemoryManager::get_header_c
+*/
     static const detail::ManagerHeader<address_traits>* get_header_c( const std::uint8_t* base ) noexcept
     {
         return detail::manager_header_at<address_traits>( base );
     }
 
+/*
+## pmm::PersistMemoryManager::layout_access
+*/
     struct layout_access
     {
+
         using address_traits                                            = manager_type::address_traits;
+
         using free_block_tree                                           = manager_type::free_block_tree;
+
         using logging_policy                                            = manager_type::logging_policy;
+
         using storage_backend                                           = manager_type::storage_backend;
+
         using index_type                                                = manager_type::index_type;
+
         static constexpr std::uint64_t                kMagic            = pmm::kMagic;
         static constexpr std::size_t                  kBlockHdrByteSize = manager_type::kBlockHdrByteSize;
+
         static constexpr index_type                   kBlockHdrGranules = manager_type::kBlockHdrGranules;
+
         static constexpr index_type                   kMgrHdrGranules   = manager_type::kMgrHdrGranules;
+
         static constexpr index_type                   kFreeBlkIdxLayout = manager_type::kFreeBlkIdxLayout;
+
+/*
+### pmm::PersistMemoryManager::layout_access::get_header
+*/
         static detail::ManagerHeader<address_traits>* get_header( std::uint8_t* base ) noexcept
         {
             return manager_type::get_header( base );
         }
+
+/*
+### pmm::PersistMemoryManager::layout_access::set_initialized
+*/
         static void set_initialized() noexcept { manager_type::_initialized = true; }
     };
 
+/*
+### pmm::PersistMemoryManager::init_layout
+*/
     static bool init_layout( std::uint8_t* base, std::size_t size ) noexcept
     {
         return detail::ManagerLayoutOps<layout_access>::init_layout( _backend, base, size );
     }
 
+/*
+### pmm::PersistMemoryManager::do_expand
+*/
     static bool do_expand( std::size_t user_size ) noexcept
     {
         return detail::ManagerLayoutOps<layout_access>::do_expand( _backend, _initialized, user_size );
     }
 };
 
-} // namespace pmm
+}

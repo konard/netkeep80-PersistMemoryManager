@@ -2,7 +2,7 @@
 
 ## Overview
 
-`PersistMemoryManager` is a header-only C++20 library for persistent heap memory management.
+[PersistMemoryManager](../include/pmm/persist_memory_manager.h#pmm::PersistMemoryManager) is a header-only C++20 library for persistent heap memory management.
 All metadata is stored inside the managed region, which allows saving and loading a memory
 image from a file or shared memory. Interaction with data in managed memory is done through
 persistent typed pointers `pptr<T>`.
@@ -56,9 +56,9 @@ of `ConfigT` and `InstanceId` is an independent manager with its own separate st
 **Template parameters:**
 - `ConfigT` — configuration struct that provides:
   - `address_traits` — address space type (index size, granule size)
-  - `storage_backend` — storage backend type (`HeapStorage`, `StaticStorage`, `MMapStorage`)
-  - `free_block_tree` — free block search policy (`AvlFreeTree`)
-  - `lock_policy` — thread safety policy (`NoLock`, `SharedMutexLock`)
+  - `storage_backend` — storage backend type ([HeapStorage](../include/pmm/heap_storage.h#pmm::HeapStorage), [StaticStorage](../include/pmm/static_storage.h#pmm::StaticStorage), [MMapStorage](../include/pmm/mmap_storage.h#pmm::MMapStorage))
+  - `free_block_tree` — free block search policy ([AvlFreeTree](../include/pmm/free_block_tree.h#pmm::AvlFreeTree))
+  - `lock_policy` — thread safety policy ([NoLock](../include/pmm/config.h#pmm::config::NoLock), [SharedMutexLock](../include/pmm/config.h#pmm::config::SharedMutexLock))
   - `granule_size` — granule size in bytes
   - `grow_numerator` / `grow_denominator` — growth ratio
 - `InstanceId` — instance identifier (default `0`). Allows multiple independent managers
@@ -110,7 +110,7 @@ static bool create() noexcept;
 ```
 
 Initializes the manager over an already-allocated backend buffer. Use this when the
-storage backend has been set up externally (e.g., `MMapStorage` or `StaticStorage`).
+storage backend has been set up externally (e.g., [MMapStorage](../include/pmm/mmap_storage.h#pmm::MMapStorage) or [StaticStorage](../include/pmm/static_storage.h#pmm::StaticStorage)).
 
 **Returns:** `true` on success, `false` if the backend is not ready.
 
@@ -220,7 +220,7 @@ template <typename T>
 static void deallocate_typed(pptr<T> p) noexcept;
 ```
 
-Frees the block pointed to by `p`. A null `pptr` is a no-op. Permanently locked blocks
+Frees the block pointed to by `p`. A null [pptr](../include/pmm/pptr.h#pmm::pptr) is a no-op. Permanently locked blocks
 (see `lock_block_permanent`) cannot be freed.
 
 **Example:**
@@ -416,7 +416,7 @@ Iterates free blocks in the AVL tree in-order (by ascending block size) and call
 
 ### AVL tree node access (advanced)
 
-These methods allow reading and writing AVL tree metadata for a block pointed to by a `pptr`.
+These methods allow reading and writing AVL tree metadata for a block pointed to by a [pptr](../include/pmm/pptr.h#pmm::pptr).
 They are intended for advanced use cases, such as implementing persistent data structures
 (e.g., a persistent AVL tree using PMM blocks as nodes).
 
@@ -431,7 +431,7 @@ template <typename T>
 static TreeNode<address_traits>& tree_node(pptr<T> p) noexcept;
 ```
 
-Returns a direct reference to the `TreeNode` embedded in the block header for `p`.
+Returns a direct reference to the [TreeNode](../include/pmm/tree_node.h#pmm::TreeNode) embedded in the block header for `p`.
 Provides unified access to all AVL fields via `get_left()`, `set_left()`, `get_right()`,
 `set_right()`, `get_parent()`, `set_parent()`, `get_height()`, `set_height()`,
 `get_weight()`, `set_weight()`.
@@ -452,7 +452,7 @@ static storage_backend& backend() noexcept;
 ```
 
 Returns a reference to the static storage backend. For advanced scenarios (e.g., accessing
-`MMapStorage` to get `base_ptr()` before calling `load()`).
+[MMapStorage](../include/pmm/mmap_storage.h#pmm::MMapStorage) to get `base_ptr()` before calling `load()`).
 
 ---
 
@@ -473,7 +473,7 @@ base address.
 **Requirement:** `sizeof(pptr<T, ManagerT>) == sizeof(index_type)` (2, 4, or 8 bytes
 depending on `address_traits`).
 
-The preferred way to obtain a `pptr` is through the nested alias in the manager:
+The preferred way to obtain a [pptr](../include/pmm/pptr.h#pmm::pptr) is through the nested alias in the manager:
 ```cpp
 using MyMgr = pmm::PersistMemoryManager<pmm::CacheManagerConfig>;
 MyMgr::pptr<int> p = MyMgr::allocate_typed<int>();
@@ -524,8 +524,8 @@ Both operations call `ManagerT::resolve<T>(p)` internally.
 TreeNode<address_traits>& tree_node() const noexcept;  // direct reference to TreeNode
 ```
 
-Returns a reference to the `TreeNode` embedded in the block header. All AVL fields
-are accessed through the returned `TreeNode` reference:
+Returns a reference to the [TreeNode](../include/pmm/tree_node.h#pmm::TreeNode) embedded in the block header. All AVL fields
+are accessed through the returned [TreeNode](../include/pmm/tree_node.h#pmm::TreeNode) reference:
 
 ```cpp
 auto& tn = p.tree_node();
@@ -542,7 +542,7 @@ tn.set_height(h);
 ```
 
 > **Note:** Absent links are stored as `address_traits::no_block` sentinel. Use
-> `p.offset()` to convert a `pptr` to a granule index for storage in tree fields.
+> `p.offset()` to convert a [pptr](../include/pmm/pptr.h#pmm::pptr) to a granule index for storage in tree fields.
 
 ### Comparison operators
 
@@ -590,8 +590,8 @@ namespace pmm {
 ```
 
 A persistent interned read-only string. Provides automatic deduplication: two calls to
-`pstringview("hello")` return the same `pptr` (same granule index). The string data and
-the `pstringview` blocks are permanently locked via `lock_block_permanent()`.
+`pstringview("hello")` return the same [pptr](../include/pmm/pptr.h#pmm::pptr) (same granule index). The string data and
+the [pstringview](../include/pmm/pstringview.h#pmm::pstringview) blocks are permanently locked via `lock_block_permanent()`.
 
 **Accessed via manager nested alias:**
 ```cpp
@@ -670,12 +670,12 @@ namespace pmm {
 ```
 
 A persistent associative container (dictionary) based on an AVL tree. Each node is an
-allocated block in PAP containing a key-value pair. The built-in `TreeNode` fields of
+allocated block in PAP containing a key-value pair. The built-in [TreeNode](../include/pmm/tree_node.h#pmm::TreeNode) fields of
 each block serve as AVL tree links (no separate node allocations). Inserting a duplicate
 key updates the existing value.
 
-`pmap` is a typed facade over the canonical forest-domain protocol. Its AVL root is stored
-in a manager domain binding under `container/pmap/<type>/<binding>`, not in the `pmap`
+[pmap](../include/pmm/pmap.h#pmm::pmap) is a typed facade over the canonical forest-domain protocol. Its AVL root is stored
+in a manager domain binding under `container/pmap/<type>/<binding>`, not in the [pmap](../include/pmm/pmap.h#pmm::pmap)
 object. The object stores only the domain identity, so separate map objects and different
 `_K`/`_V` node layouts do not share a root unless they are copied from the same facade or
 constructed with the same named domain key.
@@ -753,7 +753,7 @@ struct pmap_node {
 };
 ```
 
-Each node is a separate PAP block. Access via the returned `pptr`:
+Each node is a separate PAP block. Access via the returned [pptr](../include/pmm/pptr.h#pmm::pptr):
 ```cpp
 auto p = map.find(42);
 if (!p.is_null()) {
@@ -792,7 +792,7 @@ assert(map.empty());
 Mgr::destroy();
 ```
 
-**Using `pstringview` as a key:**
+**Using [pstringview](../include/pmm/pstringview.h#pmm::pstringview) as a key:**
 ```cpp
 using Mgr = pmm::PersistMemoryManager<pmm::CacheManagerConfig>;
 Mgr::create(64 * 1024);
@@ -860,7 +860,7 @@ Loads a manager image from a file into the backend buffer, then calls `MgrT::loa
 validate the header and restore state.
 
 **Precondition:** The backend must have an allocated buffer of sufficient size. For
-`HeapStorage`, call `MgrT::create(size)` before calling this function.
+[HeapStorage](../include/pmm/heap_storage.h#pmm::HeapStorage), call `MgrT::create(size)` before calling this function.
 
 **Parameters:**
 - `filename` — path to the image file.
@@ -886,13 +886,13 @@ Ready-to-use type aliases in namespace `pmm::presets`:
 
 | Type | Lock policy | Growth | Index | Use case |
 |------|-------------|--------|-------|----------|
-| `SingleThreadedHeap` | `NoLock` | 25% | 32-bit | Single-threaded caches, tools |
-| `MultiThreadedHeap` | `SharedMutexLock` | 25% | 32-bit | Concurrent services |
-| `EmbeddedHeap` | `NoLock` | 50% | 32-bit | Memory-constrained devices |
-| `IndustrialDBHeap` | `SharedMutexLock` | 100% | 32-bit | High-throughput databases |
-| `EmbeddedStaticHeap<N>` | `NoLock` | — | 32-bit | Embedded without heap (static buffer) |
-| `SmallEmbeddedStaticHeap<N>` | `NoLock` | — | 16-bit | Tiny embedded, up to ~1 MB |
-| `LargeDBHeap` | `SharedMutexLock` | 100% | 64-bit | Petabyte-scale databases |
+| `SingleThreadedHeap` | [NoLock](../include/pmm/config.h#pmm::config::NoLock) | 25% | 32-bit | Single-threaded caches, tools |
+| `MultiThreadedHeap` | [SharedMutexLock](../include/pmm/config.h#pmm::config::SharedMutexLock) | 25% | 32-bit | Concurrent services |
+| `EmbeddedHeap` | [NoLock](../include/pmm/config.h#pmm::config::NoLock) | 50% | 32-bit | Memory-constrained devices |
+| `IndustrialDBHeap` | [SharedMutexLock](../include/pmm/config.h#pmm::config::SharedMutexLock) | 100% | 32-bit | High-throughput databases |
+| `EmbeddedStaticHeap<N>` | [NoLock](../include/pmm/config.h#pmm::config::NoLock) | — | 32-bit | Embedded without heap (static buffer) |
+| `SmallEmbeddedStaticHeap<N>` | [NoLock](../include/pmm/config.h#pmm::config::NoLock) | — | 16-bit | Tiny embedded, up to ~1 MB |
+| `LargeDBHeap` | [SharedMutexLock](../include/pmm/config.h#pmm::config::SharedMutexLock) | 100% | 64-bit | Petabyte-scale databases |
 
 **Example using a preset:**
 ```cpp
@@ -918,7 +918,7 @@ pmm::presets::SingleThreadedHeap::create(64 * 1024);
 
 ## Data structures
 
-### `BlockView`
+### [BlockView](../include/pmm/types.h#pmm::BlockView)
 
 Describes a block when iterating via `for_each_block()`:
 
@@ -934,7 +934,7 @@ struct BlockView {
 };
 ```
 
-### `FreeBlockView`
+### [FreeBlockView](../include/pmm/types.h#pmm::FreeBlockView)
 
 Describes a free block when iterating via `for_each_free_block()`:
 
@@ -957,13 +957,13 @@ struct FreeBlockView {
 
 | Config struct | Lock | Growth | Storage | Index | Use case |
 |---------------|------|--------|---------|-------|----------|
-| `CacheManagerConfig` | `NoLock` | 25% | `HeapStorage` | 32-bit | Single-threaded cache |
-| `PersistentDataConfig` | `SharedMutexLock` | 25% | `HeapStorage` | 32-bit | Multi-threaded persistent storage |
-| `EmbeddedManagerConfig` | `NoLock` | 50% | `HeapStorage` | 32-bit | Embedded systems |
-| `IndustrialDBConfig` | `SharedMutexLock` | 100% | `HeapStorage` | 32-bit | Industrial databases |
-| `EmbeddedStaticConfig<N>` | `NoLock` | — | `StaticStorage` | 32-bit | Embedded without heap, fixed pool |
-| `SmallEmbeddedStaticConfig<N>` | `NoLock` | — | `StaticStorage` | 16-bit | Tiny embedded, up to ~1 MB |
-| `LargeDBConfig` | `SharedMutexLock` | 100% | `HeapStorage` | 64-bit | Petabyte-scale databases |
+| `CacheManagerConfig` | [NoLock](../include/pmm/config.h#pmm::config::NoLock) | 25% | [HeapStorage](../include/pmm/heap_storage.h#pmm::HeapStorage) | 32-bit | Single-threaded cache |
+| `PersistentDataConfig` | [SharedMutexLock](../include/pmm/config.h#pmm::config::SharedMutexLock) | 25% | [HeapStorage](../include/pmm/heap_storage.h#pmm::HeapStorage) | 32-bit | Multi-threaded persistent storage |
+| `EmbeddedManagerConfig` | [NoLock](../include/pmm/config.h#pmm::config::NoLock) | 50% | [HeapStorage](../include/pmm/heap_storage.h#pmm::HeapStorage) | 32-bit | Embedded systems |
+| `IndustrialDBConfig` | [SharedMutexLock](../include/pmm/config.h#pmm::config::SharedMutexLock) | 100% | [HeapStorage](../include/pmm/heap_storage.h#pmm::HeapStorage) | 32-bit | Industrial databases |
+| `EmbeddedStaticConfig<N>` | [NoLock](../include/pmm/config.h#pmm::config::NoLock) | — | [StaticStorage](../include/pmm/static_storage.h#pmm::StaticStorage) | 32-bit | Embedded without heap, fixed pool |
+| `SmallEmbeddedStaticConfig<N>` | [NoLock](../include/pmm/config.h#pmm::config::NoLock) | — | [StaticStorage](../include/pmm/static_storage.h#pmm::StaticStorage) | 16-bit | Tiny embedded, up to ~1 MB |
+| `LargeDBConfig` | [SharedMutexLock](../include/pmm/config.h#pmm::config::SharedMutexLock) | 100% | [HeapStorage](../include/pmm/heap_storage.h#pmm::HeapStorage) | 64-bit | Petabyte-scale databases |
 
 ---
 
@@ -1005,7 +1005,7 @@ struct FreeBlockView {
 | `load()` with mismatched total size | Returns `false` |
 | `load()` with mismatched granule size | Returns `false` |
 | `allocate_typed<T>()` when out of memory | Auto-expands by growth ratio |
-| `allocate_typed<T>(0)` | Returns null `pptr` |
+| `allocate_typed<T>(0)` | Returns null [pptr](../include/pmm/pptr.h#pmm::pptr) |
 | `deallocate_typed(null pptr)` | No-op |
 | `deallocate` on permanently locked block | No-op |
 | `save_manager(nullptr)` | Returns `false` |
@@ -1013,9 +1013,9 @@ struct FreeBlockView {
 | `load_manager_from_file(nonexistent file)` | Returns `false` |
 | `load_manager_from_file(file > buffer size)` | Returns `false` |
 | `pstringview(nullptr)` | Treated as `""` |
-| `pmap::find(key)` for missing key | Returns null `pptr` |
+| `pmap::find(key)` for missing key | Returns null [pptr](../include/pmm/pptr.h#pmm::pptr) |
 | `pmap::insert(key, val)` for existing key | Updates value |
-| `EmbeddedStaticConfig` backend expansion | Always fails (`StaticStorage::expand()` returns `false`) |
+| `EmbeddedStaticConfig` backend expansion | Always fails ([StaticStorage::expand()](../include/pmm/static_storage.h#pmm::StaticStorage::expand) returns `false`) |
 
 ---
 
@@ -1023,7 +1023,7 @@ struct FreeBlockView {
 
 Thread safety depends on the `lock_policy` in the configuration:
 
-- **`SharedMutexLock`**: All public methods are thread-safe using `std::shared_mutex`.
+- **[SharedMutexLock](../include/pmm/config.h#pmm::config::SharedMutexLock)**: All public methods are thread-safe using `std::shared_mutex`.
   Read operations (`total_size`, `used_size`, `free_size`, `block_count`,
   `free_block_count`, `alloc_block_count`, `for_each_block`, `for_each_free_block`,
   `is_initialized`, `resolve`, `tree_node`, `is_permanently_locked`) acquire a
@@ -1032,13 +1032,13 @@ Thread safety depends on the `lock_policy` in the configuration:
   acquire a `unique_lock`. Note: `tree_node()` returns a reference — writes through
   that reference are not guarded by the manager lock.
 
-- **`NoLock`**: No synchronization is performed. All operations are safe only in
+- **[NoLock](../include/pmm/config.h#pmm::config::NoLock)**: No synchronization is performed. All operations are safe only in
   single-threaded contexts.
 
 > Do **not** call allocate or deallocate from inside `for_each_block` or `for_each_free_block`
-> callbacks — this will deadlock under `SharedMutexLock`.
+> callbacks — this will deadlock under [SharedMutexLock](../include/pmm/config.h#pmm::config::SharedMutexLock).
 
-> `pstringview` and `pmap` are **not** independently thread-safe — their safety depends
+> [pstringview](../include/pmm/pstringview.h#pmm::pstringview) and [pmap](../include/pmm/pmap.h#pmm::pmap) are **not** independently thread-safe — their safety depends
 > entirely on the manager's lock policy.
 
 ---

@@ -1,32 +1,3 @@
-/**
- * @file pmm/typed_guard.h
- * @brief RAII scope-guard for persistent containers.
- *
- * Provides typed_guard<T, ManagerT> — an RAII wrapper that automatically calls
- * the container's cleanup method (free_data() or free_all()) and then
- * ManagerT::destroy_typed() when the guard goes out of scope.
- *
- * This prevents resource leaks when users forget to call free_data()/free_all()
- * before destroy_typed().
- *
- * Usage:
- * @code
- *   using Mgr = pmm::PersistMemoryManager<pmm::CacheManagerConfig>;
- *   Mgr::create(64 * 1024);
- *
- *   {
- *       auto guard = Mgr::make_guard<Mgr::pstring>();
- *       guard->assign("hello");
- *       // ...
- *   } // free_data() + destroy_typed() called automatically
- *
- *   Mgr::destroy();
- * @endcode
- *
- * @see pstring.h, parray.h — containers requiring explicit cleanup
- * @version 0.1
- */
-
 #pragma once
 
 #include <type_traits>
@@ -35,45 +6,37 @@
 namespace pmm
 {
 
-// ─── Concepts for cleanup method detection ──────────────────────
-
-/// @brief Detects types with a free_data() method (pstring, parray).
 template <typename T>
 concept HasFreeData = requires( T& t ) {
     { t.free_data() } noexcept;
 };
 
-/// @brief Detects types with a free_all() method.
 template <typename T>
 concept HasFreeAll = requires( T& t ) {
     { t.free_all() } noexcept;
 };
 
-/// @brief Detects types that need cleanup before destroy_typed().
 template <typename T>
 concept HasPersistentCleanup = HasFreeData<T> || HasFreeAll<T>;
 
-/**
- * @brief RAII scope-guard for persistent typed objects.
- *
- * Calls the appropriate cleanup method (free_data() or free_all()) and then
- * ManagerT::destroy_typed() when the guard goes out of scope.
- *
- * @tparam T        The persistent object type (e.g., pstring, parray).
- * @tparam ManagerT The PersistMemoryManager type.
- */
+/*
+## pmm::typed_guard
+*/
 template <typename T, typename ManagerT> class typed_guard
 {
   public:
+
     using pptr_type = typename ManagerT::template pptr<T>;
 
-    /// @brief Construct a guard owning the given persistent pointer.
+/*
+### pmm::typed_guard::typed_guard
+*/
     explicit typed_guard( pptr_type p ) noexcept : _ptr( p ) {}
 
-    /// @brief Default-construct an empty guard (null pointer).
     typed_guard() noexcept = default;
 
     typed_guard( const typed_guard& )            = delete;
+
     typed_guard& operator=( const typed_guard& ) = delete;
 
     typed_guard( typed_guard&& other ) noexcept : _ptr( other._ptr ) { other._ptr = pptr_type(); }
@@ -91,7 +54,9 @@ template <typename T, typename ManagerT> class typed_guard
 
     ~typed_guard() { reset(); }
 
-    /// @brief Release ownership and clean up resources.
+/*
+### pmm::typed_guard::reset
+*/
     void reset() noexcept
     {
         if ( !_ptr.is_null() )
@@ -102,36 +67,55 @@ template <typename T, typename ManagerT> class typed_guard
         }
     }
 
-    /// @brief Release ownership without cleanup. Returns the raw pptr.
+/*
+### pmm::typed_guard::release
+*/
     pptr_type release() noexcept
     {
+
         pptr_type p = _ptr;
+
         _ptr        = pptr_type();
         return p;
     }
 
-    /// @brief Access the managed object.
+/*
+### pmm::typed_guard::operator_arrow
+*/
     T* operator->() const noexcept { return &( *_ptr ); }
+
+/*
+### pmm::typed_guard::operator_deref
+*/
     T& operator*() const noexcept { return *_ptr; }
 
-    /// @brief Get the underlying pptr.
+/*
+### pmm::typed_guard::get
+*/
     pptr_type get() const noexcept { return _ptr; }
 
-    /// @brief Check if the guard owns a valid object.
+/*
+### pmm::typed_guard::operator_bool
+*/
     explicit operator bool() const noexcept { return !_ptr.is_null(); }
 
   private:
+
     pptr_type _ptr;
 
-    /// @brief Call the appropriate cleanup method based on the container type.
+/*
+### pmm::typed_guard::cleanup
+*/
     static void cleanup( T& obj ) noexcept
     {
         if constexpr ( HasFreeData<T> )
+
             obj.free_data();
         else if constexpr ( HasFreeAll<T> )
+
             obj.free_all();
-        // Types without cleanup methods are simply destroyed via destroy_typed().
+
     }
 };
 
-} // namespace pmm
+}

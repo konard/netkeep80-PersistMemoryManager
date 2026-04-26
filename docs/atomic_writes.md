@@ -12,9 +12,9 @@ the operation completed (or rolled back).
 
 **Scope:** the block FSM described here is the allocator / free-tree physical mutation
 protocol (allocate / deallocate / split / coalesce), not a general forest-node lifecycle.
-Persistent data structures (`pstringview`, `pmap`) build their own AVL trees over the
+Persistent data structures ([pstringview](../include/pmm/pstringview.h#pmm::pstringview), [pmap](../include/pmm/pmap.h#pmm::pmap)) build their own AVL trees over the
 same block headers but do **not** traverse `FreeBlock ↔ AllocatedBlock`: their blocks
-remain `AllocatedBlock` from the allocator's point of view. On `load()`, only the
+remain [AllocatedBlock](../include/pmm/block_state.h#pmm::AllocatedBlock) from the allocator's point of view. On `load()`, only the
 free-block AVL tree is rebuilt; user-data AVL trees must be managed by the user across
 process restarts.
 
@@ -62,10 +62,10 @@ The `granule_size` field is checked on `load()`: if it does not match the compil
   Bytes 28–31: next_offset   — next block (granule index)
 ```
 
-**Note:** The `TreeNode` fields (`left_offset`, `right_offset`, `parent_offset`,
+**Note:** The [TreeNode](../include/pmm/tree_node.h#pmm::TreeNode) fields (`left_offset`, `right_offset`, `parent_offset`,
 `avl_height`) are shared between two separate tree uses:
 1. **Free-block AVL tree** — used by the allocator when `weight == 0` (block is free).
-2. **User-data AVL trees** — used by `pstringview` and `pmap` when `weight > 0` (block
+2. **User-data AVL trees** — used by [pstringview](../include/pmm/pstringview.h#pmm::pstringview) and [pmap](../include/pmm/pmap.h#pmm::pmap) when `weight > 0` (block
    is allocated and permanently locked or in a user-managed data structure).
 These two uses are mutually exclusive by the block state machine invariants.
 
@@ -119,7 +119,7 @@ bool is_valid_block(const uint8_t* base, const ManagerHeader* hdr, uint32_t idx)
 }
 ```
 
-**Note:** For allocated blocks used as `pstringview` or `pmap` nodes, the AVL pointer
+**Note:** For allocated blocks used as [pstringview](../include/pmm/pstringview.h#pmm::pstringview) or [pmap](../include/pmm/pmap.h#pmm::pmap) nodes, the AVL pointer
 fields contain user-data tree links (not the free-block tree). These are not validated
 by `is_valid_block` — they are managed exclusively by the user-data data structure.
 
@@ -408,12 +408,12 @@ FreeBlock                    ← correct: weight=0, root_offset=0, in AVL
 
 | State | `weight` | `root_offset` | In AVL | Valid? | Notes |
 |-------|----------|---------------|--------|--------|-------|
-| `FreeBlock` | 0 | 0 | Yes | ✅ | Correct — free block |
-| `AllocatedBlock` | >0 | own idx | No | ✅ | Correct — allocated block |
-| `FreeBlockRemovedAVL` | 0 | 0 | No | ⚠️ | Transient — only during allocate |
-| `FreeBlockNotInAVL` | 0 | 0 | No | ⚠️ | Transient — only during deallocate |
-| `SplittingBlock` | 0 | 0 | No | ⚠️ | Transient — during split in allocate |
-| `CoalescingBlock` | 0 | 0 | No | ⚠️ | Transient — during coalesce in deallocate |
+| [FreeBlock](../include/pmm/block_state.h#pmm::FreeBlock) | 0 | 0 | Yes | ✅ | Correct — free block |
+| [AllocatedBlock](../include/pmm/block_state.h#pmm::AllocatedBlock) | >0 | own idx | No | ✅ | Correct — allocated block |
+| [FreeBlockRemovedAVL](../include/pmm/block_state.h#pmm::FreeBlockRemovedAVL) | 0 | 0 | No | ⚠️ | Transient — only during allocate |
+| [FreeBlockNotInAVL](../include/pmm/block_state.h#pmm::FreeBlockNotInAVL) | 0 | 0 | No | ⚠️ | Transient — only during deallocate |
+| [SplittingBlock](../include/pmm/block_state.h#pmm::SplittingBlock) | 0 | 0 | No | ⚠️ | Transient — during split in allocate |
+| [CoalescingBlock](../include/pmm/block_state.h#pmm::CoalescingBlock) | 0 | 0 | No | ⚠️ | Transient — during coalesce in deallocate |
 | — | 0 | ≠0 | — | ❌ | Invalid — contradiction |
 | — | >0 | 0 | — | ❌ | Invalid — contradiction |
 | — | >0 | own idx | Yes | ❌ | Invalid — allocated block in AVL |
@@ -474,8 +474,8 @@ public:
 
 | Transient state | Detection | Recovery |
 |-----------------|-----------|----------|
-| `FreeBlockRemovedAVL` | `weight=0`, `root_offset=0`, not reachable in AVL after rebuild | `avl_insert(idx)` |
-| `FreeBlockNotInAVL` | Same as above | `avl_insert(idx)` |
+| [FreeBlockRemovedAVL](../include/pmm/block_state.h#pmm::FreeBlockRemovedAVL) | `weight=0`, `root_offset=0`, not reachable in AVL after rebuild | `avl_insert(idx)` |
+| [FreeBlockNotInAVL](../include/pmm/block_state.h#pmm::FreeBlockNotInAVL) | Same as above | `avl_insert(idx)` |
 | Partial coalesce | Forward/backward inconsistency in linked list | `repair_linked_list()` |
 
 ### Crash recovery guarantees by interruption scenario
@@ -503,9 +503,9 @@ point**, where partially completed allocation operations are treated as "not per
 
 ---
 
-## User-data AVL trees (`pstringview`, `pmap`)
+## User-data AVL trees ([pstringview](../include/pmm/pstringview.h#pmm::pstringview), [pmap](../include/pmm/pmap.h#pmm::pmap))
 
-`pstringview` and `pmap` use the same `TreeNode` fields inside allocated blocks to
+[pstringview](../include/pmm/pstringview.h#pmm::pstringview) and [pmap](../include/pmm/pmap.h#pmm::pmap) use the same [TreeNode](../include/pmm/tree_node.h#pmm::TreeNode) fields inside allocated blocks to
 organize their own AVL trees. This is entirely separate from the free-block AVL tree.
 
 ### Persistence of user-data trees
@@ -513,24 +513,24 @@ organize their own AVL trees. This is entirely separate from the free-block AVL 
 `load()` rebuilds the **free-block** AVL tree and validates the forest-domain registry.
 User-data AVL roots are restored through their domain bindings:
 
-1. **`pstringview` interning dictionary**: The `pstringview` blocks themselves are
+1. **[pstringview](../include/pmm/pstringview.h#pmm::pstringview) interning dictionary**: The [pstringview](../include/pmm/pstringview.h#pmm::pstringview) blocks themselves are
    preserved in the image (they are permanently locked), and the dictionary root lives in
    the `system/symbols` domain record.
 
-2. **`pmap` dictionary**: `pmap` is a typed facade over type-scoped
+2. **[pmap](../include/pmm/pmap.h#pmm::pmap) dictionary**: [pmap](../include/pmm/pmap.h#pmm::pmap) is a typed facade over type-scoped
    `container/pmap/<type>/<binding>` forest domains. Store application ownership through
-   named domain identities rather than by persisting a local `pmap` root field.
+   named domain identities rather than by persisting a local [pmap](../include/pmm/pmap.h#pmm::pmap) root field.
 
 ### Crash consistency of user-data AVL operations
 
-User-data AVL operations (insert via `pmap::insert`, `pstringview::intern`) are
+User-data AVL operations (insert via [pmap::insert](../include/pmm/pmap.h#pmm::pmap::insert), [pstringview::intern](../include/pmm/pstringview.h#pmm::pstringview::intern)) are
 **non-critical** with respect to memory structure recovery, because:
 
 - All node blocks remain reachable via the linked list (allocated, `weight > 0`).
 - `rebuild_free_tree()` correctly skips allocated blocks.
 - A partially completed AVL rotation leaves the blocks allocated and reachable.
 
-However, a partially completed `pmap::insert` or `pstringview::intern` may leave the
+However, a partially completed [pmap::insert](../include/pmm/pmap.h#pmm::pmap::insert) or [pstringview::intern](../include/pmm/pstringview.h#pmm::pstringview::intern) may leave the
 user-data tree in an inconsistent state (e.g., a new key not yet linked). This is
 **not** automatically repaired by `load()`. The application must handle this if crash
 consistency is required (e.g., via WAL at the application level).

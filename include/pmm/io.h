@@ -1,18 +1,3 @@
-/**
- * @file pmm/io.h
- * @brief Утилиты файлового ввода/вывода для PersistMemoryManager
- *
- * Save/load helpers for a manager image.
- *
- * save_manager copies a locked manager snapshot, stores ManagerHeader.crc32 in
- * the copy, writes through filename + ".tmp", fsyncs the temp file, then uses
- * an atomic rename and fsyncs the parent directory where supported.
- * load_manager_from_file requires VerifyResult& and verifies CRC before
- * loading manager state.
- *
- * @version 0.3
- */
-
 #pragma once
 
 #include "pmm/diagnostics.h"
@@ -34,7 +19,7 @@
 #include <io.h>
 #include <windows.h>
 #else
-#include <cstdlib> // std::rename (POSIX)
+#include <cstdlib>
 #include <fcntl.h>
 #include <unistd.h>
 #endif
@@ -45,10 +30,6 @@ namespace pmm
 namespace detail
 {
 
-/// @brief Atomic file rename (write-then-rename pattern).
-/// On POSIX: std::rename is atomic if source and dest are on the same filesystem.
-/// On Windows: MoveFileExA with MOVEFILE_REPLACE_EXISTING and MOVEFILE_WRITE_THROUGH.
-/// @return true on success.
 inline bool atomic_rename( const char* tmp_path, const char* final_path ) noexcept
 {
 #if defined( _WIN32 ) || defined( _WIN64 )
@@ -58,7 +39,6 @@ inline bool atomic_rename( const char* tmp_path, const char* final_path ) noexce
 #endif
 }
 
-/// @brief Flush stdio buffers and force the temporary file contents to stable storage.
 inline bool flush_file_to_storage( std::FILE* file ) noexcept
 {
     if ( file == nullptr )
@@ -87,7 +67,6 @@ inline std::string parent_directory_path( const char* path )
 }
 #endif
 
-/// @brief Flush the directory entry that makes the atomic rename durable, where supported.
 inline bool flush_parent_directory( const char* path )
 {
 #if defined( _WIN32 ) || defined( _WIN64 )
@@ -109,27 +88,8 @@ inline bool flush_parent_directory( const char* path )
 #endif
 }
 
-} // namespace detail
+}
 
-/**
- * @brief Сохранить образ PersistMemoryManager в файл.
- *
- * Takes the manager lock, copies a stable snapshot of the entire managed
- * region, computes CRC32 over that snapshot (treating the crc32 field as zero),
- * and stores the checksum only in the snapshot before writing.
- *
- * Uses atomic write-then-rename — writes to "filename.tmp",
- * fsyncs the temp file, then renames to "filename" on success. On POSIX the
- * parent directory is also fsynced after rename. If the process crashes before
- * rename, the original file remains intact.
- *
- * @tparam MgrT    Тип статического менеджера (PersistMemoryManager<ConfigT, Id>).
- * @param filename Путь к выходному файлу.
- * @return true при успешной записи, false при ошибке ввода/вывода или если не инициализирован.
- *
- * Предусловие:  filename != nullptr, MgrT::is_initialized() == true.
- * Постусловие: файл содержит консистентную копию управляемой области памяти с CRC32.
- */
 template <typename MgrT> inline bool save_manager( const char* filename )
 {
     using address_traits = typename MgrT::address_traits;
@@ -153,7 +113,6 @@ template <typename MgrT> inline bool save_manager( const char* filename )
     auto* hdr  = detail::manager_header_at<address_traits>( snapshot.data() );
     hdr->crc32 = detail::compute_image_crc32<address_traits>( snapshot.data(), snapshot.size() );
 
-    // Atomic save — write to temp file, then rename.
     std::string tmp_path = std::string( filename ) + ".tmp";
 
     std::FILE* f = std::fopen( tmp_path.c_str(), "wb" );
@@ -173,7 +132,6 @@ template <typename MgrT> inline bool save_manager( const char* filename )
         return false;
     }
 
-    // Atomic rename: tmp → final
     if ( !detail::atomic_rename( tmp_path.c_str(), filename ) )
     {
         std::remove( tmp_path.c_str() );
@@ -184,26 +142,6 @@ template <typename MgrT> inline bool save_manager( const char* filename )
     return true;
 }
 
-/**
- * @brief Загрузить образ менеджера из файла в PersistMemoryManager с диагностикой.
- *
- * Читает файл, записанный функцией save_manager(), в буфер менеджера,
- * затем вызывает MgrT::load(result) для проверки заголовка и восстановления состояния.
- * Все обнаруженные нарушения и выполненные исправления записываются в result.
- *
- * If the CRC does not match, returns false without modifying manager state.
- *
- * Примечание: бэкенд менеджера должен уже иметь выделенный буфер достаточного размера.
- * Для HeapStorage вызовите MgrT::create(size) перед load_manager_from_file().
- *
- * @tparam MgrT    Тип статического менеджера (PersistMemoryManager<ConfigT, Id>).
- * @param filename Путь к файлу с образом.
- * @param result   VerifyResult, заполняемый обнаруженными нарушениями и выполненными исправлениями.
- * @return true при успешной загрузке, false при ошибке.
- *
- * Предусловие:  filename != nullptr, MgrT::backend().base_ptr() != nullptr.
- * Постусловие: менеджер восстановлен из файла, result содержит полную диагностику.
- */
 template <typename MgrT> inline bool load_manager_from_file( const char* filename, VerifyResult& result )
 {
     using address_traits = typename MgrT::address_traits;
@@ -246,7 +184,6 @@ template <typename MgrT> inline bool load_manager_from_file( const char* filenam
     if ( read_bytes != file_size )
         return false;
 
-    // Verify CRC32 before calling load().
     constexpr std::size_t kHdrOffset = detail::manager_header_offset_bytes_v<address_traits>;
     if ( file_size >= kHdrOffset + sizeof( detail::ManagerHeader<address_traits> ) )
     {
@@ -264,4 +201,4 @@ template <typename MgrT> inline bool load_manager_from_file( const char* filenam
     return MgrT::load( result );
 }
 
-} // namespace pmm
+}

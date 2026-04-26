@@ -1,21 +1,3 @@
-/**
- * @file pmm/mmap_storage.h
- * @brief MMapStorage — бэкенд хранилища через отображение файла.
- *
- * Отображает файл в память через `mmap` (POSIX) или `MapViewOfFile` (Windows).
- * Обеспечивает персистентность данных между запусками приложения.
- *
- * Расширение (expand()): не поддерживается в базовой реализации
- * (требует пересоздания отображения, что зависит от ОС).
- *
- * Применение: персистентные базы данных, разделяемая память между процессами.
- *
- * @tparam AddressTraitsT Traits адресного пространства (из address_traits.h).
- *
- * @see storage_backend.h — концепт StorageBackend
- * @version 0.1
- */
-
 #pragma once
 
 #include "pmm/address_traits.h"
@@ -43,106 +25,123 @@
 namespace pmm
 {
 
-/**
- * @brief Бэкенд хранилища через отображение файла в память.
- *
- * Открывает файл, отображает его в адресное пространство процесса.
- * При создании нового файла инициализирует его нулями.
- *
- * @tparam AddressTraitsT Traits адресного пространства.
- */
+/*
+## pmm::MMapStorage
+*/
 template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage
 {
   public:
+
     using address_traits = AddressTraitsT;
 
+/*
+### pmm::MMapStorage::MMapStorage
+*/
     MMapStorage() noexcept = default;
 
     MMapStorage( const MMapStorage& )            = delete;
+
     MMapStorage& operator=( const MMapStorage& ) = delete;
 
     MMapStorage( MMapStorage&& other ) noexcept
+
+/*
+### pmm::MMapStorage::_base
+*/
         : _base( other._base ), _size( other._size ), _mapped( other._mapped )
 #if defined( _WIN32 ) || defined( _WIN64 )
           ,
+
+/*
+### pmm::MMapStorage::_file_handle
+*/
           _file_handle( other._file_handle ), _map_handle( other._map_handle )
 #else
           ,
+
+/*
+### pmm::MMapStorage::_fd
+*/
           _fd( other._fd )
 #endif
     {
+
         other._base   = nullptr;
+
         other._size   = 0;
+
         other._mapped = false;
 #if defined( _WIN32 ) || defined( _WIN64 )
+
         other._file_handle = INVALID_HANDLE_VALUE;
+
         other._map_handle  = nullptr;
 #else
+
         other._fd = -1;
 #endif
     }
 
     ~MMapStorage() { close(); }
 
-    /**
-     * @brief Открыть или создать файл и отобразить его в память.
-     *
-     * @param path       Путь к файлу.
-     * @param size_bytes Размер отображения в байтах (при создании = размер файла).
-     *                   Должен быть кратен granule_size и > 0.
-     * @return true при успехе.
-     */
+/*
+### pmm::MMapStorage::open
+*/
     bool open( const char* path, std::size_t size_bytes ) noexcept
     {
         if ( _mapped )
-            return false; // уже открыт
+            return false;
         if ( path == nullptr || size_bytes == 0 )
             return false;
-        // Выравниваем по granule_size
+
         size_bytes = ( ( size_bytes + AddressTraitsT::granule_size - 1 ) / AddressTraitsT::granule_size ) *
+
                      AddressTraitsT::granule_size;
         return open_impl( path, size_bytes );
     }
 
-    /// @brief Закрыть отображение и файл.
+/*
+### pmm::MMapStorage::close
+*/
     void close() noexcept
     {
         if ( !_mapped )
+
             return;
+
         close_impl();
         _base   = nullptr;
         _size   = 0;
         _mapped = false;
     }
 
-    /// @brief true, если файл успешно отображён.
+/*
+### pmm::MMapStorage::is_open
+*/
     bool is_open() const noexcept { return _mapped; }
 
-    /// @brief Указатель на начало отображения.
+/*
+### pmm::MMapStorage::base_ptr
+*/
     std::uint8_t*       base_ptr() noexcept { return _base; }
     const std::uint8_t* base_ptr() const noexcept { return _base; }
 
-    /// @brief Размер отображения в байтах.
+/*
+### pmm::MMapStorage::total_size
+*/
     std::size_t total_size() const noexcept { return _size; }
 
-    /**
-     * @brief Расширить отображённый файл на additional_bytes.
-     *
-     * Расширяет файл через ftruncate/SetEndOfFile, затем пересоздаёт отображение.
-     * После expand() base_ptr() возвращает новый адрес — все ранее полученные
-     * указатели на данные становятся невалидными.
-     *
-     * @param additional_bytes Минимальный прирост в байтах.
-     * @return true при успехе, false при ошибке (отображение остаётся в прежнем состоянии).
-     */
+/*
+### pmm::MMapStorage::expand
+*/
     bool expand( std::size_t additional_bytes ) noexcept
     {
         if ( !_mapped || additional_bytes == 0 )
             return _mapped && additional_bytes == 0;
-        // Grow by 25% or by additional_bytes, whichever is larger
+
         std::size_t growth   = _size / 4 + additional_bytes;
         std::size_t new_size = _size + growth;
-        // Align to granule_size
+
         new_size = ( ( new_size + AddressTraitsT::granule_size - 1 ) / AddressTraitsT::granule_size ) *
                    AddressTraitsT::granule_size;
         if ( new_size <= _size )
@@ -150,24 +149,30 @@ template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage
         return expand_impl( new_size );
     }
 
-    /**
-     * @brief MMapStorage не владеет памятью в смысле malloc/free
-     *        (отображение управляется ОС).
-     * @return false (отображение освобождается через munmap/UnmapViewOfFile в close()).
-     */
+/*
+### pmm::MMapStorage::owns_memory
+*/
     bool owns_memory() const noexcept { return false; }
 
   private:
 #if defined( _WIN32 ) || defined( _WIN64 )
+
     std::uint8_t* _base        = nullptr;
     std::size_t   _size        = 0;
+
     bool          _mapped      = false;
     HANDLE        _file_handle = INVALID_HANDLE_VALUE;
+
     HANDLE        _map_handle  = nullptr;
 
+/*
+### pmm::MMapStorage::open_impl
+*/
     bool open_impl( const char* path, std::size_t size_bytes ) noexcept
     {
+
         _file_handle = CreateFileA( path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+
                                     OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr );
         if ( _file_handle == INVALID_HANDLE_VALUE )
             return false;
@@ -194,6 +199,7 @@ template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage
 
         DWORD size_hi = static_cast<DWORD>( size_bytes >> 32 );
         DWORD size_lo = static_cast<DWORD>( size_bytes & 0xFFFFFFFF );
+
         _map_handle   = CreateFileMappingA( _file_handle, nullptr, PAGE_READWRITE, size_hi, size_lo, nullptr );
         if ( _map_handle == nullptr )
         {
@@ -218,6 +224,9 @@ template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage
         return true;
     }
 
+/*
+### pmm::MMapStorage::close_impl
+*/
     void close_impl() noexcept
     {
         if ( _base != nullptr )
@@ -237,10 +246,12 @@ template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage
         }
     }
 
-    /// Expand the mapped file to new_size bytes.
+/*
+### pmm::MMapStorage::expand_impl
+*/
     bool expand_impl( std::size_t new_size ) noexcept
     {
-        // Flush and unmap current view
+
         if ( _base != nullptr )
         {
             FlushViewOfFile( _base, _size );
@@ -253,12 +264,12 @@ template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage
             _map_handle = nullptr;
         }
 
-        // Resize file
         LARGE_INTEGER new_size_li{};
+
         new_size_li.QuadPart = static_cast<LONGLONG>( new_size );
         if ( !SetFilePointerEx( _file_handle, new_size_li, nullptr, FILE_BEGIN ) || !SetEndOfFile( _file_handle ) )
         {
-            // Cannot resize — try to remap at old size
+
             DWORD hi    = static_cast<DWORD>( _size >> 32 );
             DWORD lo    = static_cast<DWORD>( _size & 0xFFFFFFFF );
             _map_handle = CreateFileMappingA( _file_handle, nullptr, PAGE_READWRITE, hi, lo, nullptr );
@@ -271,7 +282,6 @@ template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage
             return false;
         }
 
-        // Create new mapping at new size
         DWORD size_hi = static_cast<DWORD>( new_size >> 32 );
         DWORD size_lo = static_cast<DWORD>( new_size & 0xFFFFFFFF );
         _map_handle   = CreateFileMappingA( _file_handle, nullptr, PAGE_READWRITE, size_hi, size_lo, nullptr );
@@ -291,7 +301,7 @@ template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage
         return true;
     }
 
-#else  // POSIX
+#else
 
     std::uint8_t* _base   = nullptr;
     std::size_t   _size   = 0;
@@ -300,11 +310,14 @@ template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage
 
     bool open_impl( const char* path, std::size_t size_bytes ) noexcept
     {
+
         _fd = ::open( path, O_RDWR | O_CREAT, 0600 );
         if ( _fd < 0 )
             return false;
 
-        // Ensure file is at least size_bytes
+/*
+## pmm::MMapStorage::stat
+*/
         struct stat st
         {
         };
@@ -342,6 +355,7 @@ template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage
     void close_impl() noexcept
     {
         if ( _base != nullptr )
+
             ::munmap( _base, _size );
         if ( _fd >= 0 )
         {
@@ -350,27 +364,24 @@ template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage
         }
     }
 
-    /// Expand the mapped file to new_size bytes.
     bool expand_impl( std::size_t new_size ) noexcept
     {
-        // Unmap current mapping
+
         if ( _base != nullptr )
         {
             ::munmap( _base, _size );
             _base = nullptr;
         }
 
-        // Extend the file
         if ( ::ftruncate( _fd, static_cast<off_t>( new_size ) ) != 0 )
         {
-            // Remap at old size on failure
+
             void* addr = ::mmap( nullptr, _size, PROT_READ | PROT_WRITE, MAP_SHARED, _fd, 0 );
             if ( addr != MAP_FAILED )
                 _base = static_cast<std::uint8_t*>( addr );
             return false;
         }
 
-        // Remap at new size
         void* addr = ::mmap( nullptr, new_size, PROT_READ | PROT_WRITE, MAP_SHARED, _fd, 0 );
         if ( addr == MAP_FAILED )
             return false;
@@ -379,11 +390,9 @@ template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage
         _size = new_size;
         return true;
     }
-#endif // _WIN32
+#endif
 };
-
-// ─── static_assert: MMapStorage соответствует концепту StorageBackend ──────────
 
 static_assert( is_storage_backend_v<MMapStorage<>>, "MMapStorage must satisfy StorageBackendConcept" );
 
-} // namespace pmm
+}

@@ -1,20 +1,3 @@
-/**
- * @file pmm/forest_domain_mixin.inc
- * @brief Private forest/domain registry methods for PersistMemoryManager.
- *
- * This file is textually included inside the private section of
- * PersistMemoryManager<ConfigT, InstanceId>. It is NOT a standalone
- * translation unit — all type aliases, static members, and helper
- * functions from the enclosing class are available without qualification.
- *
- * Extracted to keep persist_memory_manager.h under the 1500-line CI limit.
- *
- * @see persist_memory_manager.h
- * @see forest_registry.h
- */
-
-// ─── Forest registry accessor ────────────────────────────────────────────────
-
 static forest_registry* forest_registry_root_unlocked() noexcept
 {
     if ( !_initialized || _backend.base_ptr() == nullptr )
@@ -30,8 +13,6 @@ static forest_registry* forest_registry_root_unlocked() noexcept
         return nullptr;
     return reg;
 }
-
-// ─── Domain lookup helpers ────────────────────────────────────────────────────
 
 static forest_domain* find_domain_by_name_unlocked( const char* name ) noexcept
 {
@@ -112,14 +93,10 @@ static bool set_forest_domain_root_index_unlocked( forest_domain* rec, index_typ
     return true;
 }
 
-// ─── Canonical system domain records ─────────────────────────────────────────
-
 static forest_domain* symbol_domain_record_unlocked() noexcept
 {
     return find_domain_by_name_unlocked( detail::kSystemDomainSymbols );
 }
-
-// ─── Domain registration ─────────────────────────────────────────────────────
 
 static bool register_domain_unlocked( const char* name, std::uint8_t flags, std::uint8_t binding_kind,
                                       index_type initial_root ) noexcept
@@ -168,8 +145,6 @@ static bool register_domain_unlocked( const char* name, std::uint8_t flags, std:
     return true;
 }
 
-// ─── Symbol interning ─────────────────────────────────────────────────────────
-
 static pptr<pstringview> intern_symbol_unlocked( const char* s ) noexcept
 {
     if ( s == nullptr )
@@ -196,7 +171,7 @@ static pptr<pstringview> intern_symbol_unlocked( const char* s ) noexcept
         deallocate_unlocked( raw );
         return pptr<pstringview>();
     }
-    // Use memcpy to avoid UB on potentially misaligned raw pointer (ASan/UBSan fix).
+
     std::memcpy( public_raw, &len, sizeof( len ) );
     char* str_dst = static_cast<char*>( public_raw ) + offsetof( pstringview, str );
     std::memcpy( str_dst, s, static_cast<std::size_t>( len ) + 1 );
@@ -209,8 +184,6 @@ static pptr<pstringview> intern_symbol_unlocked( const char* s ) noexcept
 
     return new_node;
 }
-
-// ─── Bootstrap: system symbols ────────────────────────────────────────────────
 
 static bool bootstrap_system_symbols_unlocked() noexcept
 {
@@ -243,8 +216,6 @@ static bool bootstrap_system_symbols_unlocked() noexcept
 
     return true;
 }
-
-// ─── Bootstrap: create forest registry root ───────────────────────────────────
 
 static bool bootstrap_forest_registry_unlocked() noexcept
 {
@@ -315,9 +286,6 @@ static bool bootstrap_forest_registry_unlocked() noexcept
     return true;
 }
 
-// ─── Bootstrap: invariant verification ───────────────────────────
-
-/// @brief Verify that all bootstrap invariants hold.
 static bool validate_bootstrap_invariants_unlocked() noexcept
 {
     if ( !_initialized )
@@ -326,7 +294,7 @@ static bool validate_bootstrap_invariants_unlocked() noexcept
     if ( base == nullptr )
         return false;
     const auto* hdr = get_header_c( base );
-    // 1. Manager header valid
+
     if ( hdr->magic != kMagic )
         return false;
     if ( hdr->image_version != detail::kCurrentImageVersion )
@@ -335,7 +303,7 @@ static bool validate_bootstrap_invariants_unlocked() noexcept
         return false;
     if ( hdr->granule_size != static_cast<std::uint16_t>( address_traits::granule_size ) )
         return false;
-    // 2. Forest registry exists and is valid
+
     const forest_registry* reg = forest_registry_root_unlocked();
     if ( reg == nullptr )
         return false;
@@ -344,8 +312,8 @@ static bool validate_bootstrap_invariants_unlocked() noexcept
     if ( reg->version != detail::kForestRegistryVersion )
         return false;
     if ( reg->domain_count < 4 )
-        return false; // at least free_tree, symbols, registry, domain_root
-    // 3. System domains present with correct flags
+        return false;
+
     static constexpr const char* kRequired[] = { detail::kSystemDomainFreeTree, detail::kSystemDomainSymbols,
                                                  detail::kSystemDomainRegistry, detail::kServiceNameDomainRoot };
     for ( const char* name : kRequired )
@@ -356,16 +324,16 @@ static bool validate_bootstrap_invariants_unlocked() noexcept
         if ( ( rec->flags & detail::kForestDomainFlagSystem ) == 0 )
             return false;
         if ( rec->symbol_offset == 0 )
-            return false; // symbol must be interned
+            return false;
     }
-    // 4. Free tree domain has binding kind kForestBindingFreeTree
+
     const forest_domain* free_rec = find_domain_by_name_unlocked( detail::kSystemDomainFreeTree );
     if ( free_rec->binding_kind != detail::kForestBindingFreeTree )
         return false;
-    // 5. Symbol dictionary root is non-zero (at least bootstrap symbols exist)
+
     if ( pstringview::forest_domain_ops().root_index() == 0 )
         return false;
-    // 6. Registry domain root matches header root_offset
+
     const forest_domain* reg_rec = find_domain_by_name_unlocked( detail::kSystemDomainRegistry );
     if ( reg_rec->root_offset != hdr->root_offset )
         return false;
@@ -374,8 +342,6 @@ static bool validate_bootstrap_invariants_unlocked() noexcept
         return false;
     return true;
 }
-
-// ─── Bootstrap: validate or create forest registry on load ────────────────────
 
 static bool validate_or_bootstrap_forest_registry_unlocked() noexcept
 {
@@ -403,15 +369,12 @@ static bool validate_or_bootstrap_forest_registry_unlocked() noexcept
     return bootstrap_forest_registry_unlocked();
 }
 
-// ─── Free block tree traversal ────────────────────────────────────────────────
-
-/// @brief Recursive in-order traversal of the AVL free block tree.
 template <typename Callback>
 static void for_each_free_block_inorder( const std::uint8_t* base, const detail::ManagerHeader<address_traits>* hdr,
                                          index_type node_idx, int depth, Callback&& callback ) noexcept
 {
     using BlockState = BlockStateBase<address_traits>;
-    // Use address_traits::granule_size for correct byte offset computations.
+
     static constexpr std::size_t kGranSz = address_traits::granule_size;
     if ( node_idx == address_traits::no_block )
         return;
@@ -424,10 +387,8 @@ static void for_each_free_block_inorder( const std::uint8_t* base, const detail:
     index_type right_off  = BlockState::get_right_offset( blk_raw );
     index_type parent_off = BlockState::get_parent_offset( blk_raw );
 
-    // Visit left subtree first (smaller blocks)
     for_each_free_block_inorder( base, hdr, left_off, depth + 1, callback );
 
-    // Visit current node
     index_type    total_gran = detail::block_total_granules( base, hdr, blk );
     FreeBlockView view;
     view.offset        = static_cast<std::ptrdiff_t>( static_cast<std::size_t>( node_idx ) * kGranSz );
@@ -446,12 +407,9 @@ static void for_each_free_block_inorder( const std::uint8_t* base, const detail:
     view.avl_depth     = depth;
     callback( view );
 
-    // Visit right subtree (larger blocks)
     for_each_free_block_inorder( base, hdr, right_off, depth + 1, callback );
 }
 
-/// @brief Find the mutable block header for a user-data pointer (or nullptr).
-/// @pre Caller holds the manager lock, or block links are otherwise stable for canonical raw-pointer validation.
 static pmm::Block<address_traits>* find_block_from_user_ptr( void* ptr ) noexcept
 {
     std::uint8_t*                          base = _backend.base_ptr();
@@ -479,9 +437,6 @@ static pmm::Block<address_traits>* find_block_from_user_ptr( void* ptr ) noexcep
     return detail::header_from_ptr_t<address_traits>( base, ptr, static_cast<std::size_t>( hdr->total_size ) );
 }
 
-/// @brief Find the const block header for a user-data pointer.
-/// @pre Caller holds the manager lock, or block links are otherwise stable for canonical raw-pointer validation.
-/// Returns nullptr if ptr is out of range or the block header is invalid.
 static const pmm::Block<address_traits>* find_block_from_user_ptr( const void* ptr ) noexcept
 {
     const std::uint8_t* base = _backend.base_ptr();
@@ -510,11 +465,6 @@ static const pmm::Block<address_traits>* find_block_from_user_ptr( const void* p
                                                       static_cast<std::size_t>( hdr->total_size ) );
 }
 
-// ─── raw ↔ pptr helpers ───────────────────────────────────────
-
-/// @brief Convert a raw user-data pointer returned by allocate() into a canonical public pptr<T>.
-/// Caller must ensure raw != nullptr and _initialized before calling.
-/// Returns null pptr if the pointer is not within the managed region.
 template <typename T> static pptr<T> make_pptr_from_raw( void* raw ) noexcept
 {
     if ( raw == nullptr || !_initialized )
@@ -551,11 +501,6 @@ template <typename T> static pptr<T> make_pptr_from_raw( void* raw ) noexcept
     return pptr<T>( static_cast<index_type>( blk_idx + kBlockHdrGranules ) );
 }
 
-// ─── blk_raw helpers ──────────────────────────────────────────
-// base + (offset - kBlockHdrGranules) * granule_size → block header before public user data.
-
-/// @brief Return a const pointer to the block header for the given pptr.
-/// Returns nullptr if offset is invalid (would place block header before base).
 template <typename T> static const void* block_raw_ptr_from_pptr( pptr<T> p ) noexcept
 {
     const std::uint8_t* base = _backend.base_ptr();
@@ -567,8 +512,6 @@ template <typename T> static const void* block_raw_ptr_from_pptr( pptr<T> p ) no
     return base + blk_off;
 }
 
-/// @brief Return a mutable pointer to the block header for the given pptr.
-/// Returns nullptr if offset is invalid (would place block header before base).
 template <typename T> static void* block_raw_mut_ptr_from_pptr( pptr<T> p ) noexcept
 {
     std::uint8_t* base = _backend.base_ptr();

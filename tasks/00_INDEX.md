@@ -1,6 +1,6 @@
 # PMM compactification backlog — index
 
-Этот пакет заменяет старый backlog 01–10 новым планом для **промежуточной компактификации** `PersistMemoryManager`.
+Этот пакет заменяет старый backlog 01–10 новым планом для **промежуточной компактификации** [PersistMemoryManager](../include/pmm/persist_memory_manager.h#pmm::PersistMemoryManager).
 
 Смысл этого этапа:
 - сначала **сжать и упорядочить** репозиторий;

@@ -38,41 +38,6 @@
 
 #pragma once
 
-/**
- * @file pmm/address_traits.h
- * @brief AddressTraits — адресное пространство ПАП.
- *
- * Параметризует три взаимосвязанные характеристики адресного пространства:
- *   - `index_type`   — тип гранульного индекса (uint16_t / uint32_t / uint64_t)
- *   - `granule_size` — размер гранулы в байтах (степень двойки, минимум 4)
- *   - `no_block`     — sentinel «нет блока» = максимальное значение index_type
- *
- * Поддерживаемые размеры индекса:
- *   - uint16_t (SmallAddressTraits,   16B гранула) — до ~1 МБ, малые embedded-системы.
- *   - uint32_t (DefaultAddressTraits, 16B гранула) — до 64 ГБ, основной вариант.
- *   - uint64_t (LargeAddressTraits,   64B гранула) — до петабайт, крупные БД.
- *
- * Правила выбора конфигурации:
- *   1. granule_size >= 4 (минимальный размер слова архитектуры = kMinGranuleSize в manager_configs.h).
- *   2. granule_size — степень двойки.
- *   3. Для минимального расхода памяти выбирайте конфигурации без потерь:
- *      DefaultAddressTraits (Block=32B, granule=16B, 0 байт потерь на блок),
- *      LargeAddressTraits   (Block=64B, granule=64B, 0 байт потерь на блок).
- *      SmallAddressTraits допустима, но с потерями (Block=18B, granule=16B,
- *      ceil(18/16)=2 гранулы выделяется под заголовок = 14 байт потерь на блок).
- *
- * Недопустимые конфигурации:
- *   - uint8_t индекс (TinyAddressTraits удалена): максимум 255 гранул — практически
- *     непригодно для реальных сценариев использования менеджера ПАП.
- *
- * Обратная совместимость:
- *   pmm::kGranuleSize и pmm::detail::kNoBlock остаются в persist_memory_types.h,
- *   но теперь выводятся из DefaultAddressTraits через static_assert.
- *
- * @see manager_configs.h — ValidPmmAddressTraits концепт и правила конфигурации
- * @version 0.2
- */
-
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -82,128 +47,73 @@
 namespace pmm
 {
 
-/**
- * @brief Traits адресного пространства ПАП.
- *
- * @tparam IndexT     Тип гранульного индекса (uint16_t, uint32_t, uint64_t).
- *                    Определяет максимально адресуемое пространство (2^bits * granule_size).
- *                    Рекомендуемые типы: uint16_t (embedded), uint32_t (desktop), uint64_t (large DB).
- * @tparam GranuleSz  Размер гранулы в байтах (степень двойки ≥ 4).
- *                    Минимальная единица адресации ПАП-менеджера.
- *
- * Статические проверки (static_assert):
- *  - IndexT — беззнаковый целый тип.
- *  - GranuleSz — степень двойки (GranuleSz & (GranuleSz-1) == 0).
- *  - GranuleSz ≥ 4 (минимальный размер слова архитектуры).
- */
+/*
+## pmm::AddressTraits
+*/
 template <typename IndexT, std::size_t GranuleSz> struct AddressTraits
 {
     static_assert( std::is_unsigned<IndexT>::value, "AddressTraits: IndexT must be an unsigned integer type" );
     static_assert( GranuleSz >= 4, "AddressTraits: GranuleSz must be >= 4 (minimum architecture word size)" );
     static_assert( ( GranuleSz & ( GranuleSz - 1 ) ) == 0, "AddressTraits: GranuleSz must be a power of 2" );
 
-    /// Тип гранульного индекса.
     using index_type = IndexT;
 
-    /// Размер гранулы в байтах.
     static constexpr std::size_t granule_size = GranuleSz;
 
-    /// Sentinel «нет блока» — максимальное значение index_type.
     static constexpr index_type no_block = std::numeric_limits<IndexT>::max();
 
-    // ─── Вспомогательные функции ───────────────────────────────────────────
-
-    /**
-     * @brief Перевести байты в гранулы (потолок).
-     *
-     * Возвращает 0 при переполнении.
-     */
+/*
+### pmm::AddressTraits::bytes_to_granules
+*/
     static constexpr index_type bytes_to_granules( std::size_t bytes ) noexcept
     {
         if ( bytes == 0 )
             return static_cast<index_type>( 0 );
-        // Overflow-safe ceiling division: (bytes + granule_size - 1) / granule_size
+
         if ( bytes > std::numeric_limits<std::size_t>::max() - ( granule_size - 1 ) )
-            return static_cast<index_type>( 0 ); // overflow
+            return static_cast<index_type>( 0 );
+
         std::size_t granules = ( bytes + granule_size - 1 ) / granule_size;
         if ( granules > static_cast<std::size_t>( std::numeric_limits<IndexT>::max() ) )
-            return static_cast<index_type>( 0 ); // overflow for IndexT
+            return static_cast<index_type>( 0 );
         return static_cast<index_type>( granules );
     }
 
-    /**
-     * @brief Перевести гранулы в байты.
-     */
+/*
+### pmm::AddressTraits::granules_to_bytes
+*/
     static constexpr std::size_t granules_to_bytes( index_type granules ) noexcept
     {
         return static_cast<std::size_t>( granules ) * granule_size;
     }
 
-    /**
-     * @brief Получить байтовое смещение из гранульного индекса.
-     */
+/*
+### pmm::AddressTraits::idx_to_byte_off
+*/
     static constexpr std::size_t idx_to_byte_off( index_type idx ) noexcept
     {
         return static_cast<std::size_t>( idx ) * granule_size;
     }
 
-    /**
-     * @brief Получить гранульный индекс из байтового смещения (кратно granule_size).
-     */
+/*
+### pmm::AddressTraits::byte_off_to_idx
+*/
     static index_type byte_off_to_idx( std::size_t byte_off ) noexcept
     {
+
         assert( byte_off % granule_size == 0 );
         assert( byte_off / granule_size <= static_cast<std::size_t>( std::numeric_limits<IndexT>::max() ) );
         return static_cast<index_type>( byte_off / granule_size );
     }
 };
 
-// ─── Стандартные алиасы ──────────────────────────────────────────
-//
-// Допустимые конфигурации для менеджеров ПАП:
-//   - SmallAddressTraits   — uint16_t, 16B гранула: до ~1 МБ, малые embedded-системы.
-//   - DefaultAddressTraits — uint32_t, 16B гранула: до 64 ГБ, основной вариант (без потерь).
-//   - LargeAddressTraits   — uint64_t, 64B гранула: петабайтный масштаб (без потерь).
-//
-// Удалено:
-//   - TinyAddressTraits (uint8_t, 8B): максимум 255 гранул — практически
-//     непригодно; uint8_t-индекс не поддерживается менеджерами ПАП.
-
-/// 16-bit вариант (до 65535 гранул по 16 байт = ~1 МБ, small embedded).
-/// Допустима с потерями: Block<SmallAddressTraits>=18B, ceil(18/16)=2 гранулы на заголовок.
 using SmallAddressTraits = AddressTraits<std::uint16_t, 16>;
 
-/// 32-bit вариант, 16-байтная гранула — текущий дефолт (без потерь: Block=32B=2*16B).
 using DefaultAddressTraits = AddressTraits<std::uint32_t, 16>;
 
-/// 64-bit вариант, 64-байтная гранула (без потерь: Block=64B=1*64B; для крупных БД).
 using LargeAddressTraits = AddressTraits<std::uint64_t, 64>;
 
-} // namespace pmm
-
-/**
- * @file pmm_config.h
- * @brief Политики блокировок для AbstractPersistMemoryManager
- *
- * Содержит:
- *   - pmm::config::SharedMutexLock  — политика с std::shared_mutex (многопоточная)
- *   - pmm::config::NoLock           — заглушка без блокировок (однопоточный режим)
- *   - pmm::config::kDefaultGrowNumerator / kDefaultGrowDenominator — параметры роста
- *
- * Использование:
- * @code
- *   // Однопоточный менеджер без блокировок
- *   using MyMgr = AbstractPersistMemoryManager<DefaultAddressTraits, HeapStorage<...>,
- *                                              AvlFreeTree<...>, pmm::config::NoLock>;
- *
- *   // Многопоточный менеджер с блокировками
- *   using MyMgr = AbstractPersistMemoryManager<DefaultAddressTraits, HeapStorage<...>,
- *                                              AvlFreeTree<...>, pmm::config::SharedMutexLock>;
- * @endcode
- *
- * @see pmm_presets.h — готовые конфигурации менеджеров
- * @version 2.0
- */
+}
 
 #include <mutex>
 #include <shared_mutex>
@@ -213,171 +123,93 @@ namespace pmm
 namespace config
 {
 
-/// @brief Политика блокировки с std::shared_mutex (многопоточная, по умолчанию).
+/*
+## pmm::config::SharedMutexLock
+*/
 struct SharedMutexLock
 {
+
     using mutex_type       = std::shared_mutex;
+
     using shared_lock_type = std::shared_lock<std::shared_mutex>;
+
     using unique_lock_type = std::unique_lock<std::shared_mutex>;
 };
 
-/// @brief Политика без блокировок (однопоточный режим, нет накладных расходов).
+/*
+## pmm::config::NoLock
+*/
 struct NoLock
 {
+
+/*
+## pmm::config::NoLock::mutex_type
+*/
     struct mutex_type
     {
+
+/*
+### pmm::config::NoLock::mutex_type::lock
+*/
         void lock() {}
+
+/*
+### pmm::config::NoLock::mutex_type::unlock
+*/
         void unlock() {}
+
+/*
+### pmm::config::NoLock::mutex_type::lock_shared
+*/
         void lock_shared() {}
+
+/*
+### pmm::config::NoLock::mutex_type::unlock_shared
+*/
         void unlock_shared() {}
+
+/*
+### pmm::config::NoLock::mutex_type::try_lock
+*/
         bool try_lock() { return true; }
+
+/*
+### pmm::config::NoLock::mutex_type::try_lock_shared
+*/
         bool try_lock_shared() { return true; }
     };
 
+/*
+## pmm::config::NoLock::shared_lock_type
+*/
     struct shared_lock_type
     {
+
+/*
+### pmm::config::NoLock::shared_lock_type::shared_lock_type
+*/
         explicit shared_lock_type( mutex_type& ) {}
     };
 
+/*
+## pmm::config::NoLock::unique_lock_type
+*/
     struct unique_lock_type
     {
+
+/*
+### pmm::config::NoLock::unique_lock_type::unique_lock_type
+*/
         explicit unique_lock_type( mutex_type& ) {}
     };
 };
 
-/// @brief Default grow ratio numerator (heap grows by 5/4 = 25%).
 inline constexpr std::size_t kDefaultGrowNumerator = 5;
 
-/// @brief Default grow ratio denominator (heap grows by 5/4 = 25%).
 inline constexpr std::size_t kDefaultGrowDenominator = 4;
 
-} // namespace config
-} // namespace pmm
-
-/**
- * @file pmm/free_block_tree.h
- * @brief AvlFreeTree — specialized forest-policy for the free-tree domain.
- *
- * Implements the free-tree as a specialized forest-policy within the AVL-forest model.
- * The free-tree is the primary system domain of the forest: it indexes free blocks
- * of the persistent address space (PAP) for best-fit allocation.
- *
- * ## Forest-policy: ordering and key derivation
- *
- * Sort key: (block_size_in_granules, block_index) — strict total ordering.
- * The sort key is **derived** from linear PAP geometry (next_offset - block_index),
- * not read from the `weight` field. In the free-tree domain, `weight == 0` serves
- * as a state discriminator (free vs. allocated), not as a sort key.
- *
- * This is an explicit forest-policy choice: the free-tree derives its ordering
- * from physical block layout, while other forest domains (pstringview, pmap)
- * use `weight` directly as their sort key. Both approaches are consistent
- * with the general forest model, which allows each domain to define its own
- * interpretation of `weight` and ordering semantics.
- *
- * @see docs/free_tree_forest_policy.md — canonical free-tree forest-policy document
- * @see docs/pmm_avl_forest.md — general forest model
- * @see docs/block_and_treenode_semantics.md — field semantics
- * @see block_state.h — BlockState machine
- * @see avl_tree_mixin.h — shared AVL operations via BlockPPtr adapter
- * @version 1.6
- */
-
-/**
- * @file pmm/avl_tree_mixin.h
- * @brief Shared AVL tree helper functions for pmap and pstringview.
- *
- * Provides a set of free static template functions implementing the core AVL
- * tree operations (height, balance factor, rotations, rebalancing, insert, find,
- * remove) that are shared between pmap<_K,_V,ManagerT> and pstringview<ManagerT>.
- *
- * All rotation and rebalance functions accept an optional NodeUpdateFn callback
- * that is invoked after structural changes to update derived node attributes.
- * By default avl_update_height is used (height-only).
- *
- * Template parameter PPtr must support:
- *   - is_null()
- *   - tree_node() returning a TreeNode& with get_left/set_left/get_right/set_right/
- *     get_parent/set_parent/get_height/set_height
- *   - offset()
- *   - PPtr::manager_type::address_traits::no_block sentinel
- *
- * Also provides BlockPPtr<AddressTraitsT> — a lightweight adapter that wraps
- * raw (base_ptr, index) pairs and delegates to BlockStateBase<AT> static methods,
- * enabling AvlFreeTree to reuse the shared AVL operations instead of maintaining
- * its own duplicate rotation/rebalancing code.
- *
- * Additionally provides AvlInorderIterator<NodePPtr> — a shared in-order
- * iterator template used by pmap.
- *
- * @see pmap.h — pmap<_K,_V,ManagerT>
- * @see pstringview.h — pstringview<ManagerT>
- * @see free_block_tree.h — AvlFreeTree<AT> uses BlockPPtr adapter
- * @version 0.5
- */
-
-/**
- * @file pmm/block.h
- * @brief Block<AddressTraits> — блок памяти как составной тип.
- *
- * Block<AddressTraits> является составным типом, объединяющим:
- *   - поля связного списка (prev_offset, next_offset) — хранятся прямо в Block
- *   - TreeNode<AddressTraits>  — узел AVL-дерева (включает weight и root_offset)
- *
- * Концептуальная модель:
- *   ПАП-менеджер организует память как лес AVL-деревьев.  Каждый блок является
- *   одновременно узлом двухсвязного списка (охватывает всё адресное пространство)
- *   и узлом одного из AVL-деревьев леса.  Поля `weight` и `root_offset` принадлежат
- *   узлу дерева (TreeNode), а не блоку напрямую.
- *
- * Раскладка полей при AddressTraitsT = DefaultAddressTraits (uint32_t, 16):
- *   [0..23]  TreeNode<A>: weight (4), left_offset (4), right_offset (4),
- *                         parent_offset (4), root_offset (4),
- *                         avl_height (2), node_type (2)
- *   [24..31] Block:       prev_offset (4), next_offset (4)
- *
- *             avl_height и node_type (бывший _pad) перемещены в конец TreeNode.
- *             и next_offset перемещены прямо в Block.
- *
- * Размер и выравнивание:
- *   sizeof(Block<DefaultAddressTraits>) == 32 байта (2 гранулы по 16 байт).
- *   Подтверждено через static_assert в types.h. Block<A> — единственный тип блока.
- *
- * @version 0.5
- */
-
-/**
- * @file pmm/tree_node.h
- * @brief TreeNode<AddressTraits> — intrusive AVL-slot for the forest model.
- *
- * Parametric AVL tree node where index field types are defined by
- * `AddressTraits::index_type`.
- *
- * The PAP manager organizes blocks as an AVL-forest. Each node belongs to exactly
- * one forest domain and can migrate between domains (e.g., from the free-tree
- * to a user domain tree).
- *
- * ## Field semantics in the forest model
- *
- *   - `weight`      — universal granule-key / granule-scalar field.
- *                     Semantics are determined by the owning forest domain:
- *                       - free-tree domain: state discriminator (0 = free block);
- *                         ordering key is derived from linear PAP geometry, not weight.
- *                       - user domains (pstringview, pmap): domain-specific sort key.
- *   - `root_offset` — owner-domain / owner-tree marker:
- *                       0         = node belongs to the free-tree domain;
- *                       own_index = node is allocated (self-owned).
- *
- *
- * @see docs/free_tree_forest_policy.md — free-tree ordering policy
- * @see docs/block_and_treenode_semantics.md — canonical field semantics
- * @version 0.5
- */
-
-/**
- * @file pmm/block_field.h
- * @brief Descriptor-driven access to Block/TreeNode overlay fields.
- */
+}
+}
 
 #include <cstddef>
 #include <cstdint>
@@ -389,112 +221,174 @@ namespace pmm
 namespace detail
 {
 
-/**
- * @brief Canonical raw layout used by block field descriptors.
- *
- * The production types keep fields protected and split between TreeNode<A> and
- * Block<A>. This mirror is standard-layout and exists only to derive byte
- * offsets for descriptor-based raw memory access.
- */
+/*
+## pmm::detail::BlockFieldLayout
+*/
 template <typename IndexT> struct BlockFieldLayout
 {
+
     IndexT        weight;
+
     IndexT        left_offset;
+
     IndexT        right_offset;
+
     IndexT        parent_offset;
+
     IndexT        root_offset;
+
     std::int16_t  avl_height;
     std::uint16_t node_type;
+
     IndexT        prev_offset;
+
     IndexT        next_offset;
 };
 
 static_assert( std::is_standard_layout<BlockFieldLayout<std::uint32_t>>::value,
                "BlockFieldLayout must remain standard-layout" );
 
+/*
+## pmm::detail::BlockWeightField
+*/
 struct BlockWeightField
 {
 };
+
+/*
+## pmm::detail::BlockLeftOffsetField
+*/
 struct BlockLeftOffsetField
 {
 };
+
+/*
+## pmm::detail::BlockRightOffsetField
+*/
 struct BlockRightOffsetField
 {
 };
+
+/*
+## pmm::detail::BlockParentOffsetField
+*/
 struct BlockParentOffsetField
 {
 };
+
+/*
+## pmm::detail::BlockRootOffsetField
+*/
 struct BlockRootOffsetField
 {
 };
+
+/*
+## pmm::detail::BlockAvlHeightField
+*/
 struct BlockAvlHeightField
 {
 };
+
+/*
+## pmm::detail::BlockNodeTypeField
+*/
 struct BlockNodeTypeField
 {
 };
+
+/*
+## pmm::detail::BlockPrevOffsetField
+*/
 struct BlockPrevOffsetField
 {
 };
+
+/*
+## pmm::detail::BlockNextOffsetField
+*/
 struct BlockNextOffsetField
 {
 };
 
 template <typename AddressTraitsT, typename FieldTag> struct BlockFieldTraits;
 
+/*
+## pmm::detail::BlockFieldTraits
+*/
 template <typename AddressTraitsT> struct BlockFieldTraits<AddressTraitsT, BlockWeightField>
 {
+
     using value_type                    = typename AddressTraitsT::index_type;
+
     static constexpr std::size_t offset = offsetof( BlockFieldLayout<value_type>, weight );
 };
 
 template <typename AddressTraitsT> struct BlockFieldTraits<AddressTraitsT, BlockLeftOffsetField>
 {
+
     using value_type                    = typename AddressTraitsT::index_type;
+
     static constexpr std::size_t offset = offsetof( BlockFieldLayout<value_type>, left_offset );
 };
 
 template <typename AddressTraitsT> struct BlockFieldTraits<AddressTraitsT, BlockRightOffsetField>
 {
+
     using value_type                    = typename AddressTraitsT::index_type;
+
     static constexpr std::size_t offset = offsetof( BlockFieldLayout<value_type>, right_offset );
 };
 
 template <typename AddressTraitsT> struct BlockFieldTraits<AddressTraitsT, BlockParentOffsetField>
 {
+
     using value_type                    = typename AddressTraitsT::index_type;
+
     static constexpr std::size_t offset = offsetof( BlockFieldLayout<value_type>, parent_offset );
 };
 
 template <typename AddressTraitsT> struct BlockFieldTraits<AddressTraitsT, BlockRootOffsetField>
 {
+
     using value_type                    = typename AddressTraitsT::index_type;
+
     static constexpr std::size_t offset = offsetof( BlockFieldLayout<value_type>, root_offset );
 };
 
 template <typename AddressTraitsT> struct BlockFieldTraits<AddressTraitsT, BlockAvlHeightField>
 {
+
     using value_type                    = std::int16_t;
+
     using index_type                    = typename AddressTraitsT::index_type;
+
     static constexpr std::size_t offset = offsetof( BlockFieldLayout<index_type>, avl_height );
 };
 
 template <typename AddressTraitsT> struct BlockFieldTraits<AddressTraitsT, BlockNodeTypeField>
 {
+
     using value_type                    = std::uint16_t;
+
     using index_type                    = typename AddressTraitsT::index_type;
+
     static constexpr std::size_t offset = offsetof( BlockFieldLayout<index_type>, node_type );
 };
 
 template <typename AddressTraitsT> struct BlockFieldTraits<AddressTraitsT, BlockPrevOffsetField>
 {
+
     using value_type                    = typename AddressTraitsT::index_type;
+
     static constexpr std::size_t offset = offsetof( BlockFieldLayout<value_type>, prev_offset );
 };
 
 template <typename AddressTraitsT> struct BlockFieldTraits<AddressTraitsT, BlockNextOffsetField>
 {
+
     using value_type                    = typename AddressTraitsT::index_type;
+
     static constexpr std::size_t offset = offsetof( BlockFieldLayout<value_type>, next_offset );
 };
 
@@ -504,11 +398,16 @@ using block_field_value_t = typename BlockFieldTraits<AddressTraitsT, FieldTag>:
 template <typename AddressTraitsT, typename FieldTag>
 inline constexpr std::size_t block_field_offset_v = BlockFieldTraits<AddressTraitsT, FieldTag>::offset;
 
+/*
+## pmm::detail::BlockFieldByteAccess
+*/
 struct BlockFieldByteAccess
 {
     template <typename ValueT> static ValueT read( const void* raw, std::size_t offset ) noexcept
     {
+
         ValueT value{};
+
         std::memcpy( &value, static_cast<const std::uint8_t*>( raw ) + offset, sizeof( value ) );
         return value;
     }
@@ -540,8 +439,8 @@ inline constexpr std::size_t block_tree_slot_size_v =
 template <typename AddressTraitsT>
 inline constexpr std::size_t block_layout_size_v = sizeof( BlockFieldLayout<typename AddressTraitsT::index_type> );
 
-} // namespace detail
-} // namespace pmm
+}
+}
 
 #include <cstddef>
 #include <cstdint>
@@ -550,179 +449,162 @@ inline constexpr std::size_t block_layout_size_v = sizeof( BlockFieldLayout<type
 namespace pmm
 {
 
-/**
- * @brief Intrusive AVL-slot for the forest model — used only via inheritance.
- *
- * @tparam AddressTraitsT  Address space traits (from address_traits.h).
- *                         Defines index field types.
- *
- * Fields store granule indices of child/parent nodes in the PAP.
- * Sentinel "no node" = `AddressTraitsT::no_block`.
- *
- * `weight`     — universal granule-key whose semantics depend on the owning domain.
- *               Free-tree domain: state discriminator (0 = free block);
- *               ordering is derived from linear PAP geometry, not this field.
- *               User domains: domain-specific sort key (e.g., string index, entity ID).
- *               First field for cache-efficient access.
- * `root_offset`— owner-domain marker: 0 = free-tree domain,
- *               own_idx = allocated block (self-owned tree).
- * `avl_height` — AVL subtree height (0 = slot not in any tree).
- * `node_type`  — coarse-grained block type:
- *               kNodeReadWrite (0) = read/write, kNodeReadOnly (1) = read-only.
- *
- * Layout `TreeNode<DefaultAddressTraits>` (uint32_t, 16-byte granule):
- *   weight        (4) +
- *   left_offset   (4) + right_offset (4) + parent_offset (4) +
- *   root_offset   (4) +
- *   avl_height    (2) + node_type    (2) = 24 bytes
- *
- * Public accessors: for use via pptr<T, ManagerT>::tree_node().
- */
-
-/// @brief Тип узла: значения для поля `TreeNode::node_type`.
-///
-/// kNodeReadWrite (0) — блок доступен на чтение и запись, может быть освобождён.
-/// kNodeReadOnly  (1) — блок заблокирован навечно: доступен только на чтение,
-///                      не может быть освобождён через deallocate().
 enum : std::uint16_t
 {
     kNodeReadWrite = 0,
     kNodeReadOnly  = 1,
 };
 
+/*
+## pmm::TreeNode
+*/
 template <typename AddressTraitsT> struct TreeNode
 {
+
     using address_traits = AddressTraitsT;
+
     using index_type     = typename AddressTraitsT::index_type;
 
-    // ─── Публичные методы доступа к полям узла дерева ────────────
-    // Используются через ссылку, полученную из pptr<T, ManagerT>::tree_node().
-
-    /// @brief Получить гранульный индекс левого дочернего узла AVL-дерева.
-    /// @return Гранульный индекс или no_block если нет левого потомка.
+/*
+### pmm::TreeNode::get_left
+*/
     index_type get_left() const noexcept
     {
         return detail::read_block_field<AddressTraitsT, detail::BlockLeftOffsetField>( this );
     }
 
-    /// @brief Получить гранульный индекс правого дочернего узла AVL-дерева.
-    /// @return Гранульный индекс или no_block если нет правого потомка.
+/*
+### pmm::TreeNode::get_right
+*/
     index_type get_right() const noexcept
     {
         return detail::read_block_field<AddressTraitsT, detail::BlockRightOffsetField>( this );
     }
 
-    /// @brief Получить гранульный индекс родительского узла AVL-дерева.
-    /// @return Гранульный индекс или no_block если нет родителя (корень).
+/*
+### pmm::TreeNode::get_parent
+*/
     index_type get_parent() const noexcept
     {
         return detail::read_block_field<AddressTraitsT, detail::BlockParentOffsetField>( this );
     }
 
-    /// @brief Get the owner-domain marker (root_offset).
-    /// @return 0 = free-tree domain; own_idx = allocated block.
+/*
+### pmm::TreeNode::get_root
+*/
     index_type get_root() const noexcept
     {
         return detail::read_block_field<AddressTraitsT, detail::BlockRootOffsetField>( this );
     }
 
-    /// @brief Get the universal granule-key (weight).
-    /// @return Domain-specific scalar (free-tree: 0 = free; user domains: sort key).
+/*
+### pmm::TreeNode::get_weight
+*/
     index_type get_weight() const noexcept
     {
         return detail::read_block_field<AddressTraitsT, detail::BlockWeightField>( this );
     }
 
-    /// @brief Получить высоту AVL-поддерева.
-    /// @return Высота (0 = узел не в дереве).
+/*
+### pmm::TreeNode::get_height
+*/
     std::int16_t get_height() const noexcept
     {
         return detail::read_block_field<AddressTraitsT, detail::BlockAvlHeightField>( this );
     }
 
-    /// @brief Получить тип узла.
-    /// @return kNodeReadWrite (0) или kNodeReadOnly (1).
+/*
+### pmm::TreeNode::get_node_type
+*/
     std::uint16_t get_node_type() const noexcept
     {
         return detail::read_block_field<AddressTraitsT, detail::BlockNodeTypeField>( this );
     }
 
-    /// @brief Установить гранульный индекс левого дочернего узла AVL-дерева.
-    /// @param v Гранульный индекс или no_block.
+/*
+### pmm::TreeNode::set_left
+*/
     void set_left( index_type v ) noexcept
     {
+
         detail::write_block_field<AddressTraitsT, detail::BlockLeftOffsetField>( this, v );
     }
 
-    /// @brief Установить гранульный индекс правого дочернего узла AVL-дерева.
-    /// @param v Гранульный индекс или no_block.
+/*
+### pmm::TreeNode::set_right
+*/
     void set_right( index_type v ) noexcept
     {
+
         detail::write_block_field<AddressTraitsT, detail::BlockRightOffsetField>( this, v );
     }
 
-    /// @brief Установить гранульный индекс родительского узла AVL-дерева.
-    /// @param v Гранульный индекс или no_block.
+/*
+### pmm::TreeNode::set_parent
+*/
     void set_parent( index_type v ) noexcept
     {
+
         detail::write_block_field<AddressTraitsT, detail::BlockParentOffsetField>( this, v );
     }
 
-    /// @brief Set the owner-domain marker (root_offset).
-    /// @param v 0 = free-tree domain; own_idx = allocated block.
+/*
+### pmm::TreeNode::set_root
+*/
     void set_root( index_type v ) noexcept
     {
+
         detail::write_block_field<AddressTraitsT, detail::BlockRootOffsetField>( this, v );
     }
 
-    /// @brief Set the universal granule-key (weight).
-    /// @param v Domain-specific scalar value.
+/*
+### pmm::TreeNode::set_weight
+*/
     void set_weight( index_type v ) noexcept
     {
+
         detail::write_block_field<AddressTraitsT, detail::BlockWeightField>( this, v );
     }
 
-    /// @brief Установить высоту AVL-поддерева.
-    /// @param v Новая высота (0 = не в дереве).
+/*
+### pmm::TreeNode::set_height
+*/
     void set_height( std::int16_t v ) noexcept
     {
+
         detail::write_block_field<AddressTraitsT, detail::BlockAvlHeightField>( this, v );
     }
 
-    /// @brief Установить тип узла.
-    /// @param v kNodeReadWrite (0) или kNodeReadOnly (1).
+/*
+### pmm::TreeNode::set_node_type
+*/
     void set_node_type( std::uint16_t v ) noexcept
     {
+
         detail::write_block_field<AddressTraitsT, detail::BlockNodeTypeField>( this, v );
     }
 
   protected:
-    /// Universal granule-key / granule-scalar. First field for cache-efficient access.
-    /// Semantics determined by the owning forest domain:
-    ///   - free-tree: state discriminator (0 = free); sort key derived from PAP geometry.
-    ///   - user domains: domain-specific sort key (e.g., granule count, string index).
+
     index_type weight;
-    /// Гранульный индекс левого дочернего узла AVL-дерева (или no_block).
+
     index_type left_offset;
-    /// Гранульный индекс правого дочернего узла AVL-дерева (или no_block).
+
     index_type right_offset;
-    /// Гранульный индекс родительского узла AVL-дерева (или no_block).
+
     index_type parent_offset;
-    /// Owner-domain / owner-tree marker.
-    /// 0 = node belongs to the free-tree domain (system/free_tree).
-    /// own_idx = node is allocated; value equals the block's own granule index.
+
     index_type root_offset;
-    /// Высота AVL-поддерева (0 = узел не в дереве).
+
     std::int16_t avl_height;
-    /// Тип узла: kNodeReadWrite (0) = чтение/запись, kNodeReadOnly (1) = только чтение.
+
     std::uint16_t node_type;
 };
 
-// Layout: TreeNode is a standard-layout struct.
 static_assert( std::is_standard_layout<pmm::TreeNode<pmm::DefaultAddressTraits>>::value,
                "TreeNode must be standard-layout " );
 
-} // namespace pmm
+}
 
 #include <cstdint>
 #include <type_traits>
@@ -730,64 +612,26 @@ static_assert( std::is_standard_layout<pmm::TreeNode<pmm::DefaultAddressTraits>>
 namespace pmm
 {
 
-/**
- * @brief Блок памяти ПАП — составной тип.
- *
- * @tparam AddressTraitsT  Traits адресного пространства (из address_traits.h).
- *                         Определяет тип индексных полей.
- *
- * Наследует TreeNode<AddressTraitsT>.
- * Поля связного списка (prev_offset, next_offset) хранятся прямо в Block
- *.
- *
- * Доступ к полям:
- *   - prev_offset, next_offset          — прямые поля Block<A>
- *   - weight, left_offset, right_offset,
- *     parent_offset, root_offset,
- *     avl_height, node_type             — через TreeNode<A>
- *
- * При AddressTraitsT = DefaultAddressTraits (uint32_t, 16):
- *   sizeof(Block<DefaultAddressTraits>) == 32 байта
- *   Layout: [0..23] TreeNode fields, [24..31] prev_offset, next_offset
- */
+/*
+## pmm::Block
+*/
 template <typename AddressTraitsT> struct Block : TreeNode<AddressTraitsT>
 {
+
     using address_traits = AddressTraitsT;
+
     using index_type     = typename AddressTraitsT::index_type;
 
   protected:
-    /// Гранульный индекс предыдущего блока (или no_block).
+
     index_type prev_offset;
-    /// Гранульный индекс следующего блока (или no_block).
+
     index_type next_offset;
 };
 
-// Block inherits TreeNode and adds prev_offset/next_offset as own members.
-// Note: Block is NOT standard-layout (both base and derived have data members), but
-// the memory layout is still predictable: TreeNode fields first, then Block own fields.
-// The layout is validated via kOffset* constants in BlockStateBase (block_state.h).
 static_assert( sizeof( pmm::Block<pmm::DefaultAddressTraits> ) == 32, "Block<DefaultAddressTraits> must be 32 bytes " );
 
-} // namespace pmm
-
-/**
- * @file pmm/diagnostics.h
- * @brief Structured diagnostics for verify and repair modes.
- *
- * Provides:
- *   - `RecoveryMode`     — enum to select verify-only vs. repair behaviour
- *   - `DiagnosticEntry`  — single violation record with type, affected block, action
- *   - `VerifyResult`     — aggregated result of a verify or repair pass
- *
- * The verify mode performs read-only diagnostics without modifying the image.
- * The repair mode performs the same diagnostics, then applies documented fixes.
- * Both modes populate a VerifyResult with structured diagnostic entries.
- *
- * @see block_state.h  — block-level verify_state / recover_state
- * @see allocator_policy.h — verify_linked_list, verify_counters, verify_free_tree_candidates
- * @see persist_memory_manager.h — PersistMemoryManager::verify, load
- * @version 1.0
- */
+}
 
 #include <cstddef>
 #include <cstdint>
@@ -795,72 +639,84 @@ static_assert( sizeof( pmm::Block<pmm::DefaultAddressTraits> ) == 32, "Block<Def
 namespace pmm
 {
 
-/// @brief Mode for diagnostic operations: verify-only (read) or repair (write, within load).
+/*
+## pmm::RecoveryMode
+*/
 enum class RecoveryMode : std::uint8_t
 {
-    Verify = 0, ///< Read-only diagnostics; no modifications to the image.
-    Repair = 1, ///< Diagnose and then apply documented fixes.
+    Verify = 0,
+    Repair = 1,
 };
 
-/// @brief Type of structural violation detected during verify/repair.
+/*
+## pmm::ViolationType
+*/
 enum class ViolationType : std::uint8_t
 {
-    None = 0,                 ///< No violation.
-    BlockStateInconsistent,   ///< Block weight/root_offset mismatch (transitional state).
-    PrevOffsetMismatch,       ///< prev_offset does not match expected value.
-    CounterMismatch,          ///< Recomputed counter differs from stored value.
-    FreeTreeStale,            ///< Free tree root or AVL fields need rebuild.
-    ForestRegistryMissing,    ///< Forest registry not found or invalid.
-    ForestDomainMissing,      ///< Required system domain not found.
-    ForestDomainFlagsMissing, ///< System domain lacks required flags.
-    HeaderCorruption,         ///< Magic, image_version, granule_size, or total_size mismatch.
+    None = 0,
+    BlockStateInconsistent,
+    PrevOffsetMismatch,
+    CounterMismatch,
+    FreeTreeStale,
+    ForestRegistryMissing,
+    ForestDomainMissing,
+    ForestDomainFlagsMissing,
+    HeaderCorruption,
 };
 
-/// @brief Action taken (or that would be taken) for a violation.
+/*
+## pmm::DiagnosticAction
+*/
 enum class DiagnosticAction : std::uint8_t
 {
-    NoAction = 0, ///< No action (verify mode or no fix available).
-    Repaired,     ///< Field was repaired to correct value.
-    Rebuilt,      ///< Structure was rebuilt from scratch (AVL tree, counters).
-    Aborted,      ///< Repair aborted — corruption too severe, load returns false.
+    NoAction = 0,
+    Repaired,
+    Rebuilt,
+    Aborted,
 };
 
-/// @brief A single diagnostic entry describing one violation.
+/*
+## pmm::DiagnosticEntry
+*/
 struct DiagnosticEntry
 {
-    ViolationType    type        = ViolationType::None;        ///< Kind of violation.
-    DiagnosticAction action      = DiagnosticAction::NoAction; ///< Action taken/proposed.
-    std::uint64_t    block_index = 0;                          ///< Affected block granule index (0 if N/A).
-    std::uint64_t    expected    = 0;                          ///< Expected value (interpretation depends on type).
-    std::uint64_t    actual      = 0;                          ///< Actual value found.
+
+    ViolationType    type        = ViolationType::None;
+
+    DiagnosticAction action      = DiagnosticAction::NoAction;
+
+    std::uint64_t    block_index = 0;
+    std::uint64_t    expected    = 0;
+    std::uint64_t    actual      = 0;
 };
 
-/// @brief Maximum number of diagnostic entries stored in a VerifyResult.
-///
-/// Keeps VerifyResult on the stack without dynamic allocation.
-/// Additional violations beyond this limit are counted but not detailed.
 inline constexpr std::size_t kMaxDiagnosticEntries = 64;
 
-/// @brief Aggregated result of a verify or repair pass.
+/*
+## pmm::VerifyResult
+*/
 struct VerifyResult
 {
-    RecoveryMode mode = RecoveryMode::Verify; ///< Mode used for this pass.
-    bool         ok   = true;                 ///< true if no violations found.
 
-    /// @brief Number of violations detected.
+    RecoveryMode mode = RecoveryMode::Verify;
+
+    bool         ok   = true;
+
     std::size_t violation_count = 0;
 
-    /// @brief Detailed entries (up to kMaxDiagnosticEntries).
     DiagnosticEntry entries[kMaxDiagnosticEntries] = {};
 
-    /// @brief Number of entries stored (may be < violation_count if overflow).
     std::size_t entry_count = 0;
 
-    /// @brief Add a diagnostic entry. Thread-unsafe — caller holds lock.
+/*
+### pmm::VerifyResult::add
+*/
     void add( ViolationType type, DiagnosticAction action, std::uint64_t block_index = 0, std::uint64_t expected = 0,
               std::uint64_t actual = 0 ) noexcept
     {
+
         ok = false;
+
         violation_count++;
         if ( entry_count < kMaxDiagnosticEntries )
         {
@@ -874,7 +730,7 @@ struct VerifyResult
     }
 };
 
-} // namespace pmm
+}
 
 #include <cassert>
 #include <cstdint>
@@ -891,19 +747,27 @@ template <typename AddressTraitsT> class FreeBlockNotInAVL;
 template <typename AddressTraitsT> class SplittingBlock;
 template <typename AddressTraitsT> class CoalescingBlock;
 
+/*
+## pmm::BlockStateBase
+*/
 template <typename AddressTraitsT> class BlockStateBase : private Block<AddressTraitsT>
 {
   private:
+
     using TNode = TreeNode<AddressTraitsT>;
 
   public:
+
     using address_traits = AddressTraitsT;
+
     using index_type     = typename AddressTraitsT::index_type;
+
     using BaseBlock      = Block<AddressTraitsT>;
 
     template <typename FieldTag> using field_value_type = detail::block_field_value_t<AddressTraitsT, FieldTag>;
 
     template <typename FieldTag>
+
     static constexpr std::size_t field_offset = detail::block_field_offset_v<AddressTraitsT, FieldTag>;
 
     template <typename FieldTag> static field_value_type<FieldTag> get_field_of( const void* raw_blk ) noexcept
@@ -913,14 +777,21 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
 
     template <typename FieldTag> static void set_field_of( void* raw_blk, field_value_type<FieldTag> value ) noexcept
     {
+
         detail::write_block_field<AddressTraitsT, FieldTag>( raw_blk, value );
     }
 
+/*
+### pmm::BlockStateBase::is_free_raw
+*/
     static bool is_free_raw( const void* raw_blk ) noexcept
     {
         return get_weight( raw_blk ) == 0 && get_root_offset( raw_blk ) == 0;
     }
 
+/*
+### pmm::BlockStateBase::is_allocated_raw
+*/
     static bool is_allocated_raw( const void* raw_blk, index_type own_idx ) noexcept
     {
         return get_weight( raw_blk ) > 0 && get_root_offset( raw_blk ) == own_idx;
@@ -945,44 +816,97 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
     static constexpr std::size_t kOffsetNodeType = field_offset<detail::BlockNodeTypeField>;
 
     static_assert( detail::block_tree_slot_size_v<AddressTraitsT> == sizeof( TNode ),
+
                    "Block field descriptors must match TreeNode layout" );
     static_assert( detail::block_layout_size_v<AddressTraitsT> == sizeof( BaseBlock ),
                    "Block field descriptors must match Block layout" );
 
+/*
+### pmm::BlockStateBase::BlockStateBase
+*/
     BlockStateBase() = delete;
 
+/*
+### pmm::BlockStateBase::weight
+*/
     index_type weight() const noexcept { return get_weight( this ); }
 
+/*
+### pmm::BlockStateBase::prev_offset
+*/
     index_type prev_offset() const noexcept { return get_prev_offset( this ); }
+
+/*
+### pmm::BlockStateBase::next_offset
+*/
     index_type next_offset() const noexcept { return get_next_offset( this ); }
 
+/*
+### pmm::BlockStateBase::left_offset
+*/
     index_type   left_offset() const noexcept { return get_left_offset( this ); }
+
+/*
+### pmm::BlockStateBase::right_offset
+*/
     index_type   right_offset() const noexcept { return get_right_offset( this ); }
+
+/*
+### pmm::BlockStateBase::parent_offset
+*/
     index_type   parent_offset() const noexcept { return get_parent_offset( this ); }
+
+/*
+### pmm::BlockStateBase::avl_height
+*/
     std::int16_t avl_height() const noexcept { return get_avl_height( this ); }
 
+/*
+### pmm::BlockStateBase::root_offset
+*/
     index_type root_offset() const noexcept { return get_root_offset( this ); }
 
+/*
+### pmm::BlockStateBase::node_type
+*/
     std::uint16_t node_type() const noexcept { return get_node_type( this ); }
 
+/*
+### pmm::BlockStateBase::is_free
+*/
     bool is_free() const noexcept { return is_free_raw( this ); }
 
+/*
+### pmm::BlockStateBase::is_allocated
+*/
     bool is_allocated( index_type own_idx ) const noexcept { return is_allocated_raw( this, own_idx ); }
 
+/*
+### pmm::BlockStateBase::is_permanently_locked
+*/
     bool is_permanently_locked() const noexcept { return node_type() == pmm::kNodeReadOnly; }
 
+/*
+### pmm::BlockStateBase::recover_state
+*/
     static void recover_state( void* raw_blk, index_type own_idx ) noexcept
     {
+
         const index_type weight_val = get_weight( raw_blk );
+
         const index_type root_val   = get_root_offset( raw_blk );
 
         if ( weight_val > 0 && root_val != own_idx )
+
             set_root_offset_of( raw_blk, own_idx );
 
         if ( weight_val == 0 && root_val != 0 )
             set_root_offset_of( raw_blk, 0 );
     }
 
+/*
+### pmm::BlockStateBase::verify_state
+*/
     static void verify_state( const void* raw_blk, index_type own_idx, VerifyResult& result ) noexcept
     {
         const index_type weight_val = get_weight( raw_blk );
@@ -1000,104 +924,194 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
         }
     }
 
+/*
+### pmm::BlockStateBase::reset_avl_fields_of
+*/
     static void reset_avl_fields_of( void* raw_blk ) noexcept
     {
+
         set_left_offset_of( raw_blk, AddressTraitsT::no_block );
+
         set_right_offset_of( raw_blk, AddressTraitsT::no_block );
+
         set_parent_offset_of( raw_blk, AddressTraitsT::no_block );
+
         set_avl_height_of( raw_blk, 0 );
     }
 
+/*
+### pmm::BlockStateBase::repair_prev_offset
+*/
     static void repair_prev_offset( void* raw_blk, index_type prev_idx ) noexcept
     {
+
         set_prev_offset_of( raw_blk, prev_idx );
     }
 
+/*
+### pmm::BlockStateBase::get_prev_offset
+*/
     static index_type get_prev_offset( const void* raw_blk ) noexcept
     {
         return get_field_of<detail::BlockPrevOffsetField>( raw_blk );
     }
 
+/*
+### pmm::BlockStateBase::get_next_offset
+*/
     static index_type get_next_offset( const void* raw_blk ) noexcept
     {
         return get_field_of<detail::BlockNextOffsetField>( raw_blk );
     }
 
+/*
+### pmm::BlockStateBase::get_weight
+*/
     static index_type get_weight( const void* raw_blk ) noexcept
     {
         return get_field_of<detail::BlockWeightField>( raw_blk );
     }
 
+/*
+### pmm::BlockStateBase::init_fields
+*/
     static void init_fields( void* raw_blk, index_type prev_idx, index_type next_idx, std::int16_t avl_height_val,
                              index_type weight_val, index_type root_offset_val ) noexcept
     {
         set_prev_offset_of( raw_blk, prev_idx );
+
         set_next_offset_of( raw_blk, next_idx );
         set_left_offset_of( raw_blk, AddressTraitsT::no_block );
         set_right_offset_of( raw_blk, AddressTraitsT::no_block );
         set_parent_offset_of( raw_blk, AddressTraitsT::no_block );
         set_avl_height_of( raw_blk, avl_height_val );
+
         set_weight_of( raw_blk, weight_val );
         set_root_offset_of( raw_blk, root_offset_val );
     }
 
+/*
+### pmm::BlockStateBase::set_next_offset_of
+*/
     static void set_next_offset_of( void* raw_blk, index_type next_idx ) noexcept
     {
+
         set_field_of<detail::BlockNextOffsetField>( raw_blk, next_idx );
     }
 
+/*
+### pmm::BlockStateBase::get_left_offset
+*/
     static index_type get_left_offset( const void* b ) noexcept
     {
         return get_field_of<detail::BlockLeftOffsetField>( b );
     }
+
+/*
+### pmm::BlockStateBase::get_right_offset
+*/
     static index_type get_right_offset( const void* b ) noexcept
     {
         return get_field_of<detail::BlockRightOffsetField>( b );
     }
+
+/*
+### pmm::BlockStateBase::get_parent_offset
+*/
     static index_type get_parent_offset( const void* b ) noexcept
     {
         return get_field_of<detail::BlockParentOffsetField>( b );
     }
+
+/*
+### pmm::BlockStateBase::get_root_offset
+*/
     static index_type get_root_offset( const void* b ) noexcept
     {
         return get_field_of<detail::BlockRootOffsetField>( b );
     }
+
+/*
+### pmm::BlockStateBase::set_left_offset_of
+*/
     static void set_left_offset_of( void* b, index_type v ) noexcept
     {
+
         set_field_of<detail::BlockLeftOffsetField>( b, v );
     }
+
+/*
+### pmm::BlockStateBase::set_right_offset_of
+*/
     static void set_right_offset_of( void* b, index_type v ) noexcept
     {
+
         set_field_of<detail::BlockRightOffsetField>( b, v );
     }
+
+/*
+### pmm::BlockStateBase::set_parent_offset_of
+*/
     static void set_parent_offset_of( void* b, index_type v ) noexcept
     {
+
         set_field_of<detail::BlockParentOffsetField>( b, v );
     }
+
+/*
+### pmm::BlockStateBase::set_prev_offset_of
+*/
     static void set_prev_offset_of( void* b, index_type v ) noexcept
     {
+
         set_field_of<detail::BlockPrevOffsetField>( b, v );
     }
+
+/*
+### pmm::BlockStateBase::set_weight_of
+*/
     static void set_weight_of( void* b, index_type v ) noexcept { set_field_of<detail::BlockWeightField>( b, v ); }
+
+/*
+### pmm::BlockStateBase::set_root_offset_of
+*/
     static void set_root_offset_of( void* b, index_type v ) noexcept
     {
+
         set_field_of<detail::BlockRootOffsetField>( b, v );
     }
 
+/*
+### pmm::BlockStateBase::get_avl_height
+*/
     static std::int16_t get_avl_height( const void* raw_blk ) noexcept
     {
         return get_field_of<detail::BlockAvlHeightField>( raw_blk );
     }
+
+/*
+### pmm::BlockStateBase::set_avl_height_of
+*/
     static void set_avl_height_of( void* raw_blk, std::int16_t v ) noexcept
     {
+
         set_field_of<detail::BlockAvlHeightField>( raw_blk, v );
     }
+
+/*
+### pmm::BlockStateBase::get_node_type
+*/
     static std::uint16_t get_node_type( const void* raw_blk ) noexcept
     {
         return get_field_of<detail::BlockNodeTypeField>( raw_blk );
     }
+
+/*
+### pmm::BlockStateBase::set_node_type_of
+*/
     static void set_node_type_of( void* raw_blk, std::uint16_t v ) noexcept
     {
+
         set_field_of<detail::BlockNodeTypeField>( raw_blk, v );
     }
 
@@ -1114,21 +1128,63 @@ template <typename AddressTraitsT> class BlockStateBase : private Block<AddressT
 
     template <typename StateT> StateT* state_as() noexcept { return reinterpret_cast<StateT*>( this ); }
 
+/*
+### pmm::BlockStateBase::set_weight
+*/
     void set_weight( index_type v ) noexcept { set_weight_of( this, v ); }
+
+/*
+### pmm::BlockStateBase::set_prev_offset
+*/
     void set_prev_offset( index_type v ) noexcept { set_prev_offset_of( this, v ); }
+
+/*
+### pmm::BlockStateBase::set_next_offset
+*/
     void set_next_offset( index_type v ) noexcept { set_next_offset_of( this, v ); }
+
+/*
+### pmm::BlockStateBase::set_left_offset
+*/
     void set_left_offset( index_type v ) noexcept { set_left_offset_of( this, v ); }
+
+/*
+### pmm::BlockStateBase::set_right_offset
+*/
     void set_right_offset( index_type v ) noexcept { set_right_offset_of( this, v ); }
+
+/*
+### pmm::BlockStateBase::set_parent_offset
+*/
     void set_parent_offset( index_type v ) noexcept { set_parent_offset_of( this, v ); }
+
+/*
+### pmm::BlockStateBase::set_avl_height
+*/
     void set_avl_height( std::int16_t v ) noexcept { set_avl_height_of( this, v ); }
+
+/*
+### pmm::BlockStateBase::set_root_offset
+*/
     void set_root_offset( index_type v ) noexcept { set_root_offset_of( this, v ); }
+
+/*
+### pmm::BlockStateBase::set_node_type
+*/
     void set_node_type( std::uint16_t v ) noexcept { set_node_type_of( this, v ); }
 
+/*
+### pmm::BlockStateBase::reset_avl_fields
+*/
     void reset_avl_fields() noexcept
     {
+
         set_left_offset( AddressTraitsT::no_block );
+
         set_right_offset( AddressTraitsT::no_block );
+
         set_parent_offset( AddressTraitsT::no_block );
+
         set_avl_height( 0 );
     }
 };
@@ -1138,12 +1194,20 @@ static_assert( sizeof( BlockStateBase<DefaultAddressTraits> ) == sizeof( Block<D
 static_assert( sizeof( BlockStateBase<DefaultAddressTraits> ) == 32,
                "BlockStateBase<DefaultAddressTraits> must be 32 bytes " );
 
+/*
+## pmm::FreeBlock
+*/
 template <typename AddressTraitsT> class FreeBlock : public BlockStateBase<AddressTraitsT>
 {
   public:
+
     using Base       = BlockStateBase<AddressTraitsT>;
+
     using index_type = typename AddressTraitsT::index_type;
 
+/*
+### pmm::FreeBlock::cast_from_raw
+*/
     static FreeBlock* cast_from_raw( void* raw ) noexcept
     {
         if ( raw == nullptr )
@@ -1168,8 +1232,14 @@ template <typename AddressTraitsT> class FreeBlock : public BlockStateBase<Addre
         return Base::template state_from_raw<FreeBlock<AddressTraitsT>>( raw );
     }
 
+/*
+### pmm::FreeBlock::verify_invariants
+*/
     bool verify_invariants() const noexcept { return Base::is_free(); }
 
+/*
+### pmm::FreeBlock::remove_from_avl
+*/
     FreeBlockRemovedAVL<AddressTraitsT>* remove_from_avl() noexcept
     {
 
@@ -1177,74 +1247,125 @@ template <typename AddressTraitsT> class FreeBlock : public BlockStateBase<Addre
     }
 };
 
+/*
+## pmm::FreeBlockRemovedAVL
+*/
 template <typename AddressTraitsT> class FreeBlockRemovedAVL : public BlockStateBase<AddressTraitsT>
 {
   public:
+
     using Base       = BlockStateBase<AddressTraitsT>;
+
     using index_type = typename AddressTraitsT::index_type;
 
+/*
+### pmm::FreeBlockRemovedAVL::cast_from_raw
+*/
     static FreeBlockRemovedAVL* cast_from_raw( void* raw ) noexcept
     {
         return Base::template state_from_raw<FreeBlockRemovedAVL<AddressTraitsT>>( raw );
     }
 
+/*
+### pmm::FreeBlockRemovedAVL::mark_as_allocated
+*/
     AllocatedBlock<AddressTraitsT>* mark_as_allocated( index_type data_granules, index_type own_idx ) noexcept
     {
+
         Base::set_weight( data_granules );
+
         Base::set_root_offset( own_idx );
+
         Base::reset_avl_fields();
         return this->template state_as<AllocatedBlock<AddressTraitsT>>();
     }
 
+/*
+### pmm::FreeBlockRemovedAVL::begin_splitting
+*/
     SplittingBlock<AddressTraitsT>* begin_splitting() noexcept
     {
         return this->template state_as<SplittingBlock<AddressTraitsT>>();
     }
 
+/*
+### pmm::FreeBlockRemovedAVL::insert_to_avl
+*/
     FreeBlock<AddressTraitsT>* insert_to_avl() noexcept { return this->template state_as<FreeBlock<AddressTraitsT>>(); }
 };
 
+/*
+## pmm::SplittingBlock
+*/
 template <typename AddressTraitsT> class SplittingBlock : public BlockStateBase<AddressTraitsT>
 {
   public:
+
     using Base       = BlockStateBase<AddressTraitsT>;
+
     using index_type = typename AddressTraitsT::index_type;
 
+/*
+### pmm::SplittingBlock::cast_from_raw
+*/
     static SplittingBlock* cast_from_raw( void* raw ) noexcept
     {
         return Base::template state_from_raw<SplittingBlock<AddressTraitsT>>( raw );
     }
 
+/*
+### pmm::SplittingBlock::initialize_new_block
+*/
     void initialize_new_block( void* new_blk_ptr, [[maybe_unused]] index_type new_idx, index_type own_idx ) noexcept
     {
+
         std::memset( new_blk_ptr, 0, sizeof( Block<AddressTraitsT> ) );
+
         Base::init_fields( new_blk_ptr, own_idx, this->next_offset(), 1, 0, 0 );
     }
 
+/*
+### pmm::SplittingBlock::link_new_block
+*/
     void link_new_block( void* old_next_blk, index_type new_idx ) noexcept
     {
         if ( old_next_blk != nullptr )
         {
             Base::set_prev_offset_of( old_next_blk, new_idx );
         }
+
         Base::set_next_offset( new_idx );
     }
 
+/*
+### pmm::SplittingBlock::finalize_split
+*/
     AllocatedBlock<AddressTraitsT>* finalize_split( index_type data_granules, index_type own_idx ) noexcept
     {
+
         Base::set_weight( data_granules );
+
         Base::set_root_offset( own_idx );
+
         Base::reset_avl_fields();
         return this->template state_as<AllocatedBlock<AddressTraitsT>>();
     }
 };
 
+/*
+## pmm::AllocatedBlock
+*/
 template <typename AddressTraitsT> class AllocatedBlock : public BlockStateBase<AddressTraitsT>
 {
   public:
+
     using Base       = BlockStateBase<AddressTraitsT>;
+
     using index_type = typename AddressTraitsT::index_type;
 
+/*
+### pmm::AllocatedBlock::cast_from_raw
+*/
     static AllocatedBlock* cast_from_raw( void* raw ) noexcept
     {
         if ( raw == nullptr )
@@ -1269,8 +1390,14 @@ template <typename AddressTraitsT> class AllocatedBlock : public BlockStateBase<
         return Base::template state_from_raw<AllocatedBlock<AddressTraitsT>>( raw );
     }
 
+/*
+### pmm::AllocatedBlock::verify_invariants
+*/
     bool verify_invariants( index_type own_idx ) const noexcept { return Base::is_allocated( own_idx ); }
 
+/*
+### pmm::AllocatedBlock::user_ptr
+*/
     void* user_ptr() noexcept { return reinterpret_cast<std::uint8_t*>( this ) + sizeof( Block<AddressTraitsT> ); }
 
     const void* user_ptr() const noexcept
@@ -1278,48 +1405,79 @@ template <typename AddressTraitsT> class AllocatedBlock : public BlockStateBase<
         return reinterpret_cast<const std::uint8_t*>( this ) + sizeof( Block<AddressTraitsT> );
     }
 
+/*
+### pmm::AllocatedBlock::mark_as_free
+*/
     FreeBlockNotInAVL<AddressTraitsT>* mark_as_free() noexcept
     {
+
         Base::set_weight( 0 );
+
         Base::set_root_offset( 0 );
         return this->template state_as<FreeBlockNotInAVL<AddressTraitsT>>();
     }
 };
 
+/*
+## pmm::FreeBlockNotInAVL
+*/
 template <typename AddressTraitsT> class FreeBlockNotInAVL : public BlockStateBase<AddressTraitsT>
 {
   public:
+
     using Base       = BlockStateBase<AddressTraitsT>;
+
     using index_type = typename AddressTraitsT::index_type;
 
+/*
+### pmm::FreeBlockNotInAVL::cast_from_raw
+*/
     static FreeBlockNotInAVL* cast_from_raw( void* raw ) noexcept
     {
         return Base::template state_from_raw<FreeBlockNotInAVL<AddressTraitsT>>( raw );
     }
 
+/*
+### pmm::FreeBlockNotInAVL::begin_coalescing
+*/
     CoalescingBlock<AddressTraitsT>* begin_coalescing() noexcept
     {
         return this->template state_as<CoalescingBlock<AddressTraitsT>>();
     }
 
+/*
+### pmm::FreeBlockNotInAVL::insert_to_avl
+*/
     FreeBlock<AddressTraitsT>* insert_to_avl() noexcept
     {
+
         Base::set_avl_height( 1 );
         return this->template state_as<FreeBlock<AddressTraitsT>>();
     }
 };
 
+/*
+## pmm::CoalescingBlock
+*/
 template <typename AddressTraitsT> class CoalescingBlock : public BlockStateBase<AddressTraitsT>
 {
   public:
+
     using Base       = BlockStateBase<AddressTraitsT>;
+
     using index_type = typename AddressTraitsT::index_type;
 
+/*
+### pmm::CoalescingBlock::cast_from_raw
+*/
     static CoalescingBlock* cast_from_raw( void* raw ) noexcept
     {
         return Base::template state_from_raw<CoalescingBlock<AddressTraitsT>>( raw );
     }
 
+/*
+### pmm::CoalescingBlock::coalesce_with_next
+*/
     void coalesce_with_next( void* next_blk, void* next_next_blk, index_type own_idx ) noexcept
     {
 
@@ -1332,8 +1490,12 @@ template <typename AddressTraitsT> class CoalescingBlock : public BlockStateBase
         std::memset( next_blk, 0, sizeof( Block<AddressTraitsT> ) );
     }
 
+/*
+### pmm::CoalescingBlock::coalesce_with_prev
+*/
     CoalescingBlock<AddressTraitsT>* coalesce_with_prev( void* prev_blk, void* next_blk, index_type prev_idx ) noexcept
     {
+
         Base::set_next_offset_of( prev_blk, Base::next_offset() );
 
         if ( next_blk != nullptr )
@@ -1346,8 +1508,12 @@ template <typename AddressTraitsT> class CoalescingBlock : public BlockStateBase
         return Base::template state_from_raw<CoalescingBlock<AddressTraitsT>>( prev_blk );
     }
 
+/*
+### pmm::CoalescingBlock::finalize_coalesce
+*/
     FreeBlock<AddressTraitsT>* finalize_coalesce() noexcept
     {
+
         Base::set_avl_height( 1 );
         return this->template state_as<FreeBlock<AddressTraitsT>>();
     }
@@ -1375,38 +1541,7 @@ inline void verify_block_state( const void* raw_blk, typename AT::index_type own
     BlockStateBase<AT>::verify_state( raw_blk, own_idx, result );
 }
 
-} // namespace pmm
-
-/**
- * @file pmm/types.h
- * @brief Core types and constants for PersistMemoryManager.
- *
- * Contains: ManagerHeader, MemoryStats, ManagerInfo,
- * BlockView, FreeBlockView and utility functions for byte/granule conversion.
- *
- * Sizes of structures are protected by static_assert:
- *   Block<DefaultAddressTraits> == 32 bytes
- *   ManagerHeader<DefaultAddressTraits> == 64 bytes
- *
- * @version 2.4
- */
-
-/**
- * @file pmm/validation.h
- * @brief Unified pointer and block validation layer for PersistMemoryManager.
- *
- * Centralizes all low-level validation checks that guard raw pointer → block
- * transitions. Provides two levels:
- *   - cheap (fast-path): O(1) checks for normal API operations
- *   - full (verify-level): structural consistency checks for verify/repair
- *
- * All conversion paths (granule index → Block*, user pointer → Block*,
- * pptr → T*, etc.) should route through these helpers.
- *
- * @see docs/validation_model.md — specification
- * @see types.h — block_at, header_from_ptr_t (callers of validation)
- * @version 1.0
- */
+}
 
 #include <cstddef>
 #include <cstdint>
@@ -1417,23 +1552,12 @@ namespace pmm
 namespace detail
 {
 
-// ─── Cheap (fast-path) validation ────────────────────────────────────────────
-
-/**
- * @brief Validate that a granule index refers to a location within the managed image
- *        where a complete Block header fits.
- *
- * @tparam AT Address traits type.
- * @param total_size Total size of the managed area in bytes.
- * @param idx        Granule index to validate.
- * @return true if idx is valid (not no_block, and block header fits within image).
- */
 template <typename AT> inline bool validate_block_index( std::size_t total_size, typename AT::index_type idx ) noexcept
 {
     if ( idx == AT::no_block )
         return false;
     std::size_t byte_off = static_cast<std::size_t>( idx ) * AT::granule_size;
-    // Overflow check: if idx * granule_size wrapped around, byte_off < idx for large idx.
+
     if ( idx != 0 && byte_off / AT::granule_size != static_cast<std::size_t>( idx ) )
         return false;
     if ( byte_off + sizeof( pmm::Block<AT> ) > total_size )
@@ -1441,21 +1565,6 @@ template <typename AT> inline bool validate_block_index( std::size_t total_size,
     return true;
 }
 
-/**
- * @brief Validate that a user-data pointer is within the managed image,
- *        granule-aligned, and past the minimum address for user data.
- *
- * Does NOT check whether the block is actually allocated (no weight check).
- * Use header_from_ptr_t() for the full user-ptr → Block* path.
- *
- * @tparam AT Address traits type.
- * @param base            Base pointer of the managed area.
- * @param total_size      Total size of the managed area in bytes.
- * @param ptr             User-data pointer to validate.
- * @param min_user_offset Minimum byte offset from base for the first valid user-data address.
- *                        Typically: sizeof(Block<AT>) + sizeof(ManagerHeader<AT>) + sizeof(Block<AT>).
- * @return true if ptr passes all cheap checks.
- */
 template <typename AT>
 inline bool validate_user_ptr( const std::uint8_t* base, std::size_t total_size, const void* ptr,
                                std::size_t min_user_offset ) noexcept
@@ -1472,14 +1581,13 @@ inline bool validate_user_ptr( const std::uint8_t* base, std::size_t total_size,
     if ( raw_addr < base_addr )
         return false;
     const std::size_t byte_off = static_cast<std::size_t>( raw_addr - base_addr );
-    // Must be within managed area. Unsigned subtraction keeps foreign pointers as invalid
-    // without forming out-of-object pointer sums such as base + total_size.
+
     if ( byte_off >= total_size )
         return false;
-    // Must be past minimum user-data address.
+
     if ( byte_off < min_user_offset )
         return false;
-    // The block header candidate must be granule-aligned relative to base.
+
     static constexpr std::size_t kBlockSize = sizeof( pmm::Block<AT> );
     std::size_t                  cand_off   = byte_off - kBlockSize;
     if ( cand_off % AT::granule_size != 0 )
@@ -1487,43 +1595,13 @@ inline bool validate_user_ptr( const std::uint8_t* base, std::size_t total_size,
     return true;
 }
 
-/**
- * @brief Validate a granule index used in linked-list or AVL-tree traversal.
- *
- * Checks the index is either no_block (valid sentinel) or a valid in-range index.
- * Useful for validating next_offset, prev_offset, left_offset, right_offset, etc.
- *
- * @tparam AT Address traits type.
- * @param total_size Total size of the managed area in bytes.
- * @param idx        Granule index to validate (may be no_block).
- * @return true if idx is no_block or a valid in-range index.
- */
 template <typename AT> inline bool validate_link_index( std::size_t total_size, typename AT::index_type idx ) noexcept
 {
     if ( idx == AT::no_block )
-        return true; // Sentinel is always valid.
+        return true;
     return validate_block_index<AT>( total_size, idx );
 }
 
-// ─── Full (verify-level) validation ──────────────────────────────────────────
-
-/**
- * @brief Full verify-level validation of a block header's structural integrity.
- *
- * Checks:
- *   - weight/root_offset consistency (free vs allocated invariant)
- *   - prev_offset and next_offset are valid link indices
- *   - node_type is a known value (kNodeReadWrite or kNodeReadOnly)
- *   - Block data range does not exceed image boundary
- *
- * Reports violations into the VerifyResult. Does not modify the image.
- *
- * @tparam AT Address traits type.
- * @param base       Base pointer of the managed area.
- * @param total_size Total size of the managed area in bytes.
- * @param idx        Granule index of the block being validated.
- * @param result     Diagnostic result to append violations to.
- */
 template <typename AT>
 inline void validate_block_header_full( const std::uint8_t* base, std::size_t total_size, typename AT::index_type idx,
                                         VerifyResult& result ) noexcept
@@ -1540,10 +1618,8 @@ inline void validate_block_header_full( const std::uint8_t* base, std::size_t to
 
     const void* blk_raw = base + static_cast<std::size_t>( idx ) * AT::granule_size;
 
-    // 1. Weight / root_offset consistency (delegates to BlockState::verify_state).
     BlockState::verify_state( blk_raw, idx, result );
 
-    // 2. next_offset within bounds.
     index_type next = BlockState::get_next_offset( blk_raw );
     if ( next != AT::no_block && !validate_block_index<AT>( total_size, next ) )
     {
@@ -1552,7 +1628,6 @@ inline void validate_block_header_full( const std::uint8_t* base, std::size_t to
                     static_cast<std::uint64_t>( next ) );
     }
 
-    // 3. prev_offset within bounds.
     index_type prev = BlockState::get_prev_offset( blk_raw );
     if ( prev != AT::no_block && !validate_block_index<AT>( total_size, prev ) )
     {
@@ -1561,7 +1636,6 @@ inline void validate_block_header_full( const std::uint8_t* base, std::size_t to
                     static_cast<std::uint64_t>( prev ) );
     }
 
-    // 4. node_type is a known value.
     std::uint16_t nt = BlockState::get_node_type( blk_raw );
     if ( nt != pmm::kNodeReadWrite && nt != pmm::kNodeReadOnly )
     {
@@ -1569,7 +1643,6 @@ inline void validate_block_header_full( const std::uint8_t* base, std::size_t to
                     static_cast<std::uint64_t>( idx ), 0, static_cast<std::uint64_t>( nt ) );
     }
 
-    // 5. If allocated, verify block data range fits in image.
     index_type w = BlockState::get_weight( blk_raw );
     if ( w > 0 )
     {
@@ -1585,8 +1658,8 @@ inline void validate_block_header_full( const std::uint8_t* base, std::size_t to
     }
 }
 
-} // namespace detail
-} // namespace pmm
+}
+}
 
 #include <algorithm>
 #include <cassert>
@@ -1598,47 +1671,40 @@ inline void validate_block_header_full( const std::uint8_t* base, std::size_t to
 namespace pmm
 {
 
-// ─── Error codes ──────────────────────────────────────
-
-/**
- * @brief Error codes for PersistMemoryManager operations.
- *
- * Provides detailed error information instead of bare bool/nullptr.
- * Use `PersistMemoryManager::last_error()` to query the most recent error.
- */
+/*
+## pmm::PmmError
+*/
 enum class PmmError : std::uint8_t
 {
-    Ok                      = 0,  ///< Operation succeeded
-    NotInitialized          = 1,  ///< Manager is not initialized
-    InvalidSize             = 2,  ///< Invalid size argument (zero, too small, etc.)
-    Overflow                = 3,  ///< Arithmetic overflow in size/granule computation
-    OutOfMemory             = 4,  ///< Allocation failed — not enough free space
-    ExpandFailed            = 5,  ///< Backend expand() failed
-    InvalidMagic            = 6,  ///< Magic number mismatch on load()
-    CrcMismatch             = 7,  ///< CRC32 mismatch on load (corrupted image)
-    SizeMismatch            = 8,  ///< Stored total_size does not match backend
-    GranuleMismatch         = 9,  ///< Stored granule_size does not match address_traits
-    BackendError            = 10, ///< Backend returned null or invalid state
-    InvalidPointer          = 11, ///< Pointer is null or out of bounds
-    BlockLocked             = 12, ///< Block is permanently locked (cannot deallocate)
-    UnsupportedImageVersion = 13, ///< Stored image_version is not supported by this build
+    Ok                      = 0,
+    NotInitialized          = 1,
+    InvalidSize             = 2,
+    Overflow                = 3,
+    OutOfMemory             = 4,
+    ExpandFailed            = 5,
+    InvalidMagic            = 6,
+    CrcMismatch             = 7,
+    SizeMismatch            = 8,
+    GranuleMismatch         = 9,
+    BackendError            = 10,
+    InvalidPointer          = 11,
+    BlockLocked             = 12,
+    UnsupportedImageVersion = 13,
 };
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-/// @brief Granule size in bytes. All alignment/granularity expressed via this constant.
-/// Matches DefaultAddressTraits::granule_size.
 inline constexpr std::size_t kGranuleSize = 16;
 static_assert( ( kGranuleSize & ( kGranuleSize - 1 ) ) == 0, "kGranuleSize must be a power of 2 " );
 static_assert( kGranuleSize == pmm::DefaultAddressTraits::granule_size,
                "kGranuleSize must match DefaultAddressTraits::granule_size " );
 
-inline constexpr std::uint64_t kMagic = 0x504D4D5F56303938ULL; ///< "PMM_V098"
+inline constexpr std::uint64_t kMagic = 0x504D4D5F56303938ULL;
 
-// ─── Public data structures ────────────────────────────────────────────────────
-
+/*
+## pmm::MemoryStats
+*/
 struct MemoryStats
 {
+
     std::size_t total_blocks;
     std::size_t free_blocks;
     std::size_t allocated_blocks;
@@ -1647,8 +1713,12 @@ struct MemoryStats
     std::size_t total_fragmentation;
 };
 
+/*
+## pmm::ManagerInfo
+*/
 struct ManagerInfo
 {
+
     std::uint64_t  magic;
     std::size_t    total_size;
     std::size_t    used_size;
@@ -1656,65 +1726,61 @@ struct ManagerInfo
     std::size_t    free_count;
     std::size_t    alloc_count;
     std::ptrdiff_t first_block_offset;
-    std::ptrdiff_t first_free_offset; ///< Root of AVL tree of free blocks
+    std::ptrdiff_t first_free_offset;
     std::size_t    manager_header_size;
 };
 
+/*
+## pmm::BlockView
+*/
 struct BlockView
 {
+
     std::size_t    index;
-    std::ptrdiff_t offset;      ///< Byte offset in PAS
-    std::size_t    total_size;  ///< Total block size in bytes
-    std::size_t    header_size; ///< BlockHeader size in bytes
-    std::size_t    user_size;   ///< User data size in bytes
-    std::size_t    alignment;   ///< Always kGranuleSize
+    std::ptrdiff_t offset;
+    std::size_t    total_size;
+    std::size_t    header_size;
+    std::size_t    user_size;
+    std::size_t    alignment;
+
     bool           used;
 };
 
-/// @brief View of a single free block in the AVL tree for visualisation.
-/// All _offset fields are byte offsets in the managed region, or -1 when absent.
+/*
+## pmm::FreeBlockView
+*/
 struct FreeBlockView
 {
+
     std::ptrdiff_t offset;
     std::size_t    total_size;
     std::size_t    free_size;
     std::ptrdiff_t left_offset;
     std::ptrdiff_t right_offset;
     std::ptrdiff_t parent_offset;
+
     int            avl_height;
+
     int            avl_depth;
 };
-
-// ─── Internal types (detail) ─────────────────────────────────────────────────
 
 namespace detail
 {
 
-/// @brief Legacy value found in images created before ManagerHeader had an explicit version byte.
 inline constexpr std::uint8_t kLegacyUnversionedImageVersion = 0;
 
-/// @brief Current persistent image layout version written by create().
 inline constexpr std::uint8_t kCurrentImageVersion = 1;
 
-/// @brief True when this build can read the image version directly or through an in-place migration.
 inline constexpr bool is_supported_image_version( std::uint8_t image_version ) noexcept
 {
     return image_version == kLegacyUnversionedImageVersion || image_version == kCurrentImageVersion;
 }
 
-/// @brief True when load() should upgrade the header after accepting the image.
 inline constexpr bool image_version_requires_migration( std::uint8_t image_version ) noexcept
 {
     return image_version == kLegacyUnversionedImageVersion;
 }
 
-// ─── CRC32 utility ────────────────────────────────────
-//
-// Software CRC32 (ISO 3309 / ITU-T V.42 polynomial 0xEDB88320).
-// Header-only, no external dependencies.  Used by io.h save/load functions.
-
-/// @brief CRC32 single byte accumulation.
-/// Extracts the inner loop from compute_crc32 and compute_image_crc32.
 inline std::uint32_t crc32_accumulate_byte( std::uint32_t crc, std::uint8_t byte ) noexcept
 {
     crc ^= byte;
@@ -1723,8 +1789,6 @@ inline std::uint32_t crc32_accumulate_byte( std::uint32_t crc, std::uint8_t byte
     return crc;
 }
 
-/// @brief Compute CRC32 over a byte range.
-/// Uses the standard Ethernet/zlib polynomial (0xEDB88320, reflected).
 inline std::uint32_t compute_crc32( const std::uint8_t* data, std::size_t length ) noexcept
 {
     std::uint32_t crc = 0xFFFFFFFFU;
@@ -1733,70 +1797,58 @@ inline std::uint32_t compute_crc32( const std::uint8_t* data, std::size_t length
     return crc ^ 0xFFFFFFFFU;
 }
 
-// BlockHeader struct removed — Block<DefaultAddressTraits> is the sole block type.
-// All block metadata is stored in Block<AddressTraitsT> (prev/next + TreeNode).
-
-// Verify Block<DefaultAddressTraits> layout and size constraints.
 static_assert( sizeof( pmm::Block<pmm::DefaultAddressTraits> ) == 32, "Block<DefaultAddressTraits> must be 32 bytes " );
 static_assert( sizeof( pmm::Block<pmm::DefaultAddressTraits> ) % kGranuleSize == 0,
                "Block<DefaultAddressTraits> must be granule-aligned " );
 
-// Verify Block linked list fields occupy 2 index_type fields.
-// LinkedListNode was merged into Block. Layout verified via block.h.
 static_assert( sizeof( pmm::Block<pmm::DefaultAddressTraits> ) ==
                    sizeof( pmm::TreeNode<pmm::DefaultAddressTraits> ) + 2 * sizeof( std::uint32_t ),
                "Block<DefaultAddressTraits> must have TreeNode + 2 index_type list fields " );
-// TreeNode<DefaultAddressTraits>: weight + left/right/parent + root_offset + avl_height/node_type (24 bytes).
-// Weight moved to first field, avl_height/node_type (renamed from _pad) moved to end.
+
 static_assert( sizeof( pmm::TreeNode<pmm::DefaultAddressTraits> ) == 5 * sizeof( std::uint32_t ) + 4,
                "TreeNode<DefaultAddressTraits> must be 24 bytes " );
 
-// kBlockMagic removed: block validity now uses is_valid_block() structural invariants.
-/// Matches DefaultAddressTraits::no_block.
-inline constexpr std::uint32_t kNoBlock = 0xFFFFFFFFU; ///< Sentinel: no block (granule index)
+inline constexpr std::uint32_t kNoBlock = 0xFFFFFFFFU;
 static_assert( kNoBlock == pmm::DefaultAddressTraits::no_block, "kNoBlock must match DefaultAddressTraits::no_block " );
 
-/// @brief Template alias for AddressTraitsT::no_block sentinel.
-/// Use this instead of detail::kNoBlock in generic (templated) code that works with any AT.
-/// For DefaultAddressTraits, kNoBlock_v<DefaultAddressTraits> == kNoBlock == 0xFFFFFFFFU.
 template <typename AddressTraitsT>
 inline constexpr typename AddressTraitsT::index_type kNoBlock_v = AddressTraitsT::no_block;
 
-/// @brief Null granule index sentinel: index_type(0) means "no data" in persistent containers.
-/// Use this instead of `static_cast<index_type>(0)` in persistent containers.
 template <typename AddressTraitsT>
 inline constexpr typename AddressTraitsT::index_type kNullIdx_v = static_cast<typename AddressTraitsT::index_type>( 0 );
 
-/// @brief Manager header parameterized on AddressTraitsT.
-/// All _offset and counter fields use index_type, so LargeDBConfig uses uint64_t indices
-/// and DefaultAddressTraits keeps uint32_t with exactly 64 bytes as before.
-/// prev_total_size is runtime-only (zeroed by load() — not persisted).
-/// Removed prev_owns_memory and prev_base_ptr (obsolete runtime-only fields).
-///
-/// Layout for DefaultAddressTraits (uint32_t):
-///   magic (8) + total_size (8) + 7×uint32_t + owns_memory(1) +
-///   image_version(1) + granule_size(2) + prev_total_size(8) + crc32(4) + root_offset(4) = 64 bytes
-/// For LargeAddressTraits (uint64_t): sizeof = 16 + 56 + 4*(+4 padding) + 16 = 96 bytes
-///   → occupies ceil(96/64) = 2 granules = 128 bytes via kManagerHeaderGranules_t<AT>
+/*
+## pmm::detail::ManagerHeader
+*/
 template <typename AddressTraitsT = DefaultAddressTraits> struct ManagerHeader
 {
+
     using index_type = typename AddressTraitsT::index_type;
 
-    std::uint64_t magic;              ///< Manager magic number
-    std::uint64_t total_size;         ///< Total size of managed area in bytes
-    index_type    used_size;          ///< Used size in granules
-    index_type    block_count;        ///< Total number of blocks
-    index_type    free_count;         ///< Number of free blocks
-    index_type    alloc_count;        ///< Number of allocated blocks
-    index_type    first_block_offset; ///< First block (granule index)
-    index_type    last_block_offset;  ///< Last block (granule index)
-    index_type    free_tree_root;     ///< Root of AVL tree of free blocks (granule index)
-    bool          owns_memory;        ///< Manager owns buffer (runtime-only)
-    std::uint8_t  image_version;      ///< Persistent image layout version
-    std::uint16_t granule_size;       ///< kGranuleSize at creation time; validated on load
-    std::uint64_t prev_total_size;    ///< Previous buffer size in bytes (runtime-only)
-    std::uint32_t crc32;              ///< CRC32 checksum of the persisted image
-    index_type    root_offset;        ///< Forest registry root granule index (no_block before bootstrap)
+    std::uint64_t magic;
+    std::uint64_t total_size;
+
+    index_type    used_size;
+
+    index_type    block_count;
+
+    index_type    free_count;
+
+    index_type    alloc_count;
+
+    index_type    first_block_offset;
+
+    index_type    last_block_offset;
+
+    index_type    free_tree_root;
+
+    bool          owns_memory;
+    std::uint8_t  image_version;
+    std::uint16_t granule_size;
+    std::uint64_t prev_total_size;
+    std::uint32_t crc32;
+
+    index_type    root_offset;
 };
 
 static_assert( sizeof( ManagerHeader<DefaultAddressTraits> ) == 64,
@@ -1804,27 +1856,21 @@ static_assert( sizeof( ManagerHeader<DefaultAddressTraits> ) == 64,
 static_assert( sizeof( ManagerHeader<DefaultAddressTraits> ) % kGranuleSize == 0,
                "ManagerHeader<DefaultAddressTraits> must be granule-aligned " );
 
-/// @brief Block header size in granules for AddressTraitsT.
-/// Computes ceil(sizeof(Block<AT>) / AT::granule_size).
-/// For DefaultAddressTraits: 32/16 = 2. For SmallAddressTraits: ceil(18/16) = 2. For Large: 64/64 = 1.
 template <typename AddressTraitsT>
 inline constexpr typename AddressTraitsT::index_type kBlockHeaderGranules_t =
     static_cast<typename AddressTraitsT::index_type>(
         ( sizeof( pmm::Block<AddressTraitsT> ) + AddressTraitsT::granule_size - 1 ) / AddressTraitsT::granule_size );
 
-/// @brief Canonical byte offset of ManagerHeader from the base pointer.
 template <typename AddressTraitsT>
 inline constexpr std::size_t manager_header_offset_bytes_v =
     static_cast<std::size_t>( kBlockHeaderGranules_t<AddressTraitsT> ) * AddressTraitsT::granule_size;
 
-/// @brief Canonical mutable ManagerHeader pointer from the base pointer.
 template <typename AddressTraitsT>
 inline ManagerHeader<AddressTraitsT>* manager_header_at( std::uint8_t* base ) noexcept
 {
     return reinterpret_cast<ManagerHeader<AddressTraitsT>*>( base + manager_header_offset_bytes_v<AddressTraitsT> );
 }
 
-/// @brief Canonical const ManagerHeader pointer from the base pointer.
 template <typename AddressTraitsT>
 inline const ManagerHeader<AddressTraitsT>* manager_header_at( const std::uint8_t* base ) noexcept
 {
@@ -1832,53 +1878,35 @@ inline const ManagerHeader<AddressTraitsT>* manager_header_at( const std::uint8_
                                                                    manager_header_offset_bytes_v<AddressTraitsT> );
 }
 
-/// @brief Compute CRC32 of the full persisted image, treating the crc32 field as zero.
-/// @tparam AddressTraitsT Address traits type (determines ManagerHeader layout).
-/// @param data   Pointer to the start of the managed region.
-/// @param length Total size of the managed region in bytes.
-/// @return CRC32 checksum.
 template <typename AddressTraitsT>
 inline std::uint32_t compute_image_crc32( const std::uint8_t* data, std::size_t length ) noexcept
 {
-    // Offset of the crc32 field within ManagerHeader, which itself is located
-    // at the canonical granule-aligned offset after Block_0.
+
     constexpr std::size_t kHdrOffset = manager_header_offset_bytes_v<AddressTraitsT>;
     constexpr std::size_t kCrcOffset = kHdrOffset + offsetof( ManagerHeader<AddressTraitsT>, crc32 );
     constexpr std::size_t kCrcSize   = sizeof( std::uint32_t );
     constexpr std::size_t kAfterCrc  = kCrcOffset + kCrcSize;
 
-    // CRC everything before the crc32 field
     std::uint32_t crc = 0xFFFFFFFFU;
     for ( std::size_t i = 0; i < kCrcOffset && i < length; ++i )
         crc = crc32_accumulate_byte( crc, data[i] );
-    // Skip the crc32 field (treat as 4 zero bytes)
+
     for ( std::size_t i = 0; i < kCrcSize; ++i )
         crc = crc32_accumulate_byte( crc, 0x00U );
-    // CRC everything after the crc32 field
+
     for ( std::size_t i = kAfterCrc; i < length; ++i )
         crc = crc32_accumulate_byte( crc, data[i] );
     return crc ^ 0xFFFFFFFFU;
 }
 
-/// @brief Number of granules in ManagerHeader<DefaultAddressTraits>
 inline constexpr std::uint32_t kManagerHeaderGranules = sizeof( ManagerHeader<DefaultAddressTraits> ) / kGranuleSize;
 
-/// @brief Minimum block size = Block header + 1 data granule (uses Block<A>).
 inline constexpr std::size_t kMinBlockSize = sizeof( pmm::Block<pmm::DefaultAddressTraits> ) + kGranuleSize;
 
-/// @brief Minimum memory size = Block_0 + ManagerHeader + Block_1 + kMinBlockSize.
-/// Uses DefaultAddressTraits for the non-templated constant.
 inline constexpr std::size_t kMinMemorySize = sizeof( pmm::Block<pmm::DefaultAddressTraits> ) +
                                               sizeof( ManagerHeader<pmm::DefaultAddressTraits> ) +
                                               sizeof( pmm::Block<pmm::DefaultAddressTraits> ) + kMinBlockSize;
 
-// ─── Byte ↔ granule conversion ──────────────────────────────────────────────
-//
-// Templated helpers using AddressTraitsT::granule_size.
-// For non-default address traits (SmallAddressTraits with 16B, LargeAddressTraits with 64B).
-
-/// @brief Convert bytes to granules (ceiling) using AddressTraitsT::granule_size.
-/// Returns AddressTraitsT::index_type.
 template <typename AddressTraitsT> inline typename AddressTraitsT::index_type bytes_to_granules_t( std::size_t bytes )
 {
     using IndexT                         = typename AddressTraitsT::index_type;
@@ -1891,7 +1919,6 @@ template <typename AddressTraitsT> inline typename AddressTraitsT::index_type by
     return static_cast<IndexT>( granules );
 }
 
-/// @brief Convert bytes to index_type granules (ceiling) using AddressTraitsT::granule_size.
 template <typename AddressTraitsT> inline typename AddressTraitsT::index_type bytes_to_idx_t( std::size_t bytes )
 {
     static constexpr std::size_t kGranSz = AddressTraitsT::granule_size;
@@ -1899,22 +1926,18 @@ template <typename AddressTraitsT> inline typename AddressTraitsT::index_type by
     if ( bytes == 0 )
         return static_cast<IndexT>( 0 );
     if ( bytes > std::numeric_limits<std::size_t>::max() - ( kGranSz - 1 ) )
-        return AddressTraitsT::no_block; // overflow
+        return AddressTraitsT::no_block;
     std::size_t granules = ( bytes + kGranSz - 1 ) / kGranSz;
     if ( granules > static_cast<std::size_t>( std::numeric_limits<IndexT>::max() ) )
-        return AddressTraitsT::no_block; // overflow for IndexT
+        return AddressTraitsT::no_block;
     return static_cast<IndexT>( granules );
 }
 
-/// @brief Get byte offset from granule index using AddressTraitsT::granule_size.
-/// Parameter changed from uint32_t to index_type for 64-bit support.
 template <typename AddressTraitsT> inline std::size_t idx_to_byte_off_t( typename AddressTraitsT::index_type idx )
 {
     return static_cast<std::size_t>( idx ) * AddressTraitsT::granule_size;
 }
 
-/// @brief Get granule index from byte offset using AddressTraitsT::granule_size.
-/// Return type changed from uint32_t to index_type for 64-bit support.
 template <typename AddressTraitsT> inline typename AddressTraitsT::index_type byte_off_to_idx_t( std::size_t byte_off )
 {
     using IndexT = typename AddressTraitsT::index_type;
@@ -1923,17 +1946,11 @@ template <typename AddressTraitsT> inline typename AddressTraitsT::index_type by
     return static_cast<IndexT>( byte_off / AddressTraitsT::granule_size );
 }
 
-/// @brief Returns true only for kGranuleSize (16-byte) alignment.
 inline bool is_valid_alignment( std::size_t align )
 {
     return align == kGranuleSize;
 }
 
-/// @brief Get pointer to Block<AddressTraitsT> by granule index.
-/// Single canonical implementation replacing per-file blk_at() helpers in
-/// allocator_policy.h and free_block_tree.h.
-/// Uses AddressTraitsT::granule_size for byte-offset computation.
-/// Idx parameter is now index_type (was uint32_t) for 64-bit support.
 template <typename AddressTraitsT = pmm::DefaultAddressTraits>
 inline pmm::Block<AddressTraitsT>* block_at( std::uint8_t* base, typename AddressTraitsT::index_type idx )
 {
@@ -1942,8 +1959,6 @@ inline pmm::Block<AddressTraitsT>* block_at( std::uint8_t* base, typename Addres
                                                                      AddressTraitsT::granule_size );
 }
 
-/// @brief Get const pointer to Block<AddressTraitsT> by granule index (read-only).
-/// Idx parameter is now index_type (was uint32_t) for 64-bit support.
 template <typename AddressTraitsT = pmm::DefaultAddressTraits>
 inline const pmm::Block<AddressTraitsT>* block_at( const std::uint8_t* base, typename AddressTraitsT::index_type idx )
 {
@@ -1952,8 +1967,6 @@ inline const pmm::Block<AddressTraitsT>* block_at( const std::uint8_t* base, typ
                                                                            AddressTraitsT::granule_size );
 }
 
-/// @brief Validated block_at: returns nullptr if idx is out of range.
-/// Use in verify/diagnostic paths where invalid indices must be handled gracefully.
 template <typename AddressTraitsT = pmm::DefaultAddressTraits>
 inline pmm::Block<AddressTraitsT>* block_at_checked( std::uint8_t* base, std::size_t total_size,
                                                      typename AddressTraitsT::index_type idx ) noexcept
@@ -1964,7 +1977,6 @@ inline pmm::Block<AddressTraitsT>* block_at_checked( std::uint8_t* base, std::si
                                                                      AddressTraitsT::granule_size );
 }
 
-/// @brief Validated block_at (const): returns nullptr if idx is out of range.
 template <typename AddressTraitsT = pmm::DefaultAddressTraits>
 inline const pmm::Block<AddressTraitsT>* block_at_checked( const std::uint8_t* base, std::size_t total_size,
                                                            typename AddressTraitsT::index_type idx ) noexcept
@@ -1975,7 +1987,6 @@ inline const pmm::Block<AddressTraitsT>* block_at_checked( const std::uint8_t* b
                                                                            AddressTraitsT::granule_size );
 }
 
-/// @brief Get granule index of Block<AddressTraitsT>.
 template <typename AddressTraitsT>
 inline typename AddressTraitsT::index_type block_idx_t( const std::uint8_t*               base,
                                                         const pmm::Block<AddressTraitsT>* block )
@@ -1985,19 +1996,11 @@ inline typename AddressTraitsT::index_type block_idx_t( const std::uint8_t*     
     return static_cast<typename AddressTraitsT::index_type>( byte_off / AddressTraitsT::granule_size );
 }
 
-/// @brief Manager header size in granules for AddressTraitsT.
-/// Uses ceiling division: ceil(sizeof(ManagerHeader<AT>) / AT::granule_size).
-/// For DefaultAddressTraits (16B granule): 64/16 = 4.
-/// For LargeAddressTraits (64B granule): ceil(96/64) = 2.
 template <typename AddressTraitsT>
 inline constexpr typename AddressTraitsT::index_type kManagerHeaderGranules_t =
     static_cast<typename AddressTraitsT::index_type>(
         ( sizeof( ManagerHeader<AddressTraitsT> ) + AddressTraitsT::granule_size - 1 ) / AddressTraitsT::granule_size );
 
-/// @brief Compute total granules of block for AddressTraitsT (Block<A> layout).
-/// Total_size is no longer stored — computed via next_offset.
-/// Single templated implementation; non-templated overload delegates here.
-/// ManagerHeader parameter is now ManagerHeader<AddressTraitsT>*.
 template <typename AddressTraitsT>
 inline typename AddressTraitsT::index_type block_total_granules( const std::uint8_t*                  base,
                                                                  const ManagerHeader<AddressTraitsT>* hdr,
@@ -2017,9 +2020,6 @@ inline typename AddressTraitsT::index_type block_total_granules( const std::uint
     return static_cast<IndexT>( total_gran - this_idx );
 }
 
-/// @brief Resolve a granule index to a raw pointer.
-/// Eliminates repeated `base + idx * granule_size` patterns across persistent containers.
-/// @return nullptr if idx is zero (null sentinel).
 template <typename AddressTraitsT>
 inline void* resolve_granule_ptr( std::uint8_t* base, typename AddressTraitsT::index_type idx ) noexcept
 {
@@ -2028,8 +2028,6 @@ inline void* resolve_granule_ptr( std::uint8_t* base, typename AddressTraitsT::i
     return base + static_cast<std::size_t>( idx ) * AddressTraitsT::granule_size;
 }
 
-/// @brief Validated resolve_granule_ptr: returns nullptr if idx is zero or out of bounds.
-/// Use in paths where external/untrusted indices must be validated before dereferencing.
 template <typename AddressTraitsT>
 inline void* resolve_granule_ptr_checked( std::uint8_t* base, std::size_t total_size,
                                           typename AddressTraitsT::index_type idx ) noexcept
@@ -2042,8 +2040,6 @@ inline void* resolve_granule_ptr_checked( std::uint8_t* base, std::size_t total_
     return base + byte_off;
 }
 
-/// @brief Convert a raw pointer to a granule index.
-/// Eliminates repeated `(ptr - base) / granule_size` patterns across persistent containers.
 template <typename AddressTraitsT>
 inline typename AddressTraitsT::index_type ptr_to_granule_idx( const std::uint8_t* base, const void* ptr ) noexcept
 {
@@ -2052,8 +2048,6 @@ inline typename AddressTraitsT::index_type ptr_to_granule_idx( const std::uint8_
     return static_cast<IndexT>( byte_off / AddressTraitsT::granule_size );
 }
 
-/// @brief Validated ptr_to_granule_idx: returns no_block on invalid input.
-/// Checks null, bounds, and granule alignment before converting.
 template <typename AddressTraitsT>
 inline typename AddressTraitsT::index_type ptr_to_granule_idx_checked( const std::uint8_t* base, std::size_t total_size,
                                                                        const void* ptr ) noexcept
@@ -2073,18 +2067,12 @@ inline typename AddressTraitsT::index_type ptr_to_granule_idx_checked( const std
     return static_cast<IndexT>( idx );
 }
 
-/// @brief Compute user data address for block (block + sizeof(Block<A>)).
-/// Single canonical implementation — use this instead of duplicating the cast in each call site.
 template <typename AddressTraitsT = pmm::DefaultAddressTraits>
 inline void* user_ptr( pmm::Block<AddressTraitsT>* block )
 {
     return reinterpret_cast<std::uint8_t*>( block ) + sizeof( pmm::Block<AddressTraitsT> );
 }
 
-// Canonical public-pointer reconstruction is a manager-structure check, not a
-// payload-byte self-consistency check. This reads first/last anchors plus
-// prev/next neighbor back-links without internal locking; callers must hold the
-// manager lock or otherwise guarantee that block links are stable while this runs.
 template <typename AddressTraitsT>
 inline bool is_block_header_linked_in_canonical_chain( const std::uint8_t*                  base,
                                                        const ManagerHeader<AddressTraitsT>* hdr, std::size_t total_size,
@@ -2209,10 +2197,6 @@ inline bool is_canonical_user_ptr( const std::uint8_t* base, std::size_t total_s
     return is_canonical_allocated_block_header<AddressTraitsT>( base, total_size, cand_addr );
 }
 
-/// @brief O(1) get Block<AddressTraitsT> from canonical user_ptr (ptr - sizeof(Block<AddressTraitsT>)).
-/// @pre Caller holds the manager lock, or block links are otherwise stable for the canonical-chain proof.
-/// Block<AddressTraitsT> is the sole block type.
-/// Unified templated helper replaces the former DefaultAddressTraits-specific overload.
 template <typename AddressTraitsT>
 inline pmm::Block<AddressTraitsT>* header_from_ptr_t( std::uint8_t* base, void* ptr, std::size_t total_size )
 {
@@ -2224,9 +2208,6 @@ inline pmm::Block<AddressTraitsT>* header_from_ptr_t( std::uint8_t* base, void* 
     return reinterpret_cast<pmm::Block<AddressTraitsT>*>( cand_addr );
 }
 
-/// @brief Required block granules for user_bytes = header_granules + max(1, ceil(user_bytes / granule_size)).
-/// Minimum block granules for user_bytes = header_granules + max(1, ceil(user_bytes / granule_size)).
-/// Uses AddressTraitsT::granule_size and kBlockHeaderGranules_t<AT> for correct per-AT computation.
 template <typename AddressTraitsT>
 inline typename AddressTraitsT::index_type required_block_granules_t( std::size_t user_bytes )
 {
@@ -2237,9 +2218,9 @@ inline typename AddressTraitsT::index_type required_block_granules_t( std::size_
     return kBlockHeaderGranules_t<AddressTraitsT> + data_granules;
 }
 
-} // namespace detail
+}
 
-} // namespace pmm
+}
 
 #include <concepts>
 #include <cstddef>
@@ -2250,64 +2231,52 @@ namespace pmm
 namespace detail
 {
 
-/// @cond INTERNAL
-
-/// @brief Sentinel value for "no node" in TreeNode fields.
 template <typename PPtr> static constexpr auto pptr_no_block() noexcept
 {
     return PPtr::manager_type::address_traits::no_block;
 }
 
-/// @brief Construct a sibling PPtr from an existing one with a different index.
-/// For regular pptr, returns PPtr(idx). For BlockPPtr, propagates base_ptr.
-template <typename PPtr> static PPtr pptr_make( PPtr /*source*/, typename PPtr::index_type idx ) noexcept
+template <typename PPtr> static PPtr pptr_make( PPtr  , typename PPtr::index_type idx ) noexcept
 {
     return PPtr( idx );
 }
 
-/// @brief Get left child as PPtr (translates no_block sentinel to null PPtr).
 template <typename PPtr> static PPtr pptr_get_left( PPtr p ) noexcept
 {
     auto idx = p.tree_node().get_left();
     return ( idx == pptr_no_block<PPtr>() ) ? PPtr() : pptr_make( p, idx );
 }
 
-/// @brief Get right child as PPtr (translates no_block sentinel to null PPtr).
 template <typename PPtr> static PPtr pptr_get_right( PPtr p ) noexcept
 {
     auto idx = p.tree_node().get_right();
     return ( idx == pptr_no_block<PPtr>() ) ? PPtr() : pptr_make( p, idx );
 }
 
-/// @brief Get parent as PPtr (translates no_block sentinel to null PPtr).
 template <typename PPtr> static PPtr pptr_get_parent( PPtr p ) noexcept
 {
     auto idx = p.tree_node().get_parent();
     return ( idx == pptr_no_block<PPtr>() ) ? PPtr() : pptr_make( p, idx );
 }
 
-/// @brief Set left child from PPtr (translates null PPtr to no_block sentinel).
 template <typename PPtr> static void pptr_set_left( PPtr p, PPtr child ) noexcept
 {
     auto idx = child.is_null() ? pptr_no_block<PPtr>() : child.offset();
     p.tree_node().set_left( idx );
 }
 
-/// @brief Set right child from PPtr (translates null PPtr to no_block sentinel).
 template <typename PPtr> static void pptr_set_right( PPtr p, PPtr child ) noexcept
 {
     auto idx = child.is_null() ? pptr_no_block<PPtr>() : child.offset();
     p.tree_node().set_right( idx );
 }
 
-/// @brief Set parent from PPtr (translates null PPtr to no_block sentinel).
 template <typename PPtr> static void pptr_set_parent( PPtr p, PPtr parent ) noexcept
 {
     auto idx = parent.is_null() ? pptr_no_block<PPtr>() : parent.offset();
     p.tree_node().set_parent( idx );
 }
 
-/// @brief Get height of node (0 if null).
 template <typename PPtr> static std::int16_t avl_height( PPtr p ) noexcept
 {
     if ( p.is_null() )
@@ -2315,7 +2284,6 @@ template <typename PPtr> static std::int16_t avl_height( PPtr p ) noexcept
     return p.tree_node().get_height();
 }
 
-/// @brief Update height of node from its children.
 template <typename PPtr> static void avl_update_height( PPtr p ) noexcept
 {
     if ( p.is_null() )
@@ -2326,7 +2294,6 @@ template <typename PPtr> static void avl_update_height( PPtr p ) noexcept
     p.tree_node().set_height( h );
 }
 
-/// @brief Balance factor: height(left) - height(right).
 template <typename PPtr> static std::int16_t avl_balance_factor( PPtr p ) noexcept
 {
     if ( p.is_null() )
@@ -2336,8 +2303,6 @@ template <typename PPtr> static std::int16_t avl_balance_factor( PPtr p ) noexce
     return static_cast<std::int16_t>( lh - rh );
 }
 
-/// @brief Update parent → child link (or root if parent is null).
-/// @param root_idx Reference to the tree's root index, updated when parent is null.
 template <typename PPtr, typename IndexType>
 static void avl_set_child( PPtr parent, PPtr old_child, PPtr new_child, IndexType& root_idx ) noexcept
 {
@@ -2353,24 +2318,14 @@ static void avl_set_child( PPtr parent, PPtr old_child, PPtr new_child, IndexTyp
         pptr_set_right( parent, new_child );
 }
 
-/// @brief Default node-update functor: updates height only (used by pmap, pstringview).
+/*
+## pmm::detail::AvlUpdateHeightOnly
+*/
 struct AvlUpdateHeightOnly
 {
     template <typename PPtr> void operator()( PPtr p ) const noexcept { avl_update_height( p ); }
 };
 
-/**
- * @brief Right rotation around y; returns new subtree root (x).
- *
- *     y            x
- *    / \          / \
- *   x   C  -->  A    y
- *  / \               / \
- * A   B             B   C
- *
- * @param update_node  Callable(PPtr) invoked on y then x after structural change.
- *                     Default: AvlUpdateHeightOnly (updates height only).
- */
 template <typename PPtr, typename IndexType, typename NodeUpdateFn = AvlUpdateHeightOnly>
 static PPtr avl_rotate_right( PPtr y, IndexType& root_idx, NodeUpdateFn update_node = {} ) noexcept
 {
@@ -2394,18 +2349,6 @@ static PPtr avl_rotate_right( PPtr y, IndexType& root_idx, NodeUpdateFn update_n
     return x;
 }
 
-/**
- * @brief Left rotation around x; returns new subtree root (y).
- *
- *   x               y
- *  / \             / \
- * A   y   -->    x    C
- *    / \        / \
- *   B   C      A   B
- *
- * @param update_node  Callable(PPtr) invoked on x then y after structural change.
- *                     Default: AvlUpdateHeightOnly (updates height only).
- */
 template <typename PPtr, typename IndexType, typename NodeUpdateFn = AvlUpdateHeightOnly>
 static PPtr avl_rotate_left( PPtr x, IndexType& root_idx, NodeUpdateFn update_node = {} ) noexcept
 {
@@ -2429,9 +2372,6 @@ static PPtr avl_rotate_left( PPtr x, IndexType& root_idx, NodeUpdateFn update_no
     return y;
 }
 
-/// @brief Rebalance from node p upward to root.
-/// @param update_node  Callable(PPtr) for node attribute update after rotations.
-///                     Default: AvlUpdateHeightOnly (height only).
 template <typename PPtr, typename IndexType, typename NodeUpdateFn = AvlUpdateHeightOnly>
 static void avl_rebalance_up( PPtr p, IndexType& root_idx, NodeUpdateFn update_node = {} ) noexcept
 {
@@ -2457,7 +2397,6 @@ static void avl_rebalance_up( PPtr p, IndexType& root_idx, NodeUpdateFn update_n
     }
 }
 
-/// @brief Find the minimum (leftmost) node in the subtree rooted at p.
 template <typename PPtr> static PPtr avl_min_node( PPtr p ) noexcept
 {
     while ( !p.is_null() )
@@ -2470,7 +2409,6 @@ template <typename PPtr> static PPtr avl_min_node( PPtr p ) noexcept
     return p;
 }
 
-/// @brief Find the maximum (rightmost) node in the subtree rooted at p.
 template <typename PPtr> static PPtr avl_max_node( PPtr p ) noexcept
 {
     while ( !p.is_null() )
@@ -2483,15 +2421,6 @@ template <typename PPtr> static PPtr avl_max_node( PPtr p ) noexcept
     return p;
 }
 
-/// @brief Remove target node from AVL tree and rebalance.
-///
-/// Standard BST removal with in-order successor replacement, followed by
-/// AVL rebalancing from the lowest affected node upward.
-///
-/// @param target      The node to remove (must be in the tree).
-/// @param root_idx    Reference to the tree root index.
-/// @param update_node Callable(PPtr) for node attribute update after rotations.
-///                    Default: AvlUpdateHeightOnly (height only).
 template <typename PPtr, typename IndexType, typename NodeUpdateFn = AvlUpdateHeightOnly>
 static void avl_remove( PPtr target, IndexType& root_idx, NodeUpdateFn update_node = {} ) noexcept
 {
@@ -2501,14 +2430,14 @@ static void avl_remove( PPtr target, IndexType& root_idx, NodeUpdateFn update_no
 
     if ( left_p.is_null() && right_p.is_null() )
     {
-        // Leaf node — just detach.
+
         avl_set_child( par_p, target, PPtr(), root_idx );
         if ( !par_p.is_null() )
             avl_rebalance_up( par_p, root_idx, update_node );
     }
     else if ( left_p.is_null() )
     {
-        // Only right child.
+
         pptr_set_parent( right_p, par_p );
         avl_set_child( par_p, target, right_p, root_idx );
         if ( !par_p.is_null() )
@@ -2518,7 +2447,7 @@ static void avl_remove( PPtr target, IndexType& root_idx, NodeUpdateFn update_no
     }
     else if ( right_p.is_null() )
     {
-        // Only left child.
+
         pptr_set_parent( left_p, par_p );
         avl_set_child( par_p, target, left_p, root_idx );
         if ( !par_p.is_null() )
@@ -2528,7 +2457,7 @@ static void avl_remove( PPtr target, IndexType& root_idx, NodeUpdateFn update_no
     }
     else
     {
-        // Two children — replace with in-order successor.
+
         PPtr successor = avl_min_node( right_p );
 
         auto succ_par_idx = successor.tree_node().get_parent();
@@ -2536,17 +2465,17 @@ static void avl_remove( PPtr target, IndexType& root_idx, NodeUpdateFn update_no
 
         if ( succ_par_idx == target.offset() )
         {
-            // Successor is direct right child of target.
+
             pptr_set_left( successor, left_p );
             pptr_set_parent( left_p, successor );
-            // successor keeps its right subtree
+
             pptr_set_parent( successor, par_p );
             avl_set_child( par_p, target, successor, root_idx );
             avl_rebalance_up( successor, root_idx, update_node );
         }
         else
         {
-            // Successor is deeper — detach it first.
+
             PPtr succ_par( succ_par_idx );
             if ( !succ_rgt.is_null() )
             {
@@ -2558,7 +2487,6 @@ static void avl_remove( PPtr target, IndexType& root_idx, NodeUpdateFn update_no
                 pptr_set_left( succ_par, PPtr() );
             }
 
-            // Put successor in target's place.
             pptr_set_left( successor, left_p );
             pptr_set_parent( left_p, successor );
             pptr_set_right( successor, right_p );
@@ -2571,19 +2499,6 @@ static void avl_remove( PPtr target, IndexType& root_idx, NodeUpdateFn update_no
     }
 }
 
-/// @brief Search the AVL tree for a node matching the given key.
-///
-/// Traverses the tree starting from root_idx, using compare_less to determine
-/// the direction at each node. When compare_less(cur, key) is true the search
-/// goes right; when compare_less(key, cur) is true it goes left; otherwise the
-/// node is considered a match and is returned.
-///
-/// @param root_idx     Index of the tree root (0 = empty tree).
-/// @param compare_less Callable(PPtr cur) -> int: returns negative if key < cur,
-///                     zero if key == cur, positive if key > cur.
-/// @param resolve      Callable(PPtr) -> NodeObjPtr: resolves pptr to raw pointer.
-///                     Must return nullptr when the pointer is invalid.
-/// @return PPtr to the matching node, or a null PPtr if not found.
 template <typename PPtr, typename IndexType, typename CompareThreeWayFn, typename ResolveFn>
 static PPtr avl_find( IndexType root_idx, CompareThreeWayFn&& compare_three_way, ResolveFn&& resolve ) noexcept
 {
@@ -2600,38 +2515,30 @@ static PPtr avl_find( IndexType root_idx, CompareThreeWayFn&& compare_three_way,
         else
             cur = pptr_get_right( cur );
     }
-    return PPtr(); // not found
+    return PPtr();
 }
 
-/// @brief In-order successor: next node in sorted order.
-/// Shared between pmap::iterator and other AVL-based containers.
 template <typename PPtr> static PPtr avl_inorder_successor( PPtr cur ) noexcept
 {
     if ( cur.is_null() )
         return PPtr();
 
-    // If there is a right child, go to its leftmost node.
     PPtr right = pptr_get_right( cur );
     if ( !right.is_null() )
         return avl_min_node( right );
 
-    // Otherwise, go up until we come from a left child.
     while ( true )
     {
         PPtr parent = pptr_get_parent( cur );
         if ( parent.is_null() )
-            return PPtr(); // reached root from right — end of traversal
+            return PPtr();
         PPtr parent_left = pptr_get_left( parent );
         if ( !parent_left.is_null() && parent_left.offset() == cur.offset() )
-            return parent; // cur was left child — parent is successor
+            return parent;
         cur = parent;
     }
 }
 
-/// @brief Initialize AVL tree node fields to empty state.
-/// Sets left, right, parent to sentinel and height to 1.
-/// Shared between pmap::insert and the canonical symbol-interning helper
-/// (`PersistMemoryManager::intern_symbol_unlocked`).
 template <typename PPtr> static void avl_init_node( PPtr p ) noexcept
 {
     auto& tn = p.tree_node();
@@ -2641,8 +2548,6 @@ template <typename PPtr> static void avl_init_node( PPtr p ) noexcept
     tn.set_height( static_cast<std::int16_t>( 1 ) );
 }
 
-/// @brief Count nodes in subtree rooted at p.
-/// Shared between pmap::size() and any other container that needs subtree counting.
 template <typename PPtr> static std::size_t avl_subtree_count( PPtr p ) noexcept
 {
     if ( p.is_null() )
@@ -2650,9 +2555,6 @@ template <typename PPtr> static std::size_t avl_subtree_count( PPtr p ) noexcept
     return 1 + avl_subtree_count( pptr_get_left( p ) ) + avl_subtree_count( pptr_get_right( p ) );
 }
 
-/// @brief Recursively deallocate all nodes in subtree.
-/// @tparam PPtr   Persistent pointer type.
-/// @tparam DeallocFn  Callable(PPtr) that deallocates a single node.
 template <typename PPtr, typename DeallocFn> static void avl_clear_subtree( PPtr p, DeallocFn&& dealloc ) noexcept
 {
     if ( p.is_null() )
@@ -2664,14 +2566,6 @@ template <typename PPtr, typename DeallocFn> static void avl_clear_subtree( PPtr
     dealloc( p );
 }
 
-/// @brief Insert new_node into the AVL tree with the given root.
-/// The caller must resolve the comparison ordering via go_left callback.
-/// @param new_node    The node to insert (must not be null, not already in tree).
-/// @param root_idx    Reference to the tree root index.
-/// @param go_left     Callable(cur_node_ptr) -> bool: returns true if new_node < cur.
-/// @param resolve     Callable(pptr) -> NodeObjPtr: resolves pptr to raw object pointer.
-/// @param update_node Callable(PPtr) for node attribute update after rotations.
-///                    Default: AvlUpdateHeightOnly (height only).
 template <typename PPtr, typename IndexType, typename GoLeftFn, typename ResolveFn,
           typename NodeUpdateFn = AvlUpdateHeightOnly>
 static void avl_insert( PPtr new_node, IndexType& root_idx, GoLeftFn&& go_left, ResolveFn&& resolve,
@@ -2717,8 +2611,6 @@ static void avl_insert( PPtr new_node, IndexType& root_idx, GoLeftFn&& go_left, 
     avl_rebalance_up( parent, root_idx, update_node );
 }
 
-// ─── Forest-domain protocol ──────────────────────────────────────────────────
-
 template <typename Domain>
 concept ForestDomainViewDescriptor = requires( const Domain domain, typename Domain::node_pptr p ) {
     typename Domain::index_type;
@@ -2753,162 +2645,225 @@ static bool forest_domain_validate_node( const Domain& domain, typename Domain::
         return true;
 }
 
-/**
- * @brief Generic read-only AVL-backed forest-domain operations for a concrete descriptor.
- *
- * The view descriptor supplies domain identity, read-only root binding, node
- * resolution, and optional external-key comparison.
- */
+/*
+## pmm::detail::ForestDomainViewOps
+*/
 template <ForestDomainViewDescriptor Domain> struct ForestDomainViewOps
 {
+
     using index_type = typename Domain::index_type;
+
     using node_type  = typename Domain::node_type;
+
     using node_pptr  = typename Domain::node_pptr;
 
     Domain domain;
 
+/*
+### pmm::detail::ForestDomainViewOps::ForestDomainViewOps
+*/
     constexpr explicit ForestDomainViewOps( Domain d = Domain{} ) noexcept : domain( d ) {}
 
+/*
+### pmm::detail::ForestDomainViewOps::name
+*/
     const char* name() const noexcept { return domain.name(); }
+
+/*
+### pmm::detail::ForestDomainViewOps::root_index
+*/
     index_type  root_index() const noexcept { return domain.root_index(); }
 
     template <typename Key>
         requires ForestDomainDescriptorForKey<Domain, Key>
+
+/*
+### pmm::detail::ForestDomainViewOps::find
+*/
     node_pptr find( const Key& key ) const noexcept
     {
         return avl_find<node_pptr>(
+
             domain.root_index(), [&]( node_pptr cur ) -> int { return domain.compare_key( key, cur ); },
+
             [this]( node_pptr p ) -> node_type* { return domain.resolve_node( p ); } );
     }
 };
 
-/**
- * @brief Generic mutable AVL-backed forest-domain operations for a concrete descriptor.
- *
- * The mutable descriptor adds root-slot access and node ordering. Mutation is
- * intentionally kept off the const surface: callers that only have a const
- * handle can read identity/root state and perform keyed lookup, but cannot
- * obtain or rewrite the root slot.
- */
+/*
+## pmm::detail::ForestDomainOps
+*/
 template <ForestDomainDescriptor Domain> struct ForestDomainOps : ForestDomainViewOps<Domain>
 {
+
     using view_base  = ForestDomainViewOps<Domain>;
+
     using index_type = typename view_base::index_type;
+
     using node_type  = typename view_base::node_type;
+
     using node_pptr  = typename view_base::node_pptr;
 
     using view_base::find;
     using view_base::name;
     using view_base::root_index;
 
+/*
+### pmm::detail::ForestDomainOps::ForestDomainOps
+*/
     constexpr explicit ForestDomainOps( Domain d = Domain{} ) noexcept : view_base( d ) {}
 
+/*
+### pmm::detail::ForestDomainOps::root_index_ptr
+*/
     index_type* root_index_ptr() noexcept { return this->domain.root_index_ptr(); }
 
+/*
+### pmm::detail::ForestDomainOps::reset_root
+*/
     bool reset_root() noexcept
     {
+
         index_type* root = root_index_ptr();
         if ( root == nullptr )
             return false;
+
         *root = static_cast<index_type>( 0 );
         return true;
     }
 
+/*
+### pmm::detail::ForestDomainOps::insert
+*/
     void insert( node_pptr new_node ) noexcept
     {
         index_type* root = this->domain.root_index_ptr();
         if ( root == nullptr || new_node.is_null() )
+
             return;
         if ( this->domain.resolve_node( new_node ) == nullptr ||
+
              !forest_domain_validate_node( this->domain, new_node ) )
             return;
+
         avl_insert(
             new_node, *root,
+
             [this, new_node]( node_pptr cur ) -> bool { return this->domain.less_node( new_node, cur ); },
+
             [this]( node_pptr p ) -> node_type* { return this->domain.resolve_node( p ); } );
     }
 };
 
-// ─── BlockPPtr: adapter for free_block_tree to reuse shared AVL operations ───
-
-/**
- * @brief Fake "manager type" that provides address_traits for BlockPPtr.
- *
- * BlockPPtr needs PPtr::manager_type::address_traits::no_block for the sentinel.
- * This minimal struct provides exactly that, without coupling to a real manager.
- */
+/*
+## pmm::detail::BlockPPtrManagerTag
+*/
 template <typename AddressTraitsT> struct BlockPPtrManagerTag
 {
+
     using address_traits = AddressTraitsT;
 };
 
-/**
- * @brief Proxy object returned by BlockPPtr::tree_node().
- *
- * Wraps a raw void* block pointer and delegates get/set calls to
- * BlockStateBase<AT> static methods, matching the TreeNode interface
- * expected by avl_tree_mixin functions.
- */
+/*
+## pmm::detail::BlockTreeNodeProxy
+*/
 template <typename AddressTraitsT> struct BlockTreeNodeProxy
 {
+
     using index_type = typename AddressTraitsT::index_type;
+
     void* _blk;
 
+/*
+### pmm::detail::BlockTreeNodeProxy::BlockTreeNodeProxy
+*/
     explicit BlockTreeNodeProxy( void* blk ) noexcept : _blk( blk ) {}
 
+/*
+### pmm::detail::BlockTreeNodeProxy::get_left
+*/
     index_type   get_left() const noexcept { return BlockStateBase<AddressTraitsT>::get_left_offset( _blk ); }
+
+/*
+### pmm::detail::BlockTreeNodeProxy::get_right
+*/
     index_type   get_right() const noexcept { return BlockStateBase<AddressTraitsT>::get_right_offset( _blk ); }
+
+/*
+### pmm::detail::BlockTreeNodeProxy::get_parent
+*/
     index_type   get_parent() const noexcept { return BlockStateBase<AddressTraitsT>::get_parent_offset( _blk ); }
+
+/*
+### pmm::detail::BlockTreeNodeProxy::get_height
+*/
     std::int16_t get_height() const noexcept { return BlockStateBase<AddressTraitsT>::get_avl_height( _blk ); }
 
+/*
+### pmm::detail::BlockTreeNodeProxy::set_left
+*/
     void set_left( index_type v ) noexcept { BlockStateBase<AddressTraitsT>::set_left_offset_of( _blk, v ); }
+
+/*
+### pmm::detail::BlockTreeNodeProxy::set_right
+*/
     void set_right( index_type v ) noexcept { BlockStateBase<AddressTraitsT>::set_right_offset_of( _blk, v ); }
+
+/*
+### pmm::detail::BlockTreeNodeProxy::set_parent
+*/
     void set_parent( index_type v ) noexcept { BlockStateBase<AddressTraitsT>::set_parent_offset_of( _blk, v ); }
+
+/*
+### pmm::detail::BlockTreeNodeProxy::set_height
+*/
     void set_height( std::int16_t v ) noexcept { BlockStateBase<AddressTraitsT>::set_avl_height_of( _blk, v ); }
 };
 
-/**
- * @brief Lightweight adapter making (base_ptr, block_index) behave like PPtr.
- *
- * Enables AvlFreeTree to delegate rotation, rebalancing, and min_node operations
- * to the shared AVL functions in avl_tree_mixin.h, eliminating ~120 lines of
- * duplicate code from free_block_tree.h.
- *
- * Satisfies the PPtr concept expected by avl_tree_mixin functions:
- *   - is_null(), offset(), tree_node(), operator==
- *   - manager_type::address_traits::no_block sentinel
- *   - Default and index-based construction
- *
- * @tparam AddressTraitsT  Address space traits (e.g. DefaultAddressTraits).
- */
+/*
+## pmm::detail::BlockPPtr
+*/
 template <typename AddressTraitsT> struct BlockPPtr
 {
+
     using manager_type = BlockPPtrManagerTag<AddressTraitsT>;
+
     using index_type   = typename AddressTraitsT::index_type;
 
     std::uint8_t* _base;
+
     index_type    _idx;
 
-    /// Null construction.
+/*
+### pmm::detail::BlockPPtr::BlockPPtr
+*/
     BlockPPtr() noexcept : _base( nullptr ), _idx( AddressTraitsT::no_block ) {}
 
-    /// Construct from base pointer and block index.
     BlockPPtr( std::uint8_t* base, index_type idx ) noexcept : _base( base ), _idx( idx ) {}
 
+/*
+### pmm::detail::BlockPPtr::is_null
+*/
     bool       is_null() const noexcept { return _idx == AddressTraitsT::no_block; }
+
+/*
+### pmm::detail::BlockPPtr::offset
+*/
     index_type offset() const noexcept { return _idx; }
 
     bool operator==( const BlockPPtr& other ) const noexcept { return _idx == other._idx; }
+
     bool operator!=( const BlockPPtr& other ) const noexcept { return _idx != other._idx; }
 
-    /// Returns a proxy that delegates TreeNode-like get/set calls to BlockStateBase.
+/*
+### pmm::detail::BlockPPtr::tree_node
+*/
     BlockTreeNodeProxy<AddressTraitsT> tree_node() const noexcept
     {
         return BlockTreeNodeProxy<AddressTraitsT>( block_at<AddressTraitsT>( _base, _idx ) );
     }
 };
 
-/// @brief pptr_make overload for BlockPPtr: propagates base_ptr from source to new index.
 template <typename AddressTraitsT>
 static BlockPPtr<AddressTraitsT> pptr_make( BlockPPtr<AddressTraitsT>           source,
                                             typename AddressTraitsT::index_type idx ) noexcept
@@ -2916,32 +2871,35 @@ static BlockPPtr<AddressTraitsT> pptr_make( BlockPPtr<AddressTraitsT>           
     return BlockPPtr<AddressTraitsT>( source._base, idx );
 }
 
-// ─── AvlInorderIterator: shared in-order iterator for pmap ───────────────────
-
-/**
- * @brief Shared in-order AVL tree iterator template.
- *
- * Eliminates identical iterator structs in AVL-based containers.
- * Both containers can use this template directly or as a base.
- *
- * @tparam NodePPtr  Persistent pointer type to tree nodes (e.g. pptr<node_type, ManagerT>).
- */
+/*
+## pmm::detail::AvlInorderIterator
+*/
 template <typename NodePPtr> struct AvlInorderIterator
 {
+
     using index_type = typename NodePPtr::index_type;
+
     using value_type = typename NodePPtr::element_type;
+
     using pointer    = NodePPtr;
 
     static constexpr index_type no_block = NodePPtr::manager_type::address_traits::no_block;
 
     index_type _current_idx;
 
+/*
+### pmm::detail::AvlInorderIterator::AvlInorderIterator
+*/
     AvlInorderIterator() noexcept : _current_idx( static_cast<index_type>( 0 ) ) {}
     explicit AvlInorderIterator( index_type idx ) noexcept : _current_idx( idx ) {}
 
     bool operator==( const AvlInorderIterator& other ) const noexcept { return _current_idx == other._current_idx; }
+
     bool operator!=( const AvlInorderIterator& other ) const noexcept { return _current_idx != other._current_idx; }
 
+/*
+### pmm::detail::AvlInorderIterator::operator_deref
+*/
     NodePPtr operator*() const noexcept
     {
         if ( _current_idx == static_cast<index_type>( 0 ) || _current_idx == no_block )
@@ -2949,21 +2907,23 @@ template <typename NodePPtr> struct AvlInorderIterator
         return NodePPtr( _current_idx );
     }
 
+/*
+### pmm::detail::AvlInorderIterator::operator_increment
+*/
     AvlInorderIterator& operator++() noexcept
     {
         if ( _current_idx == static_cast<index_type>( 0 ) || _current_idx == no_block )
             return *this;
 
         NodePPtr next = avl_inorder_successor( NodePPtr( _current_idx ) );
+
         _current_idx  = next.is_null() ? static_cast<index_type>( 0 ) : next.offset();
         return *this;
     }
 };
 
-/// @endcond
-
-} // namespace detail
-} // namespace pmm
+}
+}
 
 #include <concepts>
 #include <cstdint>
@@ -2972,21 +2932,6 @@ template <typename NodePPtr> struct AvlInorderIterator
 namespace pmm
 {
 
-/**
- * @brief C++20 concept: validates that Policy is a correct free-tree forest-policy
- * for a specific AddressTraitsT.
- *
- * A free-tree forest-policy must provide three static methods:
- *   - `insert(uint8_t* base, ManagerHeader<AT>* hdr, AT::index_type blk_idx)   -> void`
- *   - `remove(uint8_t* base, ManagerHeader<AT>* hdr, AT::index_type blk_idx)   -> void`
- *   - `find_best_fit(uint8_t* base, ManagerHeader<AT>* hdr, AT::index_type n)  -> AT::index_type`
- *
- * The ordering policy (sort key, key derivation, weight interpretation) is
- * determined by the concrete policy type. See AvlFreeTree for the standard policy.
- *
- * @tparam Policy         Type to check against the concept.
- * @tparam AddressTraitsT Address space traits (defines index types).
- */
 template <typename Policy, typename AddressTraitsT>
 concept FreeBlockTreePolicyForTraitsConcept = requires( std::uint8_t* base, detail::ManagerHeader<AddressTraitsT>* hdr,
                                                         typename AddressTraitsT::index_type idx ) {
@@ -2995,60 +2940,61 @@ concept FreeBlockTreePolicyForTraitsConcept = requires( std::uint8_t* base, deta
     { Policy::find_best_fit( base, hdr, idx ) } -> std::convertible_to<typename AddressTraitsT::index_type>;
 };
 
-/**
- * @brief Specialized forest-policy: AVL tree for the free-tree domain.
- *
- * All-static class implementing the free-tree forest-policy.
- * Does not depend on PersistMemoryManager singleton — takes base_ptr and header as context.
- *
- * Forest-policy details:
- *   - Sort key: (block_size_in_granules, block_index) — strict total ordering.
- *   - Block size is derived from linear PAP geometry (next_offset - block_index).
- *   - `weight` is NOT used as sort key (it is 0 for free blocks — state discriminator).
- *   - Best-fit search runs in O(log n).
- *   - Uses shared AVL substrate via BlockPPtr adapter.
- *
- * @see docs/free_tree_forest_policy.md — canonical ordering policy documentation
- *
- * @tparam AddressTraitsT  Address space traits (compatible with DefaultAddressTraits).
- */
+/*
+## pmm::AvlFreeTree
+*/
 template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree
 {
+
     using address_traits = AddressTraitsT;
+
     using index_type     = typename AddressTraitsT::index_type;
+
     using BlockT         = Block<AddressTraitsT>;
+
     using BlockState     = BlockStateBase<AddressTraitsT>;
+
     using BPPtr          = detail::BlockPPtr<AddressTraitsT>;
 
-    /// Forest-policy tag: identifies this as the free-tree domain policy.
     static constexpr const char* kForestDomainName = "system/free_tree";
 
+/*
+### pmm::AvlFreeTree::AvlFreeTree
+*/
     AvlFreeTree()                                = delete;
     AvlFreeTree( const AvlFreeTree& )            = delete;
+
     AvlFreeTree& operator=( const AvlFreeTree& ) = delete;
 
-    /// @brief Insert block into the free-tree (forest domain: system/free_tree).
-    ///
-    /// Derives sort key (block_size_in_granules, block_index) from linear PAP geometry.
+/*
+### pmm::AvlFreeTree::insert
+*/
     static void insert( std::uint8_t* base, detail::ManagerHeader<AddressTraitsT>* hdr, index_type blk_idx )
     {
+
         void* blk = detail::block_at<AddressTraitsT>( base, blk_idx );
+
         BlockState::set_left_offset_of( blk, AddressTraitsT::no_block );
+
         BlockState::set_right_offset_of( blk, AddressTraitsT::no_block );
+
         BlockState::set_parent_offset_of( blk, AddressTraitsT::no_block );
+
         BlockState::set_avl_height_of( blk, 1 );
         if ( hdr->free_tree_root == AddressTraitsT::no_block )
         {
             hdr->free_tree_root = blk_idx;
             return;
         }
-        // Derive sort key from linear PAP geometry: block_size = next_offset - block_index.
-        // Use AddressTraitsT::granule_size for correct byte→granule conversion.
+
         index_type total_gran = detail::byte_off_to_idx_t<AddressTraitsT>( hdr->total_size );
+
         index_type blk_next   = BlockState::get_next_offset( blk );
         index_type blk_gran =
             ( blk_next != AddressTraitsT::no_block ) ? ( blk_next - blk_idx ) : ( total_gran - blk_idx );
+
         index_type cur = hdr->free_tree_root, parent = AddressTraitsT::no_block;
+
         bool       go_left = false;
         while ( cur != AddressTraitsT::no_block )
         {
@@ -3056,7 +3002,7 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree
             const void* n      = detail::block_at<AddressTraitsT>( base, cur );
             index_type  n_next = BlockState::get_next_offset( n );
             index_type  n_gran = ( n_next != AddressTraitsT::no_block ) ? ( n_next - cur ) : ( total_gran - cur );
-            // Forest-policy ordering: (block_size, block_index) — smaller size goes left.
+
             bool smaller = ( blk_gran < n_gran ) || ( blk_gran == n_gran && blk_idx < cur );
             go_left      = smaller;
             cur          = smaller ? BlockState::get_left_offset( n ) : BlockState::get_right_offset( n );
@@ -3066,17 +3012,23 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree
             BlockState::set_left_offset_of( detail::block_at<AddressTraitsT>( base, parent ), blk_idx );
         else
             BlockState::set_right_offset_of( detail::block_at<AddressTraitsT>( base, parent ), blk_idx );
-        // Delegate rebalancing to shared AVL function via BlockPPtr adapter.
+
         detail::avl_rebalance_up( BPPtr( base, parent ), hdr->free_tree_root );
     }
 
-    /// @brief Remove block from the free-tree (forest domain: system/free_tree).
+/*
+### pmm::AvlFreeTree::remove
+*/
     static void remove( std::uint8_t* base, detail::ManagerHeader<AddressTraitsT>* hdr, index_type blk_idx )
     {
         void*      blk    = detail::block_at<AddressTraitsT>( base, blk_idx );
+
         index_type parent = BlockState::get_parent_offset( blk );
+
         index_type left   = BlockState::get_left_offset( blk );
+
         index_type right  = BlockState::get_right_offset( blk );
+
         index_type rebal  = AddressTraitsT::no_block;
 
         if ( left == AddressTraitsT::no_block && right == AddressTraitsT::no_block )
@@ -3093,7 +3045,7 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree
         }
         else
         {
-            // Delegate min_node to shared AVL function via BlockPPtr.
+
             BPPtr      succ        = detail::avl_min_node( BPPtr( base, right ) );
             index_type succ_idx    = succ.offset();
             void*      succ_raw    = detail::block_at<AddressTraitsT>( base, succ_idx );
@@ -3118,33 +3070,31 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree
             BlockState::set_parent_offset_of( detail::block_at<AddressTraitsT>( base, left ), succ_idx );
             BlockState::set_parent_offset_of( succ_raw, parent );
             set_child( base, hdr, parent, blk_idx, succ_idx );
-            // Delegate height update to shared AVL function via BlockPPtr.
+
             detail::avl_update_height( BPPtr( base, succ_idx ) );
         }
         BlockState::set_left_offset_of( blk, AddressTraitsT::no_block );
         BlockState::set_right_offset_of( blk, AddressTraitsT::no_block );
         BlockState::set_parent_offset_of( blk, AddressTraitsT::no_block );
         BlockState::set_avl_height_of( blk, 0 );
-        // Delegate rebalancing to shared AVL function via BlockPPtr adapter.
+
         detail::avl_rebalance_up( BPPtr( base, rebal ), hdr->free_tree_root );
     }
 
-    /// @brief Best-fit search: find smallest free block >= needed granules (O(log n)).
-    ///
-    /// Derives sort key from linear PAP geometry at each node during traversal.
+/*
+### pmm::AvlFreeTree::find_best_fit
+*/
     static index_type find_best_fit( std::uint8_t* base, detail::ManagerHeader<AddressTraitsT>* hdr,
                                      index_type needed_granules )
     {
-        // Cache total_gran once to avoid repeated hdr->total_size reads in the hot path
-        // Use AddressTraitsT::granule_size for correct byte→granule conversion.
+
         index_type total_gran = detail::byte_off_to_idx_t<AddressTraitsT>( hdr->total_size );
         index_type cur = hdr->free_tree_root, result = AddressTraitsT::no_block;
         while ( cur != AddressTraitsT::no_block )
         {
             const void* node      = detail::block_at<AddressTraitsT>( base, cur );
             index_type  node_next = BlockState::get_next_offset( node );
-            // Compare against AddressTraitsT::no_block (not detail::kNoBlock)
-            // to correctly handle SmallAddressTraits (uint16_t) sentinel 0xFFFF.
+
             index_type cur_gran =
                 ( node_next != AddressTraitsT::no_block ) ? ( node_next - cur ) : ( total_gran - cur );
             if ( cur_gran >= needed_granules )
@@ -3161,7 +3111,10 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree
     }
 
   private:
-    /// @brief Update parent → child link in tree.
+
+/*
+### pmm::AvlFreeTree::set_child
+*/
     static void set_child( std::uint8_t* base, detail::ManagerHeader<AddressTraitsT>* hdr, index_type parent,
                            index_type old_child, index_type new_child )
     {
@@ -3178,47 +3131,10 @@ template <typename AddressTraitsT = DefaultAddressTraits> struct AvlFreeTree
     }
 };
 
-// ─── Static_assert: AvlFreeTree satisfies the concept ────────────────────────
-
 static_assert( FreeBlockTreePolicyForTraitsConcept<AvlFreeTree<DefaultAddressTraits>, DefaultAddressTraits>,
                "AvlFreeTree<DefaultAddressTraits> must satisfy FreeBlockTreePolicyForTraitsConcept" );
 
-} // namespace pmm
-
-/**
- * @file pmm/heap_storage.h
- * @brief HeapStorage — динамический бэкенд хранилища ПАП.
- *
- * Управляет динамически выделяемой областью памяти через `std::malloc` / `std::free`.
- * Поддерживает расширение (expand()) путём выделения нового буфера и копирования данных.
- *
- * Применение: стандартный вариант для большинства приложений (рефакторинг expand()
- * из текущего `PersistMemoryManager`).
- *
- * @tparam AddressTraitsT Traits адресного пространства (из address_traits.h).
- *
- * @see storage_backend.h — концепт StorageBackend
- * @version 0.1
- */
-
-/**
- * @file pmm/storage_backend.h
- * @brief StorageBackend — концепт бэкенда хранилища ПАП.
- *
- * Определяет C++20 концепт `StorageBackendConcept<Backend>`,
- * которому должны соответствовать все реализации бэкендов:
- *   - `StaticStorage<Size, AddressTraitsT>` — буфер на стеке/глобально (static_storage.h)
- *   - `HeapStorage<AddressTraitsT>`         — динамическая память через malloc (heap_storage.h)
- *   - `MMapStorage<AddressTraitsT>`         — mmap/MapViewOfFile (mmap_storage.h)
- *
- * Минимальный интерфейс бэкенда:
- *   - `uint8_t* base_ptr()`         — указатель на начало управляемой области
- *   - `size_t   total_size() const` — текущий размер управляемой области в байтах
- *   - `bool     expand(size_t)`     — расширить область на указанное число байт
- *   - `bool     owns_memory() const`— true, если бэкенд владеет памятью и освободит её
- *
- * @version 0.2
- */
+}
 
 #include <concepts>
 #include <cstddef>
@@ -3228,17 +3144,6 @@ static_assert( FreeBlockTreePolicyForTraitsConcept<AvlFreeTree<DefaultAddressTra
 namespace pmm
 {
 
-/**
- * @brief C++20 концепт: проверяет, соответствует ли Backend концепту StorageBackend.
- *
- * Требует наличия:
- *   - `base_ptr()   -> uint8_t*`
- *   - `total_size() -> size_t` (const)
- *   - `expand(size_t) -> bool`
- *   - `owns_memory()  -> bool` (const)
- *
- * @tparam Backend  Тип, проверяемый на соответствие концепту.
- */
 template <typename Backend>
 concept StorageBackendConcept = requires( Backend& b, const Backend& cb, std::size_t n ) {
     { b.base_ptr() } -> std::convertible_to<std::uint8_t*>;
@@ -3247,14 +3152,9 @@ concept StorageBackendConcept = requires( Backend& b, const Backend& cb, std::si
     { cb.owns_memory() } -> std::convertible_to<bool>;
 };
 
-/**
- * @brief Вспомогательная переменная: true если Backend удовлетворяет StorageBackendConcept.
- *
- * @tparam Backend  Тип, проверяемый на соответствие концепту.
- */
 template <typename Backend> inline constexpr bool is_storage_backend_v = StorageBackendConcept<Backend>;
 
-} // namespace pmm
+}
 
 #include <cassert>
 #include <cstddef>
@@ -3266,26 +3166,30 @@ template <typename Backend> inline constexpr bool is_storage_backend_v = Storage
 namespace pmm
 {
 
-/**
- * @brief Динамический бэкенд хранилища — malloc/free.
- *
- * @tparam AddressTraitsT Traits адресного пространства.
- */
+/*
+## pmm::HeapStorage
+*/
 template <typename AddressTraitsT = DefaultAddressTraits> class HeapStorage
 {
   public:
+
     using address_traits = AddressTraitsT;
 
+/*
+### pmm::HeapStorage::HeapStorage
+*/
     HeapStorage() noexcept = default;
 
-    /// @brief Конструктор с начальным размером.
     explicit HeapStorage( std::size_t initial_size ) noexcept
     {
         if ( initial_size == 0 )
+
             return;
-        // Выравниваем по granule_size
+
         std::size_t aligned = ( ( initial_size + AddressTraitsT::granule_size - 1 ) / AddressTraitsT::granule_size ) *
+
                               AddressTraitsT::granule_size;
+
         _buffer = static_cast<std::uint8_t*>( std::malloc( aligned ) );
         if ( _buffer != nullptr )
         {
@@ -3295,13 +3199,21 @@ template <typename AddressTraitsT = DefaultAddressTraits> class HeapStorage
     }
 
     HeapStorage( const HeapStorage& )            = delete;
+
     HeapStorage& operator=( const HeapStorage& ) = delete;
 
     HeapStorage( HeapStorage&& other ) noexcept
+
+/*
+### pmm::HeapStorage::_buffer
+*/
         : _buffer( other._buffer ), _size( other._size ), _owns_memory( other._owns_memory )
     {
+
         other._buffer      = nullptr;
+
         other._size        = 0;
+
         other._owns_memory = false;
     }
 
@@ -3324,10 +3236,13 @@ template <typename AddressTraitsT = DefaultAddressTraits> class HeapStorage
     ~HeapStorage()
     {
         if ( _owns_memory && _buffer != nullptr )
+
             std::free( _buffer );
     }
 
-    /// @brief Принять внешний буфер (менеджер не владеет им).
+/*
+### pmm::HeapStorage::attach
+*/
     void attach( void* memory, std::size_t size ) noexcept
     {
         if ( _owns_memory && _buffer != nullptr )
@@ -3337,34 +3252,30 @@ template <typename AddressTraitsT = DefaultAddressTraits> class HeapStorage
         _owns_memory = false;
     }
 
-    /// @brief Указатель на начало буфера.
+/*
+### pmm::HeapStorage::base_ptr
+*/
     std::uint8_t*       base_ptr() noexcept { return _buffer; }
     const std::uint8_t* base_ptr() const noexcept { return _buffer; }
 
-    /// @brief Текущий размер буфера в байтах.
+/*
+### pmm::HeapStorage::total_size
+*/
     std::size_t total_size() const noexcept { return _size; }
 
-    /**
-     * @brief Расширить буфер на `additional_bytes` байт (минимум).
-     *
-     * Выделяет новый буфер с ростом >= additional_bytes, копирует данные.
-     * Старый буфер освобождается (если owns_memory == true).
-     *
-     * @param additional_bytes  Минимальный прирост в байтах.
-     * @return true при успехе, false при ошибке.
-     */
+/*
+### pmm::HeapStorage::expand
+*/
     bool expand( std::size_t additional_bytes ) noexcept
     {
         if ( additional_bytes == 0 )
             return _size > 0;
-        // Grow by 25% or by additional_bytes, whichever is larger.
-        // For initial allocation from zero, use a minimum of 4096 bytes
-        // (or additional_bytes if larger) to avoid inefficient tiny allocations.
+
         static constexpr std::size_t kMinInitialSize = 4096;
         std::size_t                  growth =
             ( _size > 0 ) ? ( _size / 4 + additional_bytes ) : std::max( additional_bytes, kMinInitialSize );
         std::size_t new_size = _size + growth;
-        // Align to granule_size
+
         new_size = ( ( new_size + AddressTraitsT::granule_size - 1 ) / AddressTraitsT::granule_size ) *
                    AddressTraitsT::granule_size;
         if ( new_size <= _size )
@@ -3374,6 +3285,7 @@ template <typename AddressTraitsT = DefaultAddressTraits> class HeapStorage
         if ( new_buf == nullptr )
             return false;
         if ( _buffer != nullptr )
+
             std::memcpy( new_buf, _buffer, _size );
         if ( _owns_memory && _buffer != nullptr )
             std::free( _buffer );
@@ -3383,63 +3295,22 @@ template <typename AddressTraitsT = DefaultAddressTraits> class HeapStorage
         return true;
     }
 
-    /// @brief HeapStorage владеет памятью, если она была выделена через malloc.
+/*
+### pmm::HeapStorage::owns_memory
+*/
     bool owns_memory() const noexcept { return _owns_memory; }
 
   private:
+
     std::uint8_t* _buffer      = nullptr;
     std::size_t   _size        = 0;
+
     bool          _owns_memory = false;
 };
 
-// ─── static_assert: HeapStorage соответствует концепту StorageBackend ──────────
-
 static_assert( is_storage_backend_v<HeapStorage<>>, "HeapStorage must satisfy StorageBackendConcept" );
 
-} // namespace pmm
-
-/**
- * @file pmm/logging_policy.h
- * @brief Политики логирования для PersistMemoryManager.
- *
- * Содержит:
- *   - pmm::logging::NoLogging       — заглушка без логирования (по умолчанию, нулевые накладные расходы)
- *   - pmm::logging::StderrLogging   — логирование ошибок и событий в stderr
- *
- * Хуки вызываются менеджером при ключевых событиях:
- *   - on_allocation_failure(user_size, err) — не удалось выделить память
- *   - on_expand(old_size, new_size)         — бэкенд расширен
- *   - on_corruption_detected(err)           — обнаружено повреждение данных (InvalidMagic, CrcMismatch и т.д.)
- *   - on_create(initial_size)               — менеджер успешно создан
- *   - on_destroy()                          — менеджер сброшен
- *   - on_load()                             — менеджер загружен из образа
- *
- * Все методы — static noexcept. Политика NoLogging полностью оптимизируется
- * компилятором (все методы пустые inline), обеспечивая нулевые накладные расходы
- * для конфигураций без логирования.
- *
- * Пример пользовательской политики:
- * @code
- *   struct MyLogging {
- *       static void on_allocation_failure(std::size_t user_size, pmm::PmmError err) noexcept {
- *           spdlog::warn("pmm: allocate({}) failed: {}", user_size, static_cast<int>(err));
- *       }
- *       static void on_expand(std::size_t old_size, std::size_t new_size) noexcept {
- *           spdlog::info("pmm: expanded {} -> {}", old_size, new_size);
- *       }
- *       static void on_corruption_detected(pmm::PmmError err) noexcept {
- *           spdlog::error("pmm: corruption: {}", static_cast<int>(err));
- *       }
- *       static void on_create(std::size_t size) noexcept {}
- *       static void on_destroy() noexcept {}
- *       static void on_load() noexcept {}
- *   };
- * @endcode
- *
- * @see config.h — политики блокировок (аналогичный паттерн)
- * @see persist_memory_manager.h — PersistMemoryManager (вызывает хуки)
- * @version 1.0
- */
+}
 
 #include <cstddef>
 #include <cstdio>
@@ -3449,101 +3320,95 @@ namespace pmm
 namespace logging
 {
 
-/// @brief Политика без логирования (нулевые накладные расходы, по умолчанию).
-///
-/// Все методы — пустые inline, полностью оптимизируются компилятором.
+/*
+## pmm::logging::NoLogging
+*/
 struct NoLogging
 {
-    /// @brief Вызывается при неудачной аллокации.
-    /// @param user_size Запрошенный размер в байтах.
-    /// @param err Код ошибки (OutOfMemory, Overflow, InvalidSize, NotInitialized).
-    static void on_allocation_failure( std::size_t /*user_size*/, PmmError /*err*/ ) noexcept {}
 
-    /// @brief Вызывается после успешного расширения бэкенда.
-    /// @param old_size Старый размер в байтах.
-    /// @param new_size Новый размер в байтах.
-    static void on_expand( std::size_t /*old_size*/, std::size_t /*new_size*/ ) noexcept {}
+/*
+### pmm::logging::NoLogging::on_allocation_failure
+*/
+    static void on_allocation_failure( std::size_t  , PmmError   ) noexcept {}
 
-    /// @brief Вызывается при обнаружении повреждения данных.
-    /// @param err Код ошибки (InvalidMagic, CrcMismatch, SizeMismatch, GranuleMismatch, UnsupportedImageVersion).
-    static void on_corruption_detected( PmmError /*err*/ ) noexcept {}
+/*
+### pmm::logging::NoLogging::on_expand
+*/
+    static void on_expand( std::size_t  , std::size_t   ) noexcept {}
 
-    /// @brief Вызывается после успешного создания менеджера.
-    /// @param initial_size Начальный размер в байтах.
-    static void on_create( std::size_t /*initial_size*/ ) noexcept {}
+/*
+### pmm::logging::NoLogging::on_corruption_detected
+*/
+    static void on_corruption_detected( PmmError   ) noexcept {}
 
-    /// @brief Вызывается при сбросе менеджера (destroy()).
+/*
+### pmm::logging::NoLogging::on_create
+*/
+    static void on_create( std::size_t   ) noexcept {}
+
+/*
+### pmm::logging::NoLogging::on_destroy
+*/
     static void on_destroy() noexcept {}
 
-    /// @brief Вызывается после успешной загрузки образа (load()).
+/*
+### pmm::logging::NoLogging::on_load
+*/
     static void on_load() noexcept {}
 };
 
-/// @brief Политика логирования в stderr.
-///
-/// Выводит ошибки и ключевые события менеджера в стандартный поток ошибок.
-/// Полезна для отладки и диагностики.
-///
-/// @code
-///   using MyConfig = pmm::BasicConfig<
-///       pmm::DefaultAddressTraits,
-///       pmm::config::NoLock,
-///       5, 4, 64,
-///       pmm::logging::StderrLogging  // включить логирование в stderr
-///   >;
-///   using MyMgr = pmm::PersistMemoryManager<MyConfig>;
-/// @endcode
+/*
+## pmm::logging::StderrLogging
+*/
 struct StderrLogging
 {
+
+/*
+### pmm::logging::StderrLogging::on_allocation_failure
+*/
     static void on_allocation_failure( std::size_t user_size, PmmError err ) noexcept
     {
+
         std::fprintf( stderr, "[pmm] allocation_failure: size=%zu error=%d\n", user_size, static_cast<int>( err ) );
     }
 
+/*
+### pmm::logging::StderrLogging::on_expand
+*/
     static void on_expand( std::size_t old_size, std::size_t new_size ) noexcept
     {
         std::fprintf( stderr, "[pmm] expand: %zu -> %zu\n", old_size, new_size );
     }
 
+/*
+### pmm::logging::StderrLogging::on_corruption_detected
+*/
     static void on_corruption_detected( PmmError err ) noexcept
     {
         std::fprintf( stderr, "[pmm] corruption_detected: error=%d\n", static_cast<int>( err ) );
     }
 
+/*
+### pmm::logging::StderrLogging::on_create
+*/
     static void on_create( std::size_t initial_size ) noexcept
     {
         std::fprintf( stderr, "[pmm] create: size=%zu\n", initial_size );
     }
 
+/*
+### pmm::logging::StderrLogging::on_destroy
+*/
     static void on_destroy() noexcept { std::fprintf( stderr, "[pmm] destroy\n" ); }
 
+/*
+### pmm::logging::StderrLogging::on_load
+*/
     static void on_load() noexcept { std::fprintf( stderr, "[pmm] load\n" ); }
 };
 
-} // namespace logging
-} // namespace pmm
-
-/**
- * @file pmm/static_storage.h
- * @brief StaticStorage — статический бэкенд хранилища ПАП.
- *
- * Хранит управляемую область в фиксированном буфере размером `Size` байт,
- * расположенном внутри объекта (подходит для глобальных объектов и стека).
- *
- * Ограничения:
- *   - Размер фиксирован на этапе компиляции — expand() всегда возвращает false.
- *   - Не владеет памятью в смысле dynamic allocation — owns_memory() == false.
- *   - Требует выравнивания буфера по `AddressTraitsT::granule_size`.
- *
- * Применение: embedded-системы, тесты с маленьким фиксированным пулом,
- * быстрые unit-тесты без динамической памяти.
- *
- * @tparam Size           Размер буфера в байтах (compile-time константа).
- * @tparam AddressTraitsT Traits адресного пространства (из address_traits.h).
- *
- * @see storage_backend.h — концепт StorageBackend
- * @version 0.1
- */
+}
+}
 
 #include <cstddef>
 #include <cstdint>
@@ -3551,50 +3416,60 @@ struct StderrLogging
 namespace pmm
 {
 
-/**
- * @brief Статический бэкенд хранилища — фиксированный буфер внутри объекта.
- *
- * @tparam Size           Размер буфера в байтах.
- * @tparam AddressTraitsT Traits адресного пространства (определяет выравнивание).
- */
+/*
+## pmm::StaticStorage
+*/
 template <std::size_t Size, typename AddressTraitsT = DefaultAddressTraits> class StaticStorage
 {
     static_assert( Size > 0, "StaticStorage: Size must be > 0" );
     static_assert( Size % AddressTraitsT::granule_size == 0, "StaticStorage: Size must be a multiple of granule_size" );
 
   public:
+
     using address_traits = AddressTraitsT;
 
+/*
+### pmm::StaticStorage::StaticStorage
+*/
     StaticStorage() noexcept                         = default;
     StaticStorage( const StaticStorage& )            = delete;
+
     StaticStorage& operator=( const StaticStorage& ) = delete;
     StaticStorage( StaticStorage&& )                 = delete;
     StaticStorage& operator=( StaticStorage&& )      = delete;
 
-    /// @brief Указатель на начало буфера.
+/*
+### pmm::StaticStorage::base_ptr
+*/
     std::uint8_t*       base_ptr() noexcept { return _buffer; }
     const std::uint8_t* base_ptr() const noexcept { return _buffer; }
 
-    /// @brief Текущий размер буфера (фиксированный = Size).
+/*
+### pmm::StaticStorage::total_size
+*/
     constexpr std::size_t total_size() const noexcept { return Size; }
 
-    /// @brief Расширить хранилище — невозможно для статического буфера.
-    /// @return Всегда false.
-    bool expand( std::size_t /*additional_bytes*/ ) noexcept { return false; }
+/*
+### pmm::StaticStorage::expand
+*/
+    bool expand( std::size_t   ) noexcept { return false; }
 
-    /// @brief StaticStorage не владеет динамически выделенной памятью.
-    /// @return Всегда false.
+/*
+### pmm::StaticStorage::owns_memory
+*/
     constexpr bool owns_memory() const noexcept { return false; }
 
   private:
+
+/*
+### pmm::StaticStorage::alignas
+*/
     alignas( AddressTraitsT::granule_size ) std::uint8_t _buffer[Size]{};
 };
 
-// ─── static_assert: StaticStorage соответствует концепту StorageBackend ────────
-
 static_assert( is_storage_backend_v<StaticStorage<64>>, "StaticStorage must satisfy StorageBackendConcept" );
 
-} // namespace pmm
+}
 
 #include <concepts>
 #include <cstddef>
@@ -3615,16 +3490,26 @@ static_assert( ValidPmmAddressTraits<LargeAddressTraits>, "LargeAddressTraits mu
 template <typename AddressTraitsT = DefaultAddressTraits, typename LockPolicyT = config::NoLock,
           std::size_t GrowNum = config::kDefaultGrowNumerator, std::size_t GrowDen = config::kDefaultGrowDenominator,
           std::size_t MaxMemoryGB = 64, typename LoggingPolicyT = logging::NoLogging>
+
+/*
+## pmm::BasicConfig
+*/
 struct BasicConfig
 {
     static_assert( ValidPmmAddressTraits<AddressTraitsT>,
+
                    "BasicConfig: AddressTraitsT must satisfy ValidPmmAddressTraits" );
 
     using address_traits                          = AddressTraitsT;
+
     using storage_backend                         = HeapStorage<AddressTraitsT>;
+
     using free_block_tree                         = AvlFreeTree<AddressTraitsT>;
+
     using lock_policy                             = LockPolicyT;
+
     using logging_policy                          = LoggingPolicyT;
+
     static constexpr std::size_t granule_size     = AddressTraitsT::granule_size;
     static constexpr std::size_t max_memory_gb    = MaxMemoryGB;
     static constexpr std::size_t grow_numerator   = GrowNum;
@@ -3632,16 +3517,26 @@ struct BasicConfig
 };
 
 template <typename AddressTraitsT, std::size_t BufferSize, std::size_t GrowNum = 3, std::size_t GrowDen = 2>
+
+/*
+## pmm::StaticConfig
+*/
 struct StaticConfig
 {
     static_assert( ValidPmmAddressTraits<AddressTraitsT>,
+
                    "StaticConfig: AddressTraitsT must satisfy ValidPmmAddressTraits" );
 
     using address_traits                          = AddressTraitsT;
+
     using storage_backend                         = StaticStorage<BufferSize, AddressTraitsT>;
+
     using free_block_tree                         = AvlFreeTree<AddressTraitsT>;
+
     using lock_policy                             = config::NoLock;
+
     using logging_policy                          = logging::NoLogging;
+
     static constexpr std::size_t granule_size     = AddressTraitsT::granule_size;
     static constexpr std::size_t max_memory_gb    = 0;
     static constexpr std::size_t grow_numerator   = GrowNum;
@@ -3664,7 +3559,7 @@ using IndustrialDBConfig = BasicConfig<DefaultAddressTraits, config::SharedMutex
 
 using LargeDBConfig = BasicConfig<LargeAddressTraits, config::SharedMutexLock, 2, 1, 0>;
 
-} // namespace pmm
+}
 
 #if defined( _MSVC_LANG )
 #if _MSVC_LANG < 202002L
@@ -3673,53 +3568,6 @@ using LargeDBConfig = BasicConfig<LargeAddressTraits, config::SharedMutexLock, 2
 #elif __cplusplus < 202002L
 #error "pmm.h requires C++20 or later. Please compile with -std=c++20."
 #endif
-
-/**
- * @file pmm/allocator_policy.h
- * @brief AllocatorPolicy — политика выделения/освобождения памяти.
- *
- * Параметрически объединяет:
- *   - `FreeBlockTreeT` — политику дерева свободных блоков (insert/remove/find_best_fit)
- *   - `AddressTraitsT` — traits адресного пространства
- *
- * Предоставляет все-статические методы:
- *   - `allocate_from_block()` — выделение из найденного свободного блока
- *   - `coalesce()`            — слияние соседних свободных блоков
- *   - `rebuild_free_tree()`   — перестройка дерева свободных блоков (после load())
- *   - `repair_linked_list()`  — восстановление двухсвязного списка (после load())
- *   - `recompute_counters()`  — пересчёт счётчиков (после load())
- *
- * в терминах автомата состояний из `block_state.h`.
- *
- * блоков выполняются через методы `block_state.h`, прямые присвоения к полям
- * `size` и `root_offset` заменены на типобезопасные переходы состояний.
- * Используется Block<A> layout вместо legacy BlockHeader layout.
- *
- * обращается напрямую к полям Block<A>. В split-пути allocate_from_block()
- * используются методы SplittingBlock (initialize_new_block, link_new_block,
- * finalize_split). В coalesce() соседние блоки проверяются через BlockStateBase.
- * В repair-методах load() (rebuild_free_tree, repair_linked_list, recompute_counters)
- * напрямую используются статические методы BlockStateBase<AT>:
- *   - reset_avl_fields_of()  — вместо удалённой reset_block_avl_fields()
- *   - repair_prev_offset()   — вместо удалённой repair_block_prev_offset()
- *   - get_next_offset()      — вместо удалённой read_block_next_offset()
- *   - get_weight()           — вместо удалённой read_block_weight()
- *
- * Граф состояний блока во время allocate_from_block():
- *   FreeBlock → remove_from_avl → FreeBlockRemovedAVL
- *     → [если split] begin_splitting → SplittingBlock → finalize_split → AllocatedBlock
- *     → [без split]  mark_as_allocated → AllocatedBlock
- *
- * Граф состояний блока во время coalesce():
- *   FreeBlockNotInAVL → begin_coalescing → CoalescingBlock
- *     → [правый сосед свободен] coalesce_with_next
- *     → [левый сосед свободен]  coalesce_with_prev → CoalescingBlock(prv)
- *     → finalize_coalesce → FreeBlock (вставка в AVL)
- *
- * @see block_state.h — автомат состояний блока
- * @see free_block_tree.h — концепт FreeBlockTree
- * @version 0.6
- */
 
 #include <cassert>
 #include <cstddef>
@@ -3730,101 +3578,88 @@ using LargeDBConfig = BasicConfig<LargeAddressTraits, config::SharedMutexLock, 2
 namespace pmm
 {
 
-/**
- * @brief Политика выделения и освобождения памяти для ПАП-менеджера.
- *
- * Все методы статические и принимают `base_ptr` и `header*` как контекст.
- *
- * @tparam FreeBlockTreeT   Политика дерева свободных блоков (AvlFreeTree или другая).
- * @tparam AddressTraitsT   Traits адресного пространства.
- */
 template <typename FreeBlockTreeT = AvlFreeTree<DefaultAddressTraits>, typename AddressTraitsT = DefaultAddressTraits>
+
+/*
+## pmm::AllocatorPolicy
+*/
 class AllocatorPolicy
 {
-    // Check against the specific AddressTraitsT, not hardcoded DefaultAddressTraits.
+
     static_assert( FreeBlockTreePolicyForTraitsConcept<FreeBlockTreeT, AddressTraitsT>,
+
                    "AllocatorPolicy: FreeBlockTreeT must satisfy FreeBlockTreePolicy for AddressTraitsT" );
 
   public:
+
     using address_traits  = AddressTraitsT;
+
     using free_block_tree = FreeBlockTreeT;
+
     using index_type      = typename AddressTraitsT::index_type;
+
     using BlockT          = Block<AddressTraitsT>;
+
     using BlockState      = BlockStateBase<AddressTraitsT>;
 
+/*
+### pmm::AllocatorPolicy::AllocatorPolicy
+*/
     AllocatorPolicy()                                    = delete;
     AllocatorPolicy( const AllocatorPolicy& )            = delete;
+
     AllocatorPolicy& operator=( const AllocatorPolicy& ) = delete;
 
-    // ─── Выделение ─────────────────────────────────────────────────────────────
-
-    /**
-     * @brief Выделить память из найденного свободного блока.
-     *
-     * Убирает блок из дерева свободных блоков, при необходимости разбивает его
-     * на два: один — под запрошенные данные, второй — остаток (снова свободный).
-     *
-     * Граф состояний:
-     *   FreeBlock → FreeBlockRemovedAVL [remove_from_avl]
-     *     → [split] SplittingBlock [begin_splitting]
-     *               → initialize_new_block + link_new_block + AVL insert
-     *               → AllocatedBlock [finalize_split]
-     *     → [no split] AllocatedBlock [mark_as_allocated]
-     *
-     * @param base      Базовый указатель управляемой области.
-     * @param hdr       Заголовок менеджера.
-     * @param blk_idx   Гранульный индекс свободного блока, из которого выделяется память.
-     * @param user_size Размер пользовательских данных в байтах.
-     * @return Указатель на пользовательские данные или nullptr.
-     */
+/*
+### pmm::AllocatorPolicy::allocate_from_block
+*/
     static void* allocate_from_block( std::uint8_t* base, detail::ManagerHeader<AddressTraitsT>* hdr,
                                       index_type blk_idx, std::size_t user_size )
     {
-        // State: FreeBlock → FreeBlockRemovedAVL [remove_from_avl]
+
         FreeBlockTreeT::remove( base, hdr, blk_idx );
         FreeBlock<AddressTraitsT>* fb =
+
             FreeBlock<AddressTraitsT>::cast_from_raw( detail::block_at<AddressTraitsT>( base, blk_idx ) );
+
         FreeBlockRemovedAVL<AddressTraitsT>* removed = fb->remove_from_avl();
 
-        // Use AddressTraitsT-specific granule computations.
         static constexpr index_type kBlkHdrGran =
-            detail::kBlockHeaderGranules_t<AddressTraitsT>; ///< Block header granules for this AT.
+
+            detail::kBlockHeaderGranules_t<AddressTraitsT>;
 
         index_type blk_total_gran =
+
             detail::block_total_granules( base, hdr, detail::block_at<AddressTraitsT>( base, blk_idx ) );
+
         index_type data_gran = detail::bytes_to_granules_t<AddressTraitsT>( user_size );
 
-        // Overflow protection for needed_gran computation.
         if ( data_gran > std::numeric_limits<index_type>::max() - kBlkHdrGran )
-            return nullptr; // overflow: request too large
+            return nullptr;
 
         index_type needed_gran  = kBlkHdrGran + data_gran;
+
         index_type min_rem_gran = kBlkHdrGran + 1;
 
-        // Overflow protection for split check (needed_gran + min_rem_gran).
         bool can_split = false;
         if ( needed_gran <= std::numeric_limits<index_type>::max() - min_rem_gran )
             can_split = ( blk_total_gran >= needed_gran + min_rem_gran );
 
         if ( can_split )
         {
-            // State: FreeBlockRemovedAVL → SplittingBlock [begin_splitting]
+
             SplittingBlock<AddressTraitsT>* splitting = removed->begin_splitting();
 
             index_type new_idx     = blk_idx + needed_gran;
             void*      new_blk_ptr = detail::block_at<AddressTraitsT>( base, new_idx );
 
-            // Capture old_next before initialize_new_block modifies splitting->next_offset()
-            // Compare against AddressTraitsT::no_block (correct sentinel for index_type).
             index_type curr_next = splitting->next_offset();
             BlockT*    old_next  = ( curr_next != AddressTraitsT::no_block )
                                        ? detail::block_at<AddressTraitsT>( base, curr_next )
                                        : nullptr;
 
-            // SplittingBlock::initialize_new_block — инициализировать новый (remainder) блок
             splitting->initialize_new_block( new_blk_ptr, new_idx, blk_idx );
 
-            // SplittingBlock::link_new_block — обновить связный список
             splitting->link_new_block( old_next, new_idx );
             if ( old_next == nullptr )
                 hdr->last_block_offset = new_idx;
@@ -3834,63 +3669,45 @@ class AllocatorPolicy
             hdr->used_size += kBlkHdrGran;
             FreeBlockTreeT::insert( base, hdr, new_idx );
 
-            // State: SplittingBlock → AllocatedBlock [finalize_split]
             AllocatedBlock<AddressTraitsT>* alloc = splitting->finalize_split( data_gran, blk_idx );
-            (void)alloc; // allocated block pointer obtained via state machine
+            (void)alloc;
         }
         else
         {
-            // State: FreeBlockRemovedAVL → AllocatedBlock [mark_as_allocated]
+
             AllocatedBlock<AddressTraitsT>* alloc = removed->mark_as_allocated( data_gran, blk_idx );
-            (void)alloc; // allocated block pointer obtained via state machine
+            (void)alloc;
         }
 
         hdr->alloc_count++;
+
         hdr->free_count--;
+
         hdr->used_size += data_gran;
 
-        // Return user data pointer (after block header) via canonical detail::user_ptr
         return detail::user_ptr<AddressTraitsT>( detail::block_at<AddressTraitsT>( base, blk_idx ) );
     }
 
-    // ─── Освобождение и слияние ────────────────────────────────────────────────
-
-    /**
-     * @brief Слить освобождённый блок с соседними свободными блоками.
-     *
-     * Если следующий или предыдущий блок свободен, объединяет их.
-     * Добавляет результирующий свободный блок в дерево.
-     *
-     * Граф состояний:
-     *   FreeBlockNotInAVL → CoalescingBlock [begin_coalescing]
-     *     → [правый сосед free] coalesce_with_next
-     *     → [левый сосед free]  coalesce_with_prev → CoalescingBlock(prv) → finalize_coalesce → FreeBlock
-     *     → [нет соседей]       finalize_coalesce → FreeBlock [insert в AVL]
-     *
-     * @param base     Базовый указатель управляемой области.
-     * @param hdr      Заголовок менеджера.
-     * @param blk_idx  Гранульный индекс только что освобождённого блока (weight == 0).
-     */
+/*
+### pmm::AllocatorPolicy::coalesce
+*/
     static void coalesce( std::uint8_t* base, detail::ManagerHeader<AddressTraitsT>* hdr, index_type blk_idx )
     {
-        // State: FreeBlockNotInAVL → CoalescingBlock [begin_coalescing]
+
         FreeBlockNotInAVL<AddressTraitsT>* not_avl =
             FreeBlockNotInAVL<AddressTraitsT>::cast_from_raw( detail::block_at<AddressTraitsT>( base, blk_idx ) );
+
         CoalescingBlock<AddressTraitsT>* coalescing = not_avl->begin_coalescing();
 
-        // Use AddressTraitsT-specific block header granule count.
         static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AddressTraitsT>;
 
         index_type b_idx = blk_idx;
 
-        // Слияние с правым соседом
-        // State: CoalescingBlock::coalesce_with_next
-        // Compare against AddressTraitsT::no_block for correct sentinel check.
         index_type curr_next = coalescing->next_offset();
         if ( curr_next != AddressTraitsT::no_block )
         {
             void* nxt_raw = detail::block_at<AddressTraitsT>( base, curr_next );
-            if ( BlockState::get_weight( nxt_raw ) == 0 ) // free block
+            if ( BlockState::get_weight( nxt_raw ) == 0 )
             {
                 index_type nxt_idx     = curr_next;
                 index_type nxt_next    = BlockState::get_next_offset( nxt_raw );
@@ -3900,7 +3717,6 @@ class AllocatorPolicy
 
                 FreeBlockTreeT::remove( base, hdr, nxt_idx );
 
-                // CoalescingBlock::coalesce_with_next (also updates nxt_nxt_blk->prev_offset internally)
                 coalescing->coalesce_with_next( detail::block_at<AddressTraitsT>( base, nxt_idx ), nxt_nxt_blk, b_idx );
 
                 if ( nxt_nxt_blk == nullptr )
@@ -3913,13 +3729,11 @@ class AllocatorPolicy
             }
         }
 
-        // Слияние с левым соседом
-        // State: CoalescingBlock::coalesce_with_prev → результат CoalescingBlock(prv)
         index_type curr_prev = coalescing->prev_offset();
         if ( curr_prev != AddressTraitsT::no_block )
         {
             void* prv_raw = detail::block_at<AddressTraitsT>( base, curr_prev );
-            if ( BlockState::get_weight( prv_raw ) == 0 ) // free block
+            if ( BlockState::get_weight( prv_raw ) == 0 )
             {
                 index_type prv_idx  = curr_prev;
                 index_type blk_next = coalescing->next_offset();
@@ -3929,7 +3743,6 @@ class AllocatorPolicy
 
                 FreeBlockTreeT::remove( base, hdr, prv_idx );
 
-                // CoalescingBlock::coalesce_with_prev — current block (blk) is absorbed into prv
                 CoalescingBlock<AddressTraitsT>* result_coalescing =
                     coalescing->coalesce_with_prev( prv_raw, next_blk, prv_idx );
 
@@ -3941,7 +3754,6 @@ class AllocatorPolicy
                 if ( hdr->used_size >= kBlkHdrGran )
                     hdr->used_size -= kBlkHdrGran;
 
-                // State: CoalescingBlock::finalize_coalesce → FreeBlock; вставка в AVL
                 FreeBlock<AddressTraitsT>* fb = result_coalescing->finalize_coalesce();
                 (void)fb;
                 FreeBlockTreeT::insert( base, hdr, prv_idx );
@@ -3949,45 +3761,36 @@ class AllocatorPolicy
             }
         }
 
-        // State: CoalescingBlock::finalize_coalesce → FreeBlock; вставка в AVL
         FreeBlock<AddressTraitsT>* fb = coalescing->finalize_coalesce();
         (void)fb;
+
         FreeBlockTreeT::insert( base, hdr, b_idx );
     }
 
-    // ─── Repair phase of load() — structural reconstruction ────────────────────
-
-    /**
-     * @brief Перестроить дерево свободных блоков.
-     *
-     * Сбрасывает все AVL-ссылки в блоках и заново вставляет свободные блоки.
-     * Вызывается при `load()` после восстановления менеджера из файла.
-     * Также вызывает BlockState::recover_state для каждого блока.
-     *
-     * @param base  Базовый указатель управляемой области.
-     * @param hdr   Заголовок менеджера.
-     */
+/*
+### pmm::AllocatorPolicy::rebuild_free_tree
+*/
     static void rebuild_free_tree( std::uint8_t* base, detail::ManagerHeader<AddressTraitsT>* hdr )
     {
+
         hdr->free_tree_root    = AddressTraitsT::no_block;
+
         hdr->last_block_offset = AddressTraitsT::no_block;
+
         index_type idx         = hdr->first_block_offset;
         while ( idx != AddressTraitsT::no_block )
         {
             void* blk_ptr = detail::block_at<AddressTraitsT>( base, idx );
 
-            // Repair: fix incorrect transitional states (weight/root_offset mismatch)
             BlockState::recover_state( blk_ptr, idx );
 
-            if ( BlockState::get_weight( blk_ptr ) == 0 ) // free block
+            if ( BlockState::get_weight( blk_ptr ) == 0 )
             {
-                // Reset AVL fields only for free blocks — allocated blocks may use
-                // TreeNode AVL fields for user-level trees (symbol tree, pmap, etc.)
-                // so resetting them would corrupt those data structures.
+
                 BlockState::reset_avl_fields_of( blk_ptr );
                 FreeBlockTreeT::insert( base, hdr, idx );
             }
-            // Use AddressTraitsT::no_block for correct sentinel check.
+
             index_type next_idx = BlockState::get_next_offset( blk_ptr );
             if ( next_idx == AddressTraitsT::no_block )
                 hdr->last_block_offset = idx;
@@ -3995,22 +3798,17 @@ class AllocatorPolicy
         }
     }
 
-    /**
-     * @brief Восстановить двухсвязный список блоков.
-     *
-     * Проходит по списку блоков и восстанавливает `prev_offset` у каждого.
-     * Вызывается при `load()` (данное поле не персистируется).
-     *
-     * @param base  Базовый указатель управляемой области.
-     * @param hdr   Заголовок менеджера.
-     */
+/*
+### pmm::AllocatorPolicy::repair_linked_list
+*/
     static void repair_linked_list( std::uint8_t* base, detail::ManagerHeader<AddressTraitsT>* hdr )
     {
         index_type idx  = hdr->first_block_offset;
+
         index_type prev = AddressTraitsT::no_block;
         while ( idx != AddressTraitsT::no_block )
         {
-            // Use AddressTraitsT::granule_size for correct size check.
+
             if ( static_cast<std::size_t>( idx ) * AddressTraitsT::granule_size + sizeof( BlockT ) > hdr->total_size )
                 break;
             void* blk_ptr = detail::block_at<AddressTraitsT>( base, idx );
@@ -4021,34 +3819,28 @@ class AllocatorPolicy
         }
     }
 
-    /**
-     * @brief Пересчитать счётчики блоков и использованного размера.
-     *
-     * Проходит по всем блокам и обновляет `block_count`, `free_count`,
-     * `alloc_count`, `used_size` в заголовке менеджера.
-     * Использует Block<A> layout: `weight` вместо `size`.
-     *
-     * @param base  Базовый указатель управляемой области.
-     * @param hdr   Заголовок менеджера.
-     */
+/*
+### pmm::AllocatorPolicy::recompute_counters
+*/
     static void recompute_counters( std::uint8_t* base, detail::ManagerHeader<AddressTraitsT>* hdr )
     {
-        // Use AddressTraitsT-specific block header granule count.
+
         static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AddressTraitsT>;
 
         index_type block_count = 0, free_count = 0, alloc_count = 0;
+
         index_type used_gran = 0;
         index_type idx       = hdr->first_block_offset;
         while ( idx != AddressTraitsT::no_block )
         {
-            // Use AddressTraitsT::granule_size for correct size check.
+
             if ( static_cast<std::size_t>( idx ) * AddressTraitsT::granule_size + sizeof( BlockT ) > hdr->total_size )
                 break;
             const void* blk_ptr = detail::block_at<AddressTraitsT>( base, idx );
             block_count++;
             used_gran += kBlkHdrGran;
             index_type w = BlockState::get_weight( blk_ptr );
-            if ( w > 0 ) // allocated block
+            if ( w > 0 )
             {
                 alloc_count++;
                 used_gran += w;
@@ -4065,18 +3857,9 @@ class AllocatorPolicy
         hdr->used_size   = used_gran;
     }
 
-    // ─── Verify-only diagnostics ──────────────────────────────────
-
-    /**
-     * @brief Verify linked list prev_offset consistency without modifying the image.
-     *
-     * Walks the block chain via next_offset and checks that each block's prev_offset
-     * matches the index of the preceding block.
-     *
-     * @param base    Base pointer of the managed area.
-     * @param hdr     Manager header (read-only).
-     * @param result  Diagnostic result to append violations to.
-     */
+/*
+### pmm::AllocatorPolicy::verify_linked_list
+*/
     static void verify_linked_list( const std::uint8_t* base, const detail::ManagerHeader<AddressTraitsT>* hdr,
                                     VerifyResult& result ) noexcept
     {
@@ -4100,16 +3883,9 @@ class AllocatorPolicy
         }
     }
 
-    /**
-     * @brief Verify block counters consistency without modifying the image.
-     *
-     * Recomputes block_count, free_count, alloc_count, used_size by walking the
-     * linked list and compares against stored header values.
-     *
-     * @param base    Base pointer of the managed area.
-     * @param hdr     Manager header (read-only).
-     * @param result  Diagnostic result to append violations to.
-     */
+/*
+### pmm::AllocatorPolicy::verify_counters
+*/
     static void verify_counters( const std::uint8_t* base, const detail::ManagerHeader<AddressTraitsT>* hdr,
                                  VerifyResult& result ) noexcept
     {
@@ -4145,16 +3921,9 @@ class AllocatorPolicy
         }
     }
 
-    /**
-     * @brief Verify block state consistency for all blocks without modification.
-     *
-     * Walks the linked list and calls verify_state() for each block, detecting
-     * any transitional (inconsistent) states.
-     *
-     * @param base    Base pointer of the managed area.
-     * @param hdr     Manager header (read-only).
-     * @param result  Diagnostic result to append violations to.
-     */
+/*
+### pmm::AllocatorPolicy::verify_block_states
+*/
     static void verify_block_states( const std::uint8_t* base, const detail::ManagerHeader<AddressTraitsT>* hdr,
                                      VerifyResult& result ) noexcept
     {
@@ -4169,15 +3938,13 @@ class AllocatorPolicy
         }
     }
 
-    /**
-     * @brief Verify free tree structure without modifying the image.
-     *
-     * Checks root validity, AVL parent/child links, strict ordering, height/balance,
-     * duplicate visits, and membership equality with the linked-list free blocks.
-     */
+/*
+### pmm::AllocatorPolicy::verify_free_tree
+*/
     static void verify_free_tree( const std::uint8_t* base, const detail::ManagerHeader<AddressTraitsT>* hdr,
                                   VerifyResult& result ) noexcept
     {
+
         std::size_t expected_count = 0;
         index_type  idx            = hdr->first_block_offset;
         while ( idx != AddressTraitsT::no_block )
@@ -4222,7 +3989,9 @@ class AllocatorPolicy
         }
 
         std::size_t visited_count = 0;
+
         verify_free_tree_node( base, hdr, hdr->free_tree_root, AddressTraitsT::no_block, {}, false, {}, false,
+
                                expected_count, visited_count, result );
 
         idx = hdr->first_block_offset;
@@ -4246,25 +4015,37 @@ class AllocatorPolicy
         }
     }
 
+/*
+### pmm::AllocatorPolicy::free_tree_block_granules
+*/
     static index_type free_tree_block_granules( const std::uint8_t*                          base,
                                                 const detail::ManagerHeader<AddressTraitsT>* hdr,
                                                 index_type                                   block_idx ) noexcept
     {
         const void* n      = detail::block_at<AddressTraitsT>( base, block_idx );
+
         index_type  n_next = BlockState::get_next_offset( n );
         index_type  total  = detail::byte_off_to_idx_t<AddressTraitsT>( hdr->total_size );
         return ( n_next != AddressTraitsT::no_block ) ? static_cast<index_type>( n_next - block_idx )
+
                                                       : static_cast<index_type>( total - block_idx );
     }
 
+/*
+### pmm::AllocatorPolicy::free_tree_less_key
+*/
     static bool free_tree_less_key( const std::uint8_t* base, const detail::ManagerHeader<AddressTraitsT>* hdr,
                                     index_type a, index_type b ) noexcept
     {
+
         index_type a_gran = free_tree_block_granules( base, hdr, a );
         index_type b_gran = free_tree_block_granules( base, hdr, b );
         return ( a_gran < b_gran ) || ( a_gran == b_gran && a < b );
     }
 
+/*
+### pmm::AllocatorPolicy::free_tree_contains
+*/
     static bool free_tree_contains( const std::uint8_t* base, const detail::ManagerHeader<AddressTraitsT>* hdr,
                                     index_type node_idx, index_type target, std::size_t step_limit ) noexcept
     {
@@ -4283,6 +4064,9 @@ class AllocatorPolicy
         return false;
     }
 
+/*
+### pmm::AllocatorPolicy::verify_free_tree_node
+*/
     static std::int16_t verify_free_tree_node( const std::uint8_t*                          base,
                                                const detail::ManagerHeader<AddressTraitsT>* hdr, index_type node_idx,
                                                index_type parent, index_type lower, bool has_lower, index_type upper,
@@ -4297,6 +4081,7 @@ class AllocatorPolicy
                         static_cast<std::uint64_t>( node_idx ), 1, 2 );
             return 0;
         }
+
         ++visited_count;
 
         if ( !detail::validate_block_index<AddressTraitsT>( hdr->total_size, node_idx ) )
@@ -4334,13 +4119,16 @@ class AllocatorPolicy
         }
 
         index_type left  = BlockState::get_left_offset( node );
+
         index_type right = BlockState::get_right_offset( node );
 
         std::int16_t left_h     = verify_free_tree_node( base, hdr, left, node_idx, lower, has_lower, node_idx, true,
                                                          expected_count, visited_count, result );
         std::int16_t right_h    = verify_free_tree_node( base, hdr, right, node_idx, node_idx, true, upper, has_upper,
                                                          expected_count, visited_count, result );
+
         std::int16_t expected_h = static_cast<std::int16_t>( 1 + ( left_h > right_h ? left_h : right_h ) );
+
         std::int16_t stored_h   = BlockState::get_avl_height( node );
         if ( stored_h != expected_h || left_h - right_h > 1 || right_h - left_h > 1 )
         {
@@ -4351,13 +4139,14 @@ class AllocatorPolicy
         return expected_h;
     }
 
-    // ─── reallocate_typed helpers ─────────────────────────────────
-
-    /// @brief In-place shrink: update weight, split remainder into free block + coalesce.
+/*
+### pmm::AllocatorPolicy::realloc_shrink
+*/
     static void realloc_shrink( std::uint8_t* base, detail::ManagerHeader<AddressTraitsT>* hdr, index_type blk_idx,
                                 void* blk_raw, index_type old_data_gran, index_type new_data_gran ) noexcept
     {
         static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AddressTraitsT>;
+
         index_type                  remainder   = old_data_gran - new_data_gran;
         if ( remainder >= kBlkHdrGran + 1 )
         {
@@ -4387,7 +4176,9 @@ class AllocatorPolicy
         }
     }
 
-    /// @brief Try in-place grow by absorbing adjacent free block. Returns true on success.
+/*
+### pmm::AllocatorPolicy::realloc_grow
+*/
     static bool realloc_grow( std::uint8_t* base, detail::ManagerHeader<AddressTraitsT>* hdr, index_type blk_idx,
                               void* blk_raw, index_type old_data_gran, index_type new_data_gran ) noexcept
     {
@@ -4400,21 +4191,26 @@ class AllocatorPolicy
             return false;
         index_type next_total =
             detail::block_total_granules( base, hdr, detail::block_at<AddressTraitsT>( base, next_idx ) );
+
         index_type available = old_data_gran + next_total;
         if ( available < new_data_gran )
             return false;
         FreeBlockTreeT::remove( base, hdr, next_idx );
         index_type next_next = BlockState::get_next_offset( next_blk );
+
         BlockState::set_next_offset_of( blk_raw, next_next );
         if ( next_next != AddressTraitsT::no_block )
+
             BlockState::set_prev_offset_of( detail::block_at<AddressTraitsT>( base, next_next ), blk_idx );
         else
             hdr->last_block_offset = blk_idx;
+
         std::memset( next_blk, 0, sizeof( BlockT ) );
         hdr->block_count--;
         hdr->free_count--;
         if ( hdr->used_size >= kBlkHdrGran )
             hdr->used_size -= kBlkHdrGran;
+
         index_type rem = available - new_data_gran;
         if ( rem >= kBlkHdrGran + 1 )
         {
@@ -4433,16 +4229,16 @@ class AllocatorPolicy
             hdr->used_size += kBlkHdrGran;
             FreeBlockTreeT::insert( base, hdr, rem_idx );
         }
+
         BlockState::set_weight_of( blk_raw, new_data_gran );
         hdr->used_size += ( new_data_gran - old_data_gran );
         return true;
     }
 };
 
-/// @brief Псевдоним AllocatorPolicy с настройками по умолчанию.
 using DefaultAllocatorPolicy = AllocatorPolicy<AvlFreeTree<DefaultAddressTraits>, DefaultAddressTraits>;
 
-} // namespace pmm
+}
 
 #include <cstddef>
 #include <cstdint>
@@ -4463,42 +4259,74 @@ inline constexpr const char*   kSystemTypeForestDomainRecord = "type/forest_doma
 inline constexpr const char*   kSystemTypePstringview        = "type/pstringview";
 inline constexpr const char*   kServiceNameDomainRoot        = "service/domain_root";
 inline constexpr const char*   kServiceNameDomainSymbol      = "service/domain_symbol";
-inline constexpr std::uint32_t kForestRegistryMagic          = 0x50465247U; // "PFRG"
+inline constexpr std::uint32_t kForestRegistryMagic          = 0x50465247U;
 inline constexpr std::uint16_t kForestRegistryVersion        = 1;
 inline constexpr std::uint8_t  kForestBindingDirectRoot      = 0;
 inline constexpr std::uint8_t  kForestBindingFreeTree        = 1;
 inline constexpr std::uint8_t  kForestDomainFlagSystem       = 0x01;
 
+/*
+## pmm::detail::ForestDomainRecord
+*/
 template <typename AddressTraitsT> struct ForestDomainRecord
 {
+
     using index_type = typename AddressTraitsT::index_type;
 
     index_type    binding_id;
+
     index_type    root_offset;
+
     index_type    symbol_offset;
+
     std::uint8_t  binding_kind;
     std::uint8_t  flags;
     std::uint16_t reserved;
+
     char          name[kForestDomainNameCapacity];
 
+/*
+### pmm::detail::ForestDomainRecord::ForestDomainRecord
+*/
     constexpr ForestDomainRecord() noexcept
+
+/*
+### pmm::detail::ForestDomainRecord::binding_id
+*/
         : binding_id( 0 ), root_offset( 0 ), symbol_offset( 0 ), binding_kind( kForestBindingDirectRoot ), flags( 0 ),
+
+/*
+### pmm::detail::ForestDomainRecord::reserved
+*/
           reserved( 0 ), name{}
     {
     }
 };
 
+/*
+## pmm::detail::ForestDomainRegistry
+*/
 template <typename AddressTraitsT> struct ForestDomainRegistry
 {
+
     using index_type = typename AddressTraitsT::index_type;
 
     std::uint32_t                      magic;
     std::uint16_t                      version;
     std::uint16_t                      domain_count;
+
     index_type                         next_binding_id;
+
     ForestDomainRecord<AddressTraitsT> domains[kMaxForestDomains];
 
+/*
+### pmm::detail::ForestDomainRegistry::ForestDomainRegistry
+*/
     constexpr ForestDomainRegistry() noexcept
+
+/*
+### pmm::detail::ForestDomainRegistry::magic
+*/
         : magic( kForestRegistryMagic ), version( kForestRegistryVersion ), domain_count( 0 ), next_binding_id( 1 ),
           domains{}
     {
@@ -4535,12 +4363,7 @@ static_assert( std::is_trivially_copyable_v<ForestDomainRecord<DefaultAddressTra
 static_assert( std::is_nothrow_default_constructible_v<ForestDomainRegistry<DefaultAddressTraits>>,
                "ForestDomainRegistry must be nothrow-default-constructible" );
 
-} // namespace pmm::detail
-
-/**
- * @file pmm/layout.h
- * @brief Stateless helpers for manager layout initialization and expansion.
- */
+}
 
 #include <cstddef>
 #include <cstdint>
@@ -4549,19 +4372,34 @@ static_assert( std::is_nothrow_default_constructible_v<ForestDomainRegistry<Defa
 namespace pmm::detail
 {
 
+/*
+## pmm::detail::ManagerLayoutOps
+*/
 template <typename ManagerAccess> struct ManagerLayoutOps
 {
+
     using address_traits  = typename ManagerAccess::address_traits;
+
     using free_block_tree = typename ManagerAccess::free_block_tree;
+
     using index_type      = typename address_traits::index_type;
+
     using logging_policy  = typename ManagerAccess::logging_policy;
+
     using storage_backend = typename ManagerAccess::storage_backend;
+
     using BlockState      = BlockStateBase<address_traits>;
 
+/*
+### pmm::detail::ManagerLayoutOps::init_layout
+*/
     static bool init_layout( storage_backend& backend, std::uint8_t* base, std::size_t size ) noexcept
     {
+
         static constexpr index_type  kHdrBlkIdx  = 0;
+
         static constexpr index_type  kFreeBlkIdx = ManagerAccess::kFreeBlkIdxLayout;
+
         static constexpr std::size_t kGranSz     = address_traits::granule_size;
 
         static constexpr std::size_t kMinBlockDataSize = kGranSz;
@@ -4570,63 +4408,86 @@ template <typename ManagerAccess> struct ManagerLayoutOps
             return false;
 
         void* hdr_blk = base;
+
         std::memset( hdr_blk, 0, ManagerAccess::kBlockHdrByteSize );
+
         BlockState::init_fields( hdr_blk,
-                                 /*prev*/ address_traits::no_block,
-                                 /*next*/ kFreeBlkIdx,
-                                 /*avl_height*/ 0,
-                                 /*weight*/ ManagerAccess::kMgrHdrGranules,
-                                 /*root_offset*/ kHdrBlkIdx );
+                                   address_traits::no_block,
+                                   kFreeBlkIdx,
+                                   0,
+                                   ManagerAccess::kMgrHdrGranules,
+                                   kHdrBlkIdx );
 
         ManagerHeader<address_traits>* hdr = ManagerAccess::get_header( base );
         std::memset( hdr, 0, sizeof( ManagerHeader<address_traits> ) );
+
         hdr->magic              = ManagerAccess::kMagic;
+
         hdr->total_size         = size;
+
         hdr->first_block_offset = kHdrBlkIdx;
+
         hdr->last_block_offset  = address_traits::no_block;
+
         hdr->free_tree_root     = address_traits::no_block;
+
         hdr->image_version      = kCurrentImageVersion;
+
         hdr->granule_size       = static_cast<std::uint16_t>( kGranSz );
+
         hdr->root_offset        = address_traits::no_block;
 
         void* blk = base + static_cast<std::size_t>( kFreeBlkIdx ) * kGranSz;
         std::memset( blk, 0, sizeof( Block<address_traits> ) );
         BlockState::init_fields( blk,
-                                 /*prev*/ kHdrBlkIdx,
-                                 /*next*/ address_traits::no_block,
-                                 /*avl_height*/ 1,
-                                 /*weight*/ 0,
-                                 /*root_offset*/ 0 );
+                                   kHdrBlkIdx,
+                                   address_traits::no_block,
+                                   1,
+                                   0,
+                                   0 );
 
         hdr->last_block_offset = kFreeBlkIdx;
         hdr->free_tree_root    = kFreeBlkIdx;
+
         hdr->block_count       = 2;
+
         hdr->free_count        = 1;
+
         hdr->alloc_count       = 1;
+
         hdr->used_size         = kFreeBlkIdx + ManagerAccess::kBlockHdrGranules;
 
         (void)backend;
+
         ManagerAccess::set_initialized();
         return true;
     }
 
+/*
+### pmm::detail::ManagerLayoutOps::do_expand
+*/
     static bool do_expand( storage_backend& backend, bool initialized, std::size_t user_size ) noexcept
     {
         if ( !initialized )
             return false;
+
         std::uint8_t*                  base     = backend.base_ptr();
         ManagerHeader<address_traits>* hdr      = ManagerAccess::get_header( base );
         std::size_t                    old_size = hdr->total_size;
 
         static constexpr std::size_t kGranSz        = address_traits::granule_size;
+
         index_type                   data_gran_need = bytes_to_granules_t<address_traits>( user_size );
         if ( data_gran_need == 0 )
+
             data_gran_need = 1;
         std::size_t min_need = static_cast<std::size_t>( ManagerAccess::kBlockHdrGranules + data_gran_need +
                                                          ManagerAccess::kBlockHdrGranules ) *
+
                                kGranSz;
         std::size_t growth = old_size / 4;
         if ( growth < min_need )
+
             growth = min_need;
 
         if ( !backend.expand( growth ) )
@@ -4645,6 +4506,7 @@ template <typename ManagerAccess> struct ManagerLayoutOps
 
         void* last_blk_raw =
             ( hdr->last_block_offset != address_traits::no_block )
+
                 ? static_cast<void*>( new_base + static_cast<std::size_t>( hdr->last_block_offset ) * kGranSz )
                 : nullptr;
 
@@ -4667,21 +4529,21 @@ template <typename ManagerAccess> struct ManagerLayoutOps
                 Block<address_traits>* last_blk = reinterpret_cast<Block<address_traits>*>( last_blk_raw );
                 index_type             loff     = block_idx_t<address_traits>( new_base, last_blk );
                 BlockState::init_fields( nb_blk,
-                                         /*prev*/ loff,
-                                         /*next*/ address_traits::no_block,
-                                         /*avl_height*/ 1,
-                                         /*weight*/ 0,
-                                         /*root_offset*/ 0 );
+                                           loff,
+                                           address_traits::no_block,
+                                           1,
+                                           0,
+                                           0 );
                 BlockState::set_next_offset_of( last_blk_raw, static_cast<index_type>( extra_idx ) );
             }
             else
             {
                 BlockState::init_fields( nb_blk,
-                                         /*prev*/ address_traits::no_block,
-                                         /*next*/ address_traits::no_block,
-                                         /*avl_height*/ 1,
-                                         /*weight*/ 0,
-                                         /*root_offset*/ 0 );
+                                           address_traits::no_block,
+                                           address_traits::no_block,
+                                           1,
+                                           0,
+                                           0 );
                 hdr->first_block_offset = extra_idx;
             }
             hdr->last_block_offset = extra_idx;
@@ -4694,7 +4556,7 @@ template <typename ManagerAccess> struct ManagerLayoutOps
     }
 };
 
-} // namespace pmm::detail
+}
 
 #include <cstddef>
 #include <limits>
@@ -4703,34 +4565,42 @@ template <typename ManagerAccess> struct ManagerLayoutOps
 namespace pmm
 {
 
-/**
- * STL-compatible allocator backed by ManagerT.
- *
- * Returned raw pointers are transient mapped addresses, not persistent handles.
- * Store cross-run object identity as pptr<T>; do not persist allocate() results
- * across manager destroy/load/remap cycles.
- */
+/*
+## pmm::pallocator
+*/
 template <typename T, typename ManagerT> struct pallocator
 {
 
     using value_type      = T;
+
     using size_type       = std::size_t;
+
     using difference_type = std::ptrdiff_t;
 
     using propagate_on_container_copy_assignment = std::true_type;
+
     using propagate_on_container_move_assignment = std::true_type;
+
     using propagate_on_container_swap            = std::true_type;
+
     using is_always_equal                        = std::true_type;
 
+/*
+### pmm::pallocator::pallocator
+*/
     constexpr pallocator() noexcept = default;
 
     constexpr pallocator( const pallocator& ) noexcept = default;
 
     template <typename U> constexpr pallocator( const pallocator<U, ManagerT>& ) noexcept {}
 
+/*
+### pmm::pallocator::allocate
+*/
     [[nodiscard]] T* allocate( std::size_t n )
     {
         if ( n == 0 )
+
             throw std::bad_alloc();
 
         if ( n > max_size() )
@@ -4743,9 +4613,14 @@ template <typename T, typename ManagerT> struct pallocator
         return static_cast<T*>( raw );
     }
 
-    // PMM records block sizes internally; the STL count is not trusted here.
+/*
+### pmm::pallocator::deallocate
+*/
     void deallocate( T* p, std::size_t ) noexcept { ManagerT::deallocate( static_cast<void*>( p ) ); }
 
+/*
+### pmm::pallocator::max_size
+*/
     std::size_t max_size() const noexcept { return ( std::numeric_limits<std::size_t>::max )() / sizeof( T ); }
 
     template <typename U> bool operator==( const pallocator<U, ManagerT>& ) const noexcept { return true; }
@@ -4753,7 +4628,7 @@ template <typename T, typename ManagerT> struct pallocator
     template <typename U> bool operator!=( const pallocator<U, ManagerT>& ) const noexcept { return false; }
 };
 
-} // namespace pmm
+}
 
 #include <cassert>
 #include <cstddef>
@@ -4764,34 +4639,56 @@ template <typename T, typename ManagerT> struct pallocator
 namespace pmm
 {
 
+/*
+## pmm::parray
+*/
 template <typename T, typename ManagerT> struct parray
 {
     static_assert( std::is_trivially_copyable_v<T>, "parray<T>: T must be trivially copyable for PAP persistence" );
 
     using manager_type = ManagerT;
+
     using index_type   = typename ManagerT::index_type;
+
     using value_type   = T;
 
     std::uint32_t _size;
     std::uint32_t _capacity;
+
     index_type    _data_idx;
 
+/*
+### pmm::parray::parray
+*/
     parray() noexcept : _size( 0 ), _capacity( 0 ), _data_idx( detail::kNullIdx_v<typename ManagerT::address_traits> )
     {
     }
 
     ~parray() noexcept = default;
 
+/*
+### pmm::parray::size
+*/
     std::size_t size() const noexcept { return static_cast<std::size_t>( _size ); }
 
+/*
+### pmm::parray::empty
+*/
     bool empty() const noexcept { return _size == 0; }
 
+/*
+### pmm::parray::capacity
+*/
     std::size_t capacity() const noexcept { return static_cast<std::size_t>( _capacity ); }
 
+/*
+### pmm::parray::at
+*/
     T* at( std::size_t i ) noexcept
     {
         if ( i >= static_cast<std::size_t>( _size ) )
             return nullptr;
+
         T* data = resolve_data();
         return ( data != nullptr ) ? ( data + i ) : nullptr;
     }
@@ -4804,24 +4701,39 @@ template <typename T, typename ManagerT> struct parray
         return ( data != nullptr ) ? ( data + i ) : nullptr;
     }
 
+/*
+### pmm::parray::operator_index
+*/
     T operator[]( std::size_t i ) const noexcept
     {
         const T* data = resolve_data();
         return ( data != nullptr ) ? data[i] : T{};
     }
 
+/*
+### pmm::parray::front
+*/
     T* front() noexcept { return at( 0 ); }
 
     const T* front() const noexcept { return at( 0 ); }
 
+/*
+### pmm::parray::back
+*/
     T* back() noexcept { return ( _size > 0 ) ? at( static_cast<std::size_t>( _size ) - 1 ) : nullptr; }
 
     const T* back() const noexcept { return ( _size > 0 ) ? at( static_cast<std::size_t>( _size ) - 1 ) : nullptr; }
 
+/*
+### pmm::parray::data
+*/
     T* data() noexcept { return resolve_data(); }
 
     const T* data() const noexcept { return resolve_data(); }
 
+/*
+### pmm::parray::push_back
+*/
     bool push_back( const T& value ) noexcept
     {
         if ( !ensure_capacity( _size + 1 ) )
@@ -4829,17 +4741,24 @@ template <typename T, typename ManagerT> struct parray
         T* d = resolve_data();
         if ( d == nullptr )
             return false;
+
         d[_size] = value;
         ++_size;
         return true;
     }
 
+/*
+### pmm::parray::pop_back
+*/
     void pop_back() noexcept
     {
         if ( _size > 0 )
             --_size;
     }
 
+/*
+### pmm::parray::set
+*/
     bool set( std::size_t i, const T& value ) noexcept
     {
         if ( i >= static_cast<std::size_t>( _size ) )
@@ -4847,10 +4766,14 @@ template <typename T, typename ManagerT> struct parray
         T* d = resolve_data();
         if ( d == nullptr )
             return false;
+
         d[i] = value;
         return true;
     }
 
+/*
+### pmm::parray::reserve
+*/
     bool reserve( std::size_t n ) noexcept
     {
         if ( n > static_cast<std::size_t>( std::numeric_limits<std::uint32_t>::max() ) )
@@ -4858,10 +4781,14 @@ template <typename T, typename ManagerT> struct parray
         return ensure_capacity( static_cast<std::uint32_t>( n ) );
     }
 
+/*
+### pmm::parray::resize
+*/
     bool resize( std::size_t n ) noexcept
     {
         if ( n > static_cast<std::size_t>( std::numeric_limits<std::uint32_t>::max() ) )
             return false;
+
         auto new_size = static_cast<std::uint32_t>( n );
         if ( new_size > _size )
         {
@@ -4877,6 +4804,9 @@ template <typename T, typename ManagerT> struct parray
         return true;
     }
 
+/*
+### pmm::parray::insert
+*/
     bool insert( std::size_t index, const T& value ) noexcept
     {
         if ( index > static_cast<std::size_t>( _size ) )
@@ -4888,12 +4818,17 @@ template <typename T, typename ManagerT> struct parray
             return false;
 
         if ( index < static_cast<std::size_t>( _size ) )
+
             std::memmove( d + index + 1, d + index, ( static_cast<std::size_t>( _size ) - index ) * sizeof( T ) );
+
         d[index] = value;
         ++_size;
         return true;
     }
 
+/*
+### pmm::parray::erase
+*/
     bool erase( std::size_t index ) noexcept
     {
         if ( index >= static_cast<std::size_t>( _size ) )
@@ -4908,8 +4843,14 @@ template <typename T, typename ManagerT> struct parray
         return true;
     }
 
+/*
+### pmm::parray::clear
+*/
     void clear() noexcept { _size = 0; }
 
+/*
+### pmm::parray::free_data
+*/
     void free_data() noexcept
     {
         if ( _data_idx != detail::kNullIdx_v<typename ManagerT::address_traits> )
@@ -4919,6 +4860,7 @@ template <typename T, typename ManagerT> struct parray
             _data_idx = detail::kNullIdx_v<typename ManagerT::address_traits>;
         }
         _size     = 0;
+
         _capacity = 0;
     }
 
@@ -4940,12 +4882,20 @@ template <typename T, typename ManagerT> struct parray
     bool operator!=( const parray& other ) const noexcept { return !( *this == other ); }
 
   private:
+
+/*
+### pmm::parray::resolve_data
+*/
     T* resolve_data() const noexcept
     {
         return reinterpret_cast<T*>( detail::resolve_granule_ptr<typename ManagerT::address_traits>(
+
             ManagerT::backend().base_ptr(), _data_idx ) );
     }
 
+/*
+### pmm::parray::ensure_capacity
+*/
     bool ensure_capacity( std::uint32_t required ) noexcept
     {
         if ( required <= _capacity )
@@ -4953,6 +4903,7 @@ template <typename T, typename ManagerT> struct parray
 
         std::uint32_t new_cap = _capacity * 2;
         if ( new_cap < required )
+
             new_cap = required;
         if ( new_cap < 4 )
             new_cap = 4;
@@ -4966,6 +4917,7 @@ template <typename T, typename ManagerT> struct parray
             return false;
 
         std::uint8_t* base        = ManagerT::backend().base_ptr();
+
         index_type    new_dat_idx = detail::ptr_to_granule_idx<typename ManagerT::address_traits>( base, new_raw );
 
         if ( _size > 0 && _data_idx != detail::kNullIdx_v<typename ManagerT::address_traits> )
@@ -4976,6 +4928,7 @@ template <typename T, typename ManagerT> struct parray
         }
 
         if ( _data_idx != detail::kNullIdx_v<typename ManagerT::address_traits> )
+
             ManagerT::deallocate( detail::resolve_granule_ptr<typename ManagerT::address_traits>( base, _data_idx ) );
 
         _data_idx = new_dat_idx;
@@ -4984,18 +4937,7 @@ template <typename T, typename ManagerT> struct parray
     }
 };
 
-} // namespace pmm
-
-/**
- * @file pmm/pmap.h
- * @brief pmap<_K,_V,ManagerT> — персистентный AVL-словарь, rooted in a forest domain.
- *
- * Узлы — блоки в ПАП, пары (_K,_V); AVL-поля Block<AT> используются как у pstringview.
- * Корень дерева хранится в forest-domain binding `container/pmap/<type>/<binding>`;
- * в объекте pmap лежит только binding id. erase/clear освобождают узлы.
- *
- * @see pstringview.h, avl_tree_mixin.h, tree_node.h
- */
+}
 
 #include <cstddef>
 #include <cstdint>
@@ -5006,38 +4948,28 @@ namespace pmm
 
 template <typename _K, typename _V, typename ManagerT> struct pmap;
 
-/**
- * @brief Stable persistent type identity for `pmap` domain bindings.
- *
- * Default identity mixes `sizeof`, `alignof`, and a small set of
- * `<type_traits>` category bits — ABI-stable values the persisted payload
- * already depends on. Applications specialize `tag` with a fixed ASCII
- * string to pin identity across toolchains or disambiguate structurally
- * identical PODs.
- */
+/*
+## pmm::pmap_type_identity
+*/
 template <typename T> struct pmap_type_identity
 {
+
     static constexpr const char* tag = "";
 };
 
+/*
+## pmm::pmap_node
+*/
 template <typename _K, typename _V> struct pmap_node
 {
+
     _K key;
+
     _V value;
 };
 
 namespace detail
 {
-
-// ─── compact pmap domain-name builder ─────────────────────────────────────────
-//
-// Name format: "container/pmap/<TTTTTTTT>/<k><HH..>"
-//   <T...> is an 8-hex-digit type fingerprint for (_K,_V),
-//   <k>    is the binding-kind marker: 'g' (generated) or 'n' (named),
-//   <HH..> is the 8- or 16-hex-digit value (sequence for 'g', key hash for 'n').
-//
-// Identity is ABI-stable: sizeof + alignof + a fixed subset of <type_traits>
-// bits, plus pmap_type_identity<T>::tag when the application pins one.
 
 constexpr std::uint32_t pmap_fnv1a( std::uint32_t h, std::uint64_t v, unsigned bytes ) noexcept
 {
@@ -5077,12 +5009,11 @@ inline std::uint64_t pmap_key_hash( const char* key ) noexcept
     return h;
 }
 
-// Write "container/pmap/<type_fp>/<kind><value>" into a fixed-size buffer.
 inline bool pmap_write_name( char ( &out )[kForestDomainNameCapacity], std::uint32_t type_fp, char kind,
                              std::uint64_t value, unsigned value_hex_digits ) noexcept
 {
     constexpr const char* kPrefix = "container/pmap/";
-    const unsigned        needed  = 15 + 8 + 1 + 1 + value_hex_digits + 1; // prefix + fp + '/' + kind + value + NUL
+    const unsigned        needed  = 15 + 8 + 1 + 1 + value_hex_digits + 1;
     if ( needed > kForestDomainNameCapacity )
         return false;
     std::size_t p = 0;
@@ -5104,63 +5035,96 @@ inline bool pmap_write_name( char ( &out )[kForestDomainNameCapacity], std::uint
     return true;
 }
 
-} // namespace detail
+}
 
-/**
- * @brief Персистентный ассоциативный контейнер на основе AVL-дерева.
- *
- * `pmap` — это тонкий фасад над forest-domain binding-ом, имя которого
- * зависит от (_K, _V) и либо от пользовательского domain key, либо от
- * сгенерированной последовательности. В объекте хранится только binding id;
- * корень AVL-дерева живёт в registry менеджера.
- */
+/*
+## pmm::pmap
+*/
 template <typename _K, typename _V, typename ManagerT> struct pmap
 {
+
     using manager_type = ManagerT;
+
     using index_type   = typename ManagerT::index_type;
+
     using node_type    = pmap_node<_K, _V>;
+
     using node_pptr    = typename ManagerT::template pptr<node_type>;
 
     static constexpr std::uint32_t domain_type_hash = detail::pmap_fnv1a(
+
+/*
+### pmm::pmap::pmap_fnv1a
+*/
         detail::pmap_fnv1a( 2166136261u, detail::pmap_type_fp<_K>(), 4 ), detail::pmap_type_fp<_V>(), 4 );
 
+/*
+## pmm::pmap::forest_domain_descriptor
+*/
     struct forest_domain_descriptor
     {
+
         using index_type = typename ManagerT::index_type;
+
         using node_type  = pmap_node<_K, _V>;
+
         using node_pptr  = typename ManagerT::template pptr<node_type>;
 
         index_type binding_id;
 
+/*
+### pmm::pmap::forest_domain_descriptor::forest_domain_descriptor
+*/
         constexpr explicit forest_domain_descriptor( index_type id = 0 ) noexcept : binding_id( id ) {}
 
+/*
+### pmm::pmap::forest_domain_descriptor::name
+*/
         const char* name() const noexcept
         {
+
             const auto* d = ManagerT::find_domain_by_binding_unlocked( binding_id );
             return d != nullptr ? d->name : "";
         }
 
+/*
+### pmm::pmap::forest_domain_descriptor::root_index
+*/
         index_type root_index() const noexcept
         {
             return ManagerT::forest_domain_root_index_unlocked(
                 ManagerT::find_domain_by_binding_unlocked( binding_id ) );
         }
 
+/*
+### pmm::pmap::forest_domain_descriptor::root_index_ptr
+*/
         index_type* root_index_ptr() noexcept
         {
             return binding_id == 0 ? nullptr
+
                                    : ManagerT::forest_domain_root_index_ptr_unlocked(
                                          ManagerT::find_domain_by_binding_unlocked( binding_id ) );
         }
 
+/*
+### pmm::pmap::forest_domain_descriptor::resolve_node
+*/
         static node_type* resolve_node( node_pptr p ) noexcept { return ManagerT::template resolve<node_type>( p ); }
 
+/*
+### pmm::pmap::forest_domain_descriptor::compare_key
+*/
         static int compare_key( const _K& key, node_pptr cur ) noexcept
         {
+
             node_type* obj = resolve_node( cur );
             return obj == nullptr ? 0 : ( ( key == obj->key ) ? 0 : ( ( key < obj->key ) ? -1 : 1 ) );
         }
 
+/*
+### pmm::pmap::forest_domain_descriptor::less_node
+*/
         static bool less_node( node_pptr lhs, node_pptr rhs ) noexcept
         {
             node_type* l = resolve_node( lhs );
@@ -5168,23 +5132,30 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
             return l != nullptr && r != nullptr && l->key < r->key;
         }
 
+/*
+### pmm::pmap::forest_domain_descriptor::validate_node
+*/
         static bool validate_node( node_pptr p ) noexcept { return resolve_node( p ) != nullptr; }
     };
 
     using forest_domain_view_policy = detail::ForestDomainViewOps<forest_domain_descriptor>;
+
     using forest_domain_policy      = detail::ForestDomainOps<forest_domain_descriptor>;
 
     static constexpr index_type no_block = ManagerT::address_traits::no_block;
 
   private:
+
     index_type _binding_id;
 
-    // Bind (or rebind) to a domain. When domain_key == nullptr, allocate a fresh
-    // generated binding; otherwise hash the key into a stable named binding.
+/*
+### pmm::pmap::bind
+*/
     bool bind( const char* domain_key ) noexcept
     {
         if ( !ManagerT::is_initialized() )
             return false;
+
         char buf[detail::kForestDomainNameCapacity]{};
         if ( domain_key != nullptr && domain_key[0] != '\0' )
         {
@@ -5202,51 +5173,79 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
         }
         if ( !ManagerT::has_domain( buf ) && !ManagerT::register_domain( buf ) )
             return false;
+
         _binding_id = ManagerT::find_domain_by_name( buf );
         return _binding_id != 0;
     }
 
+/*
+### pmm::pmap::descriptor
+*/
     forest_domain_descriptor descriptor() const noexcept { return forest_domain_descriptor( _binding_id ); }
 
   public:
-    /// @brief Пустой словарь с уникальным generated binding (создаётся лениво).
+
+/*
+### pmm::pmap::pmap
+*/
     pmap() noexcept : _binding_id( 0 ) {}
 
-    /// @brief Словарь, привязанный к стабильному пользовательскому ключу domain-а.
     explicit pmap( const char* domain_key ) noexcept : _binding_id( 0 ) { bind( domain_key ); }
 
-    /// @brief Имя forest-domain binding-а этого фасада; пустая строка до первого bind.
+/*
+### pmm::pmap::domain_name
+*/
     const char* domain_name() const noexcept { return descriptor().name(); }
 
-    /// @brief Текущий root binding forest-domain-а; 0 = пустое дерево.
+/*
+### pmm::pmap::root_index
+*/
     index_type root_index() const noexcept { return descriptor().root_index(); }
 
+/*
+### pmm::pmap::forest_domain_ops
+*/
     forest_domain_policy forest_domain_ops() noexcept
     {
         if ( _binding_id == 0 || ManagerT::find_domain_by_binding_unlocked( _binding_id ) == nullptr )
+
             bind( nullptr );
         return forest_domain_policy( descriptor() );
     }
 
+/*
+### pmm::pmap::forest_domain_view_ops
+*/
     forest_domain_view_policy forest_domain_view_ops() const noexcept
     {
         return forest_domain_view_policy( descriptor() );
     }
 
+/*
+### pmm::pmap::empty
+*/
     bool empty() const noexcept { return root_index() == static_cast<index_type>( 0 ); }
 
+/*
+### pmm::pmap::size
+*/
     std::size_t size() const noexcept
     {
+
         const index_type root = root_index();
         return root == static_cast<index_type>( 0 ) ? 0 : detail::avl_subtree_count( node_pptr( root ) );
     }
 
-    /// @brief Вставить или обновить пару ключ-значение. Возвращает pptr на узел; null при OOM.
+/*
+### pmm::pmap::insert
+*/
     node_pptr insert( const _K& key, const _V& val ) noexcept
     {
+
         auto ops = forest_domain_ops();
         if ( ops.root_index_ptr() == nullptr )
             return node_pptr();
+
         node_pptr existing = ops.find( key );
         if ( !existing.is_null() )
         {
@@ -5254,51 +5253,80 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
                 obj->value = val;
             return existing;
         }
+
         node_pptr  new_node = ManagerT::template allocate_typed<node_type>();
+
         node_type* obj      = new_node.is_null() ? nullptr : ManagerT::template resolve<node_type>( new_node );
         if ( obj == nullptr )
             return node_pptr();
+
         obj->key   = key;
+
         obj->value = val;
+
         detail::avl_init_node( new_node );
+
         ops.insert( new_node );
         return new_node;
     }
 
+/*
+### pmm::pmap::find
+*/
     node_pptr find( const _K& key ) const noexcept { return forest_domain_view_ops().find( key ); }
+
+/*
+### pmm::pmap::contains
+*/
     bool      contains( const _K& key ) const noexcept { return !find( key ).is_null(); }
 
-    /// @brief Удалить узел по ключу; true — если найден и удалён.
+/*
+### pmm::pmap::erase
+*/
     bool erase( const _K& key ) noexcept
     {
+
         auto        ops  = forest_domain_policy( descriptor() );
+
         index_type* root = ops.root_index_ptr();
+
         node_pptr   t    = root == nullptr ? node_pptr() : ops.find( key );
         if ( t.is_null() )
             return false;
+
         detail::avl_remove( t, *root );
         ManagerT::template deallocate_typed<node_type>( t );
         return true;
     }
 
-    /// @brief Удалить все элементы, освободив их блоки в ПАП.
+/*
+### pmm::pmap::clear
+*/
     void clear() noexcept
     {
         auto        ops  = forest_domain_policy( descriptor() );
         index_type* root = ops.root_index_ptr();
         if ( root == nullptr )
+
             return;
         if ( *root != static_cast<index_type>( 0 ) )
+
             detail::avl_clear_subtree( node_pptr( *root ),
                                        []( node_pptr p ) { ManagerT::template deallocate_typed<node_type>( p ); } );
+
         *root = static_cast<index_type>( 0 );
     }
 
-    /// @brief Обнулить root binding (данные в ПАП не освобождаются). Для тестов.
+/*
+### pmm::pmap::reset
+*/
     void reset() noexcept { forest_domain_policy( descriptor() ).reset_root(); }
 
     using iterator = detail::AvlInorderIterator<node_pptr>;
 
+/*
+### pmm::pmap::begin
+*/
     iterator begin() const noexcept
     {
         const index_type root = root_index();
@@ -5307,46 +5335,13 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
         return iterator( detail::avl_min_node( node_pptr( root ) ).offset() );
     }
 
+/*
+### pmm::pmap::end
+*/
     iterator end() const noexcept { return iterator( static_cast<index_type>( 0 ) ); }
 };
 
-} // namespace pmm
-
-/**
- * @file pmm/pptr.h
- * @brief pptr<T, ManagerT> — персистентный типизированный указатель.
- *
- * pptr<T, ManagerT> хранит гранульный индекс вместо адреса,
- * что делает его адресно-независимым и пригодным для персистентных хранилищ:
- *   - Хранит индекс типа ManagerT::address_traits::index_type
- *   - Нет смещения при повторной загрузке по другому адресу
- *   - Запрет адресной арифметики (pptr++ запрещён)
- *   - Index 0 означает null
- *
- * Поддерживаемые режимы разыменования:
- *   - Статическая модель: `*p`, `p->field` — через статический метод менеджера
- *
- * Доступ к узлу AVL-дерева:
- *   - `p.tree_node()` — прямой доступ к TreeNode через ссылку
- *
- * Пример использования с PersistMemoryManager (статическая модель):
- * @code
- *   using MyMgr = pmm::PersistMemoryManager<pmm::CacheManagerConfig>;
- *   MyMgr::create(64 * 1024);
- *
- *   MyMgr::pptr<int> p = MyMgr::allocate_typed<int>();
- *   if (p) {
- *       *p = 42;        // operator* — разыменование без аргументов
- *       p->some_field;  // operator-> — доступ к полям
- *   }
- *   MyMgr::deallocate_typed(p);
- *   MyMgr::destroy();
- * @endcode
- *
- * @see persist_memory_manager.h — PersistMemoryManager (статическая модель)
- * @see tree_node.h — TreeNode<A> с публичными методами
- * @version 0.9
- */
+}
 
 #include <concepts>
 #include <cstddef>
@@ -5359,13 +5354,12 @@ namespace pmm
 namespace detail
 {
 
-/// @cond INTERNAL
-
-/// @brief Вспомогательный trait: извлекает index_type из менеджера через address_traits.
-/// Если ManagerT::address_traits::index_type существует, использует его;
-/// иначе — uint32_t (для совместимости).
+/*
+## pmm::detail::manager_index_type
+*/
 template <typename ManagerT> struct manager_index_type
 {
+
     using type = std::uint32_t;
 };
 
@@ -5373,183 +5367,133 @@ template <typename ManagerT>
     requires requires { typename ManagerT::address_traits::index_type; }
 struct manager_index_type<ManagerT>
 {
+
     using type = typename ManagerT::address_traits::index_type;
 };
 
-/// @endcond
+}
 
-} // namespace detail
-
-/**
- * @brief Персистентный типизированный указатель (гранульный индекс).
- *
- * Хранит гранульный индекс пользовательских данных, а не адрес.
- * Адресно-независим: корректно загружается из файла по другому базовому адресу.
- *
- * Тип индекса определяется через `ManagerT::address_traits::index_type`.
- *
- * @tparam T Тип данных, на который указывает pptr.
- * @tparam ManagerT Тип менеджера (обязателен, void не допускается).
- *
- * Поддерживается статическая модель разыменования:
- *   - `*p`, `p->field` — через статический метод менеджера
- */
 template <class T, class ManagerT>
     requires( !std::is_void_v<ManagerT> )
+
+/*
+## pmm::pptr
+*/
 class pptr
 {
 
   public:
-    /// @brief Тип данных, на который ссылается pptr.
+
     using element_type = T;
 
-    /// @brief Тип менеджера, к которому привязан pptr.
     using manager_type = ManagerT;
 
-    /// @brief Тип гранульного индекса (берётся из ManagerT::address_traits::index_type).
     using index_type = typename detail::manager_index_type<ManagerT>::type;
 
   private:
-    index_type _idx; ///< Гранульный индекс пользовательских данных (0 = null)
+
+    index_type _idx;
 
   public:
+
+/*
+### pmm::pptr::pptr
+*/
     constexpr pptr() noexcept : _idx( 0 ) {}
     constexpr explicit pptr( index_type idx ) noexcept : _idx( idx ) {}
     constexpr pptr( const pptr& ) noexcept            = default;
+
     constexpr pptr& operator=( const pptr& ) noexcept = default;
     ~pptr() noexcept                                  = default;
 
-    // Адресная арифметика запрещена — pptr не является итератором
+/*
+### pmm::pptr::operator_increment
+*/
     pptr& operator++()      = delete;
     pptr  operator++( int ) = delete;
+/*
+### pmm::pptr::operator_decrement
+*/
     pptr& operator--()      = delete;
     pptr  operator--( int ) = delete;
 
-    /// @brief Проверить, является ли указатель нулевым.
+/*
+### pmm::pptr::is_null
+*/
     constexpr bool is_null() const noexcept { return _idx == 0; }
 
-    /// @brief Явное преобразование в bool: true если не null.
+/*
+### pmm::pptr::operator_bool
+*/
     constexpr explicit operator bool() const noexcept { return _idx != 0; }
 
-    /// @brief Получить гранульный индекс (для сохранения/восстановления).
+/*
+### pmm::pptr::offset
+*/
     constexpr index_type offset() const noexcept { return _idx; }
 
-    /// @brief Получить байтовое смещение из гранульного индекса.
-    ///
-    /// Возвращает `offset() * granule_size`. Упрощает интеграцию с внешними системами,
-    /// работающими с байтовыми адресами (например, BinDiffSynchronizer pam_adapter).
-    ///
-    /// @return Байтовое смещение в управляемой области. Для null pptr возвращает 0.
+/*
+### pmm::pptr::byte_offset
+*/
     constexpr std::size_t byte_offset() const noexcept
     {
         return static_cast<std::size_t>( _idx ) * ManagerT::address_traits::granule_size;
     }
 
-    /// @brief Сравнение персистентных указателей одного типа по индексу.
     constexpr bool operator==( const pptr& other ) const noexcept { return _idx == other._idx; }
+
     constexpr bool operator!=( const pptr& other ) const noexcept { return _idx != other._idx; }
 
-    /**
-     * @brief Упорядочивание персистентных указателей для использования как ключ в pmap.
-     *
-     * Сравнивает указываемые объекты через `*this < *other`, если оба указателя не null.
-     * Null pptr считается меньше любого ненулевого указателя.
-     *
-     * @note Требует, чтобы тип T поддерживал `operator<`.
-     * @return true если `*this` должен быть перед `other` в упорядоченной последовательности.
-     */
+/*
+### pmm::pptr::operator_less
+*/
     bool operator<( const pptr& other ) const noexcept
     {
-        // Compile-time check — T must support operator< for pptr ordering.
+
         static_assert(
             requires( const T& a, const T& b ) {
                 { a < b } -> std::convertible_to<bool>;
             }, "pptr<T>::operator< requires T to support operator<. "
+
                "Provide bool operator<(const T&, const T&) or use pptr::offset() for index-based ordering." );
-        // Null pptr меньше любого ненулевого
+
         if ( is_null() && !other.is_null() )
             return true;
         if ( !is_null() && other.is_null() )
             return false;
         if ( is_null() && other.is_null() )
             return false;
-        // Оба ненулевые — сравниваем указываемые объекты
+
         return **this < *other;
     }
 
-    // ─── Разыменование через статический менеджер (статическая модель) ────────
-
-    /**
-     * @brief Разыменование указателя (статическая модель).
-     *
-     * Вызывает `ManagerT::resolve_checked<T>(*this)` без аргументов.
-     * Доступно только для менеджеров со статическим API (например, PersistMemoryManager).
-     *
-     * @return T& — ссылка на данные.
-     */
+/*
+### pmm::pptr::operator_deref
+*/
     T& operator*() const noexcept { return *ManagerT::template resolve_checked<T>( *this ); }
 
-    /**
-     * @brief Доступ к членам через персистентный указатель (статическая модель).
-     *
-     * Вызывает `ManagerT::resolve_checked<T>(*this)` без аргументов.
-     * Доступно только для менеджеров со статическим API.
-     *
-     * @return T* — указатель на данные.
-     */
+/*
+### pmm::pptr::operator_arrow
+*/
     T* operator->() const noexcept { return ManagerT::template resolve_checked<T>( *this ); }
 
-    /**
-     * @brief Получить сырой указатель (низкоуровневый доступ).
-     *
-     * Вызывает `ManagerT::resolve_checked<T>(*this)`.
-     * Используйте `*p` или `p->field` вместо этого метода для обычных операций.
-     * Для доступа к элементам массива используйте `ManagerT::resolve_at(p, i)`.
-     *
-     * @warning Сырой указатель действителен только пока менеджер инициализирован
-     *          и блок не освобождён. Не храните его дольше необходимого.
-     *
-     * @return T* — указатель на данные или nullptr если is_null().
-     */
+/*
+### pmm::pptr::resolve
+*/
     T* resolve() const noexcept { return ManagerT::template resolve_checked<T>( *this ); }
 
-    /**
-     * @brief Получить сырой указатель через unchecked manager path.
-     *
-     * Проверяет только грубую адресуемость pptr. Не проверяет, что блок сейчас
-     * выделен. Предназначено для внутреннего кода менеджера и низкоуровневой
-     * диагностики, где stale/free-block access выбран явно.
-     */
+/*
+### pmm::pptr::resolve_unchecked
+*/
     T* resolve_unchecked() const noexcept { return ManagerT::template resolve_unchecked<T>( *this ); }
 
-    // ─── Доступ к узлу AVL-дерева ────────────────────────────────
-
-    /**
-     * @brief Получить ссылку на узел AVL-дерева в заголовке блока.
-     *
-     * Позволяет работать с узлом дерева напрямую через методы TreeNode:
-     * get_left(), set_left(), get_right(), set_right(), get_parent(), set_parent(),
-     * get_weight(), set_weight(), get_height(), set_height(), get_node_type(), set_node_type().
-     *
-     * Использование:
-     * @code
-     *   auto& tn = p.tree_node();
-     *   auto left_idx = tn.get_left();  // no_block если нет левого потомка
-     *   tn.set_left(other_p.offset());
-     * @endcode
-     *
-     * @warning Ссылка действительна только пока менеджер инициализирован и блок не освобождён.
-     *
-     * @return TreeNode& — ссылка на узел AVL-дерева в заголовке выделенного блока.
-     */
+/*
+### pmm::pptr::tree_node
+*/
     auto& tree_node() const noexcept { return ManagerT::tree_node( *this ); }
 };
 
-// pptr<T, ManagerT> хранит только гранульный индекс — ManagerT не хранится.
-// Размер зависит от ManagerT::address_traits::index_type.
-// Для DefaultAddressTraits (uint32_t) размер равен 4 байтам.
-
-} // namespace pmm
+}
 
 #include <cstddef>
 #include <cstdint>
@@ -5559,55 +5503,91 @@ class pptr
 namespace pmm
 {
 
+/*
+## pmm::pstring
+*/
 template <typename ManagerT> struct pstring
 {
+
     using manager_type = ManagerT;
+
     using index_type   = typename ManagerT::index_type;
 
     std::uint32_t _length;
     std::uint32_t _capacity;
+
     index_type    _data_idx;
 
+/*
+### pmm::pstring::pstring
+*/
     pstring() noexcept
+
+/*
+### pmm::pstring::_length
+*/
         : _length( 0 ), _capacity( 0 ), _data_idx( detail::kNullIdx_v<typename ManagerT::address_traits> )
     {
     }
 
     ~pstring() noexcept = default;
 
+/*
+### pmm::pstring::c_str
+*/
     const char* c_str() const noexcept
     {
         if ( _data_idx == detail::kNullIdx_v<typename ManagerT::address_traits> )
             return "";
+
         char* data = resolve_data();
         return ( data != nullptr ) ? data : "";
     }
 
+/*
+### pmm::pstring::size
+*/
     std::size_t size() const noexcept { return static_cast<std::size_t>( _length ); }
 
+/*
+### pmm::pstring::empty
+*/
     bool empty() const noexcept { return _length == 0; }
 
+/*
+### pmm::pstring::operator_index
+*/
     char operator[]( std::size_t i ) const noexcept
     {
         char* data = resolve_data();
         return ( data != nullptr ) ? data[i] : '\0';
     }
 
+/*
+### pmm::pstring::assign
+*/
     bool assign( const char* s ) noexcept
     {
         if ( s == nullptr )
+
             s = "";
+
         auto len = static_cast<std::uint32_t>( std::strlen( s ) );
         if ( !ensure_capacity( len ) )
             return false;
         char* data = resolve_data();
         if ( data == nullptr )
             return false;
+
         std::memcpy( data, s, static_cast<std::size_t>( len ) + 1 );
+
         _length = len;
         return true;
     }
 
+/*
+### pmm::pstring::append
+*/
     bool append( const char* s ) noexcept
     {
         if ( s == nullptr )
@@ -5615,6 +5595,7 @@ template <typename ManagerT> struct pstring
         auto add_len = static_cast<std::uint32_t>( std::strlen( s ) );
         if ( add_len == 0 )
             return true;
+
         std::uint32_t new_len = _length + add_len;
         if ( new_len < _length )
             return false;
@@ -5628,6 +5609,9 @@ template <typename ManagerT> struct pstring
         return true;
     }
 
+/*
+### pmm::pstring::clear
+*/
     void clear() noexcept
     {
         _length = 0;
@@ -5639,6 +5623,9 @@ template <typename ManagerT> struct pstring
         }
     }
 
+/*
+### pmm::pstring::free_data
+*/
     void free_data() noexcept
     {
         if ( _data_idx != detail::kNullIdx_v<typename ManagerT::address_traits> )
@@ -5648,6 +5635,7 @@ template <typename ManagerT> struct pstring
             _data_idx = detail::kNullIdx_v<typename ManagerT::address_traits>;
         }
         _length   = 0;
+
         _capacity = 0;
     }
 
@@ -5673,15 +5661,26 @@ template <typename ManagerT> struct pstring
 
     bool operator!=( const pstring& other ) const noexcept { return !( *this == other ); }
 
+/*
+### pmm::pstring::operator_less
+*/
     bool operator<( const pstring& other ) const noexcept { return std::strcmp( c_str(), other.c_str() ) < 0; }
 
   private:
+
+/*
+### pmm::pstring::resolve_data
+*/
     char* resolve_data() const noexcept
     {
         return reinterpret_cast<char*>( detail::resolve_granule_ptr<typename ManagerT::address_traits>(
+
             ManagerT::backend().base_ptr(), _data_idx ) );
     }
 
+/*
+### pmm::pstring::ensure_capacity
+*/
     bool ensure_capacity( std::uint32_t required ) noexcept
     {
         if ( required <= _capacity )
@@ -5689,16 +5688,19 @@ template <typename ManagerT> struct pstring
 
         std::uint32_t new_cap = _capacity * 2;
         if ( new_cap < required )
+
             new_cap = required;
         if ( new_cap < 16 )
             new_cap = 16;
 
         std::size_t alloc_size = static_cast<std::size_t>( new_cap ) + 1;
+
         void*       new_raw    = ManagerT::allocate( alloc_size );
         if ( new_raw == nullptr )
             return false;
 
         std::uint8_t* base        = ManagerT::backend().base_ptr();
+
         index_type    new_dat_idx = detail::ptr_to_granule_idx<typename ManagerT::address_traits>( base, new_raw );
 
         if ( _length > 0 && _data_idx != detail::kNullIdx_v<typename ManagerT::address_traits> )
@@ -5714,6 +5716,7 @@ template <typename ManagerT> struct pstring
         }
 
         if ( _data_idx != detail::kNullIdx_v<typename ManagerT::address_traits> )
+
             ManagerT::deallocate( detail::resolve_granule_ptr<typename ManagerT::address_traits>( base, _data_idx ) );
 
         _data_idx = new_dat_idx;
@@ -5722,7 +5725,7 @@ template <typename ManagerT> struct pstring
     }
 };
 
-} // namespace pmm
+}
 
 #include <cstddef>
 #include <cstdint>
@@ -5733,43 +5736,77 @@ namespace pmm
 
 template <typename ManagerT> struct pstringview;
 
+/*
+## pmm::pstringview
+*/
 template <typename ManagerT> struct pstringview
 {
+
     using manager_type = ManagerT;
+
     using index_type   = typename ManagerT::index_type;
+
     using psview_pptr  = typename ManagerT::template pptr<pstringview>;
 
+/*
+## pmm::pstringview::forest_domain_descriptor
+*/
     struct forest_domain_descriptor
     {
+
         using manager_type = ManagerT;
+
         using index_type   = typename ManagerT::index_type;
+
         using node_type    = pstringview;
+
         using node_pptr    = psview_pptr;
 
+/*
+### pmm::pstringview::forest_domain_descriptor::name
+*/
         static constexpr const char* name() noexcept { return detail::kSystemDomainSymbols; }
 
+/*
+### pmm::pstringview::forest_domain_descriptor::root_index
+*/
         static index_type root_index() noexcept
         {
+
             auto* domain = ManagerT::symbol_domain_record_unlocked();
             return ManagerT::forest_domain_root_index_unlocked( domain );
         }
 
+/*
+### pmm::pstringview::forest_domain_descriptor::root_index_ptr
+*/
         static index_type* root_index_ptr() noexcept
         {
             auto* domain = ManagerT::symbol_domain_record_unlocked();
             return ManagerT::forest_domain_root_index_ptr_unlocked( domain );
         }
 
+/*
+### pmm::pstringview::forest_domain_descriptor::resolve_node
+*/
         static node_type* resolve_node( node_pptr p ) noexcept { return ManagerT::template resolve<node_type>( p ); }
 
+/*
+### pmm::pstringview::forest_domain_descriptor::compare_key
+*/
         static int compare_key( const char* key, node_pptr cur ) noexcept
         {
             if ( key == nullptr )
+
                 key = "";
+
             node_type* obj = resolve_node( cur );
             return ( obj != nullptr ) ? std::strcmp( key, obj->c_str() ) : 0;
         }
 
+/*
+### pmm::pstringview::forest_domain_descriptor::less_node
+*/
         static bool less_node( node_pptr lhs, node_pptr rhs ) noexcept
         {
             node_type* lhs_obj = resolve_node( lhs );
@@ -5777,24 +5814,46 @@ template <typename ManagerT> struct pstringview
             return lhs_obj != nullptr && rhs_obj != nullptr && std::strcmp( lhs_obj->c_str(), rhs_obj->c_str() ) < 0;
         }
 
+/*
+### pmm::pstringview::forest_domain_descriptor::validate_node
+*/
         static bool validate_node( node_pptr p ) noexcept { return resolve_node( p ) != nullptr; }
     };
 
     using forest_domain_policy = detail::ForestDomainOps<forest_domain_descriptor>;
 
+/*
+### pmm::pstringview::forest_domain_ops
+*/
     static forest_domain_policy forest_domain_ops() noexcept { return forest_domain_policy{}; }
 
     std::uint32_t length;
+
     char          str[1];
 
+/*
+### pmm::pstringview::pstringview
+*/
     explicit pstringview( const char* s ) noexcept : length( 0 ), str{ '\0' } { _interned = _intern( s ); }
 
+/*
+### pmm::pstringview::operator_psview_pptr
+*/
     operator psview_pptr() const noexcept { return _interned; }
 
+/*
+### pmm::pstringview::c_str
+*/
     const char* c_str() const noexcept { return str; }
 
+/*
+### pmm::pstringview::size
+*/
     std::size_t size() const noexcept { return static_cast<std::size_t>( length ); }
 
+/*
+### pmm::pstringview::empty
+*/
     bool empty() const noexcept { return length == 0; }
 
     bool operator==( const char* s ) const noexcept
@@ -5819,18 +5878,33 @@ template <typename ManagerT> struct pstringview
 
     bool operator!=( const pstringview& other ) const noexcept { return !( *this == other ); }
 
+/*
+### pmm::pstringview::operator_less
+*/
     bool operator<( const pstringview& other ) const noexcept { return std::strcmp( c_str(), other.c_str() ) < 0; }
 
+/*
+### pmm::pstringview::intern
+*/
     static psview_pptr intern( const char* s ) noexcept { return _intern( s ); }
 
+/*
+### pmm::pstringview::reset
+*/
     static void reset() noexcept
     {
         if ( !ManagerT::is_initialized() )
+
             return;
+
         typename ManagerT::thread_policy::unique_lock_type lock( ManagerT::_mutex );
+
         forest_domain_ops().reset_root();
     }
 
+/*
+### pmm::pstringview::root_index
+*/
     static index_type root_index() noexcept
     {
         if ( !ManagerT::is_initialized() )
@@ -5842,8 +5916,12 @@ template <typename ManagerT> struct pstringview
     ~pstringview() = default;
 
   private:
+
     psview_pptr _interned;
 
+/*
+### pmm::pstringview::_intern
+*/
     static psview_pptr _intern( const char* s ) noexcept
     {
         if ( !ManagerT::is_initialized() )
@@ -5853,41 +5931,7 @@ template <typename ManagerT> struct pstringview
     }
 };
 
-} // namespace pmm
-
-/**
- * @file pmm/typed_manager_api.h
- * @brief Type-aware allocation, object lifecycle, and pptr access facade for PMM managers.
- */
-
-/**
- * @file pmm/typed_guard.h
- * @brief RAII scope-guard for persistent containers.
- *
- * Provides typed_guard<T, ManagerT> — an RAII wrapper that automatically calls
- * the container's cleanup method (free_data() or free_all()) and then
- * ManagerT::destroy_typed() when the guard goes out of scope.
- *
- * This prevents resource leaks when users forget to call free_data()/free_all()
- * before destroy_typed().
- *
- * Usage:
- * @code
- *   using Mgr = pmm::PersistMemoryManager<pmm::CacheManagerConfig>;
- *   Mgr::create(64 * 1024);
- *
- *   {
- *       auto guard = Mgr::make_guard<Mgr::pstring>();
- *       guard->assign("hello");
- *       // ...
- *   } // free_data() + destroy_typed() called automatically
- *
- *   Mgr::destroy();
- * @endcode
- *
- * @see pstring.h, parray.h — containers requiring explicit cleanup
- * @version 0.1
- */
+}
 
 #include <type_traits>
 #include <utility>
@@ -5895,45 +5939,37 @@ template <typename ManagerT> struct pstringview
 namespace pmm
 {
 
-// ─── Concepts for cleanup method detection ──────────────────────
-
-/// @brief Detects types with a free_data() method (pstring, parray).
 template <typename T>
 concept HasFreeData = requires( T& t ) {
     { t.free_data() } noexcept;
 };
 
-/// @brief Detects types with a free_all() method.
 template <typename T>
 concept HasFreeAll = requires( T& t ) {
     { t.free_all() } noexcept;
 };
 
-/// @brief Detects types that need cleanup before destroy_typed().
 template <typename T>
 concept HasPersistentCleanup = HasFreeData<T> || HasFreeAll<T>;
 
-/**
- * @brief RAII scope-guard for persistent typed objects.
- *
- * Calls the appropriate cleanup method (free_data() or free_all()) and then
- * ManagerT::destroy_typed() when the guard goes out of scope.
- *
- * @tparam T        The persistent object type (e.g., pstring, parray).
- * @tparam ManagerT The PersistMemoryManager type.
- */
+/*
+## pmm::typed_guard
+*/
 template <typename T, typename ManagerT> class typed_guard
 {
   public:
+
     using pptr_type = typename ManagerT::template pptr<T>;
 
-    /// @brief Construct a guard owning the given persistent pointer.
+/*
+### pmm::typed_guard::typed_guard
+*/
     explicit typed_guard( pptr_type p ) noexcept : _ptr( p ) {}
 
-    /// @brief Default-construct an empty guard (null pointer).
     typed_guard() noexcept = default;
 
     typed_guard( const typed_guard& )            = delete;
+
     typed_guard& operator=( const typed_guard& ) = delete;
 
     typed_guard( typed_guard&& other ) noexcept : _ptr( other._ptr ) { other._ptr = pptr_type(); }
@@ -5951,7 +5987,9 @@ template <typename T, typename ManagerT> class typed_guard
 
     ~typed_guard() { reset(); }
 
-    /// @brief Release ownership and clean up resources.
+/*
+### pmm::typed_guard::reset
+*/
     void reset() noexcept
     {
         if ( !_ptr.is_null() )
@@ -5962,39 +6000,58 @@ template <typename T, typename ManagerT> class typed_guard
         }
     }
 
-    /// @brief Release ownership without cleanup. Returns the raw pptr.
+/*
+### pmm::typed_guard::release
+*/
     pptr_type release() noexcept
     {
+
         pptr_type p = _ptr;
+
         _ptr        = pptr_type();
         return p;
     }
 
-    /// @brief Access the managed object.
+/*
+### pmm::typed_guard::operator_arrow
+*/
     T* operator->() const noexcept { return &( *_ptr ); }
+
+/*
+### pmm::typed_guard::operator_deref
+*/
     T& operator*() const noexcept { return *_ptr; }
 
-    /// @brief Get the underlying pptr.
+/*
+### pmm::typed_guard::get
+*/
     pptr_type get() const noexcept { return _ptr; }
 
-    /// @brief Check if the guard owns a valid object.
+/*
+### pmm::typed_guard::operator_bool
+*/
     explicit operator bool() const noexcept { return !_ptr.is_null(); }
 
   private:
+
     pptr_type _ptr;
 
-    /// @brief Call the appropriate cleanup method based on the container type.
+/*
+### pmm::typed_guard::cleanup
+*/
     static void cleanup( T& obj ) noexcept
     {
         if constexpr ( HasFreeData<T> )
+
             obj.free_data();
         else if constexpr ( HasFreeAll<T> )
+
             obj.free_all();
-        // Types without cleanup methods are simply destroyed via destroy_typed().
+
     }
 };
 
-} // namespace pmm
+}
 
 #include <cstddef>
 #include <cstdint>
@@ -6006,11 +6063,15 @@ template <typename T, typename ManagerT> class typed_guard
 namespace pmm::detail
 {
 
+/*
+## pmm::detail::PersistMemoryTypedApi
+*/
 template <typename ManagerT> class PersistMemoryTypedApi
 {
   public:
     template <typename T> static pmm::pptr<T, ManagerT> allocate_typed() noexcept
     {
+
         void* raw = ManagerT::allocate( sizeof( T ) );
         if ( raw == nullptr )
             return pmm::pptr<T, ManagerT>();
@@ -6032,20 +6093,33 @@ template <typename ManagerT> class PersistMemoryTypedApi
     template <typename T> static void deallocate_typed( pmm::pptr<T, ManagerT> p ) noexcept
     {
         if ( p.is_null() || !ManagerT::_initialized )
+
             return;
+
         void* raw = ManagerT::template raw_block_user_ptr_from_pptr<T>( p );
+
         ManagerT::deallocate( raw );
     }
 
     template <typename T>
+
+/*
+### pmm::detail::PersistMemoryTypedApi::reallocate_typed
+*/
     static pmm::pptr<T, ManagerT> reallocate_typed( pmm::pptr<T, ManagerT> p, std::size_t old_count,
                                                     std::size_t new_count ) noexcept
     {
+
         using address_traits  = typename ManagerT::address_traits;
+
         using allocator       = typename ManagerT::allocator;
+
         using free_block_tree = typename ManagerT::free_block_tree;
+
         using index_type      = typename ManagerT::index_type;
+
         using logging_policy  = typename ManagerT::logging_policy;
+
         using thread_policy   = typename ManagerT::thread_policy;
 
         static_assert( std::is_trivially_copyable_v<T>,
@@ -6063,19 +6137,24 @@ template <typename ManagerT> class PersistMemoryTypedApi
             return pmm::pptr<T, ManagerT>();
         }
         std::size_t                              new_user_size = sizeof( T ) * new_count;
+
         typename thread_policy::unique_lock_type lock( ManagerT::_mutex );
         if ( !ManagerT::_initialized )
         {
             ManagerT::_last_error = PmmError::NotInitialized;
             return pmm::pptr<T, ManagerT>();
         }
+
         std::uint8_t*                          base          = ManagerT::_backend.base_ptr();
+
         detail::ManagerHeader<address_traits>* hdr           = ManagerT::get_header( base );
         index_type                             blk_idx       = ManagerT::template block_idx_from_pptr<T>( p );
         void*                                  blk_raw       = detail::block_at<address_traits>( base, blk_idx );
+
         index_type                             old_data_gran = BlockStateBase<address_traits>::get_weight( blk_raw );
         index_type new_data_gran = detail::bytes_to_granules_t<address_traits>( new_user_size );
         if ( new_data_gran == 0 )
+
             new_data_gran = 1;
         if ( new_data_gran == old_data_gran )
         {
@@ -6105,13 +6184,16 @@ template <typename ManagerT> class PersistMemoryTypedApi
 
         index_type new_data_gran_alloc = detail::bytes_to_granules_t<address_traits>( new_user_size );
         if ( new_data_gran_alloc == 0 )
+
             new_data_gran_alloc = 1;
         if ( new_data_gran_alloc > std::numeric_limits<index_type>::max() - ManagerT::kBlockHdrGranules )
         {
             ManagerT::_last_error = PmmError::Overflow;
             return pmm::pptr<T, ManagerT>();
         }
+
         index_type needed  = ManagerT::kBlockHdrGranules + new_data_gran_alloc;
+
         index_type new_idx = free_block_tree::find_best_fit( base, hdr, needed );
         if ( new_idx == address_traits::no_block )
         {
@@ -6131,6 +6213,7 @@ template <typename ManagerT> class PersistMemoryTypedApi
                 return pmm::pptr<T, ManagerT>();
             }
         }
+
         void* new_raw = allocator::allocate_from_block( base, hdr, new_idx, new_user_size );
         if ( new_raw == nullptr )
         {
@@ -6145,7 +6228,9 @@ template <typename ManagerT> class PersistMemoryTypedApi
         }
         void*       new_dst = resolve_unchecked<T>( new_p );
         void*       old_src = resolve_unchecked<T>( p );
+
         std::size_t copy_sz = ( new_count < old_count ? new_count : old_count ) * sizeof( T );
+
         std::memmove( new_dst, old_src, copy_sz );
 
         index_type old_blk_idx = ManagerT::template block_idx_from_pptr<T>( p );
@@ -6164,6 +6249,7 @@ template <typename ManagerT> class PersistMemoryTypedApi
                 allocator::coalesce( base, hdr, old_blk_idx );
             }
         }
+
         ManagerT::_last_error = PmmError::Ok;
         return new_p;
     }
@@ -6184,6 +6270,7 @@ template <typename ManagerT> class PersistMemoryTypedApi
             ManagerT::deallocate( raw );
             return pmm::pptr<T, ManagerT>();
         }
+
         ::new ( obj ) T( static_cast<Args&&>( args )... );
         return p;
     }
@@ -6237,11 +6324,13 @@ template <typename ManagerT> class PersistMemoryTypedApi
         }
         index_type blk_idx = ManagerT::template block_idx_from_pptr<T>( p );
         if ( BlockStateBase<address_traits>::get_weight( blk_raw ) == 0 ||
+
              BlockStateBase<address_traits>::get_root_offset( blk_raw ) != blk_idx )
         {
             ManagerT::_last_error = PmmError::InvalidPointer;
             return nullptr;
         }
+
         const std::uint16_t node_type = BlockStateBase<address_traits>::get_node_type( blk_raw );
         if ( node_type != pmm::kNodeReadWrite && node_type != pmm::kNodeReadOnly )
         {
@@ -6275,6 +6364,7 @@ template <typename ManagerT> class PersistMemoryTypedApi
             ManagerT::_last_error = PmmError::InvalidPointer;
             return pmm::pptr<T, ManagerT>();
         }
+
         std::size_t idx = byte_off / address_traits::granule_size;
         if ( idx > static_cast<std::size_t>( std::numeric_limits<index_type>::max() ) )
         {
@@ -6290,9 +6380,7 @@ template <typename ManagerT> class PersistMemoryTypedApi
     }
 };
 
-// clang-format off
 }
-// clang-format on
 
 #include <atomic>
 #include <cassert>
@@ -6308,28 +6396,47 @@ namespace pmm
 
 namespace detail
 {
+
+/*
+## pmm::detail::config_logging_policy
+*/
 template <typename C, typename = void> struct config_logging_policy
 {
+
     using type = logging::NoLogging;
 };
 template <typename C> struct config_logging_policy<C, std::void_t<typename C::logging_policy>>
 {
+
     using type = typename C::logging_policy;
 };
-} // namespace detail
+}
 
 template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0>
+
+/*
+## pmm::PersistMemoryManager
+*/
 class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryManager<ConfigT, InstanceId>>
 {
   public:
+
     using address_traits  = typename ConfigT::address_traits;
+
     using storage_backend = typename ConfigT::storage_backend;
+
     using free_block_tree = typename ConfigT::free_block_tree;
+
     using thread_policy   = typename ConfigT::lock_policy;
+
     using logging_policy  = typename detail::config_logging_policy<ConfigT>::type;
+
     using allocator       = AllocatorPolicy<free_block_tree, address_traits>;
+
     using index_type      = typename address_traits::index_type;
+
     using forest_registry = detail::ForestDomainRegistry<address_traits>;
+
     using forest_domain   = detail::ForestDomainRecord<address_traits>;
 
     using manager_type = PersistMemoryManager<ConfigT, InstanceId>;
@@ -6351,14 +6458,27 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
 
     template <typename T> using pallocator = pmm::pallocator<T, manager_type>;
 
+/*
+### pmm::PersistMemoryManager::last_error
+*/
     static PmmError last_error() noexcept { return _last_error; }
 
+/*
+### pmm::PersistMemoryManager::clear_error
+*/
     static void clear_error() noexcept { _last_error = PmmError::Ok; }
 
+/*
+### pmm::PersistMemoryManager::set_last_error
+*/
     static void set_last_error( PmmError err ) noexcept { _last_error = err; }
 
+/*
+### pmm::PersistMemoryManager::create
+*/
     static bool create( std::size_t initial_size ) noexcept
     {
+
         typename thread_policy::unique_lock_type lock( _mutex );
         if ( initial_size < detail::kMinMemorySize )
         {
@@ -6372,6 +6492,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             _last_error = PmmError::Overflow;
             return false;
         }
+
         std::size_t aligned = ( ( initial_size + kGranSzCreate - 1 ) / kGranSzCreate ) * kGranSzCreate;
         if ( _backend.base_ptr() == nullptr || _backend.total_size() < aligned )
         {
@@ -6389,10 +6510,13 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             _last_error = PmmError::BackendError;
             return false;
         }
+
         bool ok = init_layout( _backend.base_ptr(), _backend.total_size() );
         if ( ok )
+
             ok = bootstrap_forest_registry_unlocked();
         if ( ok )
+
             ok = validate_bootstrap_invariants_unlocked();
         if ( ok )
         {
@@ -6423,9 +6547,14 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         return ok;
     }
 
+/*
+### pmm::PersistMemoryManager::load
+*/
     static bool load( VerifyResult& result ) noexcept
     {
+
         result.mode = RecoveryMode::Repair;
+
         result.ok   = true;
         typename thread_policy::unique_lock_type lock( _mutex );
         if ( _backend.base_ptr() == nullptr || _backend.total_size() < detail::kMinMemorySize )
@@ -6434,7 +6563,9 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             result.add( ViolationType::HeaderCorruption, DiagnosticAction::Aborted );
             return false;
         }
+
         std::uint8_t*                          base = _backend.base_ptr();
+
         detail::ManagerHeader<address_traits>* hdr  = get_header( base );
         if ( hdr->magic != kMagic )
         {
@@ -6475,25 +6606,37 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
                 r.entries[i].action = act;
         };
         std::size_t pre = result.entry_count;
+
         allocator::verify_block_states( base, hdr, result );
         mark_entries( result, pre, DiagnosticAction::Repaired );
+
         pre = result.entry_count;
+
         allocator::verify_linked_list( base, hdr, result );
         mark_entries( result, pre, DiagnosticAction::Repaired );
         pre = result.entry_count;
+
         allocator::verify_counters( base, hdr, result );
         mark_entries( result, pre, DiagnosticAction::Rebuilt );
         pre = result.entry_count;
+
         allocator::verify_free_tree( base, hdr, result );
         mark_entries( result, pre, DiagnosticAction::Rebuilt );
 
         if ( detail::image_version_requires_migration( hdr->image_version ) )
+
             hdr->image_version = detail::kCurrentImageVersion;
+
         hdr->owns_memory     = false;
+
         hdr->prev_total_size = 0;
+
         allocator::repair_linked_list( base, hdr );
+
         allocator::recompute_counters( base, hdr );
+
         allocator::rebuild_free_tree( base, hdr );
+
         _initialized = true;
 
         {
@@ -6522,20 +6665,30 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             _initialized = false;
             return false;
         }
+
         _last_error = PmmError::Ok;
+
         logging_policy::on_load();
         return true;
     }
 
+/*
+### pmm::PersistMemoryManager::destroy
+*/
     static void destroy() noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
         if ( !_initialized )
+
             return;
         _initialized = false;
+
         logging_policy::on_destroy();
     }
 
+/*
+### pmm::PersistMemoryManager::destroy_image
+*/
     static void destroy_image() noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
@@ -6546,31 +6699,48 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         logging_policy::on_destroy();
     }
 
+/*
+### pmm::PersistMemoryManager::is_initialized
+*/
     static bool is_initialized() noexcept { return _initialized.load( std::memory_order_acquire ); }
 
+/*
+### pmm::PersistMemoryManager::allocate
+*/
     static void* allocate( std::size_t user_size ) noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
         return allocate_unlocked( user_size );
     }
 
+/*
+### pmm::PersistMemoryManager::deallocate
+*/
     static void deallocate( void* ptr ) noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
+
         deallocate_unlocked( ptr );
     }
 
+/*
+### pmm::PersistMemoryManager::lock_block_permanent
+*/
     static bool lock_block_permanent( void* ptr ) noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
         return lock_block_permanent_unlocked( ptr );
     }
 
+/*
+### pmm::PersistMemoryManager::is_permanently_locked
+*/
     static bool is_permanently_locked( const void* ptr ) noexcept
     {
         typename thread_policy::shared_lock_type lock( _mutex );
         if ( !_initialized || ptr == nullptr )
             return false;
+
         const pmm::Block<address_traits>* blk = find_block_from_user_ptr( ptr );
         if ( blk == nullptr )
             return false;
@@ -6582,7 +6752,9 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         typename thread_policy::unique_lock_type lock( _mutex );
         if ( !_initialized )
             return;
+
         set_forest_domain_root_index_unlocked( find_domain_by_name_unlocked( detail::kServiceNameDomainRoot ),
+
                                                p.is_null() ? static_cast<index_type>( 0 ) : p.offset() );
     }
 
@@ -6592,38 +6764,56 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         if ( !_initialized )
             return pptr<T>();
         index_type root =
+
             forest_domain_root_index_unlocked( find_domain_by_name_unlocked( detail::kServiceNameDomainRoot ) );
         if ( root == static_cast<index_type>( 0 ) )
             return pptr<T>();
         return pptr<T>( root );
     }
 
+/*
+### pmm::PersistMemoryManager::find_domain_by_name
+*/
     static index_type find_domain_by_name( const char* name ) noexcept
     {
         typename thread_policy::shared_lock_type lock( _mutex );
         if ( !_initialized )
             return 0;
+
         const forest_domain* rec = find_domain_by_name_unlocked( name );
         return ( rec != nullptr ) ? rec->binding_id : static_cast<index_type>( 0 );
     }
 
+/*
+### pmm::PersistMemoryManager::find_domain_by_symbol
+*/
     static index_type find_domain_by_symbol( pptr<pstringview> symbol ) noexcept
     {
         typename thread_policy::shared_lock_type lock( _mutex );
         if ( !_initialized )
             return 0;
+
         const forest_domain* rec = find_domain_by_symbol_unlocked( symbol );
         return ( rec != nullptr ) ? rec->binding_id : static_cast<index_type>( 0 );
     }
 
+/*
+### pmm::PersistMemoryManager::has_domain
+*/
     static bool has_domain( const char* name ) noexcept { return find_domain_by_name( name ) != 0; }
 
+/*
+### pmm::PersistMemoryManager::validate_bootstrap_invariants
+*/
     static bool validate_bootstrap_invariants() noexcept
     {
         typename thread_policy::shared_lock_type lock( _mutex );
         return validate_bootstrap_invariants_unlocked();
     }
 
+/*
+### pmm::PersistMemoryManager::register_domain
+*/
     static bool register_domain( const char* name ) noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
@@ -6632,6 +6822,9 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         return register_domain_unlocked( name, 0, detail::kForestBindingDirectRoot, 0 );
     }
 
+/*
+### pmm::PersistMemoryManager::register_system_domain
+*/
     static bool register_system_domain( const char* name ) noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
@@ -6640,6 +6833,9 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         return register_domain_unlocked( name, detail::kForestDomainFlagSystem, detail::kForestBindingDirectRoot, 0 );
     }
 
+/*
+### pmm::PersistMemoryManager::get_domain_root_offset
+*/
     static index_type get_domain_root_offset( const char* name ) noexcept
     {
         typename thread_policy::shared_lock_type lock( _mutex );
@@ -6654,6 +6850,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         typename thread_policy::shared_lock_type lock( _mutex );
         if ( !_initialized )
             return 0;
+
         const forest_domain* rec = find_domain_by_binding_unlocked( binding_id );
         return forest_domain_root_index_unlocked( rec );
     }
@@ -6669,6 +6866,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
 
     template <typename T> static pptr<T> get_domain_root( const char* name ) noexcept
     {
+
         index_type root = get_domain_root_offset( name );
         return ( root == 0 ) ? pptr<T>() : pptr<T>( root );
     }
@@ -6697,31 +6895,43 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
 
   private:
     template <typename T>
+
+/*
+### pmm::PersistMemoryManager::get_tree_idx_field
+*/
     static index_type get_tree_idx_field( pptr<T> p, index_type ( *getter )( const void* ) ) noexcept
     {
         if ( p.is_null() || !_initialized )
             return 0;
+
         const void* blk = block_raw_ptr_from_pptr( p );
         if ( blk == nullptr )
         {
             _last_error = PmmError::InvalidPointer;
             return 0;
         }
+
         index_type v = getter( blk );
         return ( v == address_traits::no_block ) ? static_cast<index_type>( 0 ) : v;
     }
 
     template <typename T>
+
+/*
+### pmm::PersistMemoryManager::set_tree_idx_field
+*/
     static void set_tree_idx_field( pptr<T> p, void ( *setter )( void*, index_type ), index_type val ) noexcept
     {
         if ( p.is_null() || !_initialized )
             return;
+
         void* blk = block_raw_mut_ptr_from_pptr( p );
         if ( blk == nullptr )
         {
             _last_error = PmmError::InvalidPointer;
             return;
         }
+
         setter( blk, ( val == 0 ) ? address_traits::no_block : val );
     }
 
@@ -6741,6 +6951,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
 
     template <typename T> static void set_tree_left_offset( pptr<T> p, index_type v ) noexcept
     {
+
         set_tree_idx_field( p, &BlockStateBase<address_traits>::set_left_offset_of, v );
     }
     template <typename T> static void set_tree_right_offset( pptr<T> p, index_type v ) noexcept
@@ -6774,6 +6985,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             _last_error = PmmError::InvalidPointer;
             return;
         }
+
         BlockStateBase<address_traits>::set_weight_of( blk, w );
     }
 
@@ -6799,11 +7011,13 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             _last_error = PmmError::InvalidPointer;
             return;
         }
+
         BlockStateBase<address_traits>::set_avl_height_of( blk, h );
     }
 
     template <typename T> static TreeNode<address_traits>& tree_node( pptr<T> p ) noexcept
     {
+
         assert( !p.is_null() && "tree_node: pptr must not be null" );
         assert( _initialized && "tree_node: manager must be initialized before calling tree_node" );
         void* blk = block_raw_mut_ptr_from_pptr( p );
@@ -6830,6 +7044,10 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     }
 
   public:
+
+/*
+### pmm::PersistMemoryManager::total_size
+*/
     static std::size_t total_size() noexcept
     {
         if ( !_initialized.load( std::memory_order_acquire ) )
@@ -6837,10 +7055,18 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         typename thread_policy::shared_lock_type lock( _mutex );
         return _initialized.load( std::memory_order_relaxed ) ? _backend.total_size() : 0;
     }
+
+/*
+### pmm::PersistMemoryManager::used_size
+*/
     static std::size_t used_size() noexcept
     {
         return read_stat( []( const auto* h ) { return address_traits::granules_to_bytes( h->used_size ); } );
     }
+
+/*
+### pmm::PersistMemoryManager::free_size
+*/
     static std::size_t free_size() noexcept
     {
         return read_stat(
@@ -6850,21 +7076,37 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
                 return ( h->total_size > used ) ? ( h->total_size - used ) : std::size_t( 0 );
             } );
     }
+
+/*
+### pmm::PersistMemoryManager::block_count
+*/
     static std::size_t block_count() noexcept
     {
         return read_stat( []( const auto* h ) { return static_cast<std::size_t>( h->block_count ); } );
     }
+
+/*
+### pmm::PersistMemoryManager::free_block_count
+*/
     static std::size_t free_block_count() noexcept
     {
         return read_stat( []( const auto* h ) { return static_cast<std::size_t>( h->free_count ); } );
     }
+
+/*
+### pmm::PersistMemoryManager::alloc_block_count
+*/
     static std::size_t alloc_block_count() noexcept
     {
         return read_stat( []( const auto* h ) { return static_cast<std::size_t>( h->alloc_count ); } );
     }
 
+/*
+### pmm::PersistMemoryManager::verify
+*/
     static VerifyResult verify() noexcept
     {
+
         VerifyResult                             result;
         typename thread_policy::shared_lock_type lock( _mutex );
         if ( !_initialized || _backend.base_ptr() == nullptr )
@@ -6872,6 +7114,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             result.add( ViolationType::HeaderCorruption, DiagnosticAction::Aborted );
             return result;
         }
+
         verify_image_unlocked( result );
         return result;
     }
@@ -6882,8 +7125,11 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         if ( !_initialized )
             return false;
         const std::uint8_t* base                         = _backend.base_ptr();
+
         using BlockState                                 = BlockStateBase<address_traits>;
+
         const detail::ManagerHeader<address_traits>* hdr = get_header_c( base );
+
         index_type                                   idx = hdr->first_block_offset;
 
         static constexpr std::size_t kGranSz = address_traits::granule_size;
@@ -6920,13 +7166,18 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             return false;
         const std::uint8_t*                          base = _backend.base_ptr();
         const detail::ManagerHeader<address_traits>* hdr  = get_header_c( base );
+
         for_each_free_block_inorder( base, hdr, hdr->free_tree_root, 0, callback );
         return true;
     }
 
+/*
+### pmm::PersistMemoryManager::backend
+*/
     static storage_backend& backend() noexcept { return _backend; }
 
   private:
+
     static inline storage_backend _backend{};
 
     static inline std::atomic<bool> _initialized{ false };
@@ -6935,14 +7186,21 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
 
     static inline thread_local PmmError _last_error{ PmmError::Ok };
 
+/*
+### pmm::PersistMemoryManager::is_valid_user_offset_unlocked
+*/
     static bool is_valid_user_offset_unlocked( index_type off, std::size_t size_bytes ) noexcept
     {
         if ( off == 0 || _backend.base_ptr() == nullptr || _backend.total_size() == 0 )
             return false;
+
         std::size_t byte_off = static_cast<std::size_t>( off ) * address_traits::granule_size;
         return byte_off + size_bytes <= _backend.total_size();
     }
 
+/*
+### pmm::PersistMemoryManager::allocate_unlocked
+*/
     static void* allocate_unlocked( std::size_t user_size ) noexcept
     {
         if ( !_initialized )
@@ -6960,8 +7218,10 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
 
         std::uint8_t*                          base      = _backend.base_ptr();
         detail::ManagerHeader<address_traits>* hdr       = get_header( base );
+
         index_type                             data_gran = detail::bytes_to_granules_t<address_traits>( user_size );
         if ( data_gran == 0 )
+
             data_gran = 1;
         if ( data_gran > std::numeric_limits<index_type>::max() - kBlockHdrGranules )
         {
@@ -6971,6 +7231,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         }
 
         index_type needed = kBlockHdrGranules + data_gran;
+
         index_type idx    = free_block_tree::find_best_fit( base, hdr, needed );
         if ( idx != address_traits::no_block )
         {
@@ -6995,10 +7256,14 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         }
 
         _last_error = PmmError::OutOfMemory;
+
         logging_policy::on_allocation_failure( user_size, PmmError::OutOfMemory );
         return nullptr;
     }
 
+/*
+### pmm::PersistMemoryManager::deallocate_unlocked
+*/
     static void deallocate_unlocked( void* ptr ) noexcept
     {
         if ( !_initialized || ptr == nullptr )
@@ -7006,6 +7271,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         pmm::Block<address_traits>* blk = find_block_from_user_ptr( ptr );
         if ( blk == nullptr )
             return;
+
         index_type freed = BlockStateBase<address_traits>::get_weight( blk );
         if ( freed == 0 )
             return;
@@ -7017,15 +7283,22 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         index_type                             blk_idx = detail::block_idx_t<address_traits>( base, blk );
 
         AllocatedBlock<address_traits>* alloc = AllocatedBlock<address_traits>::cast_from_raw( blk );
+
         alloc->mark_as_free();
 
         hdr->alloc_count--;
+
         hdr->free_count++;
         if ( hdr->used_size >= freed )
+
             hdr->used_size -= freed;
+
         allocator::coalesce( base, hdr, blk_idx );
     }
 
+/*
+### pmm::PersistMemoryManager::lock_block_permanent_unlocked
+*/
     static bool lock_block_permanent_unlocked( void* ptr ) noexcept
     {
         if ( !_initialized || ptr == nullptr )
@@ -7036,6 +7309,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         index_type w = BlockStateBase<address_traits>::get_weight( blk );
         if ( w == 0 )
             return false;
+
         BlockStateBase<address_traits>::set_node_type_of( blk, pmm::kNodeReadOnly );
         return true;
     }
@@ -7043,7 +7317,9 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     template <typename T, typename... Args> static pptr<T> create_typed_unlocked( Args&&... args ) noexcept
     {
         static_assert( std::is_nothrow_constructible_v<T, Args...>,
+
                        "create_typed_unlocked<T>: T must be nothrow-constructible" );
+
         void* raw = allocate_unlocked( sizeof( T ) );
         if ( raw == nullptr )
             return pptr<T>();
@@ -7054,26 +7330,10 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             deallocate_unlocked( raw );
             return pptr<T>();
         }
+
         ::new ( obj ) T( static_cast<Args&&>( args )... );
         return p;
     }
-
-/**
- * @file pmm/forest_domain_mixin.inc
- * @brief Private forest/domain registry methods for PersistMemoryManager.
- *
- * This file is textually included inside the private section of
- * PersistMemoryManager<ConfigT, InstanceId>. It is NOT a standalone
- * translation unit — all type aliases, static members, and helper
- * functions from the enclosing class are available without qualification.
- *
- * Extracted to keep persist_memory_manager.h under the 1500-line CI limit.
- *
- * @see persist_memory_manager.h
- * @see forest_registry.h
- */
-
-// ─── Forest registry accessor ────────────────────────────────────────────────
 
 static forest_registry* forest_registry_root_unlocked() noexcept
 {
@@ -7090,8 +7350,6 @@ static forest_registry* forest_registry_root_unlocked() noexcept
         return nullptr;
     return reg;
 }
-
-// ─── Domain lookup helpers ────────────────────────────────────────────────────
 
 static forest_domain* find_domain_by_name_unlocked( const char* name ) noexcept
 {
@@ -7172,14 +7430,10 @@ static bool set_forest_domain_root_index_unlocked( forest_domain* rec, index_typ
     return true;
 }
 
-// ─── Canonical system domain records ─────────────────────────────────────────
-
 static forest_domain* symbol_domain_record_unlocked() noexcept
 {
     return find_domain_by_name_unlocked( detail::kSystemDomainSymbols );
 }
-
-// ─── Domain registration ─────────────────────────────────────────────────────
 
 static bool register_domain_unlocked( const char* name, std::uint8_t flags, std::uint8_t binding_kind,
                                       index_type initial_root ) noexcept
@@ -7228,8 +7482,6 @@ static bool register_domain_unlocked( const char* name, std::uint8_t flags, std:
     return true;
 }
 
-// ─── Symbol interning ─────────────────────────────────────────────────────────
-
 static pptr<pstringview> intern_symbol_unlocked( const char* s ) noexcept
 {
     if ( s == nullptr )
@@ -7256,7 +7508,7 @@ static pptr<pstringview> intern_symbol_unlocked( const char* s ) noexcept
         deallocate_unlocked( raw );
         return pptr<pstringview>();
     }
-    // Use memcpy to avoid UB on potentially misaligned raw pointer (ASan/UBSan fix).
+
     std::memcpy( public_raw, &len, sizeof( len ) );
     char* str_dst = static_cast<char*>( public_raw ) + offsetof( pstringview, str );
     std::memcpy( str_dst, s, static_cast<std::size_t>( len ) + 1 );
@@ -7269,8 +7521,6 @@ static pptr<pstringview> intern_symbol_unlocked( const char* s ) noexcept
 
     return new_node;
 }
-
-// ─── Bootstrap: system symbols ────────────────────────────────────────────────
 
 static bool bootstrap_system_symbols_unlocked() noexcept
 {
@@ -7303,8 +7553,6 @@ static bool bootstrap_system_symbols_unlocked() noexcept
 
     return true;
 }
-
-// ─── Bootstrap: create forest registry root ───────────────────────────────────
 
 static bool bootstrap_forest_registry_unlocked() noexcept
 {
@@ -7375,9 +7623,6 @@ static bool bootstrap_forest_registry_unlocked() noexcept
     return true;
 }
 
-// ─── Bootstrap: invariant verification ───────────────────────────
-
-/// @brief Verify that all bootstrap invariants hold.
 static bool validate_bootstrap_invariants_unlocked() noexcept
 {
     if ( !_initialized )
@@ -7386,7 +7631,7 @@ static bool validate_bootstrap_invariants_unlocked() noexcept
     if ( base == nullptr )
         return false;
     const auto* hdr = get_header_c( base );
-    // 1. Manager header valid
+
     if ( hdr->magic != kMagic )
         return false;
     if ( hdr->image_version != detail::kCurrentImageVersion )
@@ -7395,7 +7640,7 @@ static bool validate_bootstrap_invariants_unlocked() noexcept
         return false;
     if ( hdr->granule_size != static_cast<std::uint16_t>( address_traits::granule_size ) )
         return false;
-    // 2. Forest registry exists and is valid
+
     const forest_registry* reg = forest_registry_root_unlocked();
     if ( reg == nullptr )
         return false;
@@ -7404,8 +7649,8 @@ static bool validate_bootstrap_invariants_unlocked() noexcept
     if ( reg->version != detail::kForestRegistryVersion )
         return false;
     if ( reg->domain_count < 4 )
-        return false; // at least free_tree, symbols, registry, domain_root
-    // 3. System domains present with correct flags
+        return false;
+
     static constexpr const char* kRequired[] = { detail::kSystemDomainFreeTree, detail::kSystemDomainSymbols,
                                                  detail::kSystemDomainRegistry, detail::kServiceNameDomainRoot };
     for ( const char* name : kRequired )
@@ -7416,16 +7661,16 @@ static bool validate_bootstrap_invariants_unlocked() noexcept
         if ( ( rec->flags & detail::kForestDomainFlagSystem ) == 0 )
             return false;
         if ( rec->symbol_offset == 0 )
-            return false; // symbol must be interned
+            return false;
     }
-    // 4. Free tree domain has binding kind kForestBindingFreeTree
+
     const forest_domain* free_rec = find_domain_by_name_unlocked( detail::kSystemDomainFreeTree );
     if ( free_rec->binding_kind != detail::kForestBindingFreeTree )
         return false;
-    // 5. Symbol dictionary root is non-zero (at least bootstrap symbols exist)
+
     if ( pstringview::forest_domain_ops().root_index() == 0 )
         return false;
-    // 6. Registry domain root matches header root_offset
+
     const forest_domain* reg_rec = find_domain_by_name_unlocked( detail::kSystemDomainRegistry );
     if ( reg_rec->root_offset != hdr->root_offset )
         return false;
@@ -7434,8 +7679,6 @@ static bool validate_bootstrap_invariants_unlocked() noexcept
         return false;
     return true;
 }
-
-// ─── Bootstrap: validate or create forest registry on load ────────────────────
 
 static bool validate_or_bootstrap_forest_registry_unlocked() noexcept
 {
@@ -7463,15 +7706,12 @@ static bool validate_or_bootstrap_forest_registry_unlocked() noexcept
     return bootstrap_forest_registry_unlocked();
 }
 
-// ─── Free block tree traversal ────────────────────────────────────────────────
-
-/// @brief Recursive in-order traversal of the AVL free block tree.
 template <typename Callback>
 static void for_each_free_block_inorder( const std::uint8_t* base, const detail::ManagerHeader<address_traits>* hdr,
                                          index_type node_idx, int depth, Callback&& callback ) noexcept
 {
     using BlockState = BlockStateBase<address_traits>;
-    // Use address_traits::granule_size for correct byte offset computations.
+
     static constexpr std::size_t kGranSz = address_traits::granule_size;
     if ( node_idx == address_traits::no_block )
         return;
@@ -7484,10 +7724,8 @@ static void for_each_free_block_inorder( const std::uint8_t* base, const detail:
     index_type right_off  = BlockState::get_right_offset( blk_raw );
     index_type parent_off = BlockState::get_parent_offset( blk_raw );
 
-    // Visit left subtree first (smaller blocks)
     for_each_free_block_inorder( base, hdr, left_off, depth + 1, callback );
 
-    // Visit current node
     index_type    total_gran = detail::block_total_granules( base, hdr, blk );
     FreeBlockView view;
     view.offset        = static_cast<std::ptrdiff_t>( static_cast<std::size_t>( node_idx ) * kGranSz );
@@ -7506,12 +7744,9 @@ static void for_each_free_block_inorder( const std::uint8_t* base, const detail:
     view.avl_depth     = depth;
     callback( view );
 
-    // Visit right subtree (larger blocks)
     for_each_free_block_inorder( base, hdr, right_off, depth + 1, callback );
 }
 
-/// @brief Find the mutable block header for a user-data pointer (or nullptr).
-/// @pre Caller holds the manager lock, or block links are otherwise stable for canonical raw-pointer validation.
 static pmm::Block<address_traits>* find_block_from_user_ptr( void* ptr ) noexcept
 {
     std::uint8_t*                          base = _backend.base_ptr();
@@ -7539,9 +7774,6 @@ static pmm::Block<address_traits>* find_block_from_user_ptr( void* ptr ) noexcep
     return detail::header_from_ptr_t<address_traits>( base, ptr, static_cast<std::size_t>( hdr->total_size ) );
 }
 
-/// @brief Find the const block header for a user-data pointer.
-/// @pre Caller holds the manager lock, or block links are otherwise stable for canonical raw-pointer validation.
-/// Returns nullptr if ptr is out of range or the block header is invalid.
 static const pmm::Block<address_traits>* find_block_from_user_ptr( const void* ptr ) noexcept
 {
     const std::uint8_t* base = _backend.base_ptr();
@@ -7570,11 +7802,6 @@ static const pmm::Block<address_traits>* find_block_from_user_ptr( const void* p
                                                       static_cast<std::size_t>( hdr->total_size ) );
 }
 
-// ─── raw ↔ pptr helpers ───────────────────────────────────────
-
-/// @brief Convert a raw user-data pointer returned by allocate() into a canonical public pptr<T>.
-/// Caller must ensure raw != nullptr and _initialized before calling.
-/// Returns null pptr if the pointer is not within the managed region.
 template <typename T> static pptr<T> make_pptr_from_raw( void* raw ) noexcept
 {
     if ( raw == nullptr || !_initialized )
@@ -7611,11 +7838,6 @@ template <typename T> static pptr<T> make_pptr_from_raw( void* raw ) noexcept
     return pptr<T>( static_cast<index_type>( blk_idx + kBlockHdrGranules ) );
 }
 
-// ─── blk_raw helpers ──────────────────────────────────────────
-// base + (offset - kBlockHdrGranules) * granule_size → block header before public user data.
-
-/// @brief Return a const pointer to the block header for the given pptr.
-/// Returns nullptr if offset is invalid (would place block header before base).
 template <typename T> static const void* block_raw_ptr_from_pptr( pptr<T> p ) noexcept
 {
     const std::uint8_t* base = _backend.base_ptr();
@@ -7627,8 +7849,6 @@ template <typename T> static const void* block_raw_ptr_from_pptr( pptr<T> p ) no
     return base + blk_off;
 }
 
-/// @brief Return a mutable pointer to the block header for the given pptr.
-/// Returns nullptr if offset is invalid (would place block header before base).
 template <typename T> static void* block_raw_mut_ptr_from_pptr( pptr<T> p ) noexcept
 {
     std::uint8_t* base = _backend.base_ptr();
@@ -7690,22 +7910,6 @@ static const char* pstringview_c_str_unlocked( pptr<pstringview> p ) noexcept
     return static_cast<const char*>( raw ) + offsetof( pstringview, str );
 }
 
-// ─── Verify / Repair mixin ──────────────────────────────────────
-// Included inside PersistMemoryManager<ConfigT, InstanceId> private section.
-// Provides verify_image_unlocked() — read-only structural diagnostics.
-
-/**
- * @brief Verify structural integrity of the loaded image without modifications.
- *
- * Performs read-only checks on:
- *   1. Block state consistency (weight/root_offset mismatches)
- *   2. Linked list prev_offset correctness
- *   3. Counter consistency (block_count, free_count, alloc_count, used_size)
- *   4. Free tree root consistency (free_tree_root vs actual free block count)
- *   5. Forest registry and system domain presence/flags
- *
- * @param result  VerifyResult to populate with diagnostic entries.
- */
 static void verify_image_unlocked( VerifyResult& result ) noexcept
 {
     result.mode = RecoveryMode::Verify;
@@ -7714,33 +7918,31 @@ static void verify_image_unlocked( VerifyResult& result ) noexcept
     const std::uint8_t*                          base = _backend.base_ptr();
     const detail::ManagerHeader<address_traits>* hdr  = get_header_c( base );
 
-    // 1. Header validation
     if ( hdr->magic != kMagic )
     {
         result.add( ViolationType::HeaderCorruption, DiagnosticAction::Aborted, 0, static_cast<std::uint64_t>( kMagic ),
                     static_cast<std::uint64_t>( hdr->magic ) );
-        return; // Cannot proceed
+        return;
     }
     if ( !detail::is_supported_image_version( hdr->image_version ) )
     {
         result.add( ViolationType::HeaderCorruption, DiagnosticAction::Aborted, 0, detail::kCurrentImageVersion,
                     static_cast<std::uint64_t>( hdr->image_version ) );
-        return; // Cannot proceed
+        return;
     }
     if ( hdr->total_size != _backend.total_size() )
     {
         result.add( ViolationType::HeaderCorruption, DiagnosticAction::Aborted, 0, _backend.total_size(),
                     static_cast<std::uint64_t>( hdr->total_size ) );
-        return; // Cannot proceed — addressing is unreliable
+        return;
     }
     if ( hdr->granule_size != static_cast<std::uint16_t>( address_traits::granule_size ) )
     {
         result.add( ViolationType::HeaderCorruption, DiagnosticAction::Aborted, 0, address_traits::granule_size,
                     static_cast<std::uint64_t>( hdr->granule_size ) );
-        return; // Cannot proceed — block sizes are meaningless
+        return;
     }
 
-    // 2. Full block header validation (next/prev bounds, node_type, data range)
     {
         using BlockState = BlockStateBase<address_traits>;
         index_type idx   = hdr->first_block_offset;
@@ -7754,27 +7956,17 @@ static void verify_image_unlocked( VerifyResult& result ) noexcept
         }
     }
 
-    // 3. Block state consistency (transitional states)
     allocator::verify_block_states( base, hdr, result );
 
-    // 4. Linked list prev_offset
     allocator::verify_linked_list( base, hdr, result );
 
-    // 5. Counter consistency
     allocator::verify_counters( base, hdr, result );
 
-    // 6. Free tree root consistency
     allocator::verify_free_tree( base, hdr, result );
 
-    // 7. Forest registry validation
     verify_forest_registry_unlocked( result );
 }
 
-/**
- * @brief Verify forest registry and system domain integrity.
- *
- * @param result  VerifyResult to populate with diagnostic entries.
- */
 static void verify_forest_registry_unlocked( VerifyResult& result ) noexcept
 {
     const forest_registry* reg = forest_registry_root_unlocked();
@@ -7811,69 +8003,90 @@ static void verify_forest_registry_unlocked( VerifyResult& result ) noexcept
     static constexpr std::size_t kBlockHdrByteSize = detail::manager_header_offset_bytes_v<address_traits>;
 
     static constexpr index_type kBlockHdrGranules =
+
+/*
+### pmm::PersistMemoryManager::index_type
+*/
         static_cast<index_type>( kBlockHdrByteSize / address_traits::granule_size );
 
     static constexpr index_type kMgrHdrGranules = detail::kManagerHeaderGranules_t<address_traits>;
 
     static constexpr index_type kFreeBlkIdxLayout = kBlockHdrGranules + kMgrHdrGranules;
 
+/*
+### pmm::PersistMemoryManager::get_header
+*/
     static detail::ManagerHeader<address_traits>* get_header( std::uint8_t* base ) noexcept
     {
 
         return detail::manager_header_at<address_traits>( base );
     }
 
+/*
+### pmm::PersistMemoryManager::get_header_c
+*/
     static const detail::ManagerHeader<address_traits>* get_header_c( const std::uint8_t* base ) noexcept
     {
         return detail::manager_header_at<address_traits>( base );
     }
 
+/*
+## pmm::PersistMemoryManager::layout_access
+*/
     struct layout_access
     {
+
         using address_traits                                            = manager_type::address_traits;
+
         using free_block_tree                                           = manager_type::free_block_tree;
+
         using logging_policy                                            = manager_type::logging_policy;
+
         using storage_backend                                           = manager_type::storage_backend;
+
         using index_type                                                = manager_type::index_type;
+
         static constexpr std::uint64_t                kMagic            = pmm::kMagic;
         static constexpr std::size_t                  kBlockHdrByteSize = manager_type::kBlockHdrByteSize;
+
         static constexpr index_type                   kBlockHdrGranules = manager_type::kBlockHdrGranules;
+
         static constexpr index_type                   kMgrHdrGranules   = manager_type::kMgrHdrGranules;
+
         static constexpr index_type                   kFreeBlkIdxLayout = manager_type::kFreeBlkIdxLayout;
+
+/*
+### pmm::PersistMemoryManager::layout_access::get_header
+*/
         static detail::ManagerHeader<address_traits>* get_header( std::uint8_t* base ) noexcept
         {
             return manager_type::get_header( base );
         }
+
+/*
+### pmm::PersistMemoryManager::layout_access::set_initialized
+*/
         static void set_initialized() noexcept { manager_type::_initialized = true; }
     };
 
+/*
+### pmm::PersistMemoryManager::init_layout
+*/
     static bool init_layout( std::uint8_t* base, std::size_t size ) noexcept
     {
         return detail::ManagerLayoutOps<layout_access>::init_layout( _backend, base, size );
     }
 
+/*
+### pmm::PersistMemoryManager::do_expand
+*/
     static bool do_expand( std::size_t user_size ) noexcept
     {
         return detail::ManagerLayoutOps<layout_access>::do_expand( _backend, _initialized, user_size );
     }
 };
 
-} // namespace pmm
-
-/**
- * @file pmm/io.h
- * @brief Утилиты файлового ввода/вывода для PersistMemoryManager
- *
- * Save/load helpers for a manager image.
- *
- * save_manager copies a locked manager snapshot, stores ManagerHeader.crc32 in
- * the copy, writes through filename + ".tmp", fsyncs the temp file, then uses
- * an atomic rename and fsyncs the parent directory where supported.
- * load_manager_from_file requires VerifyResult& and verifies CRC before
- * loading manager state.
- *
- * @version 0.3
- */
+}
 
 #include <cstdint>
 #include <cstdio>
@@ -7891,7 +8104,7 @@ static void verify_forest_registry_unlocked( VerifyResult& result ) noexcept
 #include <io.h>
 #include <windows.h>
 #else
-#include <cstdlib> // std::rename (POSIX)
+#include <cstdlib>
 #include <fcntl.h>
 #include <unistd.h>
 #endif
@@ -7902,10 +8115,6 @@ namespace pmm
 namespace detail
 {
 
-/// @brief Atomic file rename (write-then-rename pattern).
-/// On POSIX: std::rename is atomic if source and dest are on the same filesystem.
-/// On Windows: MoveFileExA with MOVEFILE_REPLACE_EXISTING and MOVEFILE_WRITE_THROUGH.
-/// @return true on success.
 inline bool atomic_rename( const char* tmp_path, const char* final_path ) noexcept
 {
 #if defined( _WIN32 ) || defined( _WIN64 )
@@ -7915,7 +8124,6 @@ inline bool atomic_rename( const char* tmp_path, const char* final_path ) noexce
 #endif
 }
 
-/// @brief Flush stdio buffers and force the temporary file contents to stable storage.
 inline bool flush_file_to_storage( std::FILE* file ) noexcept
 {
     if ( file == nullptr )
@@ -7944,7 +8152,6 @@ inline std::string parent_directory_path( const char* path )
 }
 #endif
 
-/// @brief Flush the directory entry that makes the atomic rename durable, where supported.
 inline bool flush_parent_directory( const char* path )
 {
 #if defined( _WIN32 ) || defined( _WIN64 )
@@ -7966,27 +8173,8 @@ inline bool flush_parent_directory( const char* path )
 #endif
 }
 
-} // namespace detail
+}
 
-/**
- * @brief Сохранить образ PersistMemoryManager в файл.
- *
- * Takes the manager lock, copies a stable snapshot of the entire managed
- * region, computes CRC32 over that snapshot (treating the crc32 field as zero),
- * and stores the checksum only in the snapshot before writing.
- *
- * Uses atomic write-then-rename — writes to "filename.tmp",
- * fsyncs the temp file, then renames to "filename" on success. On POSIX the
- * parent directory is also fsynced after rename. If the process crashes before
- * rename, the original file remains intact.
- *
- * @tparam MgrT    Тип статического менеджера (PersistMemoryManager<ConfigT, Id>).
- * @param filename Путь к выходному файлу.
- * @return true при успешной записи, false при ошибке ввода/вывода или если не инициализирован.
- *
- * Предусловие:  filename != nullptr, MgrT::is_initialized() == true.
- * Постусловие: файл содержит консистентную копию управляемой области памяти с CRC32.
- */
 template <typename MgrT> inline bool save_manager( const char* filename )
 {
     using address_traits = typename MgrT::address_traits;
@@ -8010,7 +8198,6 @@ template <typename MgrT> inline bool save_manager( const char* filename )
     auto* hdr  = detail::manager_header_at<address_traits>( snapshot.data() );
     hdr->crc32 = detail::compute_image_crc32<address_traits>( snapshot.data(), snapshot.size() );
 
-    // Atomic save — write to temp file, then rename.
     std::string tmp_path = std::string( filename ) + ".tmp";
 
     std::FILE* f = std::fopen( tmp_path.c_str(), "wb" );
@@ -8030,7 +8217,6 @@ template <typename MgrT> inline bool save_manager( const char* filename )
         return false;
     }
 
-    // Atomic rename: tmp → final
     if ( !detail::atomic_rename( tmp_path.c_str(), filename ) )
     {
         std::remove( tmp_path.c_str() );
@@ -8041,26 +8227,6 @@ template <typename MgrT> inline bool save_manager( const char* filename )
     return true;
 }
 
-/**
- * @brief Загрузить образ менеджера из файла в PersistMemoryManager с диагностикой.
- *
- * Читает файл, записанный функцией save_manager(), в буфер менеджера,
- * затем вызывает MgrT::load(result) для проверки заголовка и восстановления состояния.
- * Все обнаруженные нарушения и выполненные исправления записываются в result.
- *
- * If the CRC does not match, returns false without modifying manager state.
- *
- * Примечание: бэкенд менеджера должен уже иметь выделенный буфер достаточного размера.
- * Для HeapStorage вызовите MgrT::create(size) перед load_manager_from_file().
- *
- * @tparam MgrT    Тип статического менеджера (PersistMemoryManager<ConfigT, Id>).
- * @param filename Путь к файлу с образом.
- * @param result   VerifyResult, заполняемый обнаруженными нарушениями и выполненными исправлениями.
- * @return true при успешной загрузке, false при ошибке.
- *
- * Предусловие:  filename != nullptr, MgrT::backend().base_ptr() != nullptr.
- * Постусловие: менеджер восстановлен из файла, result содержит полную диагностику.
- */
 template <typename MgrT> inline bool load_manager_from_file( const char* filename, VerifyResult& result )
 {
     using address_traits = typename MgrT::address_traits;
@@ -8103,7 +8269,6 @@ template <typename MgrT> inline bool load_manager_from_file( const char* filenam
     if ( read_bytes != file_size )
         return false;
 
-    // Verify CRC32 before calling load().
     constexpr std::size_t kHdrOffset = detail::manager_header_offset_bytes_v<address_traits>;
     if ( file_size >= kHdrOffset + sizeof( detail::ManagerHeader<address_traits> ) )
     {
@@ -8121,25 +8286,7 @@ template <typename MgrT> inline bool load_manager_from_file( const char* filenam
     return MgrT::load( result );
 }
 
-} // namespace pmm
-
-/**
- * @file pmm/mmap_storage.h
- * @brief MMapStorage — бэкенд хранилища через отображение файла.
- *
- * Отображает файл в память через `mmap` (POSIX) или `MapViewOfFile` (Windows).
- * Обеспечивает персистентность данных между запусками приложения.
- *
- * Расширение (expand()): не поддерживается в базовой реализации
- * (требует пересоздания отображения, что зависит от ОС).
- *
- * Применение: персистентные базы данных, разделяемая память между процессами.
- *
- * @tparam AddressTraitsT Traits адресного пространства (из address_traits.h).
- *
- * @see storage_backend.h — концепт StorageBackend
- * @version 0.1
- */
+}
 
 #include <cstddef>
 #include <cstdint>
@@ -8163,106 +8310,123 @@ template <typename MgrT> inline bool load_manager_from_file( const char* filenam
 namespace pmm
 {
 
-/**
- * @brief Бэкенд хранилища через отображение файла в память.
- *
- * Открывает файл, отображает его в адресное пространство процесса.
- * При создании нового файла инициализирует его нулями.
- *
- * @tparam AddressTraitsT Traits адресного пространства.
- */
+/*
+## pmm::MMapStorage
+*/
 template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage
 {
   public:
+
     using address_traits = AddressTraitsT;
 
+/*
+### pmm::MMapStorage::MMapStorage
+*/
     MMapStorage() noexcept = default;
 
     MMapStorage( const MMapStorage& )            = delete;
+
     MMapStorage& operator=( const MMapStorage& ) = delete;
 
     MMapStorage( MMapStorage&& other ) noexcept
+
+/*
+### pmm::MMapStorage::_base
+*/
         : _base( other._base ), _size( other._size ), _mapped( other._mapped )
 #if defined( _WIN32 ) || defined( _WIN64 )
           ,
+
+/*
+### pmm::MMapStorage::_file_handle
+*/
           _file_handle( other._file_handle ), _map_handle( other._map_handle )
 #else
           ,
+
+/*
+### pmm::MMapStorage::_fd
+*/
           _fd( other._fd )
 #endif
     {
+
         other._base   = nullptr;
+
         other._size   = 0;
+
         other._mapped = false;
 #if defined( _WIN32 ) || defined( _WIN64 )
+
         other._file_handle = INVALID_HANDLE_VALUE;
+
         other._map_handle  = nullptr;
 #else
+
         other._fd = -1;
 #endif
     }
 
     ~MMapStorage() { close(); }
 
-    /**
-     * @brief Открыть или создать файл и отобразить его в память.
-     *
-     * @param path       Путь к файлу.
-     * @param size_bytes Размер отображения в байтах (при создании = размер файла).
-     *                   Должен быть кратен granule_size и > 0.
-     * @return true при успехе.
-     */
+/*
+### pmm::MMapStorage::open
+*/
     bool open( const char* path, std::size_t size_bytes ) noexcept
     {
         if ( _mapped )
-            return false; // уже открыт
+            return false;
         if ( path == nullptr || size_bytes == 0 )
             return false;
-        // Выравниваем по granule_size
+
         size_bytes = ( ( size_bytes + AddressTraitsT::granule_size - 1 ) / AddressTraitsT::granule_size ) *
+
                      AddressTraitsT::granule_size;
         return open_impl( path, size_bytes );
     }
 
-    /// @brief Закрыть отображение и файл.
+/*
+### pmm::MMapStorage::close
+*/
     void close() noexcept
     {
         if ( !_mapped )
+
             return;
+
         close_impl();
         _base   = nullptr;
         _size   = 0;
         _mapped = false;
     }
 
-    /// @brief true, если файл успешно отображён.
+/*
+### pmm::MMapStorage::is_open
+*/
     bool is_open() const noexcept { return _mapped; }
 
-    /// @brief Указатель на начало отображения.
+/*
+### pmm::MMapStorage::base_ptr
+*/
     std::uint8_t*       base_ptr() noexcept { return _base; }
     const std::uint8_t* base_ptr() const noexcept { return _base; }
 
-    /// @brief Размер отображения в байтах.
+/*
+### pmm::MMapStorage::total_size
+*/
     std::size_t total_size() const noexcept { return _size; }
 
-    /**
-     * @brief Расширить отображённый файл на additional_bytes.
-     *
-     * Расширяет файл через ftruncate/SetEndOfFile, затем пересоздаёт отображение.
-     * После expand() base_ptr() возвращает новый адрес — все ранее полученные
-     * указатели на данные становятся невалидными.
-     *
-     * @param additional_bytes Минимальный прирост в байтах.
-     * @return true при успехе, false при ошибке (отображение остаётся в прежнем состоянии).
-     */
+/*
+### pmm::MMapStorage::expand
+*/
     bool expand( std::size_t additional_bytes ) noexcept
     {
         if ( !_mapped || additional_bytes == 0 )
             return _mapped && additional_bytes == 0;
-        // Grow by 25% or by additional_bytes, whichever is larger
+
         std::size_t growth   = _size / 4 + additional_bytes;
         std::size_t new_size = _size + growth;
-        // Align to granule_size
+
         new_size = ( ( new_size + AddressTraitsT::granule_size - 1 ) / AddressTraitsT::granule_size ) *
                    AddressTraitsT::granule_size;
         if ( new_size <= _size )
@@ -8270,24 +8434,30 @@ template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage
         return expand_impl( new_size );
     }
 
-    /**
-     * @brief MMapStorage не владеет памятью в смысле malloc/free
-     *        (отображение управляется ОС).
-     * @return false (отображение освобождается через munmap/UnmapViewOfFile в close()).
-     */
+/*
+### pmm::MMapStorage::owns_memory
+*/
     bool owns_memory() const noexcept { return false; }
 
   private:
 #if defined( _WIN32 ) || defined( _WIN64 )
+
     std::uint8_t* _base        = nullptr;
     std::size_t   _size        = 0;
+
     bool          _mapped      = false;
     HANDLE        _file_handle = INVALID_HANDLE_VALUE;
+
     HANDLE        _map_handle  = nullptr;
 
+/*
+### pmm::MMapStorage::open_impl
+*/
     bool open_impl( const char* path, std::size_t size_bytes ) noexcept
     {
+
         _file_handle = CreateFileA( path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+
                                     OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr );
         if ( _file_handle == INVALID_HANDLE_VALUE )
             return false;
@@ -8314,6 +8484,7 @@ template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage
 
         DWORD size_hi = static_cast<DWORD>( size_bytes >> 32 );
         DWORD size_lo = static_cast<DWORD>( size_bytes & 0xFFFFFFFF );
+
         _map_handle   = CreateFileMappingA( _file_handle, nullptr, PAGE_READWRITE, size_hi, size_lo, nullptr );
         if ( _map_handle == nullptr )
         {
@@ -8338,6 +8509,9 @@ template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage
         return true;
     }
 
+/*
+### pmm::MMapStorage::close_impl
+*/
     void close_impl() noexcept
     {
         if ( _base != nullptr )
@@ -8357,10 +8531,12 @@ template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage
         }
     }
 
-    /// Expand the mapped file to new_size bytes.
+/*
+### pmm::MMapStorage::expand_impl
+*/
     bool expand_impl( std::size_t new_size ) noexcept
     {
-        // Flush and unmap current view
+
         if ( _base != nullptr )
         {
             FlushViewOfFile( _base, _size );
@@ -8373,12 +8549,12 @@ template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage
             _map_handle = nullptr;
         }
 
-        // Resize file
         LARGE_INTEGER new_size_li{};
+
         new_size_li.QuadPart = static_cast<LONGLONG>( new_size );
         if ( !SetFilePointerEx( _file_handle, new_size_li, nullptr, FILE_BEGIN ) || !SetEndOfFile( _file_handle ) )
         {
-            // Cannot resize — try to remap at old size
+
             DWORD hi    = static_cast<DWORD>( _size >> 32 );
             DWORD lo    = static_cast<DWORD>( _size & 0xFFFFFFFF );
             _map_handle = CreateFileMappingA( _file_handle, nullptr, PAGE_READWRITE, hi, lo, nullptr );
@@ -8391,7 +8567,6 @@ template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage
             return false;
         }
 
-        // Create new mapping at new size
         DWORD size_hi = static_cast<DWORD>( new_size >> 32 );
         DWORD size_lo = static_cast<DWORD>( new_size & 0xFFFFFFFF );
         _map_handle   = CreateFileMappingA( _file_handle, nullptr, PAGE_READWRITE, size_hi, size_lo, nullptr );
@@ -8411,7 +8586,7 @@ template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage
         return true;
     }
 
-#else  // POSIX
+#else
 
     std::uint8_t* _base   = nullptr;
     std::size_t   _size   = 0;
@@ -8420,11 +8595,14 @@ template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage
 
     bool open_impl( const char* path, std::size_t size_bytes ) noexcept
     {
+
         _fd = ::open( path, O_RDWR | O_CREAT, 0600 );
         if ( _fd < 0 )
             return false;
 
-        // Ensure file is at least size_bytes
+/*
+## pmm::MMapStorage::stat
+*/
         struct stat st
         {
         };
@@ -8462,6 +8640,7 @@ template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage
     void close_impl() noexcept
     {
         if ( _base != nullptr )
+
             ::munmap( _base, _size );
         if ( _fd >= 0 )
         {
@@ -8470,27 +8649,24 @@ template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage
         }
     }
 
-    /// Expand the mapped file to new_size bytes.
     bool expand_impl( std::size_t new_size ) noexcept
     {
-        // Unmap current mapping
+
         if ( _base != nullptr )
         {
             ::munmap( _base, _size );
             _base = nullptr;
         }
 
-        // Extend the file
         if ( ::ftruncate( _fd, static_cast<off_t>( new_size ) ) != 0 )
         {
-            // Remap at old size on failure
+
             void* addr = ::mmap( nullptr, _size, PROT_READ | PROT_WRITE, MAP_SHARED, _fd, 0 );
             if ( addr != MAP_FAILED )
                 _base = static_cast<std::uint8_t*>( addr );
             return false;
         }
 
-        // Remap at new size
         void* addr = ::mmap( nullptr, new_size, PROT_READ | PROT_WRITE, MAP_SHARED, _fd, 0 );
         if ( addr == MAP_FAILED )
             return false;
@@ -8499,52 +8675,12 @@ template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage
         _size = new_size;
         return true;
     }
-#endif // _WIN32
+#endif
 };
-
-// ─── static_assert: MMapStorage соответствует концепту StorageBackend ──────────
 
 static_assert( is_storage_backend_v<MMapStorage<>>, "MMapStorage must satisfy StorageBackendConcept" );
 
-} // namespace pmm
-
-/**
- * @file pmm/manager_concept.h
- * @brief PersistMemoryManagerConcept — концепция для проверки типов менеджеров ПАП.
- *
- * Определяет C++20 концепт `PersistMemoryManagerConcept<T>` и вспомогательный тип-трейт
- * `is_persist_memory_manager<T>`, позволяющие проверить во время компиляции, является ли
- * тип корректным менеджером персистентной памяти (удовлетворяет ли статическому
- * интерфейсу PersistMemoryManager).
- *
- * Требования к типу менеджера:
- *   - `manager_type` — typedef на собственный тип (self-type)
- *   - `address_traits` — тип адресных traits
- *   - `storage_backend` — тип бэкенда хранилища
- *   - статический `is_initialized()` — проверка инициализации
- *   - статический `allocate(size_t)` → void* — выделение сырой памяти
- *   - статический `deallocate(void*)` — освобождение сырой памяти
- *   - статический `total_size()` → size_t — статистика
- *   - статический `destroy()` — сброс runtime-состояния
- *
- * Использование:
- * @code
- *   // Проверка во время компиляции
- *   static_assert(pmm::is_persist_memory_manager_v<pmm::PersistMemoryManager<pmm::CacheManagerConfig>>,
- *                 "PersistMemoryManager<CacheManagerConfig> must be a valid PersistMemoryManager");
- *
- *   // Ограничение шаблонного параметра через C++20 концепт
- *   template <pmm::PersistMemoryManagerConcept MgrT>
- *   void process() {
- *       MgrT::create(64 * 1024);
- *       // ...
- *   }
- * @endcode
- *
- * @see persist_memory_manager.h — PersistMemoryManager
- * @see pptr.h — pptr<T, ManagerT>
- * @version 0.3
- */
+}
 
 #include <concepts>
 #include <cstddef>
@@ -8553,21 +8689,6 @@ static_assert( is_storage_backend_v<MMapStorage<>>, "MMapStorage must satisfy St
 namespace pmm
 {
 
-/**
- * @brief C++20 концепт: проверяет, является ли T корректным менеджером персистентной памяти.
- *
- * Тип считается менеджером ПАП, если он предоставляет:
- *   - typedef `manager_type`
- *   - typedef `address_traits`
- *   - typedef `storage_backend`
- *   - статический метод `is_initialized() → bool`
- *   - статический метод `allocate(size_t) → void*`
- *   - статический метод `deallocate(void*)`
- *   - статический метод `total_size() → size_t`
- *   - статический метод `destroy()` для сброса runtime-состояния
- *
- * @tparam T Проверяемый тип.
- */
 template <typename T>
 concept PersistMemoryManagerConcept = requires {
     typename T::manager_type;
@@ -8580,27 +8701,14 @@ concept PersistMemoryManagerConcept = requires {
     { T::destroy() };
 };
 
-/**
- * @brief Проверить, является ли T корректным типом менеджера персистентной памяти.
- *
- * Совместимый с C++17 тип-трейт на основе C++20 концепта PersistMemoryManagerConcept.
- *
- * @tparam T Проверяемый тип.
- */
+/*
+## pmm::is_persist_memory_manager
+*/
 template <typename T> struct is_persist_memory_manager : std::bool_constant<PersistMemoryManagerConcept<T>>
 {
 };
 
-/**
- * @brief Вспомогательная переменная для is_persist_memory_manager.
- *
- * @tparam T Проверяемый тип.
- *
- * @code
- *   if constexpr (pmm::is_persist_memory_manager_v<MyType>) { ... }
- * @endcode
- */
 template <typename T> inline constexpr bool is_persist_memory_manager_v = PersistMemoryManagerConcept<T>;
 
-} // namespace pmm
+}
 

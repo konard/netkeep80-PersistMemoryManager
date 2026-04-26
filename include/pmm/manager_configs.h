@@ -27,16 +27,26 @@ static_assert( ValidPmmAddressTraits<LargeAddressTraits>, "LargeAddressTraits mu
 template <typename AddressTraitsT = DefaultAddressTraits, typename LockPolicyT = config::NoLock,
           std::size_t GrowNum = config::kDefaultGrowNumerator, std::size_t GrowDen = config::kDefaultGrowDenominator,
           std::size_t MaxMemoryGB = 64, typename LoggingPolicyT = logging::NoLogging>
+
+/*
+## pmm::BasicConfig
+*/
 struct BasicConfig
 {
     static_assert( ValidPmmAddressTraits<AddressTraitsT>,
+
                    "BasicConfig: AddressTraitsT must satisfy ValidPmmAddressTraits" );
 
     using address_traits                          = AddressTraitsT;
+
     using storage_backend                         = HeapStorage<AddressTraitsT>;
+
     using free_block_tree                         = AvlFreeTree<AddressTraitsT>;
+
     using lock_policy                             = LockPolicyT;
+
     using logging_policy                          = LoggingPolicyT;
+
     static constexpr std::size_t granule_size     = AddressTraitsT::granule_size;
     static constexpr std::size_t max_memory_gb    = MaxMemoryGB;
     static constexpr std::size_t grow_numerator   = GrowNum;
@@ -44,16 +54,26 @@ struct BasicConfig
 };
 
 template <typename AddressTraitsT, std::size_t BufferSize, std::size_t GrowNum = 3, std::size_t GrowDen = 2>
+
+/*
+## pmm::StaticConfig
+*/
 struct StaticConfig
 {
     static_assert( ValidPmmAddressTraits<AddressTraitsT>,
+
                    "StaticConfig: AddressTraitsT must satisfy ValidPmmAddressTraits" );
 
     using address_traits                          = AddressTraitsT;
+
     using storage_backend                         = StaticStorage<BufferSize, AddressTraitsT>;
+
     using free_block_tree                         = AvlFreeTree<AddressTraitsT>;
+
     using lock_policy                             = config::NoLock;
+
     using logging_policy                          = logging::NoLogging;
+
     static constexpr std::size_t granule_size     = AddressTraitsT::granule_size;
     static constexpr std::size_t max_memory_gb    = 0;
     static constexpr std::size_t grow_numerator   = GrowNum;
@@ -76,4 +96,4 @@ using IndustrialDBConfig = BasicConfig<DefaultAddressTraits, config::SharedMutex
 
 using LargeDBConfig = BasicConfig<LargeAddressTraits, config::SharedMutexLock, 2, 1, 0>;
 
-} // namespace pmm
+}

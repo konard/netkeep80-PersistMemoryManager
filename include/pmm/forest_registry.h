@@ -21,42 +21,74 @@ inline constexpr const char*   kSystemTypeForestDomainRecord = "type/forest_doma
 inline constexpr const char*   kSystemTypePstringview        = "type/pstringview";
 inline constexpr const char*   kServiceNameDomainRoot        = "service/domain_root";
 inline constexpr const char*   kServiceNameDomainSymbol      = "service/domain_symbol";
-inline constexpr std::uint32_t kForestRegistryMagic          = 0x50465247U; // "PFRG"
+inline constexpr std::uint32_t kForestRegistryMagic          = 0x50465247U;
 inline constexpr std::uint16_t kForestRegistryVersion        = 1;
 inline constexpr std::uint8_t  kForestBindingDirectRoot      = 0;
 inline constexpr std::uint8_t  kForestBindingFreeTree        = 1;
 inline constexpr std::uint8_t  kForestDomainFlagSystem       = 0x01;
 
+/*
+## pmm::detail::ForestDomainRecord
+*/
 template <typename AddressTraitsT> struct ForestDomainRecord
 {
+
     using index_type = typename AddressTraitsT::index_type;
 
     index_type    binding_id;
+
     index_type    root_offset;
+
     index_type    symbol_offset;
+
     std::uint8_t  binding_kind;
     std::uint8_t  flags;
     std::uint16_t reserved;
+
     char          name[kForestDomainNameCapacity];
 
+/*
+### pmm::detail::ForestDomainRecord::ForestDomainRecord
+*/
     constexpr ForestDomainRecord() noexcept
+
+/*
+### pmm::detail::ForestDomainRecord::binding_id
+*/
         : binding_id( 0 ), root_offset( 0 ), symbol_offset( 0 ), binding_kind( kForestBindingDirectRoot ), flags( 0 ),
+
+/*
+### pmm::detail::ForestDomainRecord::reserved
+*/
           reserved( 0 ), name{}
     {
     }
 };
 
+/*
+## pmm::detail::ForestDomainRegistry
+*/
 template <typename AddressTraitsT> struct ForestDomainRegistry
 {
+
     using index_type = typename AddressTraitsT::index_type;
 
     std::uint32_t                      magic;
     std::uint16_t                      version;
     std::uint16_t                      domain_count;
+
     index_type                         next_binding_id;
+
     ForestDomainRecord<AddressTraitsT> domains[kMaxForestDomains];
 
+/*
+### pmm::detail::ForestDomainRegistry::ForestDomainRegistry
+*/
     constexpr ForestDomainRegistry() noexcept
+
+/*
+### pmm::detail::ForestDomainRegistry::magic
+*/
         : magic( kForestRegistryMagic ), version( kForestRegistryVersion ), domain_count( 0 ), next_binding_id( 1 ),
           domains{}
     {
@@ -93,4 +125,4 @@ static_assert( std::is_trivially_copyable_v<ForestDomainRecord<DefaultAddressTra
 static_assert( std::is_nothrow_default_constructible_v<ForestDomainRegistry<DefaultAddressTraits>>,
                "ForestDomainRegistry must be nothrow-default-constructible" );
 
-} // namespace pmm::detail
+}

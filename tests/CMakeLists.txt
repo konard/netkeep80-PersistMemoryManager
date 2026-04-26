@@ -320,6 +320,10 @@ target_compile_definitions(test_issue349_remove_ppool PRIVATE PMM_SOURCE_DIR="${
 pmm_add_test(test_issue352_kernel_subtree_size test_issue352_kernel_subtree_size.cpp)
 target_compile_definitions(test_issue352_kernel_subtree_size PRIVATE PMM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
+# ─── Issue 354: source anchor and markdown link tracing ─────────────
+pmm_add_test(test_issue354_include_anchors test_issue354_include_anchors.cpp)
+target_compile_definitions(test_issue354_include_anchors PRIVATE PMM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+
 # ─── Issue 314: build graph compaction contract ─────────────────
 add_test(
     NAME test_issue314_build_graph_contract

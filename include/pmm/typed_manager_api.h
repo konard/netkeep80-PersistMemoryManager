@@ -1,8 +1,3 @@
-/**
- * @file pmm/typed_manager_api.h
- * @brief Type-aware allocation, object lifecycle, and pptr access facade for PMM managers.
- */
-
 #pragma once
 
 #include "pmm/block_state.h"
@@ -20,11 +15,15 @@
 namespace pmm::detail
 {
 
+/*
+## pmm::detail::PersistMemoryTypedApi
+*/
 template <typename ManagerT> class PersistMemoryTypedApi
 {
   public:
     template <typename T> static pmm::pptr<T, ManagerT> allocate_typed() noexcept
     {
+
         void* raw = ManagerT::allocate( sizeof( T ) );
         if ( raw == nullptr )
             return pmm::pptr<T, ManagerT>();
@@ -46,20 +45,33 @@ template <typename ManagerT> class PersistMemoryTypedApi
     template <typename T> static void deallocate_typed( pmm::pptr<T, ManagerT> p ) noexcept
     {
         if ( p.is_null() || !ManagerT::_initialized )
+
             return;
+
         void* raw = ManagerT::template raw_block_user_ptr_from_pptr<T>( p );
+
         ManagerT::deallocate( raw );
     }
 
     template <typename T>
+
+/*
+### pmm::detail::PersistMemoryTypedApi::reallocate_typed
+*/
     static pmm::pptr<T, ManagerT> reallocate_typed( pmm::pptr<T, ManagerT> p, std::size_t old_count,
                                                     std::size_t new_count ) noexcept
     {
+
         using address_traits  = typename ManagerT::address_traits;
+
         using allocator       = typename ManagerT::allocator;
+
         using free_block_tree = typename ManagerT::free_block_tree;
+
         using index_type      = typename ManagerT::index_type;
+
         using logging_policy  = typename ManagerT::logging_policy;
+
         using thread_policy   = typename ManagerT::thread_policy;
 
         static_assert( std::is_trivially_copyable_v<T>,
@@ -77,19 +89,24 @@ template <typename ManagerT> class PersistMemoryTypedApi
             return pmm::pptr<T, ManagerT>();
         }
         std::size_t                              new_user_size = sizeof( T ) * new_count;
+
         typename thread_policy::unique_lock_type lock( ManagerT::_mutex );
         if ( !ManagerT::_initialized )
         {
             ManagerT::_last_error = PmmError::NotInitialized;
             return pmm::pptr<T, ManagerT>();
         }
+
         std::uint8_t*                          base          = ManagerT::_backend.base_ptr();
+
         detail::ManagerHeader<address_traits>* hdr           = ManagerT::get_header( base );
         index_type                             blk_idx       = ManagerT::template block_idx_from_pptr<T>( p );
         void*                                  blk_raw       = detail::block_at<address_traits>( base, blk_idx );
+
         index_type                             old_data_gran = BlockStateBase<address_traits>::get_weight( blk_raw );
         index_type new_data_gran = detail::bytes_to_granules_t<address_traits>( new_user_size );
         if ( new_data_gran == 0 )
+
             new_data_gran = 1;
         if ( new_data_gran == old_data_gran )
         {
@@ -119,13 +136,16 @@ template <typename ManagerT> class PersistMemoryTypedApi
 
         index_type new_data_gran_alloc = detail::bytes_to_granules_t<address_traits>( new_user_size );
         if ( new_data_gran_alloc == 0 )
+
             new_data_gran_alloc = 1;
         if ( new_data_gran_alloc > std::numeric_limits<index_type>::max() - ManagerT::kBlockHdrGranules )
         {
             ManagerT::_last_error = PmmError::Overflow;
             return pmm::pptr<T, ManagerT>();
         }
+
         index_type needed  = ManagerT::kBlockHdrGranules + new_data_gran_alloc;
+
         index_type new_idx = free_block_tree::find_best_fit( base, hdr, needed );
         if ( new_idx == address_traits::no_block )
         {
@@ -145,6 +165,7 @@ template <typename ManagerT> class PersistMemoryTypedApi
                 return pmm::pptr<T, ManagerT>();
             }
         }
+
         void* new_raw = allocator::allocate_from_block( base, hdr, new_idx, new_user_size );
         if ( new_raw == nullptr )
         {
@@ -159,7 +180,9 @@ template <typename ManagerT> class PersistMemoryTypedApi
         }
         void*       new_dst = resolve_unchecked<T>( new_p );
         void*       old_src = resolve_unchecked<T>( p );
+
         std::size_t copy_sz = ( new_count < old_count ? new_count : old_count ) * sizeof( T );
+
         std::memmove( new_dst, old_src, copy_sz );
 
         index_type old_blk_idx = ManagerT::template block_idx_from_pptr<T>( p );
@@ -178,6 +201,7 @@ template <typename ManagerT> class PersistMemoryTypedApi
                 allocator::coalesce( base, hdr, old_blk_idx );
             }
         }
+
         ManagerT::_last_error = PmmError::Ok;
         return new_p;
     }
@@ -198,6 +222,7 @@ template <typename ManagerT> class PersistMemoryTypedApi
             ManagerT::deallocate( raw );
             return pmm::pptr<T, ManagerT>();
         }
+
         ::new ( obj ) T( static_cast<Args&&>( args )... );
         return p;
     }
@@ -251,11 +276,13 @@ template <typename ManagerT> class PersistMemoryTypedApi
         }
         index_type blk_idx = ManagerT::template block_idx_from_pptr<T>( p );
         if ( BlockStateBase<address_traits>::get_weight( blk_raw ) == 0 ||
+
              BlockStateBase<address_traits>::get_root_offset( blk_raw ) != blk_idx )
         {
             ManagerT::_last_error = PmmError::InvalidPointer;
             return nullptr;
         }
+
         const std::uint16_t node_type = BlockStateBase<address_traits>::get_node_type( blk_raw );
         if ( node_type != pmm::kNodeReadWrite && node_type != pmm::kNodeReadOnly )
         {
@@ -289,6 +316,7 @@ template <typename ManagerT> class PersistMemoryTypedApi
             ManagerT::_last_error = PmmError::InvalidPointer;
             return pmm::pptr<T, ManagerT>();
         }
+
         std::size_t idx = byte_off / address_traits::granule_size;
         if ( idx > static_cast<std::size_t>( std::numeric_limits<index_type>::max() ) )
         {
@@ -304,6 +332,4 @@ template <typename ManagerT> class PersistMemoryTypedApi
     }
 };
 
-// clang-format off
 }
-// clang-format on

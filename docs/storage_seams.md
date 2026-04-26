@@ -50,7 +50,7 @@ requirements for storage seams.
 ### Mode 1: Normal persistent image operation
 
 The primary mode. A single process owns the image (in-memory via
-`HeapStorage` or memory-mapped via `MMapStorage`). Mutations happen
+[HeapStorage](../include/pmm/heap_storage.h#pmm::HeapStorage) or memory-mapped via [MMapStorage](../include/pmm/mmap_storage.h#pmm::MMapStorage)). Mutations happen
 in-place. Persistence is achieved via periodic `save_manager()` calls
 or through OS-level `mmap` writeback.
 
@@ -172,9 +172,9 @@ pointer to the block's user-data region. There is no encode/decode step.
   and AVL tree fields are required for structural recovery. Encrypting
   them would make `repair_linked_list()` and `rebuild_free_tree()`
   impossible.
-- **`pstringview` blocks are permanently locked and used as AVL nodes.**
+- **[pstringview](../include/pmm/pstringview.h#pmm::pstringview) blocks are permanently locked and used as AVL nodes.**
   Their tree fields and string content must remain readable for the
-  symbol dictionary to function. Per-block encryption of `pstringview`
+  symbol dictionary to function. Per-block encryption of [pstringview](../include/pmm/pstringview.h#pmm::pstringview)
   blocks requires careful consideration — the string comparison function
   used during AVL traversal must operate on decrypted data.
 - **Overhead per block:** encryption/compression adds per-block metadata
@@ -190,11 +190,11 @@ metadata must remain accessible for structural recovery:
 
 | Metadata | Location | Why |
 |----------|----------|-----|
-| `ManagerHeader` (64 bytes) | Block_0 user data | Magic validation, size checks, `first_block_offset` — required by `load()` phase 1. |
+| [ManagerHeader](../include/pmm/types.h#pmm::detail::ManagerHeader) (64 bytes) | Block_0 user data | Magic validation, size checks, `first_block_offset` — required by `load()` phase 1. |
 | `prev_offset` / `next_offset` | Every block header | Linked-list traversal — required by `repair_linked_list()` and `recompute_counters()`. |
 | `weight` / `root_offset` | Every block header | Block state determination — required by `recover_state()` and `rebuild_free_tree()`. |
 | `node_type` | Every block header | `kNodeReadOnly` check — prevents deallocation of system blocks. |
-| `ForestDomainRegistry` | Allocated block pointed to by `hdr->root_offset` | Registry magic/version validation, domain enumeration. |
+| [ForestDomainRegistry](../include/pmm/forest_registry.h#pmm::detail::ForestDomainRegistry) | Allocated block pointed to by `hdr->root_offset` | Registry magic/version validation, domain enumeration. |
 | `free_tree_root` | ManagerHeader | Not strictly required (rebuilt on `load()`), but useful for hot-path validation. |
 
 **Implication:** whole-image encryption is simpler than per-block
