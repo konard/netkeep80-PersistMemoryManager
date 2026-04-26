@@ -14,31 +14,19 @@ class StaticStorage {
                 "StaticStorage: Size must be a multiple of granule_size");
 public:
   using address_traits = AddressTraitsT;
-  /*
-### pmm-staticstorage-staticstorage
-*/
-  StaticStorage() noexcept = default;
+    StaticStorage() noexcept = default;
   StaticStorage(const StaticStorage &) = delete;
   StaticStorage &operator=(const StaticStorage &) = delete;
   StaticStorage(StaticStorage &&) = delete;
   StaticStorage &operator=(StaticStorage &&) = delete;
-  /*
-### pmm-staticstorage-base_ptr
-*/
-  std::uint8_t *base_ptr() noexcept { return _buffer; }
+    std::uint8_t *base_ptr() noexcept { return _buffer; }
   const std::uint8_t *base_ptr() const noexcept { return _buffer; }
-  /*
-### pmm-staticstorage-total_size
-*/
-  constexpr std::size_t total_size() const noexcept { return Size; }
+    constexpr std::size_t total_size() const noexcept { return Size; }
   /*
 ### pmm-staticstorage-expand
 */
   bool expand(std::size_t) noexcept { return false; }
-  /*
-### pmm-staticstorage-owns_memory
-*/
-  constexpr bool owns_memory() const noexcept { return false; }
+    constexpr bool owns_memory() const noexcept { return false; }
 private:
   alignas(AddressTraitsT::granule_size) std::uint8_t _buffer[Size]{};
 };
