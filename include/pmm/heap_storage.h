@@ -13,14 +13,14 @@
 namespace pmm {
 
 /*
-## pmm::heapstorage
+## pmm-heapstorage
 */
 template <typename AddressTraitsT = DefaultAddressTraits> class HeapStorage {
 public:
   using address_traits = AddressTraitsT;
 
   /*
-### pmm::heapstorage::heapstorage
+### pmm-heapstorage-heapstorage
 */
   HeapStorage() noexcept = default;
 
@@ -77,7 +77,7 @@ public:
   }
 
   /*
-### pmm::heapstorage::attach
+### pmm-heapstorage-attach
 */
   void attach(void *memory, std::size_t size) noexcept {
     if (_owns_memory && _buffer != nullptr)
@@ -88,18 +88,18 @@ public:
   }
 
   /*
-### pmm::heapstorage::base_ptr
+### pmm-heapstorage-base_ptr
 */
   std::uint8_t *base_ptr() noexcept { return _buffer; }
   const std::uint8_t *base_ptr() const noexcept { return _buffer; }
 
   /*
-### pmm::heapstorage::total_size
+### pmm-heapstorage-total_size
 */
   std::size_t total_size() const noexcept { return _size; }
 
   /*
-### pmm::heapstorage::expand
+### pmm-heapstorage-expand
 */
   bool expand(std::size_t additional_bytes) noexcept {
     if (additional_bytes == 0)
@@ -132,7 +132,7 @@ public:
   }
 
   /*
-### pmm::heapstorage::owns_memory
+### pmm-heapstorage-owns_memory
 */
   bool owns_memory() const noexcept { return _owns_memory; }
 

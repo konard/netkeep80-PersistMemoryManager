@@ -119,7 +119,7 @@ endfunction()
 - `bytes_to_idx_t` возвращает `no_block` при переполнении
 - `allocate()` / `allocate_typed()` / `reallocate_typed()` для `size_t::max`
 - `allocate(0)` возвращает `nullptr` с `PmmError::InvalidSize`
-- `allocate_typed(0)` возвращает нулевой [pptr](../../include/pmm/pptr.h#pmm::pptr)
+- `allocate_typed(0)` возвращает нулевой [pptr](../../include/pmm/pptr.h#pmm-pptr)
 - Статическое хранилище: отказ при выходе за пределы буфера
 - 16-bit индекс (`SmallAddressTraits`): переполнение при малом адресном пространстве
 - 64-bit индекс (`LargeAddressTraits`): базовая аллокация и устойчивость к переполнению
@@ -127,7 +127,7 @@ endfunction()
 - Циклы аллокации/деаллокации с проверкой целостности
 - Граничные размеры: ровно 1 гранула, на границе гранулы, между гранулами
 
-Все варианты [AddressTraits](../../include/pmm/address_traits.h#pmm::addresstraits) протестированы: `SmallAddressTraits` (16-bit),
+Все варианты [AddressTraits](../../include/pmm/address_traits.h#pmm-addresstraits) протестированы: `SmallAddressTraits` (16-bit),
 `DefaultAddressTraits` (32-bit), `LargeAddressTraits` (64-bit).
 
 #### 5.2.2 Конкурентные тесты (`test_issue213_concurrent.cpp`)
@@ -140,7 +140,7 @@ endfunction()
 - Проверка целостности данных под конкуренцией (8 потоков, write/read/verify)
 - Конкурентный `reallocate_typed` (4 потока, рост массивов с проверкой sentinel-значений)
 
-Все тесты используют `MultiThreadedHeap` с [SharedMutexLock](../../include/pmm/config.h#pmm::config::sharedmutexlock).
+Все тесты используют `MultiThreadedHeap` с [SharedMutexLock](../../include/pmm/config.h#pmm-config-sharedmutexlock).
 
 #### 5.2.3 Fuzz-тестирование (`test_issue213_fuzz.cpp` + `fuzz_allocator.cpp`)
 

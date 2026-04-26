@@ -19,7 +19,7 @@ concept PersistMemoryManagerConcept = requires {
 };
 
 /*
-## pmm::is_persist_memory_manager
+## pmm-is_persist_memory_manager
 */
 template <typename T>
 struct is_persist_memory_manager

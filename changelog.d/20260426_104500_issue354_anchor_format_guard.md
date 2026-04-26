@@ -3,4 +3,4 @@ bump: patch
 ---
 
 ### Fixed
-- Enforce lowercase depth-matched include anchors and lowercase Markdown references to them.
+- Enforce lowercase hyphen-separated include anchors and lowercase Markdown references to them.

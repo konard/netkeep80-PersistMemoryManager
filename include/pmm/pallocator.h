@@ -7,7 +7,7 @@
 namespace pmm {
 
 /*
-## pmm::pallocator
+## pmm-pallocator
 */
 template <typename T, typename ManagerT> struct pallocator {
 
@@ -26,7 +26,7 @@ template <typename T, typename ManagerT> struct pallocator {
   using is_always_equal = std::true_type;
 
   /*
-### pmm::pallocator::pallocator
+### pmm-pallocator-pallocator
 */
   constexpr pallocator() noexcept = default;
 
@@ -36,7 +36,7 @@ template <typename T, typename ManagerT> struct pallocator {
   constexpr pallocator(const pallocator<U, ManagerT> &) noexcept {}
 
   /*
-### pmm::pallocator::allocate
+### pmm-pallocator-allocate
 */
   [[nodiscard]] T *allocate(std::size_t n) {
     if (n == 0)
@@ -54,14 +54,14 @@ template <typename T, typename ManagerT> struct pallocator {
   }
 
   /*
-### pmm::pallocator::deallocate
+### pmm-pallocator-deallocate
 */
   void deallocate(T *p, std::size_t) noexcept {
     ManagerT::deallocate(static_cast<void *>(p));
   }
 
   /*
-### pmm::pallocator::max_size
+### pmm-pallocator-max_size
 */
   std::size_t max_size() const noexcept {
     return (std::numeric_limits<std::size_t>::max)() / sizeof(T);

@@ -16,7 +16,7 @@
 namespace pmm {
 
 /*
-## pmm::pmmerror
+## pmm-pmmerror
 */
 enum class PmmError : std::uint8_t {
   Ok = 0,
@@ -44,7 +44,7 @@ static_assert(kGranuleSize == pmm::DefaultAddressTraits::granule_size,
 inline constexpr std::uint64_t kMagic = 0x504D4D5F56303938ULL;
 
 /*
-## pmm::memorystats
+## pmm-memorystats
 */
 struct MemoryStats {
 
@@ -57,7 +57,7 @@ struct MemoryStats {
 };
 
 /*
-## pmm::managerinfo
+## pmm-managerinfo
 */
 struct ManagerInfo {
 
@@ -73,7 +73,7 @@ struct ManagerInfo {
 };
 
 /*
-## pmm::blockview
+## pmm-blockview
 */
 struct BlockView {
 
@@ -88,7 +88,7 @@ struct BlockView {
 };
 
 /*
-## pmm::freeblockview
+## pmm-freeblockview
 */
 struct FreeBlockView {
 
@@ -165,7 +165,7 @@ inline constexpr typename AddressTraitsT::index_type kNullIdx_v =
     static_cast<typename AddressTraitsT::index_type>(0);
 
 /*
-### pmm::detail::managerheader
+### pmm-detail-managerheader
 */
 template <typename AddressTraitsT = DefaultAddressTraits> struct ManagerHeader {
 

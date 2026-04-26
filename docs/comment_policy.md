@@ -35,6 +35,10 @@ Prohibited comment patterns:
 
 History belongs in Git, issues, and pull requests, not in the source tree.
 
+`include/pmm` block comments are reserved for code anchors. The anchor line must
+be lowercase, use `-` between name segments, and contain as many name segments as
+heading markers: `## pmm-type`, `### pmm-type-member`.
+
 ## Documentation
 
 Canonical docs are limited to these classes:

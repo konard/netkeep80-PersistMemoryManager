@@ -175,7 +175,7 @@ using MyMgr = pmm::PersistMemoryManager<MyConfig>;
 
 ### Решение
 
-Добавлен метод `reallocate_typed<T>(pptr<T> p, old_count, new_count)` в [PersistMemoryManager](../../include/pmm/persist_memory_manager.h#pmm::persistmemorymanager):
+Добавлен метод `reallocate_typed<T>(pptr<T> p, old_count, new_count)` в [PersistMemoryManager](../../include/pmm/persist_memory_manager.h#pmm-persistmemorymanager):
 
 ```cpp
 template <typename T>
@@ -186,12 +186,12 @@ static pptr<T> reallocate_typed( pptr<T> p, std::size_t old_count, std::size_t n
 1. **Одинаковый размер** — возврат того же pptr.
 2. **Уменьшение (shrink)** — обновление weight на месте; если остаток достаточен, он выделяется в новый свободный блок с коалесценцией с соседями.
 3. **Расширение (grow)** — если следующий блок свободен и его размер достаточен, расширение на месте (in-place absorb); иначе — fallback.
-4. **Fallback** — аллокация нового блока + `memmove` + деаллокация старого. Выполняется под одним мьютексом для совместимости с [NoLock](../../include/pmm/config.h#pmm::config::nolock).
+4. **Fallback** — аллокация нового блока + `memmove` + деаллокация старого. Выполняется под одним мьютексом для совместимости с [NoLock](../../include/pmm/config.h#pmm-config-nolock).
 
 **Ограничения:**
 - `T` должен быть `trivially_copyable` (проверка через `static_assert`).
 - При неудаче старый блок НЕ освобождается — вызывающий код сохраняет владение.
-- Для [AddressTraits](../../include/pmm/address_traits.h#pmm::addresstraits) с `sizeof(Block) % granule_size != 0` (SmallAddressTraits) in-place пути пропускаются, так как `resolve()` возвращает адрес, перекрывающий заголовок блока.
+- Для [AddressTraits](../../include/pmm/address_traits.h#pmm-addresstraits) с `sizeof(Block) % granule_size != 0` (SmallAddressTraits) in-place пути пропускаются, так как `resolve()` возвращает адрес, перекрывающий заголовок блока.
 
 ### Использование
 

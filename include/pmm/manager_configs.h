@@ -35,7 +35,7 @@ template <typename AddressTraitsT = DefaultAddressTraits,
           typename LoggingPolicyT = logging::NoLogging>
 
 /*
-## pmm::basicconfig
+## pmm-basicconfig
 */
 struct BasicConfig {
   static_assert(
@@ -63,7 +63,7 @@ template <typename AddressTraitsT, std::size_t BufferSize,
           std::size_t GrowNum = 3, std::size_t GrowDen = 2>
 
 /*
-## pmm::staticconfig
+## pmm-staticconfig
 */
 struct StaticConfig {
   static_assert(

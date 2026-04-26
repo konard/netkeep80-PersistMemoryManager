@@ -79,7 +79,7 @@ Every raw/user pointer → block transition is listed below with its validation.
 | 1 | Granule index → `Block*` | `detail::block_at<AT>()` | `idx != no_block` (assert) | Index range via `validate_block_index()` |
 | 2 | User pointer → `Block*` | `detail::header_from_ptr_t<AT>()` | null, min_addr, bounds, alignment, weight | — (already comprehensive) |
 | 3 | `pptr<T>` → `T*` | `resolve<T>()` | null, initialized, bounds | — |
-| 4 | `pptr<T>` → block raw ptr | `block_raw_ptr_from_pptr()` | Relies on [pptr](../include/pmm/pptr.h#pmm::pptr) validity | `validate_block_index()` |
+| 4 | `pptr<T>` → block raw ptr | `block_raw_ptr_from_pptr()` | Relies on [pptr](../include/pmm/pptr.h#pmm-pptr) validity | `validate_block_index()` |
 | 5 | Raw `void*` → `pptr<T>` | `make_pptr_from_raw<T>()` | Pointer provenance (allocated by us) | — |
 | 6 | Byte offset → `pptr<T>` | `pptr_from_byte_offset<T>()` | null, alignment, overflow | — |
 | 7 | Granule index → `void*` | `detail::resolve_granule_ptr<AT>()` | null-index sentinel | `validate_block_index()` |
@@ -110,7 +110,7 @@ The validation layer distinguishes three categories of invalid input:
 | Address correctness | Misaligned, index overflow, beyond image extent | Return `nullptr` / `false` (fast-path), report `InvalidPointer` or `Overflow` |
 | Header integrity | Inconsistent weight/root_offset, bad node_type, next/prev out of bounds | Report `BlockStateInconsistent` (verify/repair level) |
 
-These categories map to the existing [PmmError](../include/pmm/types.h#pmm::pmmerror) and [ViolationType](../include/pmm/diagnostics.h#pmm::violationtype) enums:
+These categories map to the existing [PmmError](../include/pmm/types.h#pmm-pmmerror) and [ViolationType](../include/pmm/diagnostics.h#pmm-violationtype) enums:
 
 - Pointer provenance / address correctness → `PmmError::InvalidPointer`, `PmmError::Overflow`
 - Header integrity → `ViolationType::BlockStateInconsistent`

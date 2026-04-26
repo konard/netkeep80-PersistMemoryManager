@@ -33,7 +33,7 @@ over it. PMM does not know `pjson` semantics or any upper-layer schema.
 |----|-----------|-----------------|------|
 | A1 | PMM = persistent address space manager; the only first-class abstractions are blocks, granule addressing, persistent pointers, and intrusive AVL-forest. | Enforced by API surface: `persist_memory_manager.h` exposes only allocator, container, and forest primitives. | All tests operate through the PMM API without upper-layer types. |
 | A2 | PMM does not interpret user-data payload. Block contents are opaque to the storage kernel. | `load()` restores structure (linked list, AVL tree, counters) but never inspects user data (`allocator_policy.h:303–399`). | `test_block_modernization.cpp` — "save_load_new_format" verifies data survives round-trip without kernel interpretation. |
-| A3 | AVL-forest is a first-class abstraction. The free-tree is the primary system domain; [pstringview](../include/pmm/pstringview.h#pmm::pstringview), [pmap](../include/pmm/pmap.h#pmm::pmap), and user domains are additional forest domains sharing the same AVL substrate. | `avl_tree_mixin.h` — shared AVL operations parameterized by `PPtr`/`IndexType`. [BlockPPtr](../include/pmm/avl_tree_mixin.h#pmm::detail::blockpptr) adapter enables free-tree to reuse the same substrate. | `test_issue243_free_tree_policy.cpp`, `test_avl_tree_view.cpp`, `test_issue153_pmap.cpp`, `test_issue151_pstringview.cpp`. |
+| A3 | AVL-forest is a first-class abstraction. The free-tree is the primary system domain; [pstringview](../include/pmm/pstringview.h#pmm-pstringview), [pmap](../include/pmm/pmap.h#pmm-pmap), and user domains are additional forest domains sharing the same AVL substrate. | `avl_tree_mixin.h` — shared AVL operations parameterized by `PPtr`/`IndexType`. [BlockPPtr](../include/pmm/avl_tree_mixin.h#pmm-detail-blockpptr) adapter enables free-tree to reuse the same substrate. | `test_issue243_free_tree_policy.cpp`, `test_avl_tree_view.cpp`, `test_issue153_pmap.cpp`, `test_issue151_pstringview.cpp`. |
 
 ---
 
@@ -60,15 +60,15 @@ Each block is an atom of the linear PAP **and** an atom of the intrusive forest.
 
 | ID | Invariant | Code checkpoint | Test |
 |----|-----------|-----------------|------|
-| B3a | `weight` is a universal `index_type` key/scalar whose semantics are determined by the owning forest domain. | Domain-specific interpretation: free-tree uses `weight` as state discriminator; [pmap](../include/pmm/pmap.h#pmm::pmap)/[pstringview](../include/pmm/pstringview.h#pmm::pstringview) use it as sort key. | `test_issue243_free_tree_policy.cpp`, `test_issue153_pmap.cpp`. |
-| B3b | In the free-tree domain: `weight == 0` means free block; `weight > 0` means allocated block (user data granule count). | [BlockStateBase::is_free()](../include/pmm/block_state.h#pmm::blockstatebase::is_free) and `is_allocated()` in `block_state.h`. [FreeBlock::cast_from_raw()](../include/pmm/block_state.h#pmm::freeblock::cast_from_raw) asserts `weight == 0` (`block_state.h:406`). | `test_block_state.cpp` — "is_free / is_allocated", "FreeBlock cast_from_raw and verify_invariants". |
+| B3a | `weight` is a universal `index_type` key/scalar whose semantics are determined by the owning forest domain. | Domain-specific interpretation: free-tree uses `weight` as state discriminator; [pmap](../include/pmm/pmap.h#pmm-pmap)/[pstringview](../include/pmm/pstringview.h#pmm-pstringview) use it as sort key. | `test_issue243_free_tree_policy.cpp`, `test_issue153_pmap.cpp`. |
+| B3b | In the free-tree domain: `weight == 0` means free block; `weight > 0` means allocated block (user data granule count). | [BlockStateBase::is_free()](../include/pmm/block_state.h#pmm-blockstatebase-is_free) and `is_allocated()` in `block_state.h`. [FreeBlock::cast_from_raw()](../include/pmm/block_state.h#pmm-freeblock-cast_from_raw) asserts `weight == 0` (`block_state.h:406`). | `test_block_state.cpp` — "is_free / is_allocated", "FreeBlock cast_from_raw and verify_invariants". |
 
 ### B4. Root offset
 
 | ID | Invariant | Code checkpoint | Test |
 |----|-----------|-----------------|------|
-| B4a | `root_offset` is the owner-domain / owner-tree marker of the intrusive tree-slot. | [BlockStateBase::verify_state()](../include/pmm/block_state.h#pmm::blockstatebase::verify_state) in `block_state.h:183–197` checks consistency with `weight`. | `test_issue245_verify_repair.cpp` — "verify detects block state inconsistency". |
-| B4b | Free block: `root_offset == 0`. Allocated block: `root_offset == own_granule_index`. | [FreeBlock::verify_invariants()](../include/pmm/block_state.h#pmm::freeblock::verify_invariants) (`block_state.h:428`), [AllocatedBlock::verify_invariants()](../include/pmm/block_state.h#pmm::allocatedblock::verify_invariants) (`block_state.h:637`). `recover_state()` fixes violations (`block_state.h:162–171`). | `test_block_state.cpp` — "FreeBlock cast_from_raw and verify_invariants", "AllocatedBlock cast_from_raw and verify_invariants", "recover_block_state". |
+| B4a | `root_offset` is the owner-domain / owner-tree marker of the intrusive tree-slot. | [BlockStateBase::verify_state()](../include/pmm/block_state.h#pmm-blockstatebase-verify_state) in `block_state.h:183–197` checks consistency with `weight`. | `test_issue245_verify_repair.cpp` — "verify detects block state inconsistency". |
+| B4b | Free block: `root_offset == 0`. Allocated block: `root_offset == own_granule_index`. | [FreeBlock::verify_invariants()](../include/pmm/block_state.h#pmm-freeblock-verify_invariants) (`block_state.h:428`), [AllocatedBlock::verify_invariants()](../include/pmm/block_state.h#pmm-allocatedblock-verify_invariants) (`block_state.h:637`). `recover_state()` fixes violations (`block_state.h:162–171`). | `test_block_state.cpp` — "FreeBlock cast_from_raw and verify_invariants", "AllocatedBlock cast_from_raw and verify_invariants", "recover_block_state". |
 
 ### B5. Node type
 
@@ -103,14 +103,14 @@ Each block is an atom of the linear PAP **and** an atom of the intrusive forest.
 
 | ID | Invariant | Code checkpoint | Test |
 |----|-----------|-----------------|------|
-| C2a | The [ForestDomainRegistry](../include/pmm/forest_registry.h#pmm::detail::forestdomainregistry) is a persistent locked block containing up to 32 domain slots. Its granule index is stored in `ManagerHeader::root_offset`. | `bootstrap_forest_registry_unlocked()` allocates and locks the registry. `validate_bootstrap_invariants_unlocked()` checks `hdr->root_offset` matches the registry domain root. | `test_issue241_bootstrap.cpp` — "bootstrap invariants hold after save/load". `test_forest_registry.cpp` — "forest registry persists user domains and root". |
-| C2b | [ForestDomainRegistry](../include/pmm/forest_registry.h#pmm::detail::forestdomainregistry) has magic `0x50465247` ("PFRG") and version 1. | `validate_or_bootstrap_forest_registry_unlocked()` in `forest_domain_mixin.inc:397–451` validates magic and version. `verify_forest_registry_unlocked()` in `verify_repair_mixin.inc:64–95`. | `test_issue245_verify_repair.cpp` — "verify detects forest registry corruption". |
+| C2a | The [ForestDomainRegistry](../include/pmm/forest_registry.h#pmm-detail-forestdomainregistry) is a persistent locked block containing up to 32 domain slots. Its granule index is stored in `ManagerHeader::root_offset`. | `bootstrap_forest_registry_unlocked()` allocates and locks the registry. `validate_bootstrap_invariants_unlocked()` checks `hdr->root_offset` matches the registry domain root. | `test_issue241_bootstrap.cpp` — "bootstrap invariants hold after save/load". `test_forest_registry.cpp` — "forest registry persists user domains and root". |
+| C2b | [ForestDomainRegistry](../include/pmm/forest_registry.h#pmm-detail-forestdomainregistry) has magic `0x50465247` ("PFRG") and version 1. | `validate_or_bootstrap_forest_registry_unlocked()` in `forest_domain_mixin.inc:397–451` validates magic and version. `verify_forest_registry_unlocked()` in `verify_repair_mixin.inc:64–95`. | `test_issue245_verify_repair.cpp` — "verify detects forest registry corruption". |
 
 ### C3. Symbol dictionary
 
 | ID | Invariant | Code checkpoint | Test |
 |----|-----------|-----------------|------|
-| C3a | The symbol dictionary is a [pstringview](../include/pmm/pstringview.h#pmm::pstringview) AVL tree registered as the `system/symbols` domain. All system domain names are interned as permanently locked blocks (`kNodeReadOnly`). | `bootstrap_system_symbols_unlocked()` in `forest_domain_mixin.inc`. `validate_bootstrap_invariants_unlocked()` checks non-zero symbol dictionary root and non-zero `symbol_offset` for each system domain. | `test_issue241_bootstrap.cpp` — checks system symbol names are discoverable. `test_forest_registry.cpp` — symbols survive save/load. |
+| C3a | The symbol dictionary is a [pstringview](../include/pmm/pstringview.h#pmm-pstringview) AVL tree registered as the `system/symbols` domain. All system domain names are interned as permanently locked blocks (`kNodeReadOnly`). | `bootstrap_system_symbols_unlocked()` in `forest_domain_mixin.inc`. `validate_bootstrap_invariants_unlocked()` checks non-zero symbol dictionary root and non-zero `symbol_offset` for each system domain. | `test_issue241_bootstrap.cpp` — checks system symbol names are discoverable. `test_forest_registry.cpp` — symbols survive save/load. |
 
 ---
 
@@ -120,7 +120,7 @@ Each block is an atom of the linear PAP **and** an atom of the intrusive forest.
 
 | ID | Invariant | Code checkpoint | Test |
 |----|-----------|-----------------|------|
-| D1a | [ManagerHeader](../include/pmm/types.h#pmm::detail::managerheader) (Block_0) with valid magic, `total_size`, `granule_size`, and `root_offset` pointing to the forest registry. | `init_layout()` in `layout_mixin.inc`. `validate_bootstrap_invariants_unlocked()` verifies all header fields. | `test_issue241_bootstrap.cpp` — "bootstrap invariants hold after create(size)". |
+| D1a | [ManagerHeader](../include/pmm/types.h#pmm-detail-managerheader) (Block_0) with valid magic, `total_size`, `granule_size`, and `root_offset` pointing to the forest registry. | `init_layout()` in `layout_mixin.inc`. `validate_bootstrap_invariants_unlocked()` verifies all header fields. | `test_issue241_bootstrap.cpp` — "bootstrap invariants hold after create(size)". |
 | D1b | At least one free block (Block_1) spanning remaining space, inserted into the free-tree. | After `init_layout()`, Block_1 is the free-tree root. | `test_allocate.cpp` — "create_basic". |
 | D1c | Forest domain registry, three system domains, and symbol dictionary — all as permanently locked blocks. | `bootstrap_forest_registry_unlocked()` + `bootstrap_system_symbols_unlocked()` + `validate_bootstrap_invariants_unlocked()`. | `test_issue241_bootstrap.cpp`, `test_forest_registry.cpp`. |
 | D1d | Bootstrap is deterministic: identical `create(N)` calls produce identical block layouts, binding IDs, and symbol offsets. | Enforced by sequential bootstrap order. | `test_issue241_bootstrap.cpp` — "bootstrap is deterministic". |
@@ -153,7 +153,7 @@ Each block is an atom of the linear PAP **and** an atom of the intrusive forest.
 
 | ID | Invariant | Code checkpoint | Test |
 |----|-----------|-----------------|------|
-| E3a | `find_best_fit()` returns the smallest free block with `block_size >= needed_granules`. O(log n). | [AvlFreeTree::find_best_fit()](../include/pmm/free_block_tree.h#pmm::avlfreetree::find_best_fit) in `free_block_tree.h`. | `test_issue243_free_tree_policy.cpp` — "find_best_fit selects minimum fitting block". |
+| E3a | `find_best_fit()` returns the smallest free block with `block_size >= needed_granules`. O(log n). | [AvlFreeTree::find_best_fit()](../include/pmm/free_block_tree.h#pmm-avlfreetree-find_best_fit) in `free_block_tree.h`. | `test_issue243_free_tree_policy.cpp` — "find_best_fit selects minimum fitting block". |
 
 ### E4. Free-tree root storage
 
@@ -169,22 +169,22 @@ Each block is an atom of the linear PAP **and** an atom of the intrusive forest.
 
 | ID | Invariant | Code checkpoint | Test |
 |----|-----------|-----------------|------|
-| F1a | `verify()` is a read-only diagnostic pass. It reports violations via [VerifyResult](../include/pmm/diagnostics.h#pmm::verifyresult) but never modifies the image. | `verify()` in `verify_repair_mixin.inc` calls `verify_linked_list()`, `verify_counters()`, `verify_block_states()`, `verify_free_tree()`, `verify_forest_registry_unlocked()` — all read-only. | `test_issue245_verify_repair.cpp` — "verify does not modify the image". |
-| F1b | [VerifyResult](../include/pmm/diagnostics.h#pmm::verifyresult) reports up to 64 diagnostic entries with [ViolationType](../include/pmm/diagnostics.h#pmm::violationtype), affected block index, expected/actual values, and [DiagnosticAction](../include/pmm/diagnostics.h#pmm::diagnosticaction). | `diagnostics.h:74–105` — [VerifyResult](../include/pmm/diagnostics.h#pmm::verifyresult) struct. | `test_issue245_verify_repair.cpp` — "DiagnosticEntry fields populated". |
+| F1a | `verify()` is a read-only diagnostic pass. It reports violations via [VerifyResult](../include/pmm/diagnostics.h#pmm-verifyresult) but never modifies the image. | `verify()` in `verify_repair_mixin.inc` calls `verify_linked_list()`, `verify_counters()`, `verify_block_states()`, `verify_free_tree()`, `verify_forest_registry_unlocked()` — all read-only. | `test_issue245_verify_repair.cpp` — "verify does not modify the image". |
+| F1b | [VerifyResult](../include/pmm/diagnostics.h#pmm-verifyresult) reports up to 64 diagnostic entries with [ViolationType](../include/pmm/diagnostics.h#pmm-violationtype), affected block index, expected/actual values, and [DiagnosticAction](../include/pmm/diagnostics.h#pmm-diagnosticaction). | `diagnostics.h:74–105` — [VerifyResult](../include/pmm/diagnostics.h#pmm-verifyresult) struct. | `test_issue245_verify_repair.cpp` — "DiagnosticEntry fields populated". |
 
 ### F2. Repair does not masquerade as verify/load
 
 | ID | Invariant | Code checkpoint | Test |
 |----|-----------|-----------------|------|
-| F2a | Repair is performed only during `load()` and is explicitly documented in [VerifyResult](../include/pmm/diagnostics.h#pmm::verifyresult) with `DiagnosticAction::Repaired` or `DiagnosticAction::Rebuilt`. | `load(VerifyResult&)` in `verify_repair_mixin.inc` runs repair phases and records each action. | `test_issue245_verify_repair.cpp` — "load(VerifyResult&) reports repairs directly", "Repaired vs Rebuilt distinction". |
+| F2a | Repair is performed only during `load()` and is explicitly documented in [VerifyResult](../include/pmm/diagnostics.h#pmm-verifyresult) with `DiagnosticAction::Repaired` or `DiagnosticAction::Rebuilt`. | `load(VerifyResult&)` in `verify_repair_mixin.inc` runs repair phases and records each action. | `test_issue245_verify_repair.cpp` — "load(VerifyResult&) reports repairs directly", "Repaired vs Rebuilt distinction". |
 | F2b | Unrecoverable corruption (invalid magic, wrong granule size) is reported as `DiagnosticAction::Aborted`. Load returns failure. | `verify_repair_mixin.inc:26–41` — header validation. | `test_issue245_verify_repair.cpp` — "Aborted action on header corruption". |
 
 ### F3. Corruption is diagnosed, not masked
 
 | ID | Invariant | Code checkpoint | Test |
 |----|-----------|-----------------|------|
-| F3a | Every repair action is recorded in [VerifyResult](../include/pmm/diagnostics.h#pmm::verifyresult). No silent fixes. | All repair methods in `allocator_policy.h` and `verify_repair_mixin.inc` add entries to [VerifyResult](../include/pmm/diagnostics.h#pmm::verifyresult). | `test_issue245_verify_repair.cpp` — all repair tests check [VerifyResult](../include/pmm/diagnostics.h#pmm::verifyresult) entries. |
-| F3b | [ViolationType](../include/pmm/diagnostics.h#pmm::violationtype) enum exhaustively covers: `BlockStateInconsistent`, `PrevOffsetMismatch`, `CounterMismatch`, `FreeTreeStale`, `ForestRegistryMissing`, `ForestDomainMissing`, `ForestDomainFlagsMissing`, `HeaderCorruption`. | `diagnostics.h:35–47`. | `test_issue245_verify_repair.cpp` — tests for each violation type. |
+| F3a | Every repair action is recorded in [VerifyResult](../include/pmm/diagnostics.h#pmm-verifyresult). No silent fixes. | All repair methods in `allocator_policy.h` and `verify_repair_mixin.inc` add entries to [VerifyResult](../include/pmm/diagnostics.h#pmm-verifyresult). | `test_issue245_verify_repair.cpp` — all repair tests check [VerifyResult](../include/pmm/diagnostics.h#pmm-verifyresult) entries. |
+| F3b | [ViolationType](../include/pmm/diagnostics.h#pmm-violationtype) enum exhaustively covers: `BlockStateInconsistent`, `PrevOffsetMismatch`, `CounterMismatch`, `FreeTreeStale`, `ForestRegistryMissing`, `ForestDomainMissing`, `ForestDomainFlagsMissing`, `HeaderCorruption`. | `diagnostics.h:35–47`. | `test_issue245_verify_repair.cpp` — tests for each violation type. |
 
 ---
 
@@ -199,7 +199,7 @@ These are enforced by `static_assert` and are always checked at build time:
 | S3 | `TreeNode<DefaultAddressTraits>` size == 5 × `sizeof(uint32_t)` + 4 | `types.h:163` |
 | S4 | `kGranuleSize` is power of 2, equals `DefaultAddressTraits::granule_size` | `types.h:62–63` |
 | S5 | `BlockStateBase<AT>` is binary-compatible with `Block<AT>` | `block_state.h:369–372` |
-| S6 | [ForestDomainRecord](../include/pmm/forest_registry.h#pmm::detail::forestdomainrecord) is trivially copyable; [ForestDomainRegistry](../include/pmm/forest_registry.h#pmm::detail::forestdomainregistry) is nothrow-default-constructible | `forest_registry.h:206–209` |
+| S6 | [ForestDomainRecord](../include/pmm/forest_registry.h#pmm-detail-forestdomainrecord) is trivially copyable; [ForestDomainRegistry](../include/pmm/forest_registry.h#pmm-detail-forestdomainregistry) is nothrow-default-constructible | `forest_registry.h:206–209` |
 | S7 | Address traits: `IndexT` unsigned, `GranuleSz >= 4`, `GranuleSz` power of 2 | `address_traits.h:63–65` |
 
 ---
@@ -223,5 +223,5 @@ Forbidden states (must never appear in a persisted image):
 | > 0 | 0 | **Never valid** — `recover_state()` sets `root_offset = own_idx` |
 | > 0 | != own_idx | **Never valid** — `recover_state()` sets `root_offset = own_idx` |
 
-Code: [BlockStateBase::recover_state()](../include/pmm/block_state.h#pmm::blockstatebase::recover_state) (`block_state.h:162–171`).
+Code: [BlockStateBase::recover_state()](../include/pmm/block_state.h#pmm-blockstatebase-recover_state) (`block_state.h:162–171`).
 Test: `test_block_state.cpp` — "recover_block_state".

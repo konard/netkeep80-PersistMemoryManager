@@ -92,7 +92,7 @@ static void avl_set_child(PPtr parent, PPtr old_child, PPtr new_child,
 }
 
 /*
-### pmm::detail::avlupdateheightonly
+### pmm-detail-avlupdateheightonly
 */
 struct AvlUpdateHeightOnly {
   template <typename PPtr> void operator()(PPtr p) const noexcept {
@@ -408,7 +408,7 @@ static bool forest_domain_validate_node(const Domain &domain,
 }
 
 /*
-### pmm::detail::forestdomainviewops
+### pmm-detail-forestdomainviewops
 */
 template <ForestDomainViewDescriptor Domain> struct ForestDomainViewOps {
 
@@ -421,18 +421,18 @@ template <ForestDomainViewDescriptor Domain> struct ForestDomainViewOps {
   Domain domain;
 
   /*
-#### pmm::detail::forestdomainviewops::forestdomainviewops
+#### pmm-detail-forestdomainviewops-forestdomainviewops
 */
   constexpr explicit ForestDomainViewOps(Domain d = Domain{}) noexcept
       : domain(d) {}
 
   /*
-#### pmm::detail::forestdomainviewops::name
+#### pmm-detail-forestdomainviewops-name
 */
   const char *name() const noexcept { return domain.name(); }
 
   /*
-#### pmm::detail::forestdomainviewops::root_index
+#### pmm-detail-forestdomainviewops-root_index
 */
   index_type root_index() const noexcept { return domain.root_index(); }
 
@@ -440,7 +440,7 @@ template <ForestDomainViewDescriptor Domain> struct ForestDomainViewOps {
     requires ForestDomainDescriptorForKey<Domain, Key>
 
   /*
-#### pmm::detail::forestdomainviewops::find
+#### pmm-detail-forestdomainviewops-find
 */
   node_pptr find(const Key &key) const noexcept {
     return avl_find<node_pptr>(
@@ -453,7 +453,7 @@ template <ForestDomainViewDescriptor Domain> struct ForestDomainViewOps {
 };
 
 /*
-### pmm::detail::forestdomainops
+### pmm-detail-forestdomainops
 */
 template <ForestDomainDescriptor Domain>
 struct ForestDomainOps : ForestDomainViewOps<Domain> {
@@ -471,20 +471,20 @@ struct ForestDomainOps : ForestDomainViewOps<Domain> {
   using view_base::root_index;
 
   /*
-#### pmm::detail::forestdomainops::forestdomainops
+#### pmm-detail-forestdomainops-forestdomainops
 */
   constexpr explicit ForestDomainOps(Domain d = Domain{}) noexcept
       : view_base(d) {}
 
   /*
-#### pmm::detail::forestdomainops::root_index_ptr
+#### pmm-detail-forestdomainops-root_index_ptr
 */
   index_type *root_index_ptr() noexcept {
     return this->domain.root_index_ptr();
   }
 
   /*
-#### pmm::detail::forestdomainops::reset_root
+#### pmm-detail-forestdomainops-reset_root
 */
   bool reset_root() noexcept {
 
@@ -497,7 +497,7 @@ struct ForestDomainOps : ForestDomainViewOps<Domain> {
   }
 
   /*
-#### pmm::detail::forestdomainops::insert
+#### pmm-detail-forestdomainops-insert
 */
   void insert(node_pptr new_node) noexcept {
     index_type *root = this->domain.root_index_ptr();
@@ -523,7 +523,7 @@ struct ForestDomainOps : ForestDomainViewOps<Domain> {
 };
 
 /*
-### pmm::detail::blockpptrmanagertag
+### pmm-detail-blockpptrmanagertag
 */
 template <typename AddressTraitsT> struct BlockPPtrManagerTag {
 
@@ -531,7 +531,7 @@ template <typename AddressTraitsT> struct BlockPPtrManagerTag {
 };
 
 /*
-### pmm::detail::blocktreenodeproxy
+### pmm-detail-blocktreenodeproxy
 */
 template <typename AddressTraitsT> struct BlockTreeNodeProxy {
 
@@ -540,61 +540,61 @@ template <typename AddressTraitsT> struct BlockTreeNodeProxy {
   void *_blk;
 
   /*
-#### pmm::detail::blocktreenodeproxy::blocktreenodeproxy
+#### pmm-detail-blocktreenodeproxy-blocktreenodeproxy
 */
   explicit BlockTreeNodeProxy(void *blk) noexcept : _blk(blk) {}
 
   /*
-#### pmm::detail::blocktreenodeproxy::get_left
+#### pmm-detail-blocktreenodeproxy-get_left
 */
   index_type get_left() const noexcept {
     return BlockStateBase<AddressTraitsT>::get_left_offset(_blk);
   }
 
   /*
-#### pmm::detail::blocktreenodeproxy::get_right
+#### pmm-detail-blocktreenodeproxy-get_right
 */
   index_type get_right() const noexcept {
     return BlockStateBase<AddressTraitsT>::get_right_offset(_blk);
   }
 
   /*
-#### pmm::detail::blocktreenodeproxy::get_parent
+#### pmm-detail-blocktreenodeproxy-get_parent
 */
   index_type get_parent() const noexcept {
     return BlockStateBase<AddressTraitsT>::get_parent_offset(_blk);
   }
 
   /*
-#### pmm::detail::blocktreenodeproxy::get_height
+#### pmm-detail-blocktreenodeproxy-get_height
 */
   std::int16_t get_height() const noexcept {
     return BlockStateBase<AddressTraitsT>::get_avl_height(_blk);
   }
 
   /*
-#### pmm::detail::blocktreenodeproxy::set_left
+#### pmm-detail-blocktreenodeproxy-set_left
 */
   void set_left(index_type v) noexcept {
     BlockStateBase<AddressTraitsT>::set_left_offset_of(_blk, v);
   }
 
   /*
-#### pmm::detail::blocktreenodeproxy::set_right
+#### pmm-detail-blocktreenodeproxy-set_right
 */
   void set_right(index_type v) noexcept {
     BlockStateBase<AddressTraitsT>::set_right_offset_of(_blk, v);
   }
 
   /*
-#### pmm::detail::blocktreenodeproxy::set_parent
+#### pmm-detail-blocktreenodeproxy-set_parent
 */
   void set_parent(index_type v) noexcept {
     BlockStateBase<AddressTraitsT>::set_parent_offset_of(_blk, v);
   }
 
   /*
-#### pmm::detail::blocktreenodeproxy::set_height
+#### pmm-detail-blocktreenodeproxy-set_height
 */
   void set_height(std::int16_t v) noexcept {
     BlockStateBase<AddressTraitsT>::set_avl_height_of(_blk, v);
@@ -602,7 +602,7 @@ template <typename AddressTraitsT> struct BlockTreeNodeProxy {
 };
 
 /*
-### pmm::detail::blockpptr
+### pmm-detail-blockpptr
 */
 template <typename AddressTraitsT> struct BlockPPtr {
 
@@ -615,7 +615,7 @@ template <typename AddressTraitsT> struct BlockPPtr {
   index_type _idx;
 
   /*
-#### pmm::detail::blockpptr::blockpptr
+#### pmm-detail-blockpptr-blockpptr
 */
   BlockPPtr() noexcept : _base(nullptr), _idx(AddressTraitsT::no_block) {}
 
@@ -623,12 +623,12 @@ template <typename AddressTraitsT> struct BlockPPtr {
       : _base(base), _idx(idx) {}
 
   /*
-#### pmm::detail::blockpptr::is_null
+#### pmm-detail-blockpptr-is_null
 */
   bool is_null() const noexcept { return _idx == AddressTraitsT::no_block; }
 
   /*
-#### pmm::detail::blockpptr::offset
+#### pmm-detail-blockpptr-offset
 */
   index_type offset() const noexcept { return _idx; }
 
@@ -641,7 +641,7 @@ template <typename AddressTraitsT> struct BlockPPtr {
   }
 
   /*
-#### pmm::detail::blockpptr::tree_node
+#### pmm-detail-blockpptr-tree_node
 */
   BlockTreeNodeProxy<AddressTraitsT> tree_node() const noexcept {
     return BlockTreeNodeProxy<AddressTraitsT>(
@@ -657,7 +657,7 @@ pptr_make(BlockPPtr<AddressTraitsT> source,
 }
 
 /*
-### pmm::detail::avlinorderiterator
+### pmm-detail-avlinorderiterator
 */
 template <typename NodePPtr> struct AvlInorderIterator {
 
@@ -673,7 +673,7 @@ template <typename NodePPtr> struct AvlInorderIterator {
   index_type _current_idx;
 
   /*
-#### pmm::detail::avlinorderiterator::avlinorderiterator
+#### pmm-detail-avlinorderiterator-avlinorderiterator
 */
   AvlInorderIterator() noexcept : _current_idx(static_cast<index_type>(0)) {}
   explicit AvlInorderIterator(index_type idx) noexcept : _current_idx(idx) {}
@@ -687,7 +687,7 @@ template <typename NodePPtr> struct AvlInorderIterator {
   }
 
   /*
-#### pmm::detail::avlinorderiterator::operator_deref
+#### pmm-detail-avlinorderiterator-operator_deref
 */
   NodePPtr operator*() const noexcept {
     if (_current_idx == static_cast<index_type>(0) || _current_idx == no_block)
@@ -696,7 +696,7 @@ template <typename NodePPtr> struct AvlInorderIterator {
   }
 
   /*
-#### pmm::detail::avlinorderiterator::operator_increment
+#### pmm-detail-avlinorderiterator-operator_increment
 */
   AvlInorderIterator &operator++() noexcept {
     if (_current_idx == static_cast<index_type>(0) || _current_idx == no_block)

@@ -25,14 +25,14 @@
 namespace pmm {
 
 /*
-## pmm::mmapstorage
+## pmm-mmapstorage
 */
 template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage {
 public:
   using address_traits = AddressTraitsT;
 
   /*
-### pmm::mmapstorage::mmapstorage
+### pmm-mmapstorage-mmapstorage
 */
   MMapStorage() noexcept = default;
 
@@ -70,7 +70,7 @@ public:
   ~MMapStorage() { close(); }
 
   /*
-### pmm::mmapstorage::open
+### pmm-mmapstorage-open
 */
   bool open(const char *path, std::size_t size_bytes) noexcept {
     if (_mapped)
@@ -86,7 +86,7 @@ public:
   }
 
   /*
-### pmm::mmapstorage::close
+### pmm-mmapstorage-close
 */
   void close() noexcept {
     if (!_mapped)
@@ -100,23 +100,23 @@ public:
   }
 
   /*
-### pmm::mmapstorage::is_open
+### pmm-mmapstorage-is_open
 */
   bool is_open() const noexcept { return _mapped; }
 
   /*
-### pmm::mmapstorage::base_ptr
+### pmm-mmapstorage-base_ptr
 */
   std::uint8_t *base_ptr() noexcept { return _base; }
   const std::uint8_t *base_ptr() const noexcept { return _base; }
 
   /*
-### pmm::mmapstorage::total_size
+### pmm-mmapstorage-total_size
 */
   std::size_t total_size() const noexcept { return _size; }
 
   /*
-### pmm::mmapstorage::expand
+### pmm-mmapstorage-expand
 */
   bool expand(std::size_t additional_bytes) noexcept {
     if (!_mapped || additional_bytes == 0)
@@ -134,7 +134,7 @@ public:
   }
 
   /*
-### pmm::mmapstorage::owns_memory
+### pmm-mmapstorage-owns_memory
 */
   bool owns_memory() const noexcept { return false; }
 
@@ -150,7 +150,7 @@ private:
   HANDLE _map_handle = nullptr;
 
   /*
-### pmm::mmapstorage::open_impl
+### pmm-mmapstorage-open_impl
 */
   bool open_impl(const char *path, std::size_t size_bytes) noexcept {
 
@@ -207,7 +207,7 @@ private:
   }
 
   /*
-### pmm::mmapstorage::close_impl
+### pmm-mmapstorage-close_impl
 */
   void close_impl() noexcept {
     if (_base != nullptr) {
@@ -225,7 +225,7 @@ private:
   }
 
   /*
-### pmm::mmapstorage::expand_impl
+### pmm-mmapstorage-expand_impl
 */
   bool expand_impl(std::size_t new_size) noexcept {
 
@@ -292,7 +292,7 @@ private:
       return false;
 
     /*
-### pmm::mmapstorage::stat
+### pmm-mmapstorage-stat
 */
     struct stat st {};
     if (::fstat(_fd, &st) != 0) {

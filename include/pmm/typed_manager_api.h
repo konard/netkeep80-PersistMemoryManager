@@ -15,7 +15,7 @@
 namespace pmm::detail {
 
 /*
-### pmm::detail::persistmemorytypedapi
+### pmm-detail-persistmemorytypedapi
 */
 template <typename ManagerT> class PersistMemoryTypedApi {
 public:
@@ -55,7 +55,7 @@ public:
   template <typename T>
 
   /*
-#### pmm::detail::persistmemorytypedapi::reallocate_typed
+#### pmm-detail-persistmemorytypedapi-reallocate_typed
 */
   static pmm::pptr<T, ManagerT>
   reallocate_typed(pmm::pptr<T, ManagerT> p, std::size_t old_count,
