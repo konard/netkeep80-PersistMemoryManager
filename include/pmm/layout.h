@@ -1,97 +1,61 @@
 #pragma once
-
 #include "pmm/block.h"
 #include "pmm/block_state.h"
 #include "pmm/types.h"
-
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-
 namespace pmm::detail {
-
 /*
 ### pmm-detail-managerlayoutops
 */
 template <typename ManagerAccess> struct ManagerLayoutOps {
-
   using address_traits = typename ManagerAccess::address_traits;
-
   using free_block_tree = typename ManagerAccess::free_block_tree;
-
   using index_type = typename address_traits::index_type;
-
   using logging_policy = typename ManagerAccess::logging_policy;
-
   using storage_backend = typename ManagerAccess::storage_backend;
-
   using BlockState = BlockStateBase<address_traits>;
-
   /*
 #### pmm-detail-managerlayoutops-init_layout
 */
   static bool init_layout(storage_backend &backend, std::uint8_t *base,
                           std::size_t size) noexcept {
-
     static constexpr index_type kHdrBlkIdx = 0;
-
     static constexpr index_type kFreeBlkIdx = ManagerAccess::kFreeBlkIdxLayout;
-
     static constexpr std::size_t kGranSz = address_traits::granule_size;
-
     static constexpr std::size_t kMinBlockDataSize = kGranSz;
     if (static_cast<std::size_t>(kFreeBlkIdx) * kGranSz +
             sizeof(Block<address_traits>) + kMinBlockDataSize >
         size)
       return false;
-
     void *hdr_blk = base;
-
     std::memset(hdr_blk, 0, ManagerAccess::kBlockHdrByteSize);
-
     BlockState::init_fields(hdr_blk, address_traits::no_block, kFreeBlkIdx, 0,
                             ManagerAccess::kMgrHdrGranules, kHdrBlkIdx);
-
     ManagerHeader<address_traits> *hdr = ManagerAccess::get_header(base);
     std::memset(hdr, 0, sizeof(ManagerHeader<address_traits>));
-
     hdr->magic = ManagerAccess::kMagic;
-
     hdr->total_size = size;
-
     hdr->first_block_offset = kHdrBlkIdx;
-
     hdr->last_block_offset = address_traits::no_block;
-
     hdr->free_tree_root = address_traits::no_block;
-
     hdr->image_version = kCurrentImageVersion;
-
     hdr->granule_size = static_cast<std::uint16_t>(kGranSz);
-
     hdr->root_offset = address_traits::no_block;
-
     void *blk = base + static_cast<std::size_t>(kFreeBlkIdx) * kGranSz;
     std::memset(blk, 0, sizeof(Block<address_traits>));
     BlockState::init_fields(blk, kHdrBlkIdx, address_traits::no_block, 1, 0, 0);
-
     hdr->last_block_offset = kFreeBlkIdx;
     hdr->free_tree_root = kFreeBlkIdx;
-
     hdr->block_count = 2;
-
     hdr->free_count = 1;
-
     hdr->alloc_count = 1;
-
     hdr->used_size = kFreeBlkIdx + ManagerAccess::kBlockHdrGranules;
-
     (void)backend;
-
     ManagerAccess::set_initialized();
     return true;
   }
-
   /*
 #### pmm-detail-managerlayoutops-do_expand
 */
@@ -99,50 +63,37 @@ template <typename ManagerAccess> struct ManagerLayoutOps {
                         std::size_t user_size) noexcept {
     if (!initialized)
       return false;
-
     std::uint8_t *base = backend.base_ptr();
     ManagerHeader<address_traits> *hdr = ManagerAccess::get_header(base);
     std::size_t old_size = hdr->total_size;
-
     static constexpr std::size_t kGranSz = address_traits::granule_size;
-
     index_type data_gran_need = bytes_to_granules_t<address_traits>(user_size);
     if (data_gran_need == 0)
-
       data_gran_need = 1;
     std::size_t min_need =
         static_cast<std::size_t>(ManagerAccess::kBlockHdrGranules +
                                  data_gran_need +
                                  ManagerAccess::kBlockHdrGranules) *
-
         kGranSz;
     std::size_t growth = old_size / 4;
     if (growth < min_need)
-
       growth = min_need;
-
     if (!backend.expand(growth))
       return false;
-
     std::uint8_t *new_base = backend.base_ptr();
     std::size_t new_size = backend.total_size();
     if (new_base == nullptr || new_size <= old_size)
       return false;
-
     logging_policy::on_expand(old_size, new_size);
     hdr = ManagerAccess::get_header(new_base);
-
     index_type extra_idx = byte_off_to_idx_t<address_traits>(old_size);
     std::size_t extra_size = new_size - old_size;
-
     void *last_blk_raw =
         (hdr->last_block_offset != address_traits::no_block)
-
             ? static_cast<void *>(
                   new_base +
                   static_cast<std::size_t>(hdr->last_block_offset) * kGranSz)
             : nullptr;
-
     if (last_blk_raw != nullptr && BlockState::get_weight(last_blk_raw) == 0) {
       Block<address_traits> *last_blk =
           reinterpret_cast<Block<address_traits> *>(last_blk_raw);
@@ -177,5 +128,4 @@ template <typename ManagerAccess> struct ManagerLayoutOps {
     return true;
   }
 };
-
 }

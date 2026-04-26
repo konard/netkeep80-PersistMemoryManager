@@ -1,5 +1,4 @@
 #pragma once
-
 #if defined(_MSVC_LANG)
 #if _MSVC_LANG < 202002L
 #error "pmm.h requires C++20 or later. Please compile with /std:c++20 on MSVC."
@@ -7,7 +6,6 @@
 #elif __cplusplus < 202002L
 #error "pmm.h requires C++20 or later. Please compile with -std=c++20."
 #endif
-
 #include "pmm/allocator_policy.h"
 #include "pmm/block.h"
 #include "pmm/block_state.h"
@@ -24,7 +22,6 @@
 #include "pmm/pstringview.h"
 #include "pmm/typed_manager_api.h"
 #include "pmm/types.h"
-
 #include <atomic>
 #include <cassert>
 #include <cstddef>
@@ -33,27 +30,20 @@
 #include <cstring>
 #include <limits>
 #include <new>
-
 namespace pmm {
-
 namespace detail {
-
 /*
 ### pmm-detail-config_logging_policy
 */
 template <typename C, typename = void> struct config_logging_policy {
-
   using type = logging::NoLogging;
 };
 template <typename C>
 struct config_logging_policy<C, std::void_t<typename C::logging_policy>> {
-
   using type = typename C::logging_policy;
 };
 }
-
 template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0>
-
 /*
 ## pmm-persistmemorymanager
 */
@@ -61,80 +51,56 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<
                                  PersistMemoryManager<ConfigT, InstanceId>> {
 public:
   using address_traits = typename ConfigT::address_traits;
-
   using storage_backend = typename ConfigT::storage_backend;
-
   using free_block_tree = typename ConfigT::free_block_tree;
-
   using thread_policy = typename ConfigT::lock_policy;
-
   using logging_policy = typename detail::config_logging_policy<ConfigT>::type;
-
   using allocator = AllocatorPolicy<free_block_tree, address_traits>;
-
   using index_type = typename address_traits::index_type;
-
   using forest_registry = detail::ForestDomainRegistry<address_traits>;
-
   using forest_domain = detail::ForestDomainRecord<address_traits>;
-
   using manager_type = PersistMemoryManager<ConfigT, InstanceId>;
-
   template <typename> friend struct pstringview;
   template <typename, typename, typename> friend struct pmap;
   friend class detail::PersistMemoryTypedApi<manager_type>;
   template <typename> friend bool save_manager(const char *);
-
   template <typename T> using pptr = pmm::pptr<T, manager_type>;
-
   using pstringview = pmm::pstringview<manager_type>;
-
   using pstring = pmm::pstring<manager_type>;
-
   template <typename _K, typename _V>
   using pmap = pmm::pmap<_K, _V, manager_type>;
-
   template <typename T> using parray = pmm::parray<T, manager_type>;
-
   template <typename T> using pallocator = pmm::pallocator<T, manager_type>;
-
   /*
 ### pmm-persistmemorymanager-last_error
 */
   static PmmError last_error() noexcept { return _last_error; }
-
   /*
 ### pmm-persistmemorymanager-clear_error
 */
   static void clear_error() noexcept { _last_error = PmmError::Ok; }
-
   /*
 ### pmm-persistmemorymanager-set_last_error
 */
   static void set_last_error(PmmError err) noexcept { _last_error = err; }
-
   /*
 ### pmm-persistmemorymanager-create
 */
   static bool create(std::size_t initial_size) noexcept {
-
     typename thread_policy::unique_lock_type lock(_mutex);
     if (initial_size < detail::kMinMemorySize) {
       _last_error = PmmError::InvalidSize;
       return false;
     }
-
     static constexpr std::size_t kGranSzCreate = address_traits::granule_size;
     if (initial_size >
         std::numeric_limits<std::size_t>::max() - (kGranSzCreate - 1)) {
       _last_error = PmmError::Overflow;
       return false;
     }
-
     std::size_t aligned =
         ((initial_size + kGranSzCreate - 1) / kGranSzCreate) * kGranSzCreate;
     if (_backend.base_ptr() == nullptr || _backend.total_size() < aligned) {
-
       std::size_t additional = (_backend.total_size() < aligned)
                                    ? (aligned - _backend.total_size())
                                    : aligned;
@@ -147,13 +113,10 @@ public:
       _last_error = PmmError::BackendError;
       return false;
     }
-
     bool ok = init_layout(_backend.base_ptr(), _backend.total_size());
     if (ok)
-
       ok = bootstrap_forest_registry_unlocked();
     if (ok)
-
       ok = validate_bootstrap_invariants_unlocked();
     if (ok) {
       _last_error = PmmError::Ok;
@@ -161,7 +124,6 @@ public:
     }
     return ok;
   }
-
   static bool create() noexcept {
     typename thread_policy::unique_lock_type lock(_mutex);
     if (_backend.base_ptr() == nullptr ||
@@ -181,14 +143,11 @@ public:
     }
     return ok;
   }
-
   /*
 ### pmm-persistmemorymanager-load
 */
   static bool load(VerifyResult &result) noexcept {
-
     result.mode = RecoveryMode::Repair;
-
     result.ok = true;
     typename thread_policy::unique_lock_type lock(_mutex);
     if (_backend.base_ptr() == nullptr ||
@@ -198,9 +157,7 @@ public:
       result.add(ViolationType::HeaderCorruption, DiagnosticAction::Aborted);
       return false;
     }
-
     std::uint8_t *base = _backend.base_ptr();
-
     detail::ManagerHeader<address_traits> *hdr = get_header(base);
     if (hdr->magic != kMagic) {
       _last_error = PmmError::InvalidMagic;
@@ -235,46 +192,31 @@ public:
                  static_cast<std::uint64_t>(hdr->granule_size));
       return false;
     }
-
     auto mark_entries = [](VerifyResult &r, std::size_t from,
                            DiagnosticAction act) {
       for (std::size_t i = from; i < r.entry_count; ++i)
         r.entries[i].action = act;
     };
     std::size_t pre = result.entry_count;
-
     allocator::verify_block_states(base, hdr, result);
     mark_entries(result, pre, DiagnosticAction::Repaired);
-
     pre = result.entry_count;
-
     allocator::verify_linked_list(base, hdr, result);
     mark_entries(result, pre, DiagnosticAction::Repaired);
     pre = result.entry_count;
-
     allocator::verify_counters(base, hdr, result);
     mark_entries(result, pre, DiagnosticAction::Rebuilt);
     pre = result.entry_count;
-
     allocator::verify_free_tree(base, hdr, result);
     mark_entries(result, pre, DiagnosticAction::Rebuilt);
-
     if (detail::image_version_requires_migration(hdr->image_version))
-
       hdr->image_version = detail::kCurrentImageVersion;
-
     hdr->owns_memory = false;
-
     hdr->prev_total_size = 0;
-
     allocator::repair_linked_list(base, hdr);
-
     allocator::recompute_counters(base, hdr);
-
     allocator::rebuild_free_tree(base, hdr);
-
     _initialized = true;
-
     {
       VerifyResult forest_verify;
       verify_forest_registry_unlocked(forest_verify);
@@ -298,26 +240,20 @@ public:
       _initialized = false;
       return false;
     }
-
     _last_error = PmmError::Ok;
-
     logging_policy::on_load();
     return true;
   }
-
   /*
 ### pmm-persistmemorymanager-destroy
 */
   static void destroy() noexcept {
     typename thread_policy::unique_lock_type lock(_mutex);
     if (!_initialized)
-
       return;
     _initialized = false;
-
     logging_policy::on_destroy();
   }
-
   /*
 ### pmm-persistmemorymanager-destroy_image
 */
@@ -329,14 +265,12 @@ public:
     _initialized = false;
     logging_policy::on_destroy();
   }
-
   /*
 ### pmm-persistmemorymanager-is_initialized
 */
   static bool is_initialized() noexcept {
     return _initialized.load(std::memory_order_acquire);
   }
-
   /*
 ### pmm-persistmemorymanager-allocate
 */
@@ -344,16 +278,13 @@ public:
     typename thread_policy::unique_lock_type lock(_mutex);
     return allocate_unlocked(user_size);
   }
-
   /*
 ### pmm-persistmemorymanager-deallocate
 */
   static void deallocate(void *ptr) noexcept {
     typename thread_policy::unique_lock_type lock(_mutex);
-
     deallocate_unlocked(ptr);
   }
-
   /*
 ### pmm-persistmemorymanager-lock_block_permanent
 */
@@ -361,7 +292,6 @@ public:
     typename thread_policy::unique_lock_type lock(_mutex);
     return lock_block_permanent_unlocked(ptr);
   }
-
   /*
 ### pmm-persistmemorymanager-is_permanently_locked
 */
@@ -369,38 +299,31 @@ public:
     typename thread_policy::shared_lock_type lock(_mutex);
     if (!_initialized || ptr == nullptr)
       return false;
-
     const pmm::Block<address_traits> *blk = find_block_from_user_ptr(ptr);
     if (blk == nullptr)
       return false;
     return BlockStateBase<address_traits>::get_node_type(blk) ==
            pmm::kNodeReadOnly;
   }
-
   template <typename T> static void set_root(pptr<T> p) noexcept {
     typename thread_policy::unique_lock_type lock(_mutex);
     if (!_initialized)
       return;
-
     set_forest_domain_root_index_unlocked(
         find_domain_by_name_unlocked(detail::kServiceNameDomainRoot),
-
         p.is_null() ? static_cast<index_type>(0) : p.offset());
   }
-
   template <typename T> static pptr<T> get_root() noexcept {
     typename thread_policy::shared_lock_type lock(_mutex);
     if (!_initialized)
       return pptr<T>();
     index_type root =
-
         forest_domain_root_index_unlocked(
             find_domain_by_name_unlocked(detail::kServiceNameDomainRoot));
     if (root == static_cast<index_type>(0))
       return pptr<T>();
     return pptr<T>(root);
   }
-
   /*
 ### pmm-persistmemorymanager-find_domain_by_name
 */
@@ -408,11 +331,9 @@ public:
     typename thread_policy::shared_lock_type lock(_mutex);
     if (!_initialized)
       return 0;
-
     const forest_domain *rec = find_domain_by_name_unlocked(name);
     return (rec != nullptr) ? rec->binding_id : static_cast<index_type>(0);
   }
-
   /*
 ### pmm-persistmemorymanager-find_domain_by_symbol
 */
@@ -420,18 +341,15 @@ public:
     typename thread_policy::shared_lock_type lock(_mutex);
     if (!_initialized)
       return 0;
-
     const forest_domain *rec = find_domain_by_symbol_unlocked(symbol);
     return (rec != nullptr) ? rec->binding_id : static_cast<index_type>(0);
   }
-
   /*
 ### pmm-persistmemorymanager-has_domain
 */
   static bool has_domain(const char *name) noexcept {
     return find_domain_by_name(name) != 0;
   }
-
   /*
 ### pmm-persistmemorymanager-validate_bootstrap_invariants
 */
@@ -439,7 +357,6 @@ public:
     typename thread_policy::shared_lock_type lock(_mutex);
     return validate_bootstrap_invariants_unlocked();
   }
-
   /*
 ### pmm-persistmemorymanager-register_domain
 */
@@ -450,7 +367,6 @@ public:
     return register_domain_unlocked(name, 0, detail::kForestBindingDirectRoot,
                                     0);
   }
-
   /*
 ### pmm-persistmemorymanager-register_system_domain
 */
@@ -461,7 +377,6 @@ public:
     return register_domain_unlocked(name, detail::kForestDomainFlagSystem,
                                     detail::kForestBindingDirectRoot, 0);
   }
-
   /*
 ### pmm-persistmemorymanager-get_domain_root_offset
 */
@@ -472,16 +387,13 @@ public:
     const forest_domain *rec = find_domain_by_name_unlocked(name);
     return forest_domain_root_index_unlocked(rec);
   }
-
   static index_type get_domain_root_offset(index_type binding_id) noexcept {
     typename thread_policy::shared_lock_type lock(_mutex);
     if (!_initialized)
       return 0;
-
     const forest_domain *rec = find_domain_by_binding_unlocked(binding_id);
     return forest_domain_root_index_unlocked(rec);
   }
-
   static index_type get_domain_root_offset(pptr<pstringview> symbol) noexcept {
     typename thread_policy::shared_lock_type lock(_mutex);
     if (!_initialized)
@@ -489,26 +401,21 @@ public:
     const forest_domain *rec = find_domain_by_symbol_unlocked(symbol);
     return forest_domain_root_index_unlocked(rec);
   }
-
   template <typename T>
   static pptr<T> get_domain_root(const char *name) noexcept {
-
     index_type root = get_domain_root_offset(name);
     return (root == 0) ? pptr<T>() : pptr<T>(root);
   }
-
   template <typename T>
   static pptr<T> get_domain_root(index_type binding_id) noexcept {
     index_type root = get_domain_root_offset(binding_id);
     return (root == 0) ? pptr<T>() : pptr<T>(root);
   }
-
   template <typename T>
   static pptr<T> get_domain_root(pptr<pstringview> symbol) noexcept {
     index_type root = get_domain_root_offset(symbol);
     return (root == 0) ? pptr<T>() : pptr<T>(root);
   }
-
   template <typename T>
   static bool set_domain_root(const char *name, pptr<T> root) noexcept {
     typename thread_policy::unique_lock_type lock(_mutex);
@@ -518,47 +425,49 @@ public:
     return set_forest_domain_root_index_unlocked(
         rec, root.is_null() ? static_cast<index_type>(0) : root.offset());
   }
-
 private:
-  template <typename T>
-
-  /*
-### pmm-persistmemorymanager-get_tree_idx_field
-*/
-  static index_type
-  get_tree_idx_field(pptr<T> p, index_type (*getter)(const void *)) noexcept {
+  template <typename T, typename ValueT>
+  static ValueT get_tree_field(pptr<T> p,
+                               ValueT (*getter)(const void *)) noexcept {
     if (p.is_null() || !_initialized)
-      return 0;
-
+      return ValueT{};
     const void *blk = block_raw_ptr_from_pptr(p);
     if (blk == nullptr) {
       _last_error = PmmError::InvalidPointer;
-      return 0;
+      return ValueT{};
     }
-
-    index_type v = getter(blk);
-    return (v == address_traits::no_block) ? static_cast<index_type>(0) : v;
+    return getter(blk);
   }
-
-  template <typename T>
-
-  /*
-### pmm-persistmemorymanager-set_tree_idx_field
-*/
-  static void set_tree_idx_field(pptr<T> p, void (*setter)(void *, index_type),
-                                 index_type val) noexcept {
+  template <typename T, typename ValueT>
+  static void set_tree_field(pptr<T> p, void (*setter)(void *, ValueT),
+                             ValueT value) noexcept {
     if (p.is_null() || !_initialized)
       return;
-
     void *blk = block_raw_mut_ptr_from_pptr(p);
     if (blk == nullptr) {
       _last_error = PmmError::InvalidPointer;
       return;
     }
-
-    setter(blk, (val == 0) ? address_traits::no_block : val);
+    setter(blk, value);
   }
-
+  template <typename T>
+  /*
+### pmm-persistmemorymanager-get_tree_idx_field
+*/
+  static index_type
+  get_tree_idx_field(pptr<T> p, index_type (*getter)(const void *)) noexcept {
+    index_type v = get_tree_field(p, getter);
+    return (v == address_traits::no_block) ? static_cast<index_type>(0) : v;
+  }
+  template <typename T>
+  /*
+### pmm-persistmemorymanager-set_tree_idx_field
+*/
+  static void set_tree_idx_field(pptr<T> p, void (*setter)(void *, index_type),
+                                 index_type val) noexcept {
+    set_tree_field(p, setter,
+                   (val == 0) ? address_traits::no_block : val);
+  }
 public:
   template <typename T>
   static index_type get_tree_left_offset(pptr<T> p) noexcept {
@@ -575,10 +484,8 @@ public:
     return get_tree_idx_field(
         p, &BlockStateBase<address_traits>::get_parent_offset);
   }
-
   template <typename T>
   static void set_tree_left_offset(pptr<T> p, index_type v) noexcept {
-
     set_tree_idx_field(p, &BlockStateBase<address_traits>::set_left_offset_of,
                        v);
   }
@@ -592,71 +499,35 @@ public:
     set_tree_idx_field(p, &BlockStateBase<address_traits>::set_parent_offset_of,
                        v);
   }
-
   template <typename T> static index_type get_tree_weight(pptr<T> p) noexcept {
-    if (p.is_null() || !_initialized)
-      return 0;
-    const void *blk = block_raw_ptr_from_pptr(p);
-    if (blk == nullptr) {
-      _last_error = PmmError::InvalidPointer;
-      return 0;
-    }
-    return BlockStateBase<address_traits>::get_weight(blk);
+    return get_tree_field(p, &BlockStateBase<address_traits>::get_weight);
   }
   template <typename T>
   static void set_tree_weight(pptr<T> p, index_type w) noexcept {
-    if (p.is_null() || !_initialized)
-      return;
-    void *blk = block_raw_mut_ptr_from_pptr(p);
-    if (blk == nullptr) {
-      _last_error = PmmError::InvalidPointer;
-      return;
-    }
-
-    BlockStateBase<address_traits>::set_weight_of(blk, w);
+    set_tree_field(p, &BlockStateBase<address_traits>::set_weight_of, w);
   }
-
   template <typename T>
   static std::int16_t get_tree_height(pptr<T> p) noexcept {
-    if (p.is_null() || !_initialized)
-      return 0;
-    const void *blk = block_raw_ptr_from_pptr(p);
-    if (blk == nullptr) {
-      _last_error = PmmError::InvalidPointer;
-      return 0;
-    }
-    return BlockStateBase<address_traits>::get_avl_height(blk);
+    return get_tree_field(p, &BlockStateBase<address_traits>::get_avl_height);
   }
   template <typename T>
   static void set_tree_height(pptr<T> p, std::int16_t h) noexcept {
-    if (p.is_null() || !_initialized)
-      return;
-    void *blk = block_raw_mut_ptr_from_pptr(p);
-    if (blk == nullptr) {
-      _last_error = PmmError::InvalidPointer;
-      return;
-    }
-
-    BlockStateBase<address_traits>::set_avl_height_of(blk, h);
+    set_tree_field(p, &BlockStateBase<address_traits>::set_avl_height_of, h);
   }
-
   template <typename T>
   static TreeNode<address_traits> &tree_node(pptr<T> p) noexcept {
-
     assert(!p.is_null() && "tree_node: pptr must not be null");
     assert(_initialized &&
            "tree_node: manager must be initialized before calling tree_node");
     void *blk = block_raw_mut_ptr_from_pptr(p);
     if (blk == nullptr) {
       _last_error = PmmError::InvalidPointer;
-
       static thread_local TreeNode<address_traits> sentinel{};
       sentinel = {};
       return sentinel;
     }
     return *reinterpret_cast<TreeNode<address_traits> *>(blk);
   }
-
 private:
   template <typename Fn> static std::size_t read_stat(Fn fn) noexcept {
     if (!_initialized.load(std::memory_order_acquire))
@@ -666,7 +537,6 @@ private:
       return 0;
     return fn(get_header_c(_backend.base_ptr()));
   }
-
 public:
   /*
 ### pmm-persistmemorymanager-total_size
@@ -678,7 +548,6 @@ public:
     return _initialized.load(std::memory_order_relaxed) ? _backend.total_size()
                                                         : 0;
   }
-
   /*
 ### pmm-persistmemorymanager-used_size
 */
@@ -687,7 +556,6 @@ public:
       return address_traits::granules_to_bytes(h->used_size);
     });
   }
-
   /*
 ### pmm-persistmemorymanager-free_size
 */
@@ -697,7 +565,6 @@ public:
       return (h->total_size > used) ? (h->total_size - used) : std::size_t(0);
     });
   }
-
   /*
 ### pmm-persistmemorymanager-block_count
 */
@@ -705,7 +572,6 @@ public:
     return read_stat(
         [](const auto *h) { return static_cast<std::size_t>(h->block_count); });
   }
-
   /*
 ### pmm-persistmemorymanager-free_block_count
 */
@@ -713,7 +579,6 @@ public:
     return read_stat(
         [](const auto *h) { return static_cast<std::size_t>(h->free_count); });
   }
-
   /*
 ### pmm-persistmemorymanager-alloc_block_count
 */
@@ -721,36 +586,28 @@ public:
     return read_stat(
         [](const auto *h) { return static_cast<std::size_t>(h->alloc_count); });
   }
-
   /*
 ### pmm-persistmemorymanager-verify
 */
   static VerifyResult verify() noexcept {
-
     VerifyResult result;
     typename thread_policy::shared_lock_type lock(_mutex);
     if (!_initialized || _backend.base_ptr() == nullptr) {
       result.add(ViolationType::HeaderCorruption, DiagnosticAction::Aborted);
       return result;
     }
-
     verify_image_unlocked(result);
     return result;
   }
-
   template <typename Callback>
   static bool for_each_block(Callback &&callback) noexcept {
     typename thread_policy::shared_lock_type lock(_mutex);
     if (!_initialized)
       return false;
     const std::uint8_t *base = _backend.base_ptr();
-
     using BlockState = BlockStateBase<address_traits>;
-
     const detail::ManagerHeader<address_traits> *hdr = get_header_c(base);
-
     index_type idx = hdr->first_block_offset;
-
     static constexpr std::size_t kGranSz = address_traits::granule_size;
     while (idx != address_traits::no_block) {
       if (static_cast<std::size_t>(idx) * kGranSz +
@@ -766,7 +623,6 @@ public:
       std::size_t hdr_bytes = sizeof(Block<address_traits>);
       std::size_t data_bytes =
           is_used ? static_cast<std::size_t>(w) * kGranSz : 0;
-
       BlockView view;
       view.index = idx;
       view.offset =
@@ -781,7 +637,6 @@ public:
     }
     return true;
   }
-
   template <typename Callback>
   static bool for_each_free_block(Callback &&callback) noexcept {
     typename thread_policy::shared_lock_type lock(_mutex);
@@ -789,25 +644,18 @@ public:
       return false;
     const std::uint8_t *base = _backend.base_ptr();
     const detail::ManagerHeader<address_traits> *hdr = get_header_c(base);
-
     for_each_free_block_inorder(base, hdr, hdr->free_tree_root, 0, callback);
     return true;
   }
-
   /*
 ### pmm-persistmemorymanager-backend
 */
   static storage_backend &backend() noexcept { return _backend; }
-
 private:
   static inline storage_backend _backend{};
-
   static inline std::atomic<bool> _initialized{false};
-
   static inline typename thread_policy::mutex_type _mutex{};
-
   static inline thread_local PmmError _last_error{PmmError::Ok};
-
   /*
 ### pmm-persistmemorymanager-is_valid_user_offset_unlocked
 */
@@ -816,12 +664,10 @@ private:
     if (off == 0 || _backend.base_ptr() == nullptr ||
         _backend.total_size() == 0)
       return false;
-
     std::size_t byte_off =
         static_cast<std::size_t>(off) * address_traits::granule_size;
     return byte_off + size_bytes <= _backend.total_size();
   }
-
   /*
 ### pmm-persistmemorymanager-allocate_unlocked
 */
@@ -837,14 +683,11 @@ private:
       logging_policy::on_allocation_failure(user_size, PmmError::InvalidSize);
       return nullptr;
     }
-
     std::uint8_t *base = _backend.base_ptr();
     detail::ManagerHeader<address_traits> *hdr = get_header(base);
-
     index_type data_gran =
         detail::bytes_to_granules_t<address_traits>(user_size);
     if (data_gran == 0)
-
       data_gran = 1;
     if (data_gran >
         std::numeric_limits<index_type>::max() - kBlockHdrGranules) {
@@ -852,21 +695,17 @@ private:
       logging_policy::on_allocation_failure(user_size, PmmError::Overflow);
       return nullptr;
     }
-
     index_type needed = kBlockHdrGranules + data_gran;
-
     index_type idx = free_block_tree::find_best_fit(base, hdr, needed);
     if (idx != address_traits::no_block) {
       _last_error = PmmError::Ok;
       return allocator::allocate_from_block(base, hdr, idx, user_size);
     }
-
     if (!do_expand(user_size)) {
       _last_error = PmmError::OutOfMemory;
       logging_policy::on_allocation_failure(user_size, PmmError::OutOfMemory);
       return nullptr;
     }
-
     base = _backend.base_ptr();
     hdr = get_header(base);
     idx = free_block_tree::find_best_fit(base, hdr, needed);
@@ -874,13 +713,10 @@ private:
       _last_error = PmmError::Ok;
       return allocator::allocate_from_block(base, hdr, idx, user_size);
     }
-
     _last_error = PmmError::OutOfMemory;
-
     logging_policy::on_allocation_failure(user_size, PmmError::OutOfMemory);
     return nullptr;
   }
-
   /*
 ### pmm-persistmemorymanager-deallocate_unlocked
 */
@@ -890,33 +726,24 @@ private:
     pmm::Block<address_traits> *blk = find_block_from_user_ptr(ptr);
     if (blk == nullptr)
       return;
-
     index_type freed = BlockStateBase<address_traits>::get_weight(blk);
     if (freed == 0)
       return;
     if (BlockStateBase<address_traits>::get_node_type(blk) ==
         pmm::kNodeReadOnly)
       return;
-
     std::uint8_t *base = _backend.base_ptr();
     detail::ManagerHeader<address_traits> *hdr = get_header(base);
     index_type blk_idx = detail::block_idx_t<address_traits>(base, blk);
-
     AllocatedBlock<address_traits> *alloc =
         AllocatedBlock<address_traits>::cast_from_raw(blk);
-
     alloc->mark_as_free();
-
     hdr->alloc_count--;
-
     hdr->free_count++;
     if (hdr->used_size >= freed)
-
       hdr->used_size -= freed;
-
     allocator::coalesce(base, hdr, blk_idx);
   }
-
   /*
 ### pmm-persistmemorymanager-lock_block_permanent_unlocked
 */
@@ -929,17 +756,13 @@ private:
     index_type w = BlockStateBase<address_traits>::get_weight(blk);
     if (w == 0)
       return false;
-
     BlockStateBase<address_traits>::set_node_type_of(blk, pmm::kNodeReadOnly);
     return true;
   }
-
   template <typename T, typename... Args>
   static pptr<T> create_typed_unlocked(Args &&...args) noexcept {
     static_assert(std::is_nothrow_constructible_v<T, Args...>,
-
                   "create_typed_unlocked<T>: T must be nothrow-constructible");
-
     void *raw = allocate_unlocked(sizeof(T));
     if (raw == nullptr)
       return pptr<T>();
@@ -949,36 +772,26 @@ private:
       deallocate_unlocked(raw);
       return pptr<T>();
     }
-
     ::new (obj) T(static_cast<Args &&>(args)...);
     return p;
   }
-
 #include "pmm/forest_domain_mixin.inc"
-
 #include "pmm/verify_repair_mixin.inc"
-
   static constexpr std::size_t kBlockHdrByteSize =
       detail::manager_header_offset_bytes_v<address_traits>;
-
   static constexpr index_type kBlockHdrGranules =
       static_cast<index_type>(kBlockHdrByteSize / address_traits::granule_size);
-
   static constexpr index_type kMgrHdrGranules =
       detail::kManagerHeaderGranules_t<address_traits>;
-
   static constexpr index_type kFreeBlkIdxLayout =
       kBlockHdrGranules + kMgrHdrGranules;
-
   /*
 ### pmm-persistmemorymanager-get_header
 */
   static detail::ManagerHeader<address_traits> *
   get_header(std::uint8_t *base) noexcept {
-
     return detail::manager_header_at<address_traits>(base);
   }
-
   /*
 ### pmm-persistmemorymanager-get_header_c
 */
@@ -986,34 +799,23 @@ private:
   get_header_c(const std::uint8_t *base) noexcept {
     return detail::manager_header_at<address_traits>(base);
   }
-
   /*
 ### pmm-persistmemorymanager-layout_access
 */
   struct layout_access {
-
     using address_traits = manager_type::address_traits;
-
     using free_block_tree = manager_type::free_block_tree;
-
     using logging_policy = manager_type::logging_policy;
-
     using storage_backend = manager_type::storage_backend;
-
     using index_type = manager_type::index_type;
-
     static constexpr std::uint64_t kMagic = pmm::kMagic;
     static constexpr std::size_t kBlockHdrByteSize =
         manager_type::kBlockHdrByteSize;
-
     static constexpr index_type kBlockHdrGranules =
         manager_type::kBlockHdrGranules;
-
     static constexpr index_type kMgrHdrGranules = manager_type::kMgrHdrGranules;
-
     static constexpr index_type kFreeBlkIdxLayout =
         manager_type::kFreeBlkIdxLayout;
-
     /*
 #### pmm-persistmemorymanager-layout_access-get_header
 */
@@ -1021,7 +823,6 @@ private:
     get_header(std::uint8_t *base) noexcept {
       return manager_type::get_header(base);
     }
-
     /*
 #### pmm-persistmemorymanager-layout_access-set_initialized
 */
@@ -1029,7 +830,6 @@ private:
       manager_type::_initialized = true;
     }
   };
-
   /*
 ### pmm-persistmemorymanager-init_layout
 */
@@ -1037,7 +837,6 @@ private:
     return detail::ManagerLayoutOps<layout_access>::init_layout(_backend, base,
                                                                 size);
   }
-
   /*
 ### pmm-persistmemorymanager-do_expand
 */
@@ -1046,5 +845,4 @@ private:
         _backend, _initialized, user_size);
   }
 };
-
 }

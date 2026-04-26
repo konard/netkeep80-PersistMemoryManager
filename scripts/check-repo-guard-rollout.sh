@@ -38,7 +38,7 @@ expected_profiles = {
     "release",
 }
 expected_size_rules = [
-    ("kernel-subtree-max-lines", "directory", "lines", "include/pmm/**", 9000),
+    ("kernel-subtree-max-lines", "directory", "lines", "include/pmm/**", 7000),
 ]
 required_governance_paths = {
     ".github/workflows/repo-guard.yml",

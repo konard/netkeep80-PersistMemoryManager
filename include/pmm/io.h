@@ -1,14 +1,11 @@
 #pragma once
-
 #include "pmm/diagnostics.h"
 #include "pmm/types.h"
-
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <string>
 #include <vector>
-
 #if defined(_WIN32) || defined(_WIN64)
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -23,11 +20,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 #endif
-
 namespace pmm {
-
 namespace detail {
-
 inline bool atomic_rename(const char *tmp_path,
                           const char *final_path) noexcept {
 #if defined(_WIN32) || defined(_WIN64)
@@ -37,7 +31,6 @@ inline bool atomic_rename(const char *tmp_path,
   return std::rename(tmp_path, final_path) == 0;
 #endif
 }
-
 inline bool flush_file_to_storage(std::FILE *file) noexcept {
   if (file == nullptr)
     return false;
@@ -51,7 +44,6 @@ inline bool flush_file_to_storage(std::FILE *file) noexcept {
   return fd >= 0 && ::fsync(fd) == 0;
 #endif
 }
-
 #if !defined(_WIN32) && !defined(_WIN64)
 inline std::string parent_directory_path(const char *path) {
   std::string value(path);
@@ -63,7 +55,6 @@ inline std::string parent_directory_path(const char *path) {
   return value.substr(0, slash);
 }
 #endif
-
 inline bool flush_parent_directory(const char *path) {
 #if defined(_WIN32) || defined(_WIN64)
   (void)path;
@@ -83,15 +74,11 @@ inline bool flush_parent_directory(const char *path) {
   return ok;
 #endif
 }
-
 }
-
 template <typename MgrT> inline bool save_manager(const char *filename) {
   using address_traits = typename MgrT::address_traits;
-
   if (filename == nullptr)
     return false;
-
   std::vector<std::uint8_t> snapshot;
   {
     typename MgrT::thread_policy::shared_lock_type lock(MgrT::_mutex);
@@ -104,29 +91,23 @@ template <typename MgrT> inline bool save_manager(const char *filename) {
     snapshot.resize(total);
     std::memcpy(snapshot.data(), data, total);
   }
-
   auto *hdr = detail::manager_header_at<address_traits>(snapshot.data());
   hdr->crc32 = detail::compute_image_crc32<address_traits>(snapshot.data(),
                                                            snapshot.size());
-
   std::string tmp_path = std::string(filename) + ".tmp";
-
   std::FILE *f = std::fopen(tmp_path.c_str(), "wb");
   if (f == nullptr)
     return false;
-
   std::size_t written = std::fwrite(snapshot.data(), 1, snapshot.size(), f);
   bool ok = written == snapshot.size();
   if (ok)
     ok = detail::flush_file_to_storage(f);
   if (std::fclose(f) != 0)
     ok = false;
-
   if (!ok) {
     std::remove(tmp_path.c_str());
     return false;
   }
-
   if (!detail::atomic_rename(tmp_path.c_str(), filename)) {
     std::remove(tmp_path.c_str());
     return false;
@@ -135,23 +116,18 @@ template <typename MgrT> inline bool save_manager(const char *filename) {
     return false;
   return true;
 }
-
 template <typename MgrT>
 inline bool load_manager_from_file(const char *filename, VerifyResult &result) {
   using address_traits = typename MgrT::address_traits;
-
   if (filename == nullptr)
     return false;
-
   std::uint8_t *buf = MgrT::backend().base_ptr();
   std::size_t size = MgrT::backend().total_size();
   if (buf == nullptr || size < detail::kMinMemorySize)
     return false;
-
   std::FILE *f = std::fopen(filename, "rb");
   if (f == nullptr)
     return false;
-
   if (std::fseek(f, 0, SEEK_END) != 0) {
     std::fclose(f);
     return false;
@@ -162,19 +138,15 @@ inline bool load_manager_from_file(const char *filename, VerifyResult &result) {
     return false;
   }
   std::rewind(f);
-
   std::size_t file_size = static_cast<std::size_t>(file_size_long);
   if (file_size > size) {
     std::fclose(f);
     return false;
   }
-
   std::size_t read_bytes = std::fread(buf, 1, file_size, f);
   std::fclose(f);
-
   if (read_bytes != file_size)
     return false;
-
   constexpr std::size_t kHdrOffset =
       detail::manager_header_offset_bytes_v<address_traits>;
   if (file_size >= kHdrOffset + sizeof(detail::ManagerHeader<address_traits>)) {
@@ -188,8 +160,6 @@ inline bool load_manager_from_file(const char *filename, VerifyResult &result) {
       return false;
     }
   }
-
   return MgrT::load(result);
 }
-
 }

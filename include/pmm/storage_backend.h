@@ -1,12 +1,9 @@
 #pragma once
-
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
-
 namespace pmm {
-
 template <typename Backend>
 concept StorageBackendConcept =
     requires(Backend &b, const Backend &cb, std::size_t n) {
@@ -15,8 +12,6 @@ concept StorageBackendConcept =
       { b.expand(n) } -> std::convertible_to<bool>;
       { cb.owns_memory() } -> std::convertible_to<bool>;
     };
-
 template <typename Backend>
 inline constexpr bool is_storage_backend_v = StorageBackendConcept<Backend>;
-
 }
