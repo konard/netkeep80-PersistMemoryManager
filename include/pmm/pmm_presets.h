@@ -3,16 +3,16 @@
 #include "pmm/manager_configs.h"
 #include "pmm/persist_memory_manager.h"
 
-namespace pmm
-{
-namespace presets
-{
+namespace pmm {
+namespace presets {
 
 template <std::size_t BufferSize = 1024>
-using SmallEmbeddedStaticHeap = PersistMemoryManager<SmallEmbeddedStaticConfig<BufferSize>, 0>;
+using SmallEmbeddedStaticHeap =
+    PersistMemoryManager<SmallEmbeddedStaticConfig<BufferSize>, 0>;
 
 template <std::size_t BufferSize = 4096>
-using EmbeddedStaticHeap = PersistMemoryManager<EmbeddedStaticConfig<BufferSize>, 0>;
+using EmbeddedStaticHeap =
+    PersistMemoryManager<EmbeddedStaticConfig<BufferSize>, 0>;
 
 using EmbeddedHeap = PersistMemoryManager<EmbeddedManagerConfig, 0>;
 

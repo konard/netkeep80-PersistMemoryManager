@@ -16,4 +16,5 @@ IncludeBlocks: Preserve
 SortIncludes: false
 AllowShortFunctionsOnASingleLine: Inline
 AllowShortIfStatementsOnASingleLine: Never
+FixNamespaceComments: false
 ...

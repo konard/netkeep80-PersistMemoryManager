@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
@@ -157,7 +158,7 @@ std::vector<std::string> validate_comments_are_anchors( const std::filesystem::p
 
 std::vector<std::string> anchors_in( const std::string& text )
 {
-    static const std::regex  anchor_pattern(
+    static const std::regex anchor_pattern(
         R"re(/\*\n\s*(?:##|###) ([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_~][A-Za-z0-9_~]*)*)\n\s*\*/)re" );
     std::vector<std::string> anchors;
     for ( std::sregex_iterator it( text.begin(), text.end(), anchor_pattern ), end; it != end; ++it )
@@ -174,7 +175,8 @@ bool file_contains_anchor( const std::filesystem::path& path, const std::string&
 std::vector<std::string> validate_markdown_include_links( const std::filesystem::path& repo_root,
                                                           const std::filesystem::path& path )
 {
-    static const std::regex  link_pattern( R"re(\[[^\]]+\]\(([^)#]*include/pmm/[^)#]+\.(?:h|inc))#([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_~][A-Za-z0-9_~]*)*)\))re" );
+    static const std::regex link_pattern(
+        R"re(\[[^\]]+\]\(([^)#]*include/pmm/[^)#]+\.(?:h|inc))#([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_~][A-Za-z0-9_~]*)*)\))re" );
     const auto               text = read_file( path );
     std::vector<std::string> failures;
 
@@ -220,12 +222,15 @@ TEST_CASE( "issue354: include comments are limited to code anchors", "[issue354]
         failures.insert( failures.end(), file_failures.begin(), file_failures.end() );
     }
 
-    INFO( "Failures:\n" << [&failures] {
-        std::ostringstream out;
-        for ( const auto& failure : failures )
-            out << failure << '\n';
-        return out.str();
-    }() );
+    INFO( "Failures:\n"
+          <<
+          [&failures]
+          {
+              std::ostringstream out;
+              for ( const auto& failure : failures )
+                  out << failure << '\n';
+              return out.str();
+          }() );
     REQUIRE( failures.empty() );
 }
 
@@ -240,11 +245,14 @@ TEST_CASE( "issue354: markdown include links resolve to code anchors", "[issue35
         failures.insert( failures.end(), file_failures.begin(), file_failures.end() );
     }
 
-    INFO( "Failures:\n" << [&failures] {
-        std::ostringstream out;
-        for ( const auto& failure : failures )
-            out << failure << '\n';
-        return out.str();
-    }() );
+    INFO( "Failures:\n"
+          <<
+          [&failures]
+          {
+              std::ostringstream out;
+              for ( const auto& failure : failures )
+                  out << failure << '\n';
+              return out.str();
+          }() );
     REQUIRE( failures.empty() );
 }

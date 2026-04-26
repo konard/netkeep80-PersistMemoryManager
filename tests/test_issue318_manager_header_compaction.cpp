@@ -79,13 +79,14 @@ TEST_CASE( "issue318: typed API lives in one normal header module", "[issue318][
     const auto                  typed_header   = read_file( repo_root / "include/pmm/typed_manager_api.h" );
 
     REQUIRE( manager_header.find( "#include \"pmm/typed_manager_api.h\"" ) != std::string::npos );
-    REQUIRE( manager_header.find( "PersistMemoryTypedApi<PersistMemoryManager<ConfigT, InstanceId>>" ) !=
-             std::string::npos );
+    REQUIRE( manager_header.find( "detail::PersistMemoryTypedApi<" ) != std::string::npos );
+    REQUIRE( manager_header.find( "PersistMemoryManager<ConfigT, InstanceId>>" ) != std::string::npos );
     REQUIRE( manager_header.find( "static pptr<T> reallocate_typed" ) == std::string::npos );
     REQUIRE( manager_header.find( "static T* resolve_checked" ) == std::string::npos );
 
     REQUIRE( typed_header.find( "class PersistMemoryTypedApi" ) != std::string::npos );
-    REQUIRE( typed_header.find( "static pmm::pptr<T, ManagerT> reallocate_typed" ) != std::string::npos );
+    REQUIRE( typed_header.find( "### pmm::detail::PersistMemoryTypedApi::reallocate_typed" ) != std::string::npos );
+    REQUIRE( typed_header.find( "reallocate_typed(pmm::pptr<T, ManagerT> p" ) != std::string::npos );
     REQUIRE( typed_header.find( ".inc" ) == std::string::npos );
     REQUIRE( typed_header.find( ".inl" ) == std::string::npos );
     REQUIRE( typed_header.find( ".ipp" ) == std::string::npos );
