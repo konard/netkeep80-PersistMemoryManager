@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [3.0.4] - 2026-04-26
+
+### Changed
+- Compact `include/pmm/**` below the 5000-line kernel subtree budget while preserving linked include anchors.
+- Refresh the generated single-header bundle and rollout checker for the 5000-line budget.
+
+
 ## [3.0.3] - 2026-04-26
 
 ### Changed
