@@ -65,7 +65,7 @@ std::filesystem::path directory_from_glob( const std::filesystem::path& repo_roo
 
 } // namespace
 
-TEST_CASE( "issue352: include/pmm subtree stays below the kernel size budget", "[issue352][repo-guard]" )
+TEST_CASE( "issue352/360: include/pmm subtree stays below the kernel size budget", "[issue352][issue360][repo-guard]" )
 {
     const std::filesystem::path repo_root = PMM_SOURCE_DIR;
     const auto                  rule      = load_kernel_subtree_rule( repo_root );

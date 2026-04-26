@@ -1,10 +1,8 @@
 static void verify_image_unlocked(VerifyResult &result) noexcept {
   result.mode = RecoveryMode::Verify;
   result.ok = true;
-
   const std::uint8_t *base = _backend.base_ptr();
   const detail::ManagerHeader<address_traits> *hdr = get_header_c(base);
-
   if (hdr->magic != kMagic) {
     result.add(ViolationType::HeaderCorruption, DiagnosticAction::Aborted, 0,
                static_cast<std::uint64_t>(kMagic),
@@ -30,7 +28,6 @@ static void verify_image_unlocked(VerifyResult &result) noexcept {
                static_cast<std::uint64_t>(hdr->granule_size));
     return;
   }
-
   {
     using BlockState = BlockStateBase<address_traits>;
     index_type idx = hdr->first_block_offset;
@@ -44,18 +41,12 @@ static void verify_image_unlocked(VerifyResult &result) noexcept {
       idx = BlockState::get_next_offset(blk_ptr);
     }
   }
-
   allocator::verify_block_states(base, hdr, result);
-
   allocator::verify_linked_list(base, hdr, result);
-
   allocator::verify_counters(base, hdr, result);
-
   allocator::verify_free_tree(base, hdr, result);
-
   verify_forest_registry_unlocked(result);
 }
-
 static void verify_forest_registry_unlocked(VerifyResult &result) noexcept {
   const forest_registry *reg = forest_registry_root_unlocked();
   if (reg == nullptr) {
@@ -70,7 +61,6 @@ static void verify_forest_registry_unlocked(VerifyResult &result) noexcept {
                static_cast<std::uint64_t>(reg->magic));
     return;
   }
-
   static constexpr const char *kRequired[] = {
       detail::kSystemDomainFreeTree, detail::kSystemDomainSymbols,
       detail::kSystemDomainRegistry, detail::kServiceNameDomainRoot};

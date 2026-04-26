@@ -1,36 +1,25 @@
 #pragma once
-
 #include "pmm/avl_tree_mixin.h"
 #include "pmm/forest_registry.h"
-
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
-
 namespace pmm {
-
 template <typename _K, typename _V, typename ManagerT> struct pmap;
-
 /*
 ## pmm-pmap_type_identity
 */
 template <typename T> struct pmap_type_identity {
-
   static constexpr const char *tag = "";
 };
-
 /*
 ## pmm-pmap_node
 */
 template <typename _K, typename _V> struct pmap_node {
-
   _K key;
-
   _V value;
 };
-
 namespace detail {
-
 constexpr std::uint32_t pmap_fnv1a(std::uint32_t h, std::uint64_t v,
                                    unsigned bytes) noexcept {
   for (unsigned i = 0; i < bytes; ++i, v >>= 8) {
@@ -39,7 +28,6 @@ constexpr std::uint32_t pmap_fnv1a(std::uint32_t h, std::uint64_t v,
   }
   return h;
 }
-
 template <typename T> constexpr std::uint32_t pmap_type_fp() noexcept {
   const std::uint64_t traits =
       (std::uint64_t{std::is_integral_v<T>} << 0) |
@@ -60,7 +48,6 @@ template <typename T> constexpr std::uint32_t pmap_type_fp() noexcept {
     h = pmap_fnv1a(h, static_cast<std::uint8_t>(*t), 1);
   return h;
 }
-
 inline std::uint64_t pmap_key_hash(const char *key) noexcept {
   std::uint64_t h = 14695981039346656037ull;
   for (; key != nullptr && *key != '\0'; ++key) {
@@ -69,7 +56,6 @@ inline std::uint64_t pmap_key_hash(const char *key) noexcept {
   }
   return h;
 }
-
 inline bool pmap_write_name(char (&out)[kForestDomainNameCapacity],
                             std::uint32_t type_fp, char kind,
                             std::uint64_t value,
@@ -95,58 +81,41 @@ inline bool pmap_write_name(char (&out)[kForestDomainNameCapacity],
   out[p] = '\0';
   return true;
 }
-
 }
-
 /*
 ## pmm-pmap
 */
 template <typename _K, typename _V, typename ManagerT> struct pmap {
-
   using manager_type = ManagerT;
-
   using index_type = typename ManagerT::index_type;
-
   using node_type = pmap_node<_K, _V>;
-
   using node_pptr = typename ManagerT::template pptr<node_type>;
-
   static constexpr std::uint32_t domain_type_hash = detail::pmap_fnv1a(
-
       /*
 ### pmm-pmap-pmap_fnv1a
 */
       detail::pmap_fnv1a(2166136261u, detail::pmap_type_fp<_K>(), 4),
       detail::pmap_type_fp<_V>(), 4);
-
   /*
 ### pmm-pmap-forest_domain_descriptor
 */
   struct forest_domain_descriptor {
-
     using index_type = typename ManagerT::index_type;
-
     using node_type = pmap_node<_K, _V>;
-
     using node_pptr = typename ManagerT::template pptr<node_type>;
-
     index_type binding_id;
-
     /*
 #### pmm-pmap-forest_domain_descriptor-forest_domain_descriptor
 */
     constexpr explicit forest_domain_descriptor(index_type id = 0) noexcept
         : binding_id(id) {}
-
     /*
 #### pmm-pmap-forest_domain_descriptor-name
 */
     const char *name() const noexcept {
-
       const auto *d = ManagerT::find_domain_by_binding_unlocked(binding_id);
       return d != nullptr ? d->name : "";
     }
-
     /*
 #### pmm-pmap-forest_domain_descriptor-root_index
 */
@@ -154,36 +123,30 @@ template <typename _K, typename _V, typename ManagerT> struct pmap {
       return ManagerT::forest_domain_root_index_unlocked(
           ManagerT::find_domain_by_binding_unlocked(binding_id));
     }
-
     /*
 #### pmm-pmap-forest_domain_descriptor-root_index_ptr
 */
     index_type *root_index_ptr() noexcept {
       return binding_id == 0
                  ? nullptr
-
                  : ManagerT::forest_domain_root_index_ptr_unlocked(
                        ManagerT::find_domain_by_binding_unlocked(binding_id));
     }
-
     /*
 #### pmm-pmap-forest_domain_descriptor-resolve_node
 */
     static node_type *resolve_node(node_pptr p) noexcept {
       return ManagerT::template resolve<node_type>(p);
     }
-
     /*
 #### pmm-pmap-forest_domain_descriptor-compare_key
 */
     static int compare_key(const _K &key, node_pptr cur) noexcept {
-
       node_type *obj = resolve_node(cur);
       return obj == nullptr
                  ? 0
                  : ((key == obj->key) ? 0 : ((key < obj->key) ? -1 : 1));
     }
-
     /*
 #### pmm-pmap-forest_domain_descriptor-less_node
 */
@@ -192,7 +155,6 @@ template <typename _K, typename _V, typename ManagerT> struct pmap {
       node_type *r = resolve_node(rhs);
       return l != nullptr && r != nullptr && l->key < r->key;
     }
-
     /*
 #### pmm-pmap-forest_domain_descriptor-validate_node
 */
@@ -200,25 +162,19 @@ template <typename _K, typename _V, typename ManagerT> struct pmap {
       return resolve_node(p) != nullptr;
     }
   };
-
   using forest_domain_view_policy =
       detail::ForestDomainViewOps<forest_domain_descriptor>;
-
   using forest_domain_policy =
       detail::ForestDomainOps<forest_domain_descriptor>;
-
   static constexpr index_type no_block = ManagerT::address_traits::no_block;
-
 private:
   index_type _binding_id;
-
   /*
 ### pmm-pmap-bind
 */
   bool bind(const char *domain_key) noexcept {
     if (!ManagerT::is_initialized())
       return false;
-
     char buf[detail::kForestDomainNameCapacity]{};
     if (domain_key != nullptr && domain_key[0] != '\0') {
       if (!detail::pmap_write_name(buf, domain_type_hash, 'n',
@@ -233,83 +189,68 @@ private:
     }
     if (!ManagerT::has_domain(buf) && !ManagerT::register_domain(buf))
       return false;
-
     _binding_id = ManagerT::find_domain_by_name(buf);
     return _binding_id != 0;
   }
-
   /*
 ### pmm-pmap-descriptor
 */
   forest_domain_descriptor descriptor() const noexcept {
     return forest_domain_descriptor(_binding_id);
   }
-
 public:
   /*
 ### pmm-pmap-pmap
 */
   pmap() noexcept : _binding_id(0) {}
-
   explicit pmap(const char *domain_key) noexcept : _binding_id(0) {
     bind(domain_key);
   }
-
   /*
 ### pmm-pmap-domain_name
 */
   const char *domain_name() const noexcept { return descriptor().name(); }
-
   /*
 ### pmm-pmap-root_index
 */
   index_type root_index() const noexcept { return descriptor().root_index(); }
-
   /*
 ### pmm-pmap-forest_domain_ops
 */
   forest_domain_policy forest_domain_ops() noexcept {
     if (_binding_id == 0 ||
         ManagerT::find_domain_by_binding_unlocked(_binding_id) == nullptr)
-
       bind(nullptr);
     return forest_domain_policy(descriptor());
   }
-
   /*
 ### pmm-pmap-forest_domain_view_ops
 */
   forest_domain_view_policy forest_domain_view_ops() const noexcept {
     return forest_domain_view_policy(descriptor());
   }
-
   /*
 ### pmm-pmap-empty
 */
   bool empty() const noexcept {
     return root_index() == static_cast<index_type>(0);
   }
-
   /*
 ### pmm-pmap-size
 */
   std::size_t size() const noexcept {
-
     const index_type root = root_index();
     return root == static_cast<index_type>(0)
                ? 0
                : detail::avl_subtree_count(node_pptr(root));
   }
-
   /*
 ### pmm-pmap-insert
 */
   node_pptr insert(const _K &key, const _V &val) noexcept {
-
     auto ops = forest_domain_ops();
     if (ops.root_index_ptr() == nullptr)
       return node_pptr();
-
     node_pptr existing = ops.find(key);
     if (!existing.is_null()) {
       if (node_type *obj = ManagerT::template resolve<node_type>(existing);
@@ -317,55 +258,41 @@ public:
         obj->value = val;
       return existing;
     }
-
     node_pptr new_node = ManagerT::template allocate_typed<node_type>();
-
     node_type *obj = new_node.is_null()
                          ? nullptr
                          : ManagerT::template resolve<node_type>(new_node);
     if (obj == nullptr)
       return node_pptr();
-
     obj->key = key;
-
     obj->value = val;
-
     detail::avl_init_node(new_node);
-
     ops.insert(new_node);
     return new_node;
   }
-
   /*
 ### pmm-pmap-find
 */
   node_pptr find(const _K &key) const noexcept {
     return forest_domain_view_ops().find(key);
   }
-
   /*
 ### pmm-pmap-contains
 */
   bool contains(const _K &key) const noexcept { return !find(key).is_null(); }
-
   /*
 ### pmm-pmap-erase
 */
   bool erase(const _K &key) noexcept {
-
     auto ops = forest_domain_policy(descriptor());
-
     index_type *root = ops.root_index_ptr();
-
     node_pptr t = root == nullptr ? node_pptr() : ops.find(key);
     if (t.is_null())
       return false;
-
     detail::avl_remove(t, *root);
     ManagerT::template deallocate_typed<node_type>(t);
     return true;
   }
-
   /*
 ### pmm-pmap-clear
 */
@@ -373,24 +300,18 @@ public:
     auto ops = forest_domain_policy(descriptor());
     index_type *root = ops.root_index_ptr();
     if (root == nullptr)
-
       return;
     if (*root != static_cast<index_type>(0))
-
       detail::avl_clear_subtree(node_pptr(*root), [](node_pptr p) {
         ManagerT::template deallocate_typed<node_type>(p);
       });
-
     *root = static_cast<index_type>(0);
   }
-
   /*
 ### pmm-pmap-reset
 */
   void reset() noexcept { forest_domain_policy(descriptor()).reset_root(); }
-
   using iterator = detail::AvlInorderIterator<node_pptr>;
-
   /*
 ### pmm-pmap-begin
 */
@@ -400,11 +321,9 @@ public:
       return iterator();
     return iterator(detail::avl_min_node(node_pptr(root)).offset());
   }
-
   /*
 ### pmm-pmap-end
 */
   iterator end() const noexcept { return iterator(static_cast<index_type>(0)); }
 };
-
 }
