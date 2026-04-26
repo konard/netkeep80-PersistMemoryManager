@@ -14,7 +14,7 @@ the operation completed (or rolled back).
 protocol (allocate / deallocate / split / coalesce), not a general forest-node lifecycle.
 Persistent data structures ([pstringview](../include/pmm/pstringview.h#pmm::pstringview), [pmap](../include/pmm/pmap.h#pmm::pmap)) build their own AVL trees over the
 same block headers but do **not** traverse `FreeBlock ↔ AllocatedBlock`: their blocks
-remain [AllocatedBlock](../include/pmm/block_state.h#pmm::AllocatedBlock) from the allocator's point of view. On `load()`, only the
+remain [AllocatedBlock](../include/pmm/block_state.h#pmm::allocatedblock) from the allocator's point of view. On `load()`, only the
 free-block AVL tree is rebuilt; user-data AVL trees must be managed by the user across
 process restarts.
 
@@ -62,7 +62,7 @@ The `granule_size` field is checked on `load()`: if it does not match the compil
   Bytes 28–31: next_offset   — next block (granule index)
 ```
 
-**Note:** The [TreeNode](../include/pmm/tree_node.h#pmm::TreeNode) fields (`left_offset`, `right_offset`, `parent_offset`,
+**Note:** The [TreeNode](../include/pmm/tree_node.h#pmm::treenode) fields (`left_offset`, `right_offset`, `parent_offset`,
 `avl_height`) are shared between two separate tree uses:
 1. **Free-block AVL tree** — used by the allocator when `weight == 0` (block is free).
 2. **User-data AVL trees** — used by [pstringview](../include/pmm/pstringview.h#pmm::pstringview) and [pmap](../include/pmm/pmap.h#pmm::pmap) when `weight > 0` (block
@@ -408,12 +408,12 @@ FreeBlock                    ← correct: weight=0, root_offset=0, in AVL
 
 | State | `weight` | `root_offset` | In AVL | Valid? | Notes |
 |-------|----------|---------------|--------|--------|-------|
-| [FreeBlock](../include/pmm/block_state.h#pmm::FreeBlock) | 0 | 0 | Yes | ✅ | Correct — free block |
-| [AllocatedBlock](../include/pmm/block_state.h#pmm::AllocatedBlock) | >0 | own idx | No | ✅ | Correct — allocated block |
-| [FreeBlockRemovedAVL](../include/pmm/block_state.h#pmm::FreeBlockRemovedAVL) | 0 | 0 | No | ⚠️ | Transient — only during allocate |
-| [FreeBlockNotInAVL](../include/pmm/block_state.h#pmm::FreeBlockNotInAVL) | 0 | 0 | No | ⚠️ | Transient — only during deallocate |
-| [SplittingBlock](../include/pmm/block_state.h#pmm::SplittingBlock) | 0 | 0 | No | ⚠️ | Transient — during split in allocate |
-| [CoalescingBlock](../include/pmm/block_state.h#pmm::CoalescingBlock) | 0 | 0 | No | ⚠️ | Transient — during coalesce in deallocate |
+| [FreeBlock](../include/pmm/block_state.h#pmm::freeblock) | 0 | 0 | Yes | ✅ | Correct — free block |
+| [AllocatedBlock](../include/pmm/block_state.h#pmm::allocatedblock) | >0 | own idx | No | ✅ | Correct — allocated block |
+| [FreeBlockRemovedAVL](../include/pmm/block_state.h#pmm::freeblockremovedavl) | 0 | 0 | No | ⚠️ | Transient — only during allocate |
+| [FreeBlockNotInAVL](../include/pmm/block_state.h#pmm::freeblocknotinavl) | 0 | 0 | No | ⚠️ | Transient — only during deallocate |
+| [SplittingBlock](../include/pmm/block_state.h#pmm::splittingblock) | 0 | 0 | No | ⚠️ | Transient — during split in allocate |
+| [CoalescingBlock](../include/pmm/block_state.h#pmm::coalescingblock) | 0 | 0 | No | ⚠️ | Transient — during coalesce in deallocate |
 | — | 0 | ≠0 | — | ❌ | Invalid — contradiction |
 | — | >0 | 0 | — | ❌ | Invalid — contradiction |
 | — | >0 | own idx | Yes | ❌ | Invalid — allocated block in AVL |
@@ -474,8 +474,8 @@ public:
 
 | Transient state | Detection | Recovery |
 |-----------------|-----------|----------|
-| [FreeBlockRemovedAVL](../include/pmm/block_state.h#pmm::FreeBlockRemovedAVL) | `weight=0`, `root_offset=0`, not reachable in AVL after rebuild | `avl_insert(idx)` |
-| [FreeBlockNotInAVL](../include/pmm/block_state.h#pmm::FreeBlockNotInAVL) | Same as above | `avl_insert(idx)` |
+| [FreeBlockRemovedAVL](../include/pmm/block_state.h#pmm::freeblockremovedavl) | `weight=0`, `root_offset=0`, not reachable in AVL after rebuild | `avl_insert(idx)` |
+| [FreeBlockNotInAVL](../include/pmm/block_state.h#pmm::freeblocknotinavl) | Same as above | `avl_insert(idx)` |
 | Partial coalesce | Forward/backward inconsistency in linked list | `repair_linked_list()` |
 
 ### Crash recovery guarantees by interruption scenario
@@ -505,7 +505,7 @@ point**, where partially completed allocation operations are treated as "not per
 
 ## User-data AVL trees ([pstringview](../include/pmm/pstringview.h#pmm::pstringview), [pmap](../include/pmm/pmap.h#pmm::pmap))
 
-[pstringview](../include/pmm/pstringview.h#pmm::pstringview) and [pmap](../include/pmm/pmap.h#pmm::pmap) use the same [TreeNode](../include/pmm/tree_node.h#pmm::TreeNode) fields inside allocated blocks to
+[pstringview](../include/pmm/pstringview.h#pmm::pstringview) and [pmap](../include/pmm/pmap.h#pmm::pmap) use the same [TreeNode](../include/pmm/tree_node.h#pmm::treenode) fields inside allocated blocks to
 organize their own AVL trees. This is entirely separate from the free-block AVL tree.
 
 ### Persistence of user-data trees

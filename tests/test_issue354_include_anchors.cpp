@@ -32,11 +32,43 @@ std::size_t line_number_at( std::string_view text, std::size_t pos )
     return line;
 }
 
-bool is_anchor_comment( std::string_view comment )
+std::size_t anchor_segment_count( std::string_view anchor )
 {
-    static const std::regex anchor_pattern(
-        R"re(^/\*\n(##|###) [A-Za-z_][A-Za-z0-9_]*(::[A-Za-z_~][A-Za-z0-9_~]*)*\n\s*\*/$)re" );
-    return std::regex_match( std::string( comment ), anchor_pattern );
+    std::size_t count = 1;
+    std::size_t pos   = 0;
+    while ( ( pos = anchor.find( "::", pos ) ) != std::string_view::npos )
+    {
+        ++count;
+        pos += 2;
+    }
+    return count;
+}
+
+bool is_anchor_name( std::string_view anchor )
+{
+    static const std::regex anchor_pattern( R"re(^[a-z_~][a-z0-9_~]*(::[a-z_~][a-z0-9_~]*)*$)re" );
+    return std::regex_match( std::string( anchor ), anchor_pattern );
+}
+
+std::string validate_anchor_comment_format( std::string_view comment )
+{
+    static const std::regex comment_pattern( R"re(^/\*\n(#+) ([^\n]+)\n\s*\*/$)re" );
+
+    std::smatch match;
+    const auto  comment_text = std::string( comment );
+    if ( !std::regex_match( comment_text, match, comment_pattern ) )
+        return "block comment is not a PMM anchor";
+
+    const auto heading_depth = match[1].str().size();
+    const auto anchor        = match[2].str();
+    if ( !is_anchor_name( anchor ) )
+        return "anchor name must contain only lowercase ASCII segments";
+
+    const auto segment_count = anchor_segment_count( anchor );
+    if ( heading_depth != segment_count )
+        return "anchor heading depth must match the number of ::-separated name segments";
+
+    return {};
 }
 
 void skip_quoted_literal( std::string_view text, std::size_t& pos )
@@ -170,11 +202,12 @@ std::vector<std::string> validate_comments_are_anchors( const std::filesystem::p
                 break;
             }
 
-            const auto comment = std::string_view( text ).substr( pos, end + 2 - pos );
-            if ( !is_anchor_comment( comment ) )
+            const auto comment            = std::string_view( text ).substr( pos, end + 2 - pos );
+            const auto validation_failure = validate_anchor_comment_format( comment );
+            if ( !validation_failure.empty() )
             {
                 std::ostringstream failure;
-                failure << path << ':' << line_number_at( text, pos ) << ": block comment is not a PMM anchor";
+                failure << path << ':' << line_number_at( text, pos ) << ": " << validation_failure;
                 failures.push_back( failure.str() );
             }
             pos = end + 2;
@@ -189,11 +222,15 @@ std::vector<std::string> validate_comments_are_anchors( const std::filesystem::p
 
 std::vector<std::string> anchors_in( const std::string& text )
 {
-    static const std::regex anchor_pattern(
-        R"re(/\*\n(?:##|###) ([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_~][A-Za-z0-9_~]*)*)\n\s*\*/)re" );
+    static const std::regex  anchor_pattern( R"re(/\*\n(#+) ([a-z_~][a-z0-9_~]*(?:::[a-z_~][a-z0-9_~]*)*)\n\s*\*/)re" );
     std::vector<std::string> anchors;
     for ( std::sregex_iterator it( text.begin(), text.end(), anchor_pattern ), end; it != end; ++it )
-        anchors.push_back( ( *it )[1].str() );
+    {
+        const auto heading_depth = static_cast<std::size_t>( ( *it )[1].length() );
+        const auto anchor        = ( *it )[2].str();
+        if ( heading_depth == anchor_segment_count( anchor ) )
+            anchors.push_back( anchor );
+    }
     return anchors;
 }
 
@@ -206,8 +243,7 @@ bool file_contains_anchor( const std::filesystem::path& path, const std::string&
 std::vector<std::string> validate_markdown_include_links( const std::filesystem::path& repo_root,
                                                           const std::filesystem::path& path )
 {
-    static const std::regex link_pattern(
-        R"re(\[[^\]]+\]\(([^)#]*include/pmm/[^)#]+\.(?:h|inc))#([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_~][A-Za-z0-9_~]*)*)\))re" );
+    static const std::regex  link_pattern( R"re(\[[^\]]+\]\(([^)#]*include/pmm/[^)#]+\.(?:h|inc))#([^)]+)\))re" );
     const auto               text = read_file( path );
     std::vector<std::string> failures;
 
@@ -221,6 +257,14 @@ std::vector<std::string> validate_markdown_include_links( const std::filesystem:
 
         const auto target_path = repo_root / target;
         const auto anchor      = ( *it )[2].str();
+        if ( !is_anchor_name( anchor ) )
+        {
+            std::ostringstream failure;
+            failure << path << ": linked anchor is not lowercase PMM anchor: " << target << '#' << anchor;
+            failures.push_back( failure.str() );
+            continue;
+        }
+
         if ( !std::filesystem::exists( target_path ) )
         {
             std::ostringstream failure;
@@ -269,7 +313,7 @@ std::vector<std::string> validate_removed_secondary_single_header( const std::fi
 
 } // namespace
 
-TEST_CASE( "issue354: include comments are limited to code anchors", "[issue354][docs]" )
+TEST_CASE( "issue354: include comments are lowercase depth-matched code anchors", "[issue354][docs]" )
 {
     const std::filesystem::path repo_root = PMM_SOURCE_DIR;
 

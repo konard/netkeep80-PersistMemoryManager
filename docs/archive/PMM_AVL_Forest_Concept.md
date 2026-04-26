@@ -5,7 +5,7 @@
 
 ## Назначение документа
 
-Этот документ описывает **расширенную концептуальную модель `AVL-forest` для [PersistMemoryManager](../../include/pmm/persist_memory_manager.h#pmm::PersistMemoryManager)** как
+Этот документ описывает **расширенную концептуальную модель `AVL-forest` для [PersistMemoryManager](../../include/pmm/persist_memory_manager.h#pmm::persistmemorymanager)** как
 основы глобального проекта:
 
 - `PMM` как persistent address space manager;
@@ -98,8 +98,8 @@
 
 Для `DefaultAddressTraits` layout таков:
 
-- [TreeNode](../../include/pmm/tree_node.h#pmm::TreeNode) = 24 байта;
-- [Block](../../include/pmm/block.h#pmm::Block) = 32 байта;
+- [TreeNode](../../include/pmm/tree_node.h#pmm::treenode) = 24 байта;
+- [Block](../../include/pmm/block.h#pmm::block) = 32 байта;
 - блок идеально укладывается в 2 гранулы по 16 байт.
 
 Это важное архитектурное ограничение:

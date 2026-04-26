@@ -6,7 +6,7 @@
 namespace pmm {
 
 /*
-## pmm::RecoveryMode
+## pmm::recoverymode
 */
 enum class RecoveryMode : std::uint8_t {
   Verify = 0,
@@ -14,7 +14,7 @@ enum class RecoveryMode : std::uint8_t {
 };
 
 /*
-## pmm::ViolationType
+## pmm::violationtype
 */
 enum class ViolationType : std::uint8_t {
   None = 0,
@@ -29,7 +29,7 @@ enum class ViolationType : std::uint8_t {
 };
 
 /*
-## pmm::DiagnosticAction
+## pmm::diagnosticaction
 */
 enum class DiagnosticAction : std::uint8_t {
   NoAction = 0,
@@ -39,7 +39,7 @@ enum class DiagnosticAction : std::uint8_t {
 };
 
 /*
-## pmm::DiagnosticEntry
+## pmm::diagnosticentry
 */
 struct DiagnosticEntry {
 
@@ -55,7 +55,7 @@ struct DiagnosticEntry {
 inline constexpr std::size_t kMaxDiagnosticEntries = 64;
 
 /*
-## pmm::VerifyResult
+## pmm::verifyresult
 */
 struct VerifyResult {
 
@@ -70,8 +70,8 @@ struct VerifyResult {
   std::size_t entry_count = 0;
 
   /*
-### pmm::VerifyResult::add
-  */
+### pmm::verifyresult::add
+*/
   void add(ViolationType type, DiagnosticAction action,
            std::uint64_t block_index = 0, std::uint64_t expected = 0,
            std::uint64_t actual = 0) noexcept {

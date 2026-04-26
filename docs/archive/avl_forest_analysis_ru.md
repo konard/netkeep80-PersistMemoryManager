@@ -32,7 +32,7 @@
 - Metadata index для блочного стора.
 
 ## Code review: что удачно
-- Хорошо выделен слой адресации ([AddressTraits](../../include/pmm/address_traits.h#pmm::AddressTraits)).
+- Хорошо выделен слой адресации ([AddressTraits](../../include/pmm/address_traits.h#pmm::addresstraits)).
 - Интрузивные поля дерева в header-е блока — сильное инженерное решение.
 - AVL-примитивы вынесены в generic layer.
 - Есть попытка восстановительного прохода при `load()`.

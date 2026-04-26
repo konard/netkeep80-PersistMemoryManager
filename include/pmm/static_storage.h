@@ -9,7 +9,7 @@
 namespace pmm {
 
 /*
-## pmm::StaticStorage
+## pmm::staticstorage
 */
 template <std::size_t Size, typename AddressTraitsT = DefaultAddressTraits>
 class StaticStorage {
@@ -21,8 +21,8 @@ public:
   using address_traits = AddressTraitsT;
 
   /*
-### pmm::StaticStorage::StaticStorage
-  */
+### pmm::staticstorage::staticstorage
+*/
   StaticStorage() noexcept = default;
   StaticStorage(const StaticStorage &) = delete;
 
@@ -31,24 +31,24 @@ public:
   StaticStorage &operator=(StaticStorage &&) = delete;
 
   /*
-### pmm::StaticStorage::base_ptr
-  */
+### pmm::staticstorage::base_ptr
+*/
   std::uint8_t *base_ptr() noexcept { return _buffer; }
   const std::uint8_t *base_ptr() const noexcept { return _buffer; }
 
   /*
-### pmm::StaticStorage::total_size
-  */
+### pmm::staticstorage::total_size
+*/
   constexpr std::size_t total_size() const noexcept { return Size; }
 
   /*
-### pmm::StaticStorage::expand
-  */
+### pmm::staticstorage::expand
+*/
   bool expand(std::size_t) noexcept { return false; }
 
   /*
-### pmm::StaticStorage::owns_memory
-  */
+### pmm::staticstorage::owns_memory
+*/
   constexpr bool owns_memory() const noexcept { return false; }
 
 private:

@@ -9,7 +9,7 @@
 namespace pmm {
 
 /*
-## pmm::Block
+## pmm::block
 */
 template <typename AddressTraitsT> struct Block : TreeNode<AddressTraitsT> {
 

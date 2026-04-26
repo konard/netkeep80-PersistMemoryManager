@@ -25,7 +25,7 @@ template <typename ManagerT> struct pstring {
 
   /*
 ### pmm::pstring::pstring
-  */
+*/
   pstring() noexcept
       : _length(0), _capacity(0),
         _data_idx(detail::kNullIdx_v<typename ManagerT::address_traits>) {}
@@ -34,7 +34,7 @@ template <typename ManagerT> struct pstring {
 
   /*
 ### pmm::pstring::c_str
-  */
+*/
   const char *c_str() const noexcept {
     if (_data_idx == detail::kNullIdx_v<typename ManagerT::address_traits>)
       return "";
@@ -45,19 +45,19 @@ template <typename ManagerT> struct pstring {
 
   /*
 ### pmm::pstring::size
-  */
+*/
   std::size_t size() const noexcept {
     return static_cast<std::size_t>(_length);
   }
 
   /*
 ### pmm::pstring::empty
-  */
+*/
   bool empty() const noexcept { return _length == 0; }
 
   /*
 ### pmm::pstring::operator_index
-  */
+*/
   char operator[](std::size_t i) const noexcept {
     char *data = resolve_data();
     return (data != nullptr) ? data[i] : '\0';
@@ -65,7 +65,7 @@ template <typename ManagerT> struct pstring {
 
   /*
 ### pmm::pstring::assign
-  */
+*/
   bool assign(const char *s) noexcept {
     if (s == nullptr)
 
@@ -86,7 +86,7 @@ template <typename ManagerT> struct pstring {
 
   /*
 ### pmm::pstring::append
-  */
+*/
   bool append(const char *s) noexcept {
     if (s == nullptr)
       s = "";
@@ -109,7 +109,7 @@ template <typename ManagerT> struct pstring {
 
   /*
 ### pmm::pstring::clear
-  */
+*/
   void clear() noexcept {
     _length = 0;
     if (_data_idx != detail::kNullIdx_v<typename ManagerT::address_traits>) {
@@ -121,7 +121,7 @@ template <typename ManagerT> struct pstring {
 
   /*
 ### pmm::pstring::free_data
-  */
+*/
   void free_data() noexcept {
     if (_data_idx != detail::kNullIdx_v<typename ManagerT::address_traits>) {
       ManagerT::deallocate(
@@ -158,7 +158,7 @@ template <typename ManagerT> struct pstring {
 
   /*
 ### pmm::pstring::operator_less
-  */
+*/
   bool operator<(const pstring &other) const noexcept {
     return std::strcmp(c_str(), other.c_str()) < 0;
   }
@@ -166,7 +166,7 @@ template <typename ManagerT> struct pstring {
 private:
   /*
 ### pmm::pstring::resolve_data
-  */
+*/
   char *resolve_data() const noexcept {
     return reinterpret_cast<char *>(
         detail::resolve_granule_ptr<typename ManagerT::address_traits>(
@@ -176,7 +176,7 @@ private:
 
   /*
 ### pmm::pstring::ensure_capacity
-  */
+*/
   bool ensure_capacity(std::uint32_t required) noexcept {
     if (required <= _capacity)
       return true;

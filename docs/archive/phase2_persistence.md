@@ -12,7 +12,7 @@ This document describes the persistence and reliability improvements implemented
 - **On load:** `load_manager_from_file()` recomputes the CRC32 and compares it to the stored value. If they don't match, load fails.
 - **Backward compatibility:** Images with `crc32 == 0` (saved before Phase 2.1) are accepted without CRC verification.
 
-The CRC32 field uses 4 bytes from the previously reserved `_reserved[8]` space in [ManagerHeader](../../include/pmm/types.h#pmm::detail::ManagerHeader). The struct size remains unchanged (64 bytes for DefaultAddressTraits).
+The CRC32 field uses 4 bytes from the previously reserved `_reserved[8]` space in [ManagerHeader](../../include/pmm/types.h#pmm::detail::managerheader). The struct size remains unchanged (64 bytes for DefaultAddressTraits).
 
 **Files:** `include/pmm/types.h` (CRC32 utility + header field), `include/pmm/io.h` (save/load integration)
 
@@ -33,7 +33,7 @@ If any step fails, the temporary file is cleaned up and the original file remain
 
 ## 2.3 MMapStorage Expand Support
 
-**Problem:** [MMapStorage::expand()](../../include/pmm/mmap_storage.h#pmm::MMapStorage::expand) always returned `false`. Persistent databases backed by mmap files could not grow dynamically.
+**Problem:** [MMapStorage::expand()](../../include/pmm/mmap_storage.h#pmm::mmapstorage::expand) always returned `false`. Persistent databases backed by mmap files could not grow dynamically.
 
 **Solution:** Implemented `expand()` through remap:
 

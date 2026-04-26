@@ -81,7 +81,7 @@ demo/
 
 | Состояние байта | Цвет |
 |-----------------|------|
-| Заголовок менеджера ([ManagerHeader](../../include/pmm/types.h#pmm::detail::ManagerHeader)) | Синий `#4488FF` |
+| Заголовок менеджера ([ManagerHeader](../../include/pmm/types.h#pmm::detail::managerheader)) | Синий `#4488FF` |
 | Заголовок блока (`BlockHeader`), занятый | Тёмно-красный `#882222` |
 | Данные пользователя, занятый блок | Красный `#FF4444` |
 | Заголовок блока, свободный | Тёмно-серый `#444444` |
@@ -303,7 +303,7 @@ PersistMemoryManager
 |-------|-----------------|
 | `PersistMemoryManager::create(buf, size)` | Инициализация при старте |
 | `PersistMemoryManager::load(buf, size)` | Сценарий Persistence Cycle |
-| [PersistMemoryManager::destroy()](../../include/pmm/persist_memory_manager.h#pmm::PersistMemoryManager::destroy) | Сценарий Persistence Cycle, выход |
+| [PersistMemoryManager::destroy()](../../include/pmm/persist_memory_manager.h#pmm::persistmemorymanager::destroy) | Сценарий Persistence Cycle, выход |
 | `PersistMemoryManager::instance()` | Получение синглтона в сценариях |
 | `mgr->allocate(size, align)` | Все сценарии |
 | `mgr->deallocate(ptr)` | Все сценарии |

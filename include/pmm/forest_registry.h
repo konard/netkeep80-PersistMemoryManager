@@ -28,7 +28,7 @@ inline constexpr std::uint8_t kForestBindingFreeTree = 1;
 inline constexpr std::uint8_t kForestDomainFlagSystem = 0x01;
 
 /*
-## pmm::detail::ForestDomainRecord
+### pmm::detail::forestdomainrecord
 */
 template <typename AddressTraitsT> struct ForestDomainRecord {
 
@@ -47,15 +47,15 @@ template <typename AddressTraitsT> struct ForestDomainRecord {
   char name[kForestDomainNameCapacity];
 
   /*
-### pmm::detail::ForestDomainRecord::ForestDomainRecord
-  */
+#### pmm::detail::forestdomainrecord::forestdomainrecord
+*/
   constexpr ForestDomainRecord() noexcept
       : binding_id(0), root_offset(0), symbol_offset(0),
         binding_kind(kForestBindingDirectRoot), flags(0), reserved(0), name{} {}
 };
 
 /*
-## pmm::detail::ForestDomainRegistry
+### pmm::detail::forestdomainregistry
 */
 template <typename AddressTraitsT> struct ForestDomainRegistry {
 
@@ -70,8 +70,8 @@ template <typename AddressTraitsT> struct ForestDomainRegistry {
   ForestDomainRecord<AddressTraitsT> domains[kMaxForestDomains];
 
   /*
-### pmm::detail::ForestDomainRegistry::ForestDomainRegistry
-  */
+#### pmm::detail::forestdomainregistry::forestdomainregistry
+*/
   constexpr ForestDomainRegistry() noexcept
       : magic(kForestRegistryMagic), version(kForestRegistryVersion),
         domain_count(0), next_binding_id(1), domains{} {}

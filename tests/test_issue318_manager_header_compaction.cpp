@@ -85,7 +85,7 @@ TEST_CASE( "issue318: typed API lives in one normal header module", "[issue318][
     REQUIRE( manager_header.find( "static T* resolve_checked" ) == std::string::npos );
 
     REQUIRE( typed_header.find( "class PersistMemoryTypedApi" ) != std::string::npos );
-    REQUIRE( typed_header.find( "### pmm::detail::PersistMemoryTypedApi::reallocate_typed" ) != std::string::npos );
+    REQUIRE( typed_header.find( "#### pmm::detail::persistmemorytypedapi::reallocate_typed" ) != std::string::npos );
     REQUIRE( typed_header.find( "reallocate_typed(pmm::pptr<T, ManagerT> p" ) != std::string::npos );
     REQUIRE( typed_header.find( ".inc" ) == std::string::npos );
     REQUIRE( typed_header.find( ".inl" ) == std::string::npos );

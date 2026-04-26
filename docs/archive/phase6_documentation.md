@@ -8,7 +8,7 @@
 
 ### Проблема
 
-Проект использует политики блокировок ([SharedMutexLock](../../include/pmm/config.h#pmm::config::SharedMutexLock), [NoLock](../../include/pmm/config.h#pmm::config::NoLock)) и атомарные операции
+Проект использует политики блокировок ([SharedMutexLock](../../include/pmm/config.h#pmm::config::sharedmutexlock), [NoLock](../../include/pmm/config.h#pmm::config::nolock)) и атомарные операции
 для обеспечения потокобезопасности, однако модель синхронизации не была формально
 задокументирована. Разработчикам приходилось изучать исходный код, чтобы понять:
 
@@ -28,7 +28,7 @@
 #### Модель потокобезопасности
 
 - Описание стратегии readers–writer lock через шаблонные политики
-- Сравнительная таблица политик [SharedMutexLock](../../include/pmm/config.h#pmm::config::SharedMutexLock) и [NoLock](../../include/pmm/config.h#pmm::config::NoLock)
+- Сравнительная таблица политик [SharedMutexLock](../../include/pmm/config.h#pmm::config::sharedmutexlock) и [NoLock](../../include/pmm/config.h#pmm::config::nolock)
 - Готовые конфигурации и пресеты с указанием политики блокировок
 
 #### Контракты операций
@@ -199,7 +199,7 @@
 #### `BlockPPtr<AT>` адаптер
 
 Легковесная обёртка `(base_ptr, block_index)`, имитирующая интерфейс [pptr](../../include/pmm/pptr.h#pmm::pptr) через
-[BlockTreeNodeProxy](../../include/pmm/avl_tree_mixin.h#pmm::detail::BlockTreeNodeProxy). Позволяет [AvlFreeTree](../../include/pmm/free_block_tree.h#pmm::AvlFreeTree) делегировать ротации, ребалансировку
+[BlockTreeNodeProxy](../../include/pmm/avl_tree_mixin.h#pmm::detail::blocktreenodeproxy). Позволяет [AvlFreeTree](../../include/pmm/free_block_tree.h#pmm::avlfreetree) делегировать ротации, ребалансировку
 и поиск минимума общим AVL-функциям вместо дублирования ~120 строк кода.
 
 #### `AvlInorderIterator<NodePPtr>`
@@ -217,12 +217,12 @@
 
 `StaticConfig<AddressTraitsT, BufferSize>` — общий базовый шаблон для статических
 конфигураций. `SmallEmbeddedStaticConfig` и `EmbeddedStaticConfig` теперь являются
-алиасами [StaticConfig](../../include/pmm/manager_configs.h#pmm::StaticConfig) с соответствующими параметрами.
+алиасами [StaticConfig](../../include/pmm/manager_configs.h#pmm::staticconfig) с соответствующими параметрами.
 
 ### Результат
 
 - **−383 строк** (4029 вставок, 4412 удалений)
 - Все 70 существующих тестов проходят
 - Контейнеры ([pmap](../../include/pmm/pmap.h#pmm::pmap), [pstringview](../../include/pmm/pstringview.h#pmm::pstringview)) делегируют AVL-операции общим функциям
-- [AvlFreeTree](../../include/pmm/free_block_tree.h#pmm::AvlFreeTree) использует [BlockPPtr](../../include/pmm/avl_tree_mixin.h#pmm::detail::BlockPPtr) адаптер вместо собственных ротаций
+- [AvlFreeTree](../../include/pmm/free_block_tree.h#pmm::avlfreetree) использует [BlockPPtr](../../include/pmm/avl_tree_mixin.h#pmm::detail::blockpptr) адаптер вместо собственных ротаций
 - Единообразная инициализация узлов через `avl_init_node` (sentinel `no_block`)
