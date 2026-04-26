@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [3.0.2] - 2026-04-26
+
+### Changed
+- Replace include comments with PMM code anchors and trace Markdown symbol references to those anchors.
+- Remove the secondary generated single-header variant from generation, tests, and docs.
+
+### Fixed
+- Enforce lowercase hyphen-separated include anchors and lowercase Markdown references to them.
+
+### Fixed
+- Align the release workflow with the current single-header generator command so auto and manual releases no longer pass the removed `--strip-comments` option.
+
+
 ## [3.0.1] - 2026-04-21
 
 ### Changed
