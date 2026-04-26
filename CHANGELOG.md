@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [3.0.5] - 2026-04-26
+
+### Changed
+- Compacted PMM kernel headers below the 180000-byte subtree budget and added a regression check for the byte rule.
+
+
 ## [3.0.4] - 2026-04-26
 
 ### Changed
