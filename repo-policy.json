@@ -64,6 +64,15 @@
       "max": 5000,
       "count": "all_tracked",
       "level": "blocking"
+    },
+    {
+      "id": "kernel-subtree-max-bytes",
+      "scope": "directory",
+      "metric": "bytes",
+      "glob": "include/pmm/**",
+      "max": 180000,
+      "count": "all_tracked",
+      "level": "blocking"
     }
   ],
   "surfaces": {
