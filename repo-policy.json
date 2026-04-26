@@ -70,7 +70,7 @@
       "scope": "directory",
       "metric": "bytes",
       "glob": "include/pmm/**",
-      "max": 180000,
+      "max": 100000,
       "count": "all_tracked",
       "level": "blocking"
     }
