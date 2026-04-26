@@ -38,7 +38,7 @@ expected_profiles = {
     "release",
 }
 expected_size_rules = [
-    ("kernel-subtree-max-lines", "directory", "lines", "include/pmm/**", 5000),
+    ("kernel-subtree-max-lines", "directory", "lines", "include/**", 5000),
 ]
 required_governance_paths = {
     ".github/workflows/repo-guard.yml",
@@ -201,7 +201,7 @@ for rule_id, scope, metric, glob, max_size in expected_size_rules:
     )
 require(
     not any("single_include/" in str(rule.get("glob", "")) for rule in size_rules if isinstance(rule, dict)),
-    "size_rules must target canonical include/pmm/**, not generated single_include/**",
+    "size_rules must target canonical include/**, not generated single_include/**",
 )
 
 governance_paths = set(policy.get("paths", {}).get("governance_paths", []))

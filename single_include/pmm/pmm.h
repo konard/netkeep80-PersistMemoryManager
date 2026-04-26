@@ -43,222 +43,8936 @@
 #include <cstdint>
 #include <limits>
 #include <type_traits>
-namespace pmm{using std::size_t;using std::uint8_t;using std::uint16_t;using std::uint32_t;using std::uint64_t;
-/*
-## pmm-addresstraits
-*/
-template<typename IndexT,size_t GranuleSz>struct AddressTraits{static_assert(std::is_unsigned<IndexT>::value,"");static_assert(GranuleSz>=4,"");static_assert((GranuleSz&(GranuleSz-1))==0,"");using index_type=IndexT;static constexpr size_t granule_size=GranuleSz;static constexpr index_type no_block=std::numeric_limits<IndexT>::max();static constexpr index_type bytes_to_granules(size_t bytes)noexcept{if(bytes==0)return static_cast<index_type>(0);if(bytes>std::numeric_limits<size_t>::max()-(granule_size-1))return static_cast<index_type>(0);size_t granules=(bytes+granule_size-1)/granule_size;if(granules>static_cast<size_t>(std::numeric_limits<IndexT>::max()))return static_cast<index_type>(0);return static_cast<index_type>(granules);}static constexpr size_t granules_to_bytes(index_type granules)noexcept{return static_cast<size_t>(granules)*granule_size;}static constexpr size_t idx_to_byte_off(index_type idx)noexcept{return static_cast<size_t>(idx)*granule_size;}static index_type byte_off_to_idx(size_t byte_off)noexcept{assert(byte_off%granule_size==0);assert(byte_off/granule_size<=static_cast<size_t>(std::numeric_limits<IndexT>::max()));return static_cast<index_type>(byte_off/granule_size);}};using SmallAddressTraits=AddressTraits<uint16_t,16>;using DefaultAddressTraits=AddressTraits<uint32_t,16>;using LargeAddressTraits=AddressTraits<uint64_t,64>;}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
 
+AY Ap{j AL::H;j AL::Y;j AL::BV;j AL::Ak;j AL::z;
 /*
 ## pmm-addresstraits
 */
+I<F BJ,H KZ>Au JH{AK(AL::is_unsigned<BJ>::DX,"");AK(KZ>=4,"");AK((KZ&(KZ-1))==0,"");j A=BJ;N Q H P=KZ;N Q A k=AL::Ag<BJ>::IQ();N Q A bytes_to_granules(H IU)D{if(IU==0)B G<A>(0);if(IU>AL::Ag<H>::IQ()-(P-1))B G<A>(0);H Ft=(IU+P-1)/P;if(Ft>G<H>(AL::Ag<BJ>::IQ()))B G<A>(0);B G<A>(Ft);}N Q H Iw(A Ft)D{B G<H>(Ft)*P;}N Q H idx_to_byte_off(A At)D{B G<H>(At)*P;}N A byte_off_to_idx(H BI)D{Gx(BI%P==0);Gx(BI/P<=G<H>(AL::Ag<BJ>::IQ()));B G<A>(BI/P);}};j Ib=JH<BV,16>;j W=JH<Ak,16>;j Ic=JH<z,64>;}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <mutex>
 #include <shared_mutex>
-namespace pmm{namespace config{
-/*
-### pmm-config-sharedmutexlock
-*/
-struct SharedMutexLock{using mutex_type=std::shared_mutex;using shared_lock_type=std::shared_lock<std::shared_mutex>;using unique_lock_type=std::unique_lock<std::shared_mutex>;};
-/*
-### pmm-config-nolock
-*/
-struct NoLock{struct mutex_type{void lock(){}void unlock(){}void lock_shared(){}void unlock_shared(){}bool try_lock(){return true;}bool try_lock_shared(){return true;}};struct shared_lock_type{explicit shared_lock_type(mutex_type&){}};struct unique_lock_type{explicit unique_lock_type(mutex_type&){}};};inline constexpr size_t kDefaultGrowNumerator=5;inline constexpr size_t kDefaultGrowDenominator=4;}}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
 
+AY Ap{AY Gb{
 /*
 ### pmm-config-sharedmutexlock
 */
+Au Hx{j JS=AL::shared_mutex;j Ax=AL::shared_lock<AL::shared_mutex>;j Aw=AL::unique_lock<AL::shared_mutex>;};
 /*
 ### pmm-config-nolock
 */
+Au NoLock{Au JS{V Eo(){}V unlock(){}V lock_shared(){}V unlock_shared(){}AN try_lock(){B Bi;}AN try_lock_shared(){B Bi;}};Au Ax{Eh Ax(JS&){}};Au Aw{Eh Aw(JS&){}};};AO Q H Fe=5;AO Q H FG=4;}}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <type_traits>
-namespace pmm{namespace detail{template<typename IndexT>struct BlockFieldLayout{IndexT weight;IndexT left_offset;IndexT right_offset;IndexT parent_offset;IndexT root_offset;std::int16_t avl_height;uint16_t node_type;IndexT prev_offset;IndexT next_offset;};static_assert(std::is_standard_layout<BlockFieldLayout<uint32_t>>::value,"");
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
+
+AY Ap{AY K{I<F BJ>Au GC{BJ KE;BJ HX;BJ Gn;BJ GF;BJ BW;AL::Bk Ed;BV AW;BJ HS;BJ DG;};AK(AL::is_standard_layout<GC<Ak>>::DX,"");
 #define PMM_BLOCK_FIELD(Tag, Member, ValueType)                               \
-struct Tag{template<typename IndexT>using value_type=ValueType;template<typename IndexT>static constexpr size_t offset()noexcept{return offsetof(BlockFieldLayout<IndexT>,Member);}};
+Au Tag{I<F BJ>j HH=ValueType;I<F BJ>N Q H Bc()D{B Jp(GC<BJ>,Member);}};
 #define PMM_BLOCK_INDEX_FIELD(Tag, Member) PMM_BLOCK_FIELD(Tag, Member, IndexT)
-PMM_BLOCK_INDEX_FIELD(BlockWeightField,weight)PMM_BLOCK_INDEX_FIELD(BlockLeftOffsetField,left_offset)PMM_BLOCK_INDEX_FIELD(BlockRightOffsetField,right_offset)PMM_BLOCK_INDEX_FIELD(BlockParentOffsetField,parent_offset)PMM_BLOCK_INDEX_FIELD(BlockRootOffsetField,root_offset)PMM_BLOCK_FIELD(BlockAvlHeightField,avl_height,std::int16_t)PMM_BLOCK_FIELD(BlockNodeTypeField,node_type,uint16_t)PMM_BLOCK_INDEX_FIELD(BlockPrevOffsetField,prev_offset)PMM_BLOCK_INDEX_FIELD(BlockNextOffsetField,next_offset)template<typename AT,typename FieldTag>struct BlockFieldTraits;template<typename AT,typename FieldTag>struct BlockFieldTraits{using index_type=typename AT::index_type;using value_type=typename FieldTag::template value_type<index_type>;static constexpr size_t offset=FieldTag::template offset<index_type>();};
+Cu(FF,KE)Cu(Do,HX)Cu(Dg,Gn)Cu(DT,GF)Cu(Dn,BW)PMM_BLOCK_FIELD(EH,Ed,AL::Bk)PMM_BLOCK_FIELD(EV,AW,BV)Cu(Fy,HS)Cu(Fz,DG)I<F AT,F Bx>Au He;I<F AT,F Bx>Au He{j A=F AT::A;j HH=F Bx::I HH<A>;N Q H Bc=Bx::I Bc<A>();};
 #undef PMM_BLOCK_INDEX_FIELD
 #undef PMM_BLOCK_FIELD
-template<typename AT,typename FieldTag>using block_field_value_t=typename BlockFieldTraits<AT,FieldTag>::value_type;template<typename AT,typename FieldTag>inline constexpr size_t block_field_offset_v=BlockFieldTraits<AT,FieldTag>::offset;struct BlockFieldByteAccess{template<typename ValueT>static ValueT read(const void*raw,size_t offset)noexcept{ValueT value{};std::memcpy(&value,static_cast<const uint8_t*>(raw)+offset,sizeof(value));return value;}template<typename ValueT>static void write(void*raw,size_t offset,ValueT value)noexcept{std::memcpy(static_cast<uint8_t*>(raw)+offset,&value,sizeof(value));}};template<typename AT,typename FieldTag,typename AccessPolicy=BlockFieldByteAccess>block_field_value_t<AT,FieldTag>read_block_field(const void*raw)noexcept{return AccessPolicy::template read<block_field_value_t<AT,FieldTag>>(raw,block_field_offset_v<AT,FieldTag>);}template<typename AT,typename FieldTag,typename AccessPolicy=BlockFieldByteAccess>void write_block_field(void*raw,block_field_value_t<AT,FieldTag>value)noexcept{AccessPolicy::template write<block_field_value_t<AT,FieldTag>>(raw,block_field_offset_v<AT,FieldTag>,value);}template<typename AT>inline constexpr size_t block_tree_slot_size_v=offsetof(BlockFieldLayout<typename AT::index_type>,prev_offset);template<typename AT>inline constexpr size_t block_layout_size_v=sizeof(BlockFieldLayout<typename AT::index_type>);}}
+I<F AT,F Bx>j EF=F He<AT,Bx>::HH;I<F AT,F Bx>AO Q H Fv=He<AT,Bx>::Bc;Au Hi{I<F Gy>N Gy read(J V*CC,H Bc)D{Gy DX{};AL::Hz(&DX,G<J Y*>(CC)+Bc,AG(DX));B DX;}I<F Gy>N V write(V*CC,H Bc,Gy DX)D{AL::Hz(G<Y*>(CC)+Bc,&DX,AG(DX));}};I<F AT,F Bx,F Jf=Hi>EF<AT,Bx>Cz(J V*CC)D{B Jf::I read<EF<AT,Bx>>(CC,Fv<AT,Bx>);}I<F AT,F Bx,F Jf=Hi>V Ci(V*CC,EF<AT,Bx>DX)D{Jf::I write<EF<AT,Bx>>(CC,Fv<AT,Bx>,DX);}I<F AT>AO Q H block_tree_slot_size_v=Jp(GC<F AT::A>,HS);I<F AT>AO Q H block_layout_size_v=AG(GC<F AT::A>);}}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
-namespace pmm{enum:uint16_t{kNodeReadWrite=0,kNodeReadOnly=1,};
-/*
-## pmm-treenode
-*/
-template<typename AT>struct TreeNode{using address_traits=AT;using index_type=typename AT::index_type;index_type get_left()const noexcept{return detail::read_block_field<AT,detail::BlockLeftOffsetField>(this);}index_type get_right()const noexcept{return detail::read_block_field<AT,detail::BlockRightOffsetField>(this);}index_type get_parent()const noexcept{return detail::read_block_field<AT,detail::BlockParentOffsetField>(this);}index_type get_root()const noexcept{return detail::read_block_field<AT,detail::BlockRootOffsetField>(this);}index_type get_weight()const noexcept{return detail::read_block_field<AT,detail::BlockWeightField>(this);}std::int16_t get_height()const noexcept{return detail::read_block_field<AT,detail::BlockAvlHeightField>(this);}uint16_t get_node_type()const noexcept{return detail::read_block_field<AT,detail::BlockNodeTypeField>(this);}void set_left(index_type v)noexcept{detail::write_block_field<AT,detail::BlockLeftOffsetField>(this,v);}void set_right(index_type v)noexcept{detail::write_block_field<AT,detail::BlockRightOffsetField>(this,v);}void set_parent(index_type v)noexcept{detail::write_block_field<AT,detail::BlockParentOffsetField>(this,v);}void set_root(index_type v)noexcept{detail::write_block_field<AT,detail::BlockRootOffsetField>(this,v);}void set_weight(index_type v)noexcept{detail::write_block_field<AT,detail::BlockWeightField>(this,v);}void set_height(std::int16_t v)noexcept{detail::write_block_field<AT,detail::BlockAvlHeightField>(this,v);}void set_node_type(uint16_t v)noexcept{detail::write_block_field<AT,detail::BlockNodeTypeField>(this,v);}protected:index_type weight;index_type left_offset;index_type right_offset;index_type parent_offset;index_type root_offset;std::int16_t avl_height;uint16_t node_type;};static_assert(std::is_standard_layout<pmm::TreeNode<pmm::DefaultAddressTraits>>::value,"");}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
 
+AY Ap{enum:BV{Gw=0,Db=1,};
 /*
 ## pmm-treenode
 */
+I<F AT>Au HP{j E=AT;j A=F AT::A;A get_left()J D{B K::Cz<AT,K::Do>(BN);}A get_right()J D{B K::Cz<AT,K::Dg>(BN);}A get_parent()J D{B K::Cz<AT,K::DT>(BN);}A get_root()J D{B K::Cz<AT,K::Dn>(BN);}A Ar()J D{B K::Cz<AT,K::FF>(BN);}AL::Bk get_height()J D{B K::Cz<AT,K::EH>(BN);}BV Dc()J D{B K::Cz<AT,K::EV>(BN);}V set_left(A v)D{K::Ci<AT,K::Do>(BN,v);}V set_right(A v)D{K::Ci<AT,K::Dg>(BN,v);}V set_parent(A v)D{K::Ci<AT,K::DT>(BN,v);}V set_root(A v)D{K::Ci<AT,K::Dn>(BN,v);}V JM(A v)D{K::Ci<AT,K::FF>(BN,v);}V JO(AL::Bk v)D{K::Ci<AT,K::EH>(BN,v);}V set_node_type(BV v)D{K::Ci<AT,K::EV>(BN,v);}protected:A KE;A HX;A Gn;A GF;A BW;AL::Bk Ed;BV AW;};AK(AL::is_standard_layout<Ap::HP<Ap::W>>::DX,"");}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <cstdint>
 #include <type_traits>
-namespace pmm{
-/*
-## pmm-block
-*/
-template<typename AT>struct Block:TreeNode<AT>{using address_traits=AT;using index_type=typename AT::index_type;protected:index_type prev_offset;index_type next_offset;};static_assert(sizeof(pmm::Block<pmm::DefaultAddressTraits>)==32,"");}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
 
+AY Ap{
 /*
 ## pmm-block
 */
+I<F AT>Au Ao:HP<AT>{j E=AT;j A=F AT::A;protected:A HS;A DG;};AK(AG(Ap::Ao<Ap::W>)==32,"");}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <cstddef>
 #include <cstdint>
-namespace pmm{using std::size_t;using std::uint8_t;using std::uint16_t;using std::uint32_t;using std::uint64_t;
-/*
-## pmm-recoverymode
-*/
-enum class RecoveryMode:uint8_t{Verify=0,Repair=1,};
-/*
-## pmm-violationtype
-*/
-enum class ViolationType:uint8_t{None=0,BlockStateInconsistent,PrevOffsetMismatch,CounterMismatch,FreeTreeStale,ForestRegistryMissing,ForestDomainMissing,ForestDomainFlagsMissing,HeaderCorruption,};
-/*
-## pmm-diagnosticaction
-*/
-enum class DiagnosticAction:uint8_t{NoAction=0,Repaired,Rebuilt,Aborted,};
-/*
-## pmm-diagnosticentry
-*/
-struct DiagnosticEntry{ViolationType type=ViolationType::None;DiagnosticAction action=DiagnosticAction::NoAction;uint64_t block_index=0;uint64_t expected=0;uint64_t actual=0;};inline constexpr size_t kMaxDiagnosticEntries=64;
-/*
-## pmm-verifyresult
-*/
-struct VerifyResult{RecoveryMode mode=RecoveryMode::Verify;bool ok=true;size_t violation_count=0;DiagnosticEntry entries[kMaxDiagnosticEntries]={};size_t entry_count=0;void add(ViolationType type,DiagnosticAction action,uint64_t block_index=0,uint64_t expected=0,uint64_t actual=0)noexcept{ok=false;violation_count++;if(entry_count<kMaxDiagnosticEntries){entries[entry_count].type=type;entries[entry_count].action=action;entries[entry_count].block_index=block_index;entries[entry_count].expected=expected;entries[entry_count].actual=actual;entry_count++;}}};}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
 
+AY Ap{j AL::H;j AL::Y;j AL::BV;j AL::Ak;j AL::z;
 /*
 ## pmm-recoverymode
 */
+enum Dt ID:Y{Verify=0,Repair=1,};
 /*
 ## pmm-violationtype
 */
+enum Dt AF:Y{None=0,CO,PrevOffsetMismatch,CounterMismatch,CN,Fl,IK,Gf,CS,};
 /*
 ## pmm-diagnosticaction
 */
+enum Dt o:Y{Bg=0,Repaired,Rebuilt,GT,};
 /*
 ## pmm-diagnosticentry
 */
+Au DiagnosticEntry{AF Ji=AF::None;o action=o::Bg;z Im=0;z expected=0;z actual=0;};AO Q H HY=64;
 /*
 ## pmm-verifyresult
 */
+Au Bq{ID mode=ID::Verify;AN ok=Bi;H violation_count=0;DiagnosticEntry GJ[HY]={};H Ce=0;V Fw(AF Ji,o action,z Im=0,z expected=0,z actual=0)D{ok=X;violation_count++;if(Ce<HY){GJ[Ce].Ji=Ji;GJ[Ce].action=action;GJ[Ce].Im=Im;GJ[Ce].expected=expected;GJ[Ce].actual=actual;Ce++;}}};}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <type_traits>
-namespace pmm{template<typename AT>class FreeBlock;template<typename AT>class AllocatedBlock;template<typename AT>class FreeBlockRemovedAVL;template<typename AT>class FreeBlockNotInAVL;template<typename AT>class SplittingBlock;template<typename AT>class CoalescingBlock;
-/*
-## pmm-blockstatebase
-*/
-template<typename AT>class BlockStateBase:private Block<AT>{private:using TNode=TreeNode<AT>;public:using address_traits=AT;using index_type=typename AT::index_type;using BaseBlock=Block<AT>;template<typename FieldTag>using field_value_type=detail::block_field_value_t<AT,FieldTag>;template<typename FieldTag>static constexpr size_t field_offset=detail::block_field_offset_v<AT,FieldTag>;template<typename FieldTag>static field_value_type<FieldTag>get_field_of(const void*raw_blk)noexcept{return detail::read_block_field<AT,FieldTag>(raw_blk);}template<typename FieldTag>static void set_field_of(void*raw_blk,field_value_type<FieldTag>value)noexcept{detail::write_block_field<AT,FieldTag>(raw_blk,value);}static bool is_free_raw(const void*raw_blk)noexcept{return get_weight(raw_blk)==0&&get_root_offset(raw_blk)==0;}static bool is_allocated_raw(const void*raw_blk,index_type own_idx)noexcept{return get_weight(raw_blk)>0&&get_root_offset(raw_blk)==own_idx;}static constexpr size_t kOffsetPrevOffset=field_offset<detail::BlockPrevOffsetField>;static constexpr size_t kOffsetNextOffset=field_offset<detail::BlockNextOffsetField>;static constexpr size_t kOffsetWeight=field_offset<detail::BlockWeightField>;static constexpr size_t kOffsetLeftOffset=field_offset<detail::BlockLeftOffsetField>;static constexpr size_t kOffsetRightOffset=field_offset<detail::BlockRightOffsetField>;static constexpr size_t kOffsetParentOffset=field_offset<detail::BlockParentOffsetField>;static constexpr size_t kOffsetRootOffset=field_offset<detail::BlockRootOffsetField>;static constexpr size_t kOffsetAvlHeight=field_offset<detail::BlockAvlHeightField>;static constexpr size_t kOffsetNodeType=field_offset<detail::BlockNodeTypeField>;static_assert(detail::block_tree_slot_size_v<AT> ==sizeof(TNode),"");static_assert(detail::block_layout_size_v<AT> ==sizeof(BaseBlock),"");BlockStateBase()=delete;index_type weight()const noexcept{return get_weight(this);}index_type prev_offset()const noexcept{return get_prev_offset(this);}index_type next_offset()const noexcept{return get_next_offset(this);}index_type left_offset()const noexcept{return get_left_offset(this);}index_type right_offset()const noexcept{return get_right_offset(this);}index_type parent_offset()const noexcept{return get_parent_offset(this);}std::int16_t avl_height()const noexcept{return get_avl_height(this);}index_type root_offset()const noexcept{return get_root_offset(this);}uint16_t node_type()const noexcept{return get_node_type(this);}
-/*
-### pmm-blockstatebase-is_free
-*/
-bool is_free()const noexcept{return is_free_raw(this);}bool is_allocated(index_type own_idx)const noexcept{return is_allocated_raw(this,own_idx);}bool is_permanently_locked()const noexcept{return node_type()==pmm::kNodeReadOnly;}
-/*
-### pmm-blockstatebase-recover_state
-*/
-static void recover_state(void*raw_blk,index_type own_idx)noexcept{const index_type weight_val=get_weight(raw_blk);const index_type root_val=get_root_offset(raw_blk);if(weight_val>0&&root_val!=own_idx)set_root_offset_of(raw_blk,own_idx);if(weight_val==0&&root_val!=0)set_root_offset_of(raw_blk,0);}
-/*
-### pmm-blockstatebase-verify_state
-*/
-static void verify_state(const void*raw_blk,index_type own_idx,VerifyResult&result)noexcept{const index_type weight_val=get_weight(raw_blk);const index_type root_val=get_root_offset(raw_blk);if(weight_val>0&&root_val!=own_idx){result.add(ViolationType::BlockStateInconsistent,DiagnosticAction::NoAction,static_cast<uint64_t>(own_idx),static_cast<uint64_t>(own_idx),static_cast<uint64_t>(root_val));}if(weight_val==0&&root_val!=0){result.add(ViolationType::BlockStateInconsistent,DiagnosticAction::NoAction,static_cast<uint64_t>(own_idx),0,static_cast<uint64_t>(root_val));}}static void reset_avl_fields_of(void*raw_blk)noexcept{set_left_offset_of(raw_blk,AT::no_block);set_right_offset_of(raw_blk,AT::no_block);set_parent_offset_of(raw_blk,AT::no_block);set_avl_height_of(raw_blk,0);}static void repair_prev_offset(void*raw_blk,index_type prev_idx)noexcept{set_prev_offset_of(raw_blk,prev_idx);}static index_type get_prev_offset(const void*raw_blk)noexcept{return get_field_of<detail::BlockPrevOffsetField>(raw_blk);}static index_type get_next_offset(const void*raw_blk)noexcept{return get_field_of<detail::BlockNextOffsetField>(raw_blk);}static index_type get_weight(const void*raw_blk)noexcept{return get_field_of<detail::BlockWeightField>(raw_blk);}static void init_fields(void*raw_blk,index_type prev_idx,index_type next_idx,std::int16_t avl_height_val,index_type weight_val,index_type root_offset_val)noexcept{set_prev_offset_of(raw_blk,prev_idx);set_next_offset_of(raw_blk,next_idx);set_left_offset_of(raw_blk,AT::no_block);set_right_offset_of(raw_blk,AT::no_block);set_parent_offset_of(raw_blk,AT::no_block);set_avl_height_of(raw_blk,avl_height_val);set_weight_of(raw_blk,weight_val);set_root_offset_of(raw_blk,root_offset_val);}static void set_next_offset_of(void*raw_blk,index_type next_idx)noexcept{set_field_of<detail::BlockNextOffsetField>(raw_blk,next_idx);}static index_type get_left_offset(const void*b)noexcept{return get_field_of<detail::BlockLeftOffsetField>(b);}static index_type get_right_offset(const void*b)noexcept{return get_field_of<detail::BlockRightOffsetField>(b);}static index_type get_parent_offset(const void*b)noexcept{return get_field_of<detail::BlockParentOffsetField>(b);}static index_type get_root_offset(const void*b)noexcept{return get_field_of<detail::BlockRootOffsetField>(b);}static void set_left_offset_of(void*b,index_type v)noexcept{set_field_of<detail::BlockLeftOffsetField>(b,v);}static void set_right_offset_of(void*b,index_type v)noexcept{set_field_of<detail::BlockRightOffsetField>(b,v);}static void set_parent_offset_of(void*b,index_type v)noexcept{set_field_of<detail::BlockParentOffsetField>(b,v);}static void set_prev_offset_of(void*b,index_type v)noexcept{set_field_of<detail::BlockPrevOffsetField>(b,v);}static void set_weight_of(void*b,index_type v)noexcept{set_field_of<detail::BlockWeightField>(b,v);}static void set_root_offset_of(void*b,index_type v)noexcept{set_field_of<detail::BlockRootOffsetField>(b,v);}static std::int16_t get_avl_height(const void*raw_blk)noexcept{return get_field_of<detail::BlockAvlHeightField>(raw_blk);}static void set_avl_height_of(void*raw_blk,std::int16_t v)noexcept{set_field_of<detail::BlockAvlHeightField>(raw_blk,v);}static uint16_t get_node_type(const void*raw_blk)noexcept{return get_field_of<detail::BlockNodeTypeField>(raw_blk);}static void set_node_type_of(void*raw_blk,uint16_t v)noexcept{set_field_of<detail::BlockNodeTypeField>(raw_blk,v);}protected:template<typename StateT>static StateT*state_from_raw(void*raw)noexcept{return reinterpret_cast<StateT*>(raw);}template<typename StateT>static const StateT*state_from_raw(const void*raw)noexcept{return reinterpret_cast<const StateT*>(raw);}template<typename StateT>StateT*state_as()noexcept{return reinterpret_cast<StateT*>(this);}void set_weight(index_type v)noexcept{set_weight_of(this,v);}void set_prev_offset(index_type v)noexcept{set_prev_offset_of(this,v);}void set_next_offset(index_type v)noexcept{set_next_offset_of(this,v);}void set_left_offset(index_type v)noexcept{set_left_offset_of(this,v);}void set_right_offset(index_type v)noexcept{set_right_offset_of(this,v);}void set_parent_offset(index_type v)noexcept{set_parent_offset_of(this,v);}void set_avl_height(std::int16_t v)noexcept{set_avl_height_of(this,v);}void set_root_offset(index_type v)noexcept{set_root_offset_of(this,v);}void set_node_type(uint16_t v)noexcept{set_node_type_of(this,v);}void reset_avl_fields()noexcept{set_left_offset(AT::no_block);set_right_offset(AT::no_block);set_parent_offset(AT::no_block);set_avl_height(0);}};static_assert(sizeof(BlockStateBase<DefaultAddressTraits>)==sizeof(Block<DefaultAddressTraits>),"");static_assert(sizeof(BlockStateBase<DefaultAddressTraits>)==32,"");
-/*
-## pmm-freeblock
-*/
-template<typename AT>class FreeBlock:public BlockStateBase<AT>{public:using Base=BlockStateBase<AT>;using index_type=typename AT::index_type;
-/*
-### pmm-freeblock-cast_from_raw
-*/
-static FreeBlock*cast_from_raw(void*raw)noexcept{if(raw==nullptr)return nullptr;if(!Base::is_free_raw(raw)){assert(false&&"cast_from_raw<FreeBlock>: block is not in FreeBlock state");return nullptr;}return Base::template state_from_raw<FreeBlock<AT>>(raw);}static const FreeBlock*cast_from_raw(const void*raw)noexcept{if(raw==nullptr)return nullptr;if(!Base::is_free_raw(raw)){assert(false&&"cast_from_raw<FreeBlock>: block is not in FreeBlock state");return nullptr;}return Base::template state_from_raw<FreeBlock<AT>>(raw);}
-/*
-### pmm-freeblock-verify_invariants
-*/
-bool verify_invariants()const noexcept{return Base::is_free();}FreeBlockRemovedAVL<AT>*remove_from_avl()noexcept{return this->template state_as<FreeBlockRemovedAVL<AT>>();}};
-/*
-## pmm-freeblockremovedavl
-*/
-template<typename AT>class FreeBlockRemovedAVL:public BlockStateBase<AT>{public:using Base=BlockStateBase<AT>;using index_type=typename AT::index_type;static FreeBlockRemovedAVL*cast_from_raw(void*raw)noexcept{return Base::template state_from_raw<FreeBlockRemovedAVL<AT>>(raw);}AllocatedBlock<AT>*mark_as_allocated(index_type data_granules,index_type own_idx)noexcept{Base::set_weight(data_granules);Base::set_root_offset(own_idx);Base::reset_avl_fields();return this->template state_as<AllocatedBlock<AT>>();}SplittingBlock<AT>*begin_splitting()noexcept{return this->template state_as<SplittingBlock<AT>>();}FreeBlock<AT>*insert_to_avl()noexcept{return this->template state_as<FreeBlock<AT>>();}};
-/*
-## pmm-splittingblock
-*/
-template<typename AT>class SplittingBlock:public BlockStateBase<AT>{public:using Base=BlockStateBase<AT>;using index_type=typename AT::index_type;static SplittingBlock*cast_from_raw(void*raw)noexcept{return Base::template state_from_raw<SplittingBlock<AT>>(raw);}void initialize_new_block(void*new_blk_ptr,[[maybe_unused]]index_type new_idx,index_type own_idx)noexcept{std::memset(new_blk_ptr,0,sizeof(Block<AT>));Base::init_fields(new_blk_ptr,own_idx,this->next_offset(),1,0,0);}void link_new_block(void*old_next_blk,index_type new_idx)noexcept{if(old_next_blk!=nullptr){Base::set_prev_offset_of(old_next_blk,new_idx);}Base::set_next_offset(new_idx);}AllocatedBlock<AT>*finalize_split(index_type data_granules,index_type own_idx)noexcept{Base::set_weight(data_granules);Base::set_root_offset(own_idx);Base::reset_avl_fields();return this->template state_as<AllocatedBlock<AT>>();}};
-/*
-## pmm-allocatedblock
-*/
-template<typename AT>class AllocatedBlock:public BlockStateBase<AT>{public:using Base=BlockStateBase<AT>;using index_type=typename AT::index_type;
-/*
-### pmm-allocatedblock-cast_from_raw
-*/
-static AllocatedBlock*cast_from_raw(void*raw)noexcept{if(raw==nullptr)return nullptr;if(Base::get_weight(raw)==0){assert(false&&"cast_from_raw<AllocatedBlock>: block is not allocated (weight==0)");return nullptr;}return Base::template state_from_raw<AllocatedBlock<AT>>(raw);}static const AllocatedBlock*cast_from_raw(const void*raw)noexcept{if(raw==nullptr)return nullptr;if(Base::get_weight(raw)==0){assert(false&&"cast_from_raw<AllocatedBlock>: block is not allocated (weight==0)");return nullptr;}return Base::template state_from_raw<AllocatedBlock<AT>>(raw);}
-/*
-### pmm-allocatedblock-verify_invariants
-*/
-bool verify_invariants(index_type own_idx)const noexcept{return Base::is_allocated(own_idx);}void*user_ptr()noexcept{return reinterpret_cast<uint8_t*>(this)+sizeof(Block<AT>);}const void*user_ptr()const noexcept{return reinterpret_cast<const uint8_t*>(this)+sizeof(Block<AT>);}FreeBlockNotInAVL<AT>*mark_as_free()noexcept{Base::set_weight(0);Base::set_root_offset(0);return this->template state_as<FreeBlockNotInAVL<AT>>();}};
-/*
-## pmm-freeblocknotinavl
-*/
-template<typename AT>class FreeBlockNotInAVL:public BlockStateBase<AT>{public:using Base=BlockStateBase<AT>;using index_type=typename AT::index_type;static FreeBlockNotInAVL*cast_from_raw(void*raw)noexcept{return Base::template state_from_raw<FreeBlockNotInAVL<AT>>(raw);}CoalescingBlock<AT>*begin_coalescing()noexcept{return this->template state_as<CoalescingBlock<AT>>();}FreeBlock<AT>*insert_to_avl()noexcept{Base::set_avl_height(1);return this->template state_as<FreeBlock<AT>>();}};
-/*
-## pmm-coalescingblock
-*/
-template<typename AT>class CoalescingBlock:public BlockStateBase<AT>{public:using Base=BlockStateBase<AT>;using index_type=typename AT::index_type;static CoalescingBlock*cast_from_raw(void*raw)noexcept{return Base::template state_from_raw<CoalescingBlock<AT>>(raw);}void coalesce_with_next(void*next_blk,void*next_next_blk,index_type own_idx)noexcept{Base::set_next_offset(Base::get_next_offset(next_blk));if(next_next_blk!=nullptr){Base::set_prev_offset_of(next_next_blk,own_idx);}std::memset(next_blk,0,sizeof(Block<AT>));}CoalescingBlock<AT>*coalesce_with_prev(void*prev_blk,void*next_blk,index_type prev_idx)noexcept{Base::set_next_offset_of(prev_blk,Base::next_offset());if(next_blk!=nullptr){Base::set_prev_offset_of(next_blk,prev_idx);}std::memset(this,0,sizeof(Block<AT>));return Base::template state_from_raw<CoalescingBlock<AT>>(prev_blk);}FreeBlock<AT>*finalize_coalesce()noexcept{Base::set_avl_height(1);return this->template state_as<FreeBlock<AT>>();}};template<typename AT>int detect_block_state(const void*raw_blk,typename AT::index_type own_idx)noexcept{using BlockState=BlockStateBase<AT>;if(BlockState::is_free_raw(raw_blk))return 0;if(BlockState::is_allocated_raw(raw_blk,own_idx))return 1;return-1;}template<typename AT>inline void recover_block_state(void*raw_blk,typename AT::index_type own_idx)noexcept{BlockStateBase<AT>::recover_state(raw_blk,own_idx);}template<typename AT>inline void verify_block_state(const void*raw_blk,typename AT::index_type own_idx,VerifyResult&result)noexcept{BlockStateBase<AT>::verify_state(raw_blk,own_idx,result);}}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
 
+AY Ap{I<F AT>Dt DL;I<F AT>Dt Bh;I<F AT>Dt DS;I<F AT>Dt DK;I<F AT>Dt Et;I<F AT>Dt Cw;
 /*
 ## pmm-blockstatebase
 */
+I<F AT>Dt Z:Ew Ao<AT>{Ew:j TNode=HP<AT>;DF:j E=AT;j A=F AT::A;j BaseBlock=Ao<AT>;I<F Bx>j JV=K::EF<AT,Bx>;I<F Bx>N Q H Dx=K::Fv<AT,Bx>;I<F Bx>N JV<Bx>Dw(J V*AZ)D{B K::Cz<AT,Bx>(AZ);}I<F Bx>N V Dv(V*AZ,JV<Bx>DX)D{K::Ci<AT,Bx>(AZ,DX);}N AN Ik(J V*AZ)D{B Ar(AZ)==0&&DP(AZ)==0;}N AN JU(J V*AZ,A CJ)D{B Ar(AZ)>0&&DP(AZ)==CJ;}N Q H kOffsetPrevOffset=Dx<K::Fy>;N Q H kOffsetNextOffset=Dx<K::Fz>;N Q H kOffsetWeight=Dx<K::FF>;N Q H kOffsetLeftOffset=Dx<K::Do>;N Q H kOffsetRightOffset=Dx<K::Dg>;N Q H kOffsetParentOffset=Dx<K::DT>;N Q H kOffsetRootOffset=Dx<K::Dn>;N Q H kOffsetAvlHeight=Dx<K::EH>;N Q H kOffsetNodeType=Dx<K::EV>;AK(K::block_tree_slot_size_v<AT> ==AG(TNode),"");AK(K::block_layout_size_v<AT> ==AG(BaseBlock),"");Z()=EO;A KE()J D{B Ar(BN);}A HS()J D{B FX(BN);}A DG()J D{B AU(BN);}A HX()J D{B Ca(BN);}A Gn()J D{B CQ(BN);}A GF()J D{B CA(BN);}AL::Bk Ed()J D{B Fo(BN);}A BW()J D{B DP(BN);}BV AW()J D{B Dc(BN);}
 /*
 ### pmm-blockstatebase-is_free
 */
+AN is_free()J D{B Ik(BN);}AN is_allocated(A CJ)J D{B JU(BN,CJ);}AN is_permanently_locked()J D{B AW()==Ap::Db;}
 /*
 ### pmm-blockstatebase-recover_state
 */
+N V recover_state(V*AZ,A CJ)D{J A GD=Ar(AZ);J A Hm=DP(AZ);if(GD>0&&Hm!=CJ)FO(AZ,CJ);if(GD==0&&Hm!=0)FO(AZ,0);}
 /*
 ### pmm-blockstatebase-verify_state
 */
+N V Jb(J V*AZ,A CJ,Bq&AM)D{J A GD=Ar(AZ);J A Hm=DP(AZ);if(GD>0&&Hm!=CJ){AM.Fw(AF::CO,o::Bg,G<z>(CJ),G<z>(CJ),G<z>(Hm));}if(GD==0&&Hm!=0){AM.Fw(AF::CO,o::Bg,G<z>(CJ),0,G<z>(Hm));}}N V reset_avl_fields_of(V*AZ)D{Bp(AZ,AT::k);Bd(AZ,AT::k);Ay(AZ,AT::k);DI(AZ,0);}N V repair_prev_offset(V*AZ,A Jm)D{CH(AZ,Jm);}N A FX(J V*AZ)D{B Dw<K::Fy>(AZ);}N A AU(J V*AZ)D{B Dw<K::Fz>(AZ);}N A Ar(J V*AZ)D{B Dw<K::FF>(AZ);}N V Fh(V*AZ,A Jm,A FU,AL::Bk avl_height_val,A GD,A root_offset_val)D{CH(AZ,Jm);Cy(AZ,FU);Bp(AZ,AT::k);Bd(AZ,AT::k);Ay(AZ,AT::k);DI(AZ,avl_height_val);FR(AZ,GD);FO(AZ,root_offset_val);}N V Cy(V*AZ,A FU)D{Dv<K::Fz>(AZ,FU);}N A Ca(J V*b)D{B Dw<K::Do>(b);}N A CQ(J V*b)D{B Dw<K::Dg>(b);}N A CA(J V*b)D{B Dw<K::DT>(b);}N A DP(J V*b)D{B Dw<K::Dn>(b);}N V Bp(V*b,A v)D{Dv<K::Do>(b,v);}N V Bd(V*b,A v)D{Dv<K::Dg>(b,v);}N V Ay(V*b,A v)D{Dv<K::DT>(b,v);}N V CH(V*b,A v)D{Dv<K::Fy>(b,v);}N V FR(V*b,A v)D{Dv<K::FF>(b,v);}N V FO(V*b,A v)D{Dv<K::Dn>(b,v);}N AL::Bk Fo(J V*AZ)D{B Dw<K::EH>(AZ);}N V DI(V*AZ,AL::Bk v)D{Dv<K::EH>(AZ,v);}N BV Dc(J V*AZ)D{B Dw<K::EV>(AZ);}N V JN(V*AZ,BV v)D{Dv<K::EV>(AZ,v);}protected:I<F JZ>N JZ*Co(V*CC)D{B AI<JZ*>(CC);}I<F JZ>N J JZ*Co(J V*CC)D{B AI<J JZ*>(CC);}I<F JZ>JZ*GU()D{B AI<JZ*>(BN);}V JM(A v)D{FR(BN,v);}V set_prev_offset(A v)D{CH(BN,v);}V Jk(A v)D{Cy(BN,v);}V set_left_offset(A v)D{Bp(BN,v);}V set_right_offset(A v)D{Bd(BN,v);}V set_parent_offset(A v)D{Ay(BN,v);}V IO(AL::Bk v)D{DI(BN,v);}V Hl(A v)D{FO(BN,v);}V set_node_type(BV v)D{JN(BN,v);}V JP()D{set_left_offset(AT::k);set_right_offset(AT::k);set_parent_offset(AT::k);IO(0);}};AK(AG(Z<W>)==AG(Ao<W>),"");AK(AG(Z<W>)==32,"");
 /*
 ## pmm-freeblock
 */
+I<F AT>Dt DL:DF Z<AT>{DF:j Dh=Z<AT>;j A=F AT::A;
 /*
 ### pmm-freeblock-cast_from_raw
 */
+N DL*Cm(V*CC)D{if(CC==M)B M;if(!Dh::Ik(CC)){Gx(X&&"cast_from_raw<FreeBlock>: block is not in FreeBlock state");B M;}B Dh::I Co<DL<AT>>(CC);}N J DL*Cm(J V*CC)D{if(CC==M)B M;if(!Dh::Ik(CC)){Gx(X&&"cast_from_raw<FreeBlock>: block is not in FreeBlock state");B M;}B Dh::I Co<DL<AT>>(CC);}
 /*
 ### pmm-freeblock-verify_invariants
 */
+AN verify_invariants()J D{B Dh::is_free();}DS<AT>*remove_from_avl()D{B BN->I GU<DS<AT>>();}};
 /*
 ## pmm-freeblockremovedavl
 */
+I<F AT>Dt DS:DF Z<AT>{DF:j Dh=Z<AT>;j A=F AT::A;N DS*Cm(V*CC)D{B Dh::I Co<DS<AT>>(CC);}Bh<AT>*mark_as_allocated(A Ej,A CJ)D{Dh::JM(Ej);Dh::Hl(CJ);Dh::JP();B BN->I GU<Bh<AT>>();}Et<AT>*begin_splitting()D{B BN->I GU<Et<AT>>();}DL<AT>*insert_to_avl()D{B BN->I GU<DL<AT>>();}};
 /*
 ## pmm-splittingblock
 */
+I<F AT>Dt Et:DF Z<AT>{DF:j Dh=Z<AT>;j A=F AT::A;N Et*Cm(V*CC)D{B Dh::I Co<Et<AT>>(CC);}V initialize_new_block(V*Ii,[[maybe_unused]]A Ey,A CJ)D{AL::Gv(Ii,0,AG(Ao<AT>));Dh::Fh(Ii,CJ,BN->DG(),1,0,0);}V link_new_block(V*Gq,A Ey)D{if(Gq!=M){Dh::CH(Gq,Ey);}Dh::Jk(Ey);}Bh<AT>*finalize_split(A Ej,A CJ)D{Dh::JM(Ej);Dh::Hl(CJ);Dh::JP();B BN->I GU<Bh<AT>>();}};
 /*
 ## pmm-allocatedblock
 */
+I<F AT>Dt Bh:DF Z<AT>{DF:j Dh=Z<AT>;j A=F AT::A;
 /*
 ### pmm-allocatedblock-cast_from_raw
 */
+N Bh*Cm(V*CC)D{if(CC==M)B M;if(Dh::Ar(CC)==0){Gx(X&&"cast_from_raw<AllocatedBlock>: block is not allocated (weight==0)");B M;}B Dh::I Co<Bh<AT>>(CC);}N J Bh*Cm(J V*CC)D{if(CC==M)B M;if(Dh::Ar(CC)==0){Gx(X&&"cast_from_raw<AllocatedBlock>: block is not allocated (weight==0)");B M;}B Dh::I Co<Bh<AT>>(CC);}
 /*
 ### pmm-allocatedblock-verify_invariants
 */
+AN verify_invariants(A CJ)J D{B Dh::is_allocated(CJ);}V*user_ptr()D{B AI<Y*>(BN)+AG(Ao<AT>);}J V*user_ptr()J D{B AI<J Y*>(BN)+AG(Ao<AT>);}DK<AT>*mark_as_free()D{Dh::JM(0);Dh::Hl(0);B BN->I GU<DK<AT>>();}};
 /*
 ## pmm-freeblocknotinavl
 */
+I<F AT>Dt DK:DF Z<AT>{DF:j Dh=Z<AT>;j A=F AT::A;N DK*Cm(V*CC)D{B Dh::I Co<DK<AT>>(CC);}Cw<AT>*begin_coalescing()D{B BN->I GU<Cw<AT>>();}DL<AT>*insert_to_avl()D{Dh::IO(1);B BN->I GU<DL<AT>>();}};
 /*
 ## pmm-coalescingblock
 */
+I<F AT>Dt Cw:DF Z<AT>{DF:j Dh=Z<AT>;j A=F AT::A;N Cw*Cm(V*CC)D{B Dh::I Co<Cw<AT>>(CC);}V coalesce_with_next(V*Er,V*next_next_blk,A CJ)D{Dh::Jk(Dh::AU(Er));if(next_next_blk!=M){Dh::CH(next_next_blk,CJ);}AL::Gv(Er,0,AG(Ao<AT>));}Cw<AT>*coalesce_with_prev(V*prev_blk,V*Er,A Jm)D{Dh::Cy(prev_blk,Dh::DG());if(Er!=M){Dh::CH(Er,Jm);}AL::Gv(BN,0,AG(Ao<AT>));B Dh::I Co<Cw<AT>>(prev_blk);}DL<AT>*JA()D{Dh::IO(1);B BN->I GU<DL<AT>>();}};I<F AT>int detect_block_state(J V*AZ,F AT::A CJ)D{j R=Z<AT>;if(R::Ik(AZ))B 0;if(R::JU(AZ,CJ))B 1;B-1;}I<F AT>AO V recover_block_state(V*AZ,F AT::A CJ)D{Z<AT>::recover_state(AZ,CJ);}I<F AT>AO V verify_block_state(J V*AZ,F AT::A CJ,Bq&AM)D{Z<AT>::Jb(AZ,CJ,AM);}}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <cstddef>
 #include <cstdint>
 #include <limits>
-namespace pmm{namespace detail{template<typename AT>inline bool validate_block_index(size_t total_size,typename AT::index_type idx)noexcept{if(idx==AT::no_block)return false;size_t byte_off=static_cast<size_t>(idx)*AT::granule_size;if(idx!=0&&byte_off/AT::granule_size!=static_cast<size_t>(idx))return false;if(byte_off+sizeof(pmm::Block<AT>)>total_size)return false;return true;}template<typename AT>inline bool validate_user_ptr(const uint8_t*base,size_t total_size,const void*ptr,size_t min_user_offset)noexcept{if(ptr==nullptr||base==nullptr)return false;if(min_user_offset<sizeof(pmm::Block<AT>))return false;if(total_size<min_user_offset)return false;const auto*raw_ptr=static_cast<const uint8_t*>(ptr);const std::uintptr_t raw_addr=reinterpret_cast<std::uintptr_t>(raw_ptr);const std::uintptr_t base_addr=reinterpret_cast<std::uintptr_t>(base);if(raw_addr<base_addr)return false;const size_t byte_off=static_cast<size_t>(raw_addr-base_addr);if(byte_off>=total_size)return false;if(byte_off<min_user_offset)return false;static constexpr size_t kBlockSize=sizeof(pmm::Block<AT>);size_t cand_off=byte_off-kBlockSize;if(cand_off%AT::granule_size!=0)return false;return true;}template<typename AT>inline bool validate_link_index(size_t total_size,typename AT::index_type idx)noexcept{if(idx==AT::no_block)return true;return validate_block_index<AT>(total_size,idx);}template<typename AT>inline void validate_block_header_full(const uint8_t*base,size_t total_size,typename AT::index_type idx,VerifyResult&result)noexcept{using BlockState=pmm::BlockStateBase<AT>;using index_type=typename AT::index_type;if(!validate_block_index<AT>(total_size,idx)){result.add(ViolationType::BlockStateInconsistent,DiagnosticAction::NoAction,static_cast<uint64_t>(idx),0,0);return;}const void*blk_raw=base+static_cast<size_t>(idx)*AT::granule_size;BlockState::verify_state(blk_raw,idx,result);index_type next=BlockState::get_next_offset(blk_raw);if(next!=AT::no_block&&!validate_block_index<AT>(total_size,next)){result.add(ViolationType::BlockStateInconsistent,DiagnosticAction::NoAction,static_cast<uint64_t>(idx),static_cast<uint64_t>(AT::no_block),static_cast<uint64_t>(next));}index_type prev=BlockState::get_prev_offset(blk_raw);if(prev!=AT::no_block&&!validate_block_index<AT>(total_size,prev)){result.add(ViolationType::BlockStateInconsistent,DiagnosticAction::NoAction,static_cast<uint64_t>(idx),static_cast<uint64_t>(AT::no_block),static_cast<uint64_t>(prev));}uint16_t nt=BlockState::get_node_type(blk_raw);if(nt!=pmm::kNodeReadWrite&&nt!=pmm::kNodeReadOnly){result.add(ViolationType::BlockStateInconsistent,DiagnosticAction::NoAction,static_cast<uint64_t>(idx),0,static_cast<uint64_t>(nt));}index_type w=BlockState::get_weight(blk_raw);if(w>0){static constexpr size_t kBlkHdrBytes=sizeof(pmm::Block<AT>);size_t blk_byte_off=static_cast<size_t>(idx)*AT::granule_size;size_t data_bytes=static_cast<size_t>(w)*AT::granule_size;if(blk_byte_off+kBlkHdrBytes+data_bytes>total_size){result.add(ViolationType::BlockStateInconsistent,DiagnosticAction::NoAction,static_cast<uint64_t>(idx),total_size,static_cast<uint64_t>(blk_byte_off+kBlkHdrBytes+data_bytes));}}}}}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
+
+AY Ap{AY K{I<F AT>AO AN Ah(H S,F AT::A At)D{if(At==AT::k)B X;H BI=G<H>(At)*AT::P;if(At!=0&&BI/AT::P!=G<H>(At))B X;if(BI+AG(Ap::Ao<AT>)>S)B X;B Bi;}I<F AT>AO AN validate_user_ptr(J Y*m,H S,J V*Gp,H FW)D{if(Gp==M||m==M)B X;if(FW<AG(Ap::Ao<AT>))B X;if(S<FW)B X;J DH*raw_ptr=G<J Y*>(Gp);J AL::Ei Jl=AI<AL::Ei>(raw_ptr);J AL::Ei GQ=AI<AL::Ei>(m);if(Jl<GQ)B X;J H BI=G<H>(Jl-GQ);if(BI>=S)B X;if(BI<FW)B X;N Q H EE=AG(Ap::Ao<AT>);H Hv=BI-EE;if(Hv%AT::P!=0)B X;B Bi;}I<F AT>AO AN validate_link_index(H S,F AT::A At)D{if(At==AT::k)B Bi;B Ah<AT>(S,At);}I<F AT>AO V validate_block_header_full(J Y*m,H S,F AT::A At,Bq&AM)D{j R=Ap::Z<AT>;j A=F AT::A;if(!Ah<AT>(S,At)){AM.Fw(AF::CO,o::Bg,G<z>(At),0,0);B;}J V*BU=m+G<H>(At)*AT::P;R::Jb(BU,At,AM);A next=R::AU(BU);if(next!=AT::k&&!Ah<AT>(S,next)){AM.Fw(AF::CO,o::Bg,G<z>(At),G<z>(AT::k),G<z>(next));}A It=R::FX(BU);if(It!=AT::k&&!Ah<AT>(S,It)){AM.Fw(AF::CO,o::Bg,G<z>(At),G<z>(AT::k),G<z>(It));}BV nt=R::Dc(BU);if(nt!=Ap::Gw&&nt!=Ap::Db){AM.Fw(AF::CO,o::Bg,G<z>(At),0,G<z>(nt));}A w=R::Ar(BU);if(w>0){N Q H kBlkHdrBytes=AG(Ap::Ao<AT>);H blk_byte_off=G<H>(At)*AT::P;H HK=G<H>(w)*AT::P;if(blk_byte_off+kBlkHdrBytes+HK>S){AM.Fw(AF::CO,o::Bg,G<z>(At),S,G<z>(blk_byte_off+kBlkHdrBytes+HK));}}}}}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <algorithm>
 #include <cassert>
@@ -266,103 +8980,4463 @@ namespace pmm{namespace detail{template<typename AT>inline bool validate_block_i
 #include <cstdint>
 #include <limits>
 #include <ostream>
-namespace pmm{
-/*
-## pmm-pmmerror
-*/
-enum class PmmError:uint8_t{Ok=0,NotInitialized=1,InvalidSize=2,Overflow=3,OutOfMemory=4,ExpandFailed=5,InvalidMagic=6,CrcMismatch=7,SizeMismatch=8,GranuleMismatch=9,BackendError=10,InvalidPointer=11,BlockLocked=12,UnsupportedImageVersion=13,};inline constexpr size_t kGranuleSize=16;static_assert((kGranuleSize&(kGranuleSize-1))==0,"");static_assert(kGranuleSize==pmm::DefaultAddressTraits::granule_size,"");inline constexpr uint64_t kMagic=0x504D4D5F56303938ULL;
-/*
-## pmm-memorystats
-*/
-struct MemoryStats{size_t total_blocks;size_t free_blocks;size_t allocated_blocks;size_t largest_free;size_t smallest_free;size_t total_fragmentation;};struct ManagerInfo{uint64_t magic;size_t total_size;size_t used_size;size_t block_count;size_t free_count;size_t alloc_count;std::ptrdiff_t first_block_offset;std::ptrdiff_t first_free_offset;size_t manager_header_size;};
-/*
-## pmm-blockview
-*/
-struct BlockView{size_t index;std::ptrdiff_t offset;size_t total_size;size_t header_size;size_t user_size;size_t alignment;bool used;};
-/*
-## pmm-freeblockview
-*/
-struct FreeBlockView{std::ptrdiff_t offset;size_t total_size;size_t free_size;std::ptrdiff_t left_offset;std::ptrdiff_t right_offset;std::ptrdiff_t parent_offset;int avl_height;int avl_depth;};namespace detail{inline constexpr uint8_t kLegacyUnversionedImageVersion=0;inline constexpr uint8_t kCurrentImageVersion=1;inline constexpr bool is_supported_image_version(uint8_t image_version)noexcept{return image_version==kLegacyUnversionedImageVersion||image_version==kCurrentImageVersion;}inline constexpr bool image_version_requires_migration(uint8_t image_version)noexcept{return image_version==kLegacyUnversionedImageVersion;}inline uint32_t crc32_accumulate_byte(uint32_t crc,uint8_t byte)noexcept{crc^=byte;for(int bit=0;bit<8;++bit)crc=(crc>>1)^(0xEDB88320U&(~(crc&1U)+1U));return crc;}inline uint32_t compute_crc32(const uint8_t*data,size_t length)noexcept{uint32_t crc=0xFFFFFFFFU;for(size_t i=0;i<length;++i)crc=crc32_accumulate_byte(crc,data[i]);return crc^0xFFFFFFFFU;}static_assert(sizeof(pmm::Block<pmm::DefaultAddressTraits>)==32,"");static_assert(sizeof(pmm::Block<pmm::DefaultAddressTraits>)%kGranuleSize==0,"");static_assert(sizeof(pmm::Block<pmm::DefaultAddressTraits>)==sizeof(pmm::TreeNode<pmm::DefaultAddressTraits>)+2*sizeof(uint32_t),"");static_assert(sizeof(pmm::TreeNode<pmm::DefaultAddressTraits>)==5*sizeof(uint32_t)+4,"");inline constexpr uint32_t kNoBlock=0xFFFFFFFFU;static_assert(kNoBlock==pmm::DefaultAddressTraits::no_block,"");template<typename AT>inline constexpr typename AT::index_type kNoBlock_v=AT::no_block;template<typename AT>inline constexpr typename AT::index_type kNullIdx_v=static_cast<typename AT::index_type>(0);
-/*
-### pmm-detail-managerheader
-*/
-template<typename AT=DefaultAddressTraits>struct ManagerHeader{using index_type=typename AT::index_type;uint64_t magic;uint64_t total_size;index_type used_size;index_type block_count;index_type free_count;index_type alloc_count;index_type first_block_offset;index_type last_block_offset;index_type free_tree_root;bool owns_memory;uint8_t image_version;uint16_t granule_size;uint64_t prev_total_size;uint32_t crc32;index_type root_offset;};static_assert(sizeof(ManagerHeader<DefaultAddressTraits>)==64,"");static_assert(sizeof(ManagerHeader<DefaultAddressTraits>)%kGranuleSize==0,"");template<typename AT>inline constexpr typename AT::index_type kBlockHeaderGranules_t=static_cast<typename AT::index_type>((sizeof(pmm::Block<AT>)+AT::granule_size-1)/AT::granule_size);template<typename AT>inline constexpr size_t manager_header_offset_bytes_v=static_cast<size_t>(kBlockHeaderGranules_t<AT>)*AT::granule_size;template<typename AT>inline ManagerHeader<AT>*manager_header_at(uint8_t*base)noexcept{return reinterpret_cast<ManagerHeader<AT>*>(base+manager_header_offset_bytes_v<AT>);}template<typename AT>inline const ManagerHeader<AT>*manager_header_at(const uint8_t*base)noexcept{return reinterpret_cast<const ManagerHeader<AT>*>(base+manager_header_offset_bytes_v<AT>);}template<typename AT>inline uint32_t compute_image_crc32(const uint8_t*data,size_t length)noexcept{constexpr size_t kHdrOffset=manager_header_offset_bytes_v<AT>;constexpr size_t kCrcOffset=kHdrOffset+offsetof(ManagerHeader<AT>,crc32);constexpr size_t kCrcSize=sizeof(uint32_t);constexpr size_t kAfterCrc=kCrcOffset+kCrcSize;uint32_t crc=0xFFFFFFFFU;for(size_t i=0;i<kCrcOffset&&i<length;++i)crc=crc32_accumulate_byte(crc,data[i]);for(size_t i=0;i<kCrcSize;++i)crc=crc32_accumulate_byte(crc,0x00U);for(size_t i=kAfterCrc;i<length;++i)crc=crc32_accumulate_byte(crc,data[i]);return crc^0xFFFFFFFFU;}inline constexpr uint32_t kManagerHeaderGranules=sizeof(ManagerHeader<DefaultAddressTraits>)/kGranuleSize;inline constexpr size_t kMinBlockSize=sizeof(pmm::Block<pmm::DefaultAddressTraits>)+kGranuleSize;inline constexpr size_t kMinMemorySize=sizeof(pmm::Block<pmm::DefaultAddressTraits>)+sizeof(ManagerHeader<pmm::DefaultAddressTraits>)+sizeof(pmm::Block<pmm::DefaultAddressTraits>)+kMinBlockSize;template<typename AT>inline typename AT::index_type bytes_to_granules_t(size_t bytes){using IndexT=typename AT::index_type;static constexpr size_t kGranSz=AT::granule_size;if(bytes>std::numeric_limits<size_t>::max()-(kGranSz-1))return static_cast<IndexT>(0);size_t granules=(bytes+kGranSz-1)/kGranSz;if(granules>static_cast<size_t>(std::numeric_limits<IndexT>::max()))return static_cast<IndexT>(0);return static_cast<IndexT>(granules);}template<typename AT>inline typename AT::index_type bytes_to_idx_t(size_t bytes){static constexpr size_t kGranSz=AT::granule_size;using IndexT=typename AT::index_type;if(bytes==0)return static_cast<IndexT>(0);if(bytes>std::numeric_limits<size_t>::max()-(kGranSz-1))return AT::no_block;size_t granules=(bytes+kGranSz-1)/kGranSz;if(granules>static_cast<size_t>(std::numeric_limits<IndexT>::max()))return AT::no_block;return static_cast<IndexT>(granules);}template<typename AT>inline size_t idx_to_byte_off_t(typename AT::index_type idx){return static_cast<size_t>(idx)*AT::granule_size;}template<typename AT>inline typename AT::index_type byte_off_to_idx_t(size_t byte_off){using IndexT=typename AT::index_type;assert(byte_off%AT::granule_size==0);assert(byte_off/AT::granule_size<=static_cast<size_t>(std::numeric_limits<IndexT>::max()));return static_cast<IndexT>(byte_off/AT::granule_size);}inline bool is_valid_alignment(size_t align){return align==kGranuleSize;}template<typename AT=pmm::DefaultAddressTraits>inline pmm::Block<AT>*block_at(uint8_t*base,typename AT::index_type idx){assert(idx!=kNoBlock_v<AT>);return reinterpret_cast<pmm::Block<AT>*>(base+static_cast<size_t>(idx)*AT::granule_size);}template<typename AT=pmm::DefaultAddressTraits>inline const pmm::Block<AT>*block_at(const uint8_t*base,typename AT::index_type idx){assert(idx!=kNoBlock_v<AT>);return reinterpret_cast<const pmm::Block<AT>*>(base+static_cast<size_t>(idx)*AT::granule_size);}template<typename AT=pmm::DefaultAddressTraits>inline pmm::Block<AT>*block_at_checked(uint8_t*base,size_t total_size,typename AT::index_type idx)noexcept{if(!validate_block_index<AT>(total_size,idx))return nullptr;return reinterpret_cast<pmm::Block<AT>*>(base+static_cast<size_t>(idx)*AT::granule_size);}template<typename AT=pmm::DefaultAddressTraits>inline const pmm::Block<AT>*block_at_checked(const uint8_t*base,size_t total_size,typename AT::index_type idx)noexcept{if(!validate_block_index<AT>(total_size,idx))return nullptr;return reinterpret_cast<const pmm::Block<AT>*>(base+static_cast<size_t>(idx)*AT::granule_size);}template<typename AT>inline typename AT::index_type block_idx_t(const uint8_t*base,const pmm::Block<AT>*block){size_t byte_off=reinterpret_cast<const uint8_t*>(block)-base;assert(byte_off%AT::granule_size==0);return static_cast<typename AT::index_type>(byte_off/AT::granule_size);}template<typename AT>inline constexpr typename AT::index_type kManagerHeaderGranules_t=static_cast<typename AT::index_type>((sizeof(ManagerHeader<AT>)+AT::granule_size-1)/AT::granule_size);template<typename AT>inline typename AT::index_type block_total_granules(const uint8_t*base,const ManagerHeader<AT>*hdr,const pmm::Block<AT>*blk){using BlockState=pmm::BlockStateBase<AT>;static constexpr size_t kGranSz=AT::granule_size;using IndexT=typename AT::index_type;static constexpr IndexT kNoBlk=AT::no_block;size_t byte_off=reinterpret_cast<const uint8_t*>(blk)-base;IndexT this_idx=static_cast<IndexT>(byte_off/kGranSz);IndexT next_off=BlockState::get_next_offset(blk);IndexT total_gran=static_cast<IndexT>(hdr->total_size/kGranSz);if(next_off!=kNoBlk)return static_cast<IndexT>(next_off-this_idx);return static_cast<IndexT>(total_gran-this_idx);}template<typename AT>inline void*resolve_granule_ptr(uint8_t*base,typename AT::index_type idx)noexcept{return(idx==static_cast<typename AT::index_type>(0))?nullptr:base+static_cast<size_t>(idx)*AT::granule_size;}template<typename AT>inline void*resolve_granule_ptr_checked(uint8_t*base,size_t total_size,typename AT::index_type idx)noexcept{if(idx==static_cast<typename AT::index_type>(0))return nullptr;size_t byte_off=static_cast<size_t>(idx)*AT::granule_size;if(byte_off>=total_size)return nullptr;return base+byte_off;}template<typename AT>inline typename AT::index_type ptr_to_granule_idx(const uint8_t*base,const void*ptr)noexcept{return static_cast<typename AT::index_type>((static_cast<const uint8_t*>(ptr)-base)/AT::granule_size);}template<typename AT>inline typename AT::index_type ptr_to_granule_idx_checked(const uint8_t*base,size_t total_size,const void*ptr)noexcept{using IndexT=typename AT::index_type;if(ptr==nullptr||base==nullptr)return AT::no_block;const auto*raw=static_cast<const uint8_t*>(ptr);if(raw<base||raw>=base+total_size)return AT::no_block;size_t byte_off=static_cast<size_t>(raw-base);if(byte_off%AT::granule_size!=0)return AT::no_block;size_t idx=byte_off/AT::granule_size;if(idx>static_cast<size_t>(std::numeric_limits<IndexT>::max()))return AT::no_block;return static_cast<IndexT>(idx);}template<typename AT=pmm::DefaultAddressTraits>inline void*user_ptr(pmm::Block<AT>*block){return reinterpret_cast<uint8_t*>(block)+sizeof(pmm::Block<AT>);}template<typename AT>inline bool is_block_header_linked_in_canonical_chain(const uint8_t*base,const ManagerHeader<AT>*hdr,size_t total_size,typename AT::index_type cand_idx)noexcept{using BlockState=pmm::BlockStateBase<AT>;using IndexT=typename AT::index_type;if(base==nullptr||hdr==nullptr)return false;if(hdr->block_count==0||hdr->first_block_offset==AT::no_block)return false;if(!validate_block_index<AT>(total_size,hdr->first_block_offset)||!validate_block_index<AT>(total_size,hdr->last_block_offset))return false;const void*cand=base+static_cast<size_t>(cand_idx)*AT::granule_size;const IndexT prev=BlockState::get_prev_offset(cand);const IndexT next=BlockState::get_next_offset(cand);if(prev==AT::no_block){if(cand_idx!=hdr->first_block_offset)return false;}else{if(!validate_block_index<AT>(total_size,prev)||prev>=cand_idx)return false;const void*prev_block=base+static_cast<size_t>(prev)*AT::granule_size;if(BlockState::get_next_offset(prev_block)!=cand_idx)return false;}if(next==AT::no_block){if(cand_idx!=hdr->last_block_offset)return false;}else{if(!validate_block_index<AT>(total_size,next)||next<=cand_idx)return false;const void*next_block=base+static_cast<size_t>(next)*AT::granule_size;if(BlockState::get_prev_offset(next_block)!=cand_idx)return false;}return true;}template<typename AT>inline bool is_canonical_allocated_block_header(const uint8_t*base,size_t total_size,const uint8_t*cand_addr)noexcept{using BlockState=pmm::BlockStateBase<AT>;using IndexT=typename AT::index_type;if(base==nullptr||cand_addr==nullptr)return false;const std::uintptr_t base_addr=reinterpret_cast<std::uintptr_t>(base);const std::uintptr_t cand_raw=reinterpret_cast<std::uintptr_t>(cand_addr);if(cand_raw<base_addr)return false;const size_t cand_off=static_cast<size_t>(cand_raw-base_addr);if(cand_off%AT::granule_size!=0)return false;if(cand_off/AT::granule_size>static_cast<size_t>(std::numeric_limits<IndexT>::max()))return false;const IndexT cand_idx=static_cast<IndexT>(cand_off/AT::granule_size);if(!validate_block_index<AT>(total_size,cand_idx))return false;const IndexT weight=BlockState::get_weight(cand_addr);if(weight==0||BlockState::get_root_offset(cand_addr)!=cand_idx)return false;const uint16_t node_type=BlockState::get_node_type(cand_addr);if(node_type!=pmm::kNodeReadWrite&&node_type!=pmm::kNodeReadOnly)return false;if(total_size<manager_header_offset_bytes_v<AT>+sizeof(ManagerHeader<AT>))return false;const auto*hdr=manager_header_at<AT>(base);if(hdr->total_size!=total_size)return false;if(!is_block_header_linked_in_canonical_chain<AT>(base,hdr,total_size,cand_idx))return false;constexpr size_t kBlockSize=sizeof(pmm::Block<AT>);if(cand_off>total_size-kBlockSize)return false;const size_t data_start=cand_off+kBlockSize;if(static_cast<size_t>(weight)>(std::numeric_limits<size_t>::max)()/AT::granule_size)return false;const size_t data_bytes=static_cast<size_t>(weight)*AT::granule_size;if(data_bytes>total_size-data_start)return false;return true;}template<typename AT>inline bool is_canonical_user_ptr(const uint8_t*base,size_t total_size,const void*ptr)noexcept{constexpr size_t kBlockSize=sizeof(pmm::Block<AT>);const size_t min_user_offset=kBlockSize+sizeof(ManagerHeader<AT>)+kBlockSize;if(!validate_user_ptr<AT>(base,total_size,ptr,min_user_offset))return false;const auto*raw_ptr=static_cast<const uint8_t*>(ptr);const auto*cand_addr=raw_ptr-kBlockSize;if(cand_addr+kBlockSize!=raw_ptr)return false;return is_canonical_allocated_block_header<AT>(base,total_size,cand_addr);}template<typename AT>inline pmm::Block<AT>*header_from_ptr_t(uint8_t*base,void*ptr,size_t total_size){static constexpr size_t kBlockSize=sizeof(pmm::Block<AT>);if(!is_canonical_user_ptr<AT>(base,total_size,ptr))return nullptr;uint8_t*cand_addr=static_cast<uint8_t*>(ptr)-kBlockSize;return reinterpret_cast<pmm::Block<AT>*>(cand_addr);}template<typename AT>inline typename AT::index_type required_block_granules_t(size_t user_bytes){using index_type=typename AT::index_type;index_type data_granules=bytes_to_granules_t<AT>(user_bytes);if(data_granules==0)data_granules=1;return kBlockHeaderGranules_t<AT>+data_granules;}}}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
 
+AY Ap{
 /*
 ## pmm-pmmerror
 */
+enum Dt AE:Y{Ok=0,IX=1,Gd=2,Io=3,Dy=4,ExpandFailed=5,InvalidMagic=6,CrcMismatch=7,SizeMismatch=8,KB=9,Ee=10,CX=11,BlockLocked=12,Gt=13,};AO Q H Ea=16;AK((Ea&(Ea-1))==0,"");AK(Ea==Ap::W::P,"");AO Q z JT=0x504D4D5F56303938ULL;
 /*
 ## pmm-memorystats
 */
+Au MemoryStats{H total_blocks;H free_blocks;H allocated_blocks;H largest_free;H smallest_free;H total_fragmentation;};Au ManagerInfo{z HD;H S;H Bb;H BP;H Be;H Cf;AL::EP Aq;AL::EP first_free_offset;H manager_header_size;};
 /*
 ## pmm-blockview
 */
+Au BlockView{H Ha;AL::EP Bc;H S;H header_size;H Bs;H alignment;AN used;};
 /*
 ## pmm-freeblockview
 */
+Au FreeBlockView{AL::EP Bc;H S;H free_size;AL::EP HX;AL::EP Gn;AL::EP GF;int Ed;int avl_depth;};AY K{AO Q Y FM=0;AO Q Y DC=1;AO Q AN GA(Y CK)D{B CK==FM||CK==DC;}AO Q AN HR(Y CK)D{B CK==FM;}AO Ak EX(Ak crc,Y byte)D{crc^=byte;for(int bit=0;bit<8;++bit)crc=(crc>>1)^(0xEDB88320U&(~(crc&1U)+1U));B crc;}AO Ak compute_crc32(J Y*Dm,H HV)D{Ak crc=0xFFFFFFFFU;for(H i=0;i<HV;++i)crc=EX(crc,Dm[i]);B crc^0xFFFFFFFFU;}AK(AG(Ap::Ao<Ap::W>)==32,"");AK(AG(Ap::Ao<Ap::W>)%Ea==0,"");AK(AG(Ap::Ao<Ap::W>)==AG(Ap::HP<Ap::W>)+2*AG(Ak),"");AK(AG(Ap::HP<Ap::W>)==5*AG(Ak)+4,"");AO Q Ak kNoBlock=0xFFFFFFFFU;AK(kNoBlock==Ap::W::k,"");I<F AT>AO Q F AT::A kNoBlock_v=AT::k;I<F AT>AO Q F AT::A Dl=G<F AT::A>(0);
 /*
 ### pmm-detail-managerheader
 */
+I<F AT=W>Au q{j A=F AT::A;z HD;z S;A Bb;A BP;A Be;A Cf;A Aq;A BB;A Am;AN HT;Y CK;BV P;z prev_total_size;Ak crc32;A BW;};AK(AG(q<W>)==64,"");AK(AG(q<W>)%Ea==0,"");I<F AT>AO Q F AT::A Bo=G<F AT::A>((AG(Ap::Ao<AT>)+AT::P-1)/AT::P);I<F AT>AO Q H Bf=G<H>(Bo<AT>)*AT::P;I<F AT>AO q<AT>*Dq(Y*m)D{B AI<q<AT>*>(m+Bf<AT>);}I<F AT>AO J q<AT>*Dq(J Y*m)D{B AI<J q<AT>*>(m+Bf<AT>);}I<F AT>AO Ak IH(J Y*Dm,H HV)D{Q H kHdrOffset=Bf<AT>;Q H kCrcOffset=kHdrOffset+Jp(q<AT>,crc32);Q H kCrcSize=AG(Ak);Q H kAfterCrc=kCrcOffset+kCrcSize;Ak crc=0xFFFFFFFFU;for(H i=0;i<kCrcOffset&&i<HV;++i)crc=EX(crc,Dm[i]);for(H i=0;i<kCrcSize;++i)crc=EX(crc,0x00U);for(H i=kAfterCrc;i<HV;++i)crc=EX(crc,Dm[i]);B crc^0xFFFFFFFFU;}AO Q Ak kManagerHeaderGranules=AG(q<W>)/Ea;AO Q H kMinBlockSize=AG(Ap::Ao<Ap::W>)+Ea;AO Q H Fm=AG(Ap::Ao<Ap::W>)+AG(q<Ap::W>)+AG(Ap::Ao<Ap::W>)+kMinBlockSize;I<F AT>AO F AT::A DR(H IU){j BJ=F AT::A;N Q H BH=AT::P;if(IU>AL::Ag<H>::IQ()-(BH-1))B G<BJ>(0);H Ft=(IU+BH-1)/BH;if(Ft>G<H>(AL::Ag<BJ>::IQ()))B G<BJ>(0);B G<BJ>(Ft);}I<F AT>AO F AT::A bytes_to_idx_t(H IU){N Q H BH=AT::P;j BJ=F AT::A;if(IU==0)B G<BJ>(0);if(IU>AL::Ag<H>::IQ()-(BH-1))B AT::k;H Ft=(IU+BH-1)/BH;if(Ft>G<H>(AL::Ag<BJ>::IQ()))B AT::k;B G<BJ>(Ft);}I<F AT>AO H idx_to_byte_off_t(F AT::A At){B G<H>(At)*AT::P;}I<F AT>AO F AT::A Fi(H BI){j BJ=F AT::A;Gx(BI%AT::P==0);Gx(BI/AT::P<=G<H>(AL::Ag<BJ>::IQ()));B G<BJ>(BI/AT::P);}AO AN is_valid_alignment(H align){B align==Ea;}I<F AT=Ap::W>AO Ap::Ao<AT>*Ac(Y*m,F AT::A At){Gx(At!=kNoBlock_v<AT>);B AI<Ap::Ao<AT>*>(m+G<H>(At)*AT::P);}I<F AT=Ap::W>AO J Ap::Ao<AT>*Ac(J Y*m,F AT::A At){Gx(At!=kNoBlock_v<AT>);B AI<J Ap::Ao<AT>*>(m+G<H>(At)*AT::P);}I<F AT=Ap::W>AO Ap::Ao<AT>*block_at_checked(Y*m,H S,F AT::A At)D{if(!Ah<AT>(S,At))B M;B AI<Ap::Ao<AT>*>(m+G<H>(At)*AT::P);}I<F AT=Ap::W>AO J Ap::Ao<AT>*block_at_checked(J Y*m,H S,F AT::A At)D{if(!Ah<AT>(S,At))B M;B AI<J Ap::Ao<AT>*>(m+G<H>(At)*AT::P);}I<F AT>AO F AT::A KW(J Y*m,J Ap::Ao<AT>*block){H BI=AI<J Y*>(block)-m;Gx(BI%AT::P==0);B G<F AT::A>(BI/AT::P);}I<F AT>AO Q F AT::A kManagerHeaderGranules_t=G<F AT::A>((AG(q<AT>)+AT::P-1)/AT::P);I<F AT>AO F AT::A En(J Y*m,J q<AT>*AD,J Ap::Ao<AT>*EK){j R=Ap::Z<AT>;N Q H BH=AT::P;j BJ=F AT::A;N Q BJ kNoBlk=AT::k;H BI=AI<J Y*>(EK)-m;BJ this_idx=G<BJ>(BI/BH);BJ next_off=R::AU(EK);BJ EC=G<BJ>(AD->S/BH);if(next_off!=kNoBlk)B G<BJ>(next_off-this_idx);B G<BJ>(EC-this_idx);}I<F AT>AO V*DM(Y*m,F AT::A At)D{B(At==G<F AT::A>(0))?M:m+G<H>(At)*AT::P;}I<F AT>AO V*resolve_granule_ptr_checked(Y*m,H S,F AT::A At)D{if(At==G<F AT::A>(0))B M;H BI=G<H>(At)*AT::P;if(BI>=S)B M;B m+BI;}I<F AT>AO F AT::A Gh(J Y*m,J V*Gp)D{B G<F AT::A>((G<J Y*>(Gp)-m)/AT::P);}I<F AT>AO F AT::A ptr_to_granule_idx_checked(J Y*m,H S,J V*Gp)D{j BJ=F AT::A;if(Gp==M||m==M)B AT::k;J DH*CC=G<J Y*>(Gp);if(CC<m||CC>=m+S)B AT::k;H BI=G<H>(CC-m);if(BI%AT::P!=0)B AT::k;H At=BI/AT::P;if(At>G<H>(AL::Ag<BJ>::IQ()))B AT::k;B G<BJ>(At);}I<F AT=Ap::W>AO V*user_ptr(Ap::Ao<AT>*block){B AI<Y*>(block)+AG(Ap::Ao<AT>);}I<F AT>AO AN Fg(J Y*m,J q<AT>*AD,H S,F AT::A FY)D{j R=Ap::Z<AT>;j BJ=F AT::A;if(m==M||AD==M)B X;if(AD->BP==0||AD->Aq==AT::k)B X;if(!Ah<AT>(S,AD->Aq)||!Ah<AT>(S,AD->BB))B X;J V*cand=m+G<H>(FY)*AT::P;J BJ It=R::FX(cand);J BJ next=R::AU(cand);if(It==AT::k){if(FY!=AD->Aq)B X;}EN{if(!Ah<AT>(S,It)||It>=FY)B X;J V*prev_block=m+G<H>(It)*AT::P;if(R::AU(prev_block)!=FY)B X;}if(next==AT::k){if(FY!=AD->BB)B X;}EN{if(!Ah<AT>(S,next)||next<=FY)B X;J V*next_block=m+G<H>(next)*AT::P;if(R::FX(next_block)!=FY)B X;}B Bi;}I<F AT>AO AN ES(J Y*m,H S,J Y*FL)D{j R=Ap::Z<AT>;j BJ=F AT::A;if(m==M||FL==M)B X;J AL::Ei GQ=AI<AL::Ei>(m);J AL::Ei cand_raw=AI<AL::Ei>(FL);if(cand_raw<GQ)B X;J H Hv=G<H>(cand_raw-GQ);if(Hv%AT::P!=0)B X;if(Hv/AT::P>G<H>(AL::Ag<BJ>::IQ()))B X;J BJ FY=G<BJ>(Hv/AT::P);if(!Ah<AT>(S,FY))B X;J BJ KE=R::Ar(FL);if(KE==0||R::DP(FL)!=FY)B X;J BV AW=R::Dc(FL);if(AW!=Ap::Gw&&AW!=Ap::Db)B X;if(S<Bf<AT>+AG(q<AT>))B X;J DH*AD=Dq<AT>(m);if(AD->S!=S)B X;if(!Fg<AT>(m,AD,S,FY))B X;Q H EE=AG(Ap::Ao<AT>);if(Hv>S-EE)B X;J H data_start=Hv+EE;if(G<H>(KE)>(AL::Ag<H>::IQ)()/AT::P)B X;J H HK=G<H>(KE)*AT::P;if(HK>S-data_start)B X;B Bi;}I<F AT>AO AN is_canonical_user_ptr(J Y*m,H S,J V*Gp)D{Q H EE=AG(Ap::Ao<AT>);J H FW=EE+AG(q<AT>)+EE;if(!validate_user_ptr<AT>(m,S,Gp,FW))B X;J DH*raw_ptr=G<J Y*>(Gp);J DH*FL=raw_ptr-EE;if(FL+EE!=raw_ptr)B X;B ES<AT>(m,S,FL);}I<F AT>AO Ap::Ao<AT>*header_from_ptr_t(Y*m,V*Gp,H S){N Q H EE=AG(Ap::Ao<AT>);if(!is_canonical_user_ptr<AT>(m,S,Gp))B M;Y*FL=G<Y*>(Gp)-EE;B AI<Ap::Ao<AT>*>(FL);}I<F AT>AO F AT::A required_block_granules_t(H user_bytes){j A=F AT::A;A Ej=DR<AT>(user_bytes);if(Ej==0)Ej=1;B Bo<AT>+Ej;}}}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
-namespace pmm{namespace detail{template<typename PPtr>static constexpr auto pptr_no_block()noexcept{return PPtr::manager_type::address_traits::no_block;}template<typename PPtr>static PPtr pptr_make(PPtr,typename PPtr::index_type idx)noexcept{return PPtr(idx);}template<typename PPtr>static PPtr pptr_get_left(PPtr p)noexcept{auto idx=p.tree_node().get_left();return(idx==pptr_no_block<PPtr>())?PPtr():pptr_make(p,idx);}template<typename PPtr>static PPtr pptr_get_right(PPtr p)noexcept{auto idx=p.tree_node().get_right();return(idx==pptr_no_block<PPtr>())?PPtr():pptr_make(p,idx);}template<typename PPtr>static PPtr pptr_get_parent(PPtr p)noexcept{auto idx=p.tree_node().get_parent();return(idx==pptr_no_block<PPtr>())?PPtr():pptr_make(p,idx);}template<typename PPtr>static void pptr_set_left(PPtr p,PPtr child)noexcept{auto idx=child.is_null()?pptr_no_block<PPtr>():child.offset();p.tree_node().set_left(idx);}template<typename PPtr>static void pptr_set_right(PPtr p,PPtr child)noexcept{auto idx=child.is_null()?pptr_no_block<PPtr>():child.offset();p.tree_node().set_right(idx);}template<typename PPtr>static void pptr_set_parent(PPtr p,PPtr parent)noexcept{auto idx=parent.is_null()?pptr_no_block<PPtr>():parent.offset();p.tree_node().set_parent(idx);}template<typename PPtr>static std::int16_t avl_height(PPtr p)noexcept{if(p.is_null())return 0;return p.tree_node().get_height();}template<typename PPtr>static void avl_update_height(PPtr p)noexcept{if(p.is_null())return;std::int16_t lh=avl_height(pptr_get_left(p));std::int16_t rh=avl_height(pptr_get_right(p));std::int16_t h=static_cast<std::int16_t>(1+(lh>rh?lh:rh));p.tree_node().set_height(h);}template<typename PPtr>static std::int16_t avl_balance_factor(PPtr p)noexcept{if(p.is_null())return 0;std::int16_t lh=avl_height(pptr_get_left(p));std::int16_t rh=avl_height(pptr_get_right(p));return static_cast<std::int16_t>(lh-rh);}template<typename PPtr,typename IndexType>static void avl_set_child(PPtr parent,PPtr old_child,PPtr new_child,IndexType&root_idx)noexcept{if(parent.is_null()){root_idx=new_child.offset();return;}PPtr left_of_parent=pptr_get_left(parent);if(left_of_parent==old_child)pptr_set_left(parent,new_child);else pptr_set_right(parent,new_child);}
-/*
-### pmm-detail-avlupdateheightonly
-*/
-struct AvlUpdateHeightOnly{template<typename PPtr>void operator()(PPtr p)const noexcept{avl_update_height(p);}};template<typename PPtr,typename IndexType,typename NodeUpdateFn=AvlUpdateHeightOnly>static PPtr avl_rotate_right(PPtr y,IndexType&root_idx,NodeUpdateFn update_node={})noexcept{PPtr x=pptr_get_left(y);PPtr b=pptr_get_right(x);PPtr y_par=pptr_get_parent(y);pptr_set_right(x,y);pptr_set_parent(y,x);pptr_set_left(y,b);if(!b.is_null())pptr_set_parent(b,y);pptr_set_parent(x,y_par);avl_set_child(y_par,y,x,root_idx);update_node(y);update_node(x);return x;}template<typename PPtr,typename IndexType,typename NodeUpdateFn=AvlUpdateHeightOnly>static PPtr avl_rotate_left(PPtr x,IndexType&root_idx,NodeUpdateFn update_node={})noexcept{PPtr y=pptr_get_right(x);PPtr b=pptr_get_left(y);PPtr x_par=pptr_get_parent(x);pptr_set_left(y,x);pptr_set_parent(x,y);pptr_set_right(x,b);if(!b.is_null())pptr_set_parent(b,x);pptr_set_parent(y,x_par);avl_set_child(x_par,x,y,root_idx);update_node(x);update_node(y);return y;}template<typename PPtr,typename IndexType,typename NodeUpdateFn=AvlUpdateHeightOnly>static void avl_rebalance_up(PPtr p,IndexType&root_idx,NodeUpdateFn update_node={})noexcept{while(!p.is_null()){update_node(p);std::int16_t bf=avl_balance_factor(p);if(bf>1){PPtr left=pptr_get_left(p);if(avl_balance_factor(left)<0)avl_rotate_left(left,root_idx,update_node);p=avl_rotate_right(p,root_idx,update_node);}else if(bf<-1){PPtr right=pptr_get_right(p);if(avl_balance_factor(right)>0)avl_rotate_right(right,root_idx,update_node);p=avl_rotate_left(p,root_idx,update_node);}p=pptr_get_parent(p);}}template<typename PPtr>static PPtr avl_min_node(PPtr p)noexcept{while(!p.is_null()){PPtr left=pptr_get_left(p);if(left.is_null())break;p=left;}return p;}template<typename PPtr>static PPtr avl_max_node(PPtr p)noexcept{while(!p.is_null()){PPtr right=pptr_get_right(p);if(right.is_null())break;p=right;}return p;}template<typename PPtr,typename IndexType,typename NodeUpdateFn=AvlUpdateHeightOnly>static void avl_remove(PPtr target,IndexType&root_idx,NodeUpdateFn update_node={})noexcept{PPtr left_p=pptr_get_left(target);PPtr right_p=pptr_get_right(target);PPtr par_p=pptr_get_parent(target);if(left_p.is_null()&&right_p.is_null()){avl_set_child(par_p,target,PPtr(),root_idx);if(!par_p.is_null())avl_rebalance_up(par_p,root_idx,update_node);}else if(left_p.is_null()){pptr_set_parent(right_p,par_p);avl_set_child(par_p,target,right_p,root_idx);if(!par_p.is_null())avl_rebalance_up(par_p,root_idx,update_node);else update_node(right_p);}else if(right_p.is_null()){pptr_set_parent(left_p,par_p);avl_set_child(par_p,target,left_p,root_idx);if(!par_p.is_null())avl_rebalance_up(par_p,root_idx,update_node);else update_node(left_p);}else{PPtr successor=avl_min_node(right_p);auto succ_par_idx=successor.tree_node().get_parent();PPtr succ_rgt=pptr_get_right(successor);if(succ_par_idx==target.offset()){pptr_set_left(successor,left_p);pptr_set_parent(left_p,successor);pptr_set_parent(successor,par_p);avl_set_child(par_p,target,successor,root_idx);avl_rebalance_up(successor,root_idx,update_node);}else{PPtr succ_par(succ_par_idx);if(!succ_rgt.is_null()){pptr_set_parent(succ_rgt,succ_par);pptr_set_left(succ_par,succ_rgt);}else{pptr_set_left(succ_par,PPtr());}pptr_set_left(successor,left_p);pptr_set_parent(left_p,successor);pptr_set_right(successor,right_p);pptr_set_parent(right_p,successor);pptr_set_parent(successor,par_p);avl_set_child(par_p,target,successor,root_idx);avl_rebalance_up(succ_par,root_idx,update_node);}}}template<typename PPtr,typename IndexType,typename CompareThreeWayFn,typename ResolveFn>static PPtr avl_find(IndexType root_idx,CompareThreeWayFn&&compare_three_way,ResolveFn&&resolve)noexcept{PPtr cur(root_idx);while(!cur.is_null()){if(resolve(cur)==nullptr)break;int cmp=compare_three_way(cur);if(cmp==0)return cur;else if(cmp<0)cur=pptr_get_left(cur);else cur=pptr_get_right(cur);}return PPtr();}template<typename PPtr>static PPtr avl_inorder_successor(PPtr cur)noexcept{if(cur.is_null())return PPtr();PPtr right=pptr_get_right(cur);if(!right.is_null())return avl_min_node(right);while(true){PPtr parent=pptr_get_parent(cur);if(parent.is_null())return PPtr();PPtr parent_left=pptr_get_left(parent);if(!parent_left.is_null()&&parent_left.offset()==cur.offset())return parent;cur=parent;}}template<typename PPtr>static void avl_init_node(PPtr p)noexcept{auto&tn=p.tree_node();tn.set_left(pptr_no_block<PPtr>());tn.set_right(pptr_no_block<PPtr>());tn.set_parent(pptr_no_block<PPtr>());tn.set_height(static_cast<std::int16_t>(1));}template<typename PPtr>static size_t avl_subtree_count(PPtr p)noexcept{if(p.is_null())return 0;return 1+avl_subtree_count(pptr_get_left(p))+avl_subtree_count(pptr_get_right(p));}template<typename PPtr,typename DeallocFn>static void avl_clear_subtree(PPtr p,DeallocFn&&dealloc)noexcept{if(p.is_null())return;PPtr left_p=pptr_get_left(p);PPtr right_p=pptr_get_right(p);avl_clear_subtree(left_p,dealloc);avl_clear_subtree(right_p,dealloc);dealloc(p);}template<typename PPtr,typename IndexType,typename GoLeftFn,typename ResolveFn,typename NodeUpdateFn=AvlUpdateHeightOnly>static void avl_insert(PPtr new_node,IndexType&root_idx,GoLeftFn&&go_left,ResolveFn&&resolve,NodeUpdateFn update_node={})noexcept{if(new_node.is_null())return;if(resolve(new_node)==nullptr)return;if(root_idx==static_cast<IndexType>(0)){pptr_set_left(new_node,PPtr());pptr_set_right(new_node,PPtr());pptr_set_parent(new_node,PPtr());new_node.tree_node().set_height(static_cast<std::int16_t>(1));root_idx=new_node.offset();return;}PPtr cur(root_idx);PPtr parent;bool left=false;while(!cur.is_null()){if(resolve(cur)==nullptr)break;parent=cur;left=go_left(cur);if(left)cur=pptr_get_left(cur);else cur=pptr_get_right(cur);}pptr_set_parent(new_node,parent);if(left)pptr_set_left(parent,new_node);else pptr_set_right(parent,new_node);avl_rebalance_up(parent,root_idx,update_node);}template<typename Domain>concept ForestDomainViewDescriptor=requires(const Domain domain,typename Domain::node_pptr p){typename Domain::index_type;typename Domain::node_type;typename Domain::node_pptr;{domain.name()}->std::convertible_to<const char*>;{domain.root_index()}->std::convertible_to<typename Domain::index_type>;{domain.resolve_node(p)}->std::convertible_to<typename Domain::node_type*>;};template<typename Domain>concept ForestDomainDescriptor=ForestDomainViewDescriptor<Domain>&&requires(Domain domain,typename Domain::node_pptr p){{domain.root_index_ptr()}->std::same_as<typename Domain::index_type*>;{domain.less_node(p,p)}->std::convertible_to<bool>;};template<typename Domain,typename Key>concept ForestDomainDescriptorForKey=ForestDomainViewDescriptor<Domain>&&requires(const Domain domain,typename Domain::node_pptr p,const Key&key){{domain.compare_key(key,p)}->std::convertible_to<int>;};template<typename Domain>static bool forest_domain_validate_node(const Domain&domain,typename Domain::node_pptr p)noexcept{if constexpr(requires{{domain.validate_node(p)}->std::convertible_to<bool>;})return domain.validate_node(p);else return true;}template<ForestDomainViewDescriptor Domain>struct ForestDomainViewOps{using index_type=typename Domain::index_type;using node_type=typename Domain::node_type;using node_pptr=typename Domain::node_pptr;Domain domain;constexpr explicit ForestDomainViewOps(Domain d=Domain{})noexcept:domain(d){}const char*name()const noexcept{return domain.name();}index_type root_index()const noexcept{return domain.root_index();}template<typename Key>requires ForestDomainDescriptorForKey<Domain,Key>node_pptr find(const Key&key)const noexcept{return avl_find<node_pptr>(domain.root_index(),[&](node_pptr cur)->int{return domain.compare_key(key,cur);},[this](node_pptr p)->node_type*{return domain.resolve_node(p);});}};template<ForestDomainDescriptor Domain>struct ForestDomainOps:ForestDomainViewOps<Domain>{using view_base=ForestDomainViewOps<Domain>;using index_type=typename view_base::index_type;using node_type=typename view_base::node_type;using node_pptr=typename view_base::node_pptr;using view_base::find;using view_base::name;using view_base::root_index;constexpr explicit ForestDomainOps(Domain d=Domain{})noexcept:view_base(d){}index_type*root_index_ptr()noexcept{return this->domain.root_index_ptr();}bool reset_root()noexcept{index_type*root=root_index_ptr();if(root==nullptr)return false;*root=static_cast<index_type>(0);return true;}void insert(node_pptr new_node)noexcept{index_type*root=this->domain.root_index_ptr();if(root==nullptr||new_node.is_null())return;if(this->domain.resolve_node(new_node)==nullptr||!forest_domain_validate_node(this->domain,new_node))return;avl_insert(new_node,*root,[this,new_node](node_pptr cur)->bool{return this->domain.less_node(new_node,cur);},[this](node_pptr p)->node_type*{return this->domain.resolve_node(p);});}};template<typename AT>struct BlockPPtrManagerTag{using address_traits=AT;};
-/*
-### pmm-detail-blocktreenodeproxy
-*/
-template<typename AT>struct BlockTreeNodeProxy{using index_type=typename AT::index_type;void*_blk;explicit BlockTreeNodeProxy(void*blk)noexcept:_blk(blk){}index_type get_left()const noexcept{return BlockStateBase<AT>::get_left_offset(_blk);}index_type get_right()const noexcept{return BlockStateBase<AT>::get_right_offset(_blk);}index_type get_parent()const noexcept{return BlockStateBase<AT>::get_parent_offset(_blk);}std::int16_t get_height()const noexcept{return BlockStateBase<AT>::get_avl_height(_blk);}void set_left(index_type v)noexcept{BlockStateBase<AT>::set_left_offset_of(_blk,v);}void set_right(index_type v)noexcept{BlockStateBase<AT>::set_right_offset_of(_blk,v);}void set_parent(index_type v)noexcept{BlockStateBase<AT>::set_parent_offset_of(_blk,v);}void set_height(std::int16_t v)noexcept{BlockStateBase<AT>::set_avl_height_of(_blk,v);}};
-/*
-### pmm-detail-blockpptr
-*/
-template<typename AT>struct BlockPPtr{using manager_type=BlockPPtrManagerTag<AT>;using index_type=typename AT::index_type;uint8_t*_base;index_type _idx;BlockPPtr()noexcept:_base(nullptr),_idx(AT::no_block){}BlockPPtr(uint8_t*base,index_type idx)noexcept:_base(base),_idx(idx){}bool is_null()const noexcept{return _idx==AT::no_block;}index_type offset()const noexcept{return _idx;}bool operator==(const BlockPPtr&other)const noexcept{return _idx==other._idx;}bool operator!=(const BlockPPtr&other)const noexcept{return _idx!=other._idx;}BlockTreeNodeProxy<AT>tree_node()const noexcept{return BlockTreeNodeProxy<AT>(block_at<AT>(_base,_idx));}};template<typename AT>static BlockPPtr<AT>pptr_make(BlockPPtr<AT>source,typename AT::index_type idx)noexcept{return BlockPPtr<AT>(source._base,idx);}
-/*
-### pmm-detail-avlinorderiterator
-*/
-template<typename NodePPtr>struct AvlInorderIterator{using index_type=typename NodePPtr::index_type;using value_type=typename NodePPtr::element_type;using pointer=NodePPtr;static constexpr index_type no_block=NodePPtr::manager_type::address_traits::no_block;index_type _current_idx;AvlInorderIterator()noexcept:_current_idx(static_cast<index_type>(0)){}explicit AvlInorderIterator(index_type idx)noexcept:_current_idx(idx){}bool operator==(const AvlInorderIterator&other)const noexcept{return _current_idx==other._current_idx;}bool operator!=(const AvlInorderIterator&other)const noexcept{return _current_idx!=other._current_idx;}NodePPtr operator*()const noexcept{if(_current_idx==static_cast<index_type>(0)||_current_idx==no_block)return NodePPtr();return NodePPtr(_current_idx);}AvlInorderIterator&operator++()noexcept{if(_current_idx==static_cast<index_type>(0)||_current_idx==no_block)return*this;NodePPtr next=avl_inorder_successor(NodePPtr(_current_idx));_current_idx=next.is_null()?static_cast<index_type>(0):next.offset();return*this;}};}}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
 
+AY Ap{AY K{I<F Ad>N Q DH Da()D{B Ad::Ae::E::k;}I<F Ad>N Ad KJ(Ad,F Ad::A At)D{B Ad(At);}I<F Ad>N Ad CI(Ad p)D{DH At=p.DY().get_left();B(At==Da<Ad>())?Ad():KJ(p,At);}I<F Ad>N Ad Bv(Ad p)D{DH At=p.DY().get_right();B(At==Da<Ad>())?Ad():KJ(p,At);}I<F Ad>N Ad FS(Ad p)D{DH At=p.DY().get_parent();B(At==Da<Ad>())?Ad():KJ(p,At);}I<F Ad>N V DZ(Ad p,Ad child)D{DH At=child.AQ()?Da<Ad>():child.Bc();p.DY().set_left(At);}I<F Ad>N V Eq(Ad p,Ad child)D{DH At=child.AQ()?Da<Ad>():child.Bc();p.DY().set_right(At);}I<F Ad>N V BL(Ad p,Ad BX)D{DH At=BX.AQ()?Da<Ad>():BX.Bc();p.DY().set_parent(At);}I<F Ad>N AL::Bk Ed(Ad p)D{if(p.AQ())B 0;B p.DY().get_height();}I<F Ad>N V JD(Ad p)D{if(p.AQ())B;AL::Bk lh=Ed(CI(p));AL::Bk rh=Ed(Bv(p));AL::Bk h=G<AL::Bk>(1+(lh>rh?lh:rh));p.DY().JO(h);}I<F Ad>N AL::Bk Gk(Ad p)D{if(p.AQ())B 0;AL::Bk lh=Ed(CI(p));AL::Bk rh=Ed(Bv(p));B G<AL::Bk>(lh-rh);}I<F Ad,F Df>N V Em(Ad BX,Ad old_child,Ad HC,Df&BZ)D{if(BX.AQ()){BZ=HC.Bc();B;}Ad left_of_parent=CI(BX);if(left_of_parent==old_child)DZ(BX,HC);EN Eq(BX,HC);}
 /*
 ### pmm-detail-avlupdateheightonly
 */
+Au EI{I<F Ad>V Af()(Ad p)J D{JD(p);}};I<F Ad,F Df,F Dz=EI>N Ad JY(Ad y,Df&BZ,Dz BS={})D{Ad x=CI(y);Ad b=Bv(x);Ad y_par=FS(y);Eq(x,y);BL(y,x);DZ(y,b);if(!b.AQ())BL(b,y);BL(x,y_par);Em(y_par,y,x,BZ);BS(y);BS(x);B x;}I<F Ad,F Df,F Dz=EI>N Ad Jy(Ad x,Df&BZ,Dz BS={})D{Ad y=Bv(x);Ad b=CI(y);Ad x_par=FS(x);DZ(y,x);BL(x,y);Eq(x,b);if(!b.AQ())BL(b,x);BL(y,x_par);Em(x_par,x,y,BZ);BS(x);BS(y);B y;}I<F Ad,F Df,F Dz=EI>N V DA(Ad p,Df&BZ,Dz BS={})D{Fa(!p.AQ()){BS(p);AL::Bk bf=Gk(p);if(bf>1){Ad Hh=CI(p);if(Gk(Hh)<0)Jy(Hh,BZ,BS);p=JY(p,BZ,BS);}EN if(bf<-1){Ad GE=Bv(p);if(Gk(GE)>0)JY(GE,BZ,BS);p=Jy(p,BZ,BS);}p=FS(p);}}I<F Ad>N Ad IC(Ad p)D{Fa(!p.AQ()){Ad Hh=CI(p);if(Hh.AQ())IV;p=Hh;}B p;}I<F Ad>N Ad avl_max_node(Ad p)D{Fa(!p.AQ()){Ad GE=Bv(p);if(GE.AQ())IV;p=GE;}B p;}I<F Ad,F Df,F Dz=EI>N V avl_remove(Ad Gu,Df&BZ,Dz BS={})D{Ad HW=CI(Gu);Ad Gm=Bv(Gu);Ad HB=FS(Gu);if(HW.AQ()&&Gm.AQ()){Em(HB,Gu,Ad(),BZ);if(!HB.AQ())DA(HB,BZ,BS);}EN if(HW.AQ()){BL(Gm,HB);Em(HB,Gu,Gm,BZ);if(!HB.AQ())DA(HB,BZ,BS);EN BS(Gm);}EN if(Gm.AQ()){BL(HW,HB);Em(HB,Gu,HW,BZ);if(!HB.AQ())DA(HB,BZ,BS);EN BS(HW);}EN{Ad Dp=IC(Gm);DH succ_par_idx=Dp.DY().get_parent();Ad succ_rgt=Bv(Dp);if(succ_par_idx==Gu.Bc()){DZ(Dp,HW);BL(HW,Dp);BL(Dp,HB);Em(HB,Gu,Dp,BZ);DA(Dp,BZ,BS);}EN{Ad succ_par(succ_par_idx);if(!succ_rgt.AQ()){BL(succ_rgt,succ_par);DZ(succ_par,succ_rgt);}EN{DZ(succ_par,Ad());}DZ(Dp,HW);BL(HW,Dp);Eq(Dp,Gm);BL(Gm,Dp);BL(Dp,HB);Em(HB,Gu,Dp,BZ);DA(succ_par,BZ,BS);}}}I<F Ad,F Df,F CompareThreeWayFn,F ResolveFn>N Ad avl_find(Df BZ,CompareThreeWayFn&&compare_three_way,ResolveFn&&Go)D{Ad Ek(BZ);Fa(!Ek.AQ()){if(Go(Ek)==M)IV;int cmp=compare_three_way(Ek);if(cmp==0)B Ek;EN if(cmp<0)Ek=CI(Ek);EN Ek=Bv(Ek);}B Ad();}I<F Ad>N Ad avl_inorder_successor(Ad Ek)D{if(Ek.AQ())B Ad();Ad GE=Bv(Ek);if(!GE.AQ())B IC(GE);Fa(Bi){Ad BX=FS(Ek);if(BX.AQ())B Ad();Ad parent_left=CI(BX);if(!parent_left.AQ()&&parent_left.Bc()==Ek.Bc())B BX;Ek=BX;}}I<F Ad>N V avl_init_node(Ad p)D{DH&tn=p.DY();tn.set_left(Da<Ad>());tn.set_right(Da<Ad>());tn.set_parent(Da<Ad>());tn.JO(G<AL::Bk>(1));}I<F Ad>N H HF(Ad p)D{if(p.AQ())B 0;B 1+HF(CI(p))+HF(Bv(p));}I<F Ad,F DeallocFn>N V HG(Ad p,DeallocFn&&dealloc)D{if(p.AQ())B;Ad HW=CI(p);Ad Gm=Bv(p);HG(HW,dealloc);HG(Gm,dealloc);dealloc(p);}I<F Ad,F Df,F GoLeftFn,F ResolveFn,F Dz=EI>N V avl_insert(Ad Ba,Df&BZ,GoLeftFn&&go_left,ResolveFn&&Go,Dz BS={})D{if(Ba.AQ())B;if(Go(Ba)==M)B;if(BZ==G<Df>(0)){DZ(Ba,Ad());Eq(Ba,Ad());BL(Ba,Ad());Ba.DY().JO(G<AL::Bk>(1));BZ=Ba.Bc();B;}Ad Ek(BZ);Ad BX;AN Hh=X;Fa(!Ek.AQ()){if(Go(Ek)==M)IV;BX=Ek;Hh=go_left(Ek);if(Hh)Ek=CI(Ek);EN Ek=Bv(Ek);}BL(Ba,BX);if(Hh)DZ(BX,Ba);EN Eq(BX,Ba);DA(BX,BZ,BS);}I<F CT>Hc EZ=Eg(J CT Ch,F CT::Ab p){F CT::A;F CT::AW;F CT::Ab;{Ch.CP()}->AL::Bw<J BG*>;{Ch.Cj()}->AL::Bw<F CT::A>;{Ch.CZ(p)}->AL::Bw<F CT::AW*>;};I<F CT>Hc ForestDomainDescriptor=EZ<CT>&&Eg(CT Ch,F CT::Ab p){{Ch.Cp()}->AL::same_as<F CT::A*>;{Ch.less_node(p,p)}->AL::Bw<AN>;};I<F CT,F Key>Hc IL=EZ<CT>&&Eg(J CT Ch,F CT::Ab p,J Key&HQ){{Ch.KV(HQ,p)}->AL::Bw<int>;};I<F CT>N AN IS(J CT&Ch,F CT::Ab p)D{if Q(Eg{{Ch.Ip(p)}->AL::Bw<AN>;})B Ch.Ip(p);EN B Bi;}I<EZ CT>Au FC{j A=F CT::A;j AW=F CT::AW;j Ab=F CT::Ab;CT Ch;Q Eh FC(CT d=CT{})D:Ch(d){}J BG*CP()J D{B Ch.CP();}A Cj()J D{B Ch.Cj();}I<F Key>Eg IL<CT,Key>Ab find(J Key&HQ)J D{B avl_find<Ab>(Ch.Cj(),[&](Ab Ek)->int{B Ch.KV(HQ,Ek);},[BN](Ab p)->AW*{B Ch.CZ(p);});}};I<ForestDomainDescriptor CT>Au Hy:FC<CT>{j Gz=FC<CT>;j A=F Gz::A;j AW=F Gz::AW;j Ab=F Gz::Ab;j Gz::find;j Gz::CP;j Gz::Cj;Q Eh Hy(CT d=CT{})D:Gz(d){}A*Cp()D{B BN->Ch.Cp();}AN reset_root()D{A*DV=Cp();if(DV==M)B X;*DV=G<A>(0);B Bi;}V GZ(Ab Ba)D{A*DV=BN->Ch.Cp();if(DV==M||Ba.AQ())B;if(BN->Ch.CZ(Ba)==M||!IS(BN->Ch,Ba))B;avl_insert(Ba,*DV,[BN,Ba](Ab Ek)->AN{B BN->Ch.less_node(Ba,Ek);},[BN](Ab p)->AW*{B BN->Ch.CZ(p);});}};I<F AT>Au BlockPPtrManagerTag{j E=AT;};
 /*
 ### pmm-detail-blocktreenodeproxy
 */
+I<F AT>Au Gl{j A=F AT::A;V*_blk;Eh Gl(V*EK)D:_blk(EK){}A get_left()J D{B Z<AT>::Ca(_blk);}A get_right()J D{B Z<AT>::CQ(_blk);}A get_parent()J D{B Z<AT>::CA(_blk);}AL::Bk get_height()J D{B Z<AT>::Fo(_blk);}V set_left(A v)D{Z<AT>::Bp(_blk,v);}V set_right(A v)D{Z<AT>::Bd(_blk,v);}V set_parent(A v)D{Z<AT>::Ay(_blk,v);}V JO(AL::Bk v)D{Z<AT>::DI(_blk,v);}};
 /*
 ### pmm-detail-blockpptr
 */
+I<F AT>Au GS{j Ae=BlockPPtrManagerTag<AT>;j A=F AT::A;Y*DU;A HO;GS()D:DU(M),HO(AT::k){}GS(Y*m,A At)D:DU(m),HO(At){}AN AQ()J D{B HO==AT::k;}A Bc()J D{B HO;}AN Af==(J GS&An)J D{B HO==An.HO;}AN Af!=(J GS&An)J D{B HO!=An.HO;}Gl<AT>DY()J D{B Gl<AT>(Ac<AT>(DU,HO));}};I<F AT>N GS<AT>KJ(GS<AT>source,F AT::A At)D{B GS<AT>(source.DU,At);}
 /*
 ### pmm-detail-avlinorderiterator
 */
+I<F Gc>Au Dk{j A=F Gc::A;j HH=F Gc::element_type;j pointer=Gc;N Q A k=Gc::Ae::E::k;A Cb;Dk()D:Cb(G<A>(0)){}Eh Dk(A At)D:Cb(At){}AN Af==(J Dk&An)J D{B Cb==An.Cb;}AN Af!=(J Dk&An)J D{B Cb!=An.Cb;}Gc Af*()J D{if(Cb==G<A>(0)||Cb==k)B Gc();B Gc(Cb);}Dk&Af++()D{if(Cb==G<A>(0)||Cb==k)B*BN;Gc next=avl_inorder_successor(Gc(Cb));Cb=next.AQ()?G<A>(0):next.Bc();B*BN;}};}}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <concepts>
 #include <cstdint>
 #include <type_traits>
-namespace pmm{template<typename Policy,typename AT>concept FreeBlockTreePolicyForTraitsConcept=requires(uint8_t*base,detail::ManagerHeader<AT>*hdr,typename AT::index_type idx){{Policy::insert(base,hdr,idx)};{Policy::remove(base,hdr,idx)};{Policy::find_best_fit(base,hdr,idx)}->std::convertible_to<typename AT::index_type>;};
-/*
-## pmm-avlfreetree
-*/
-template<typename AT=DefaultAddressTraits>struct AvlFreeTree{using address_traits=AT;using index_type=typename AT::index_type;using BlockT=Block<AT>;using BlockState=BlockStateBase<AT>;using BPPtr=detail::BlockPPtr<AT>;static constexpr const char*kForestDomainName="system/free_tree";AvlFreeTree()=delete;AvlFreeTree(const AvlFreeTree&)=delete;AvlFreeTree&operator=(const AvlFreeTree&)=delete;static void insert(uint8_t*base,detail::ManagerHeader<AT>*hdr,index_type blk_idx){void*blk=detail::block_at<AT>(base,blk_idx);BlockState::set_left_offset_of(blk,AT::no_block);BlockState::set_right_offset_of(blk,AT::no_block);BlockState::set_parent_offset_of(blk,AT::no_block);BlockState::set_avl_height_of(blk,1);if(hdr->free_tree_root==AT::no_block){hdr->free_tree_root=blk_idx;return;}index_type total_gran=detail::byte_off_to_idx_t<AT>(hdr->total_size);index_type blk_next=BlockState::get_next_offset(blk);index_type blk_gran=(blk_next!=AT::no_block)?(blk_next-blk_idx):(total_gran-blk_idx);index_type cur=hdr->free_tree_root,parent=AT::no_block;bool go_left=false;while(cur!=AT::no_block){parent=cur;const void*n=detail::block_at<AT>(base,cur);index_type n_next=BlockState::get_next_offset(n);index_type n_gran=(n_next!=AT::no_block)?(n_next-cur):(total_gran-cur);bool smaller=(blk_gran<n_gran)||(blk_gran==n_gran&&blk_idx<cur);go_left=smaller;cur=smaller?BlockState::get_left_offset(n):BlockState::get_right_offset(n);}BlockState::set_parent_offset_of(blk,parent);if(go_left)BlockState::set_left_offset_of(detail::block_at<AT>(base,parent),blk_idx);else BlockState::set_right_offset_of(detail::block_at<AT>(base,parent),blk_idx);detail::avl_rebalance_up(BPPtr(base,parent),hdr->free_tree_root);}static void remove(uint8_t*base,detail::ManagerHeader<AT>*hdr,index_type blk_idx){void*blk=detail::block_at<AT>(base,blk_idx);index_type parent=BlockState::get_parent_offset(blk);index_type left=BlockState::get_left_offset(blk);index_type right=BlockState::get_right_offset(blk);index_type rebal=AT::no_block;if(left==AT::no_block&&right==AT::no_block){set_child(base,hdr,parent,blk_idx,AT::no_block);rebal=parent;}else if(left==AT::no_block||right==AT::no_block){index_type child=(left!=AT::no_block)?left:right;BlockState::set_parent_offset_of(detail::block_at<AT>(base,child),parent);set_child(base,hdr,parent,blk_idx,child);rebal=parent;}else{BPPtr succ=detail::avl_min_node(BPPtr(base,right));index_type succ_idx=succ.offset();void*succ_raw=detail::block_at<AT>(base,succ_idx);index_type succ_parent=BlockState::get_parent_offset(succ_raw);index_type succ_right=BlockState::get_right_offset(succ_raw);if(succ_parent!=blk_idx){set_child(base,hdr,succ_parent,succ_idx,succ_right);if(succ_right!=AT::no_block)BlockState::set_parent_offset_of(detail::block_at<AT>(base,succ_right),succ_parent);BlockState::set_right_offset_of(succ_raw,right);BlockState::set_parent_offset_of(detail::block_at<AT>(base,right),succ_idx);rebal=succ_parent;}else{rebal=succ_idx;}BlockState::set_left_offset_of(succ_raw,left);BlockState::set_parent_offset_of(detail::block_at<AT>(base,left),succ_idx);BlockState::set_parent_offset_of(succ_raw,parent);set_child(base,hdr,parent,blk_idx,succ_idx);detail::avl_update_height(BPPtr(base,succ_idx));}BlockState::set_left_offset_of(blk,AT::no_block);BlockState::set_right_offset_of(blk,AT::no_block);BlockState::set_parent_offset_of(blk,AT::no_block);BlockState::set_avl_height_of(blk,0);detail::avl_rebalance_up(BPPtr(base,rebal),hdr->free_tree_root);}
-/*
-### pmm-avlfreetree-find_best_fit
-*/
-static index_type find_best_fit(uint8_t*base,detail::ManagerHeader<AT>*hdr,index_type needed_granules){index_type total_gran=detail::byte_off_to_idx_t<AT>(hdr->total_size);index_type cur=hdr->free_tree_root,result=AT::no_block;while(cur!=AT::no_block){const void*node=detail::block_at<AT>(base,cur);index_type node_next=BlockState::get_next_offset(node);index_type cur_gran=(node_next!=AT::no_block)?(node_next-cur):(total_gran-cur);if(cur_gran>=needed_granules){result=cur;cur=BlockState::get_left_offset(node);}else{cur=BlockState::get_right_offset(node);}}return result;}private:static void set_child(uint8_t*base,detail::ManagerHeader<AT>*hdr,index_type parent,index_type old_child,index_type new_child){if(parent==AT::no_block){hdr->free_tree_root=new_child;return;}void*p=detail::block_at<AT>(base,parent);if(BlockState::get_left_offset(p)==old_child)BlockState::set_left_offset_of(p,new_child);else BlockState::set_right_offset_of(p,new_child);}};static_assert(FreeBlockTreePolicyForTraitsConcept<AvlFreeTree<DefaultAddressTraits>,DefaultAddressTraits>,"");}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
 
+AY Ap{I<F Policy,F AT>Hc EU=Eg(Y*m,K::q<AT>*AD,F AT::A At){{Policy::GZ(m,AD,At)};{Policy::JQ(m,AD,At)};{Policy::GI(m,AD,At)}->AL::Bw<F AT::A>;};
 /*
 ## pmm-avlfreetree
 */
+I<F AT=W>Au EA{j E=AT;j A=F AT::A;j GB=Ao<AT>;j R=Z<AT>;j BPPtr=K::GS<AT>;N Q J BG*kForestDomainName="system/free_tree";EA()=EO;EA(J EA&)=EO;EA&Af=(J EA&)=EO;N V GZ(Y*m,K::q<AT>*AD,A As){V*EK=K::Ac<AT>(m,As);R::Bp(EK,AT::k);R::Bd(EK,AT::k);R::Ay(EK,AT::k);R::DI(EK,1);if(AD->Am==AT::k){AD->Am=As;B;}A EC=K::Fi<AT>(AD->S);A Jx=R::AU(EK);A blk_gran=(Jx!=AT::k)?(Jx-As):(EC-As);A Ek=AD->Am,BX=AT::k;AN go_left=X;Fa(Ek!=AT::k){BX=Ek;J V*n=K::Ac<AT>(m,Ek);A n_next=R::AU(n);A n_gran=(n_next!=AT::k)?(n_next-Ek):(EC-Ek);AN smaller=(blk_gran<n_gran)||(blk_gran==n_gran&&As<Ek);go_left=smaller;Ek=smaller?R::Ca(n):R::CQ(n);}R::Ay(EK,BX);if(go_left)R::Bp(K::Ac<AT>(m,BX),As);EN R::Bd(K::Ac<AT>(m,BX),As);K::DA(BPPtr(m,BX),AD->Am);}N V JQ(Y*m,K::q<AT>*AD,A As){V*EK=K::Ac<AT>(m,As);A BX=R::CA(EK);A Hh=R::Ca(EK);A GE=R::CQ(EK);A rebal=AT::k;if(Hh==AT::k&&GE==AT::k){KI(m,AD,BX,As,AT::k);rebal=BX;}EN if(Hh==AT::k||GE==AT::k){A child=(Hh!=AT::k)?Hh:GE;R::Ay(K::Ac<AT>(m,child),BX);KI(m,AD,BX,As,child);rebal=BX;}EN{BPPtr succ=K::IC(BPPtr(m,GE));A Hk=succ.Bc();V*Jj=K::Ac<AT>(m,Hk);A Ig=R::CA(Jj);A succ_right=R::CQ(Jj);if(Ig!=As){KI(m,AD,Ig,Hk,succ_right);if(succ_right!=AT::k)R::Ay(K::Ac<AT>(m,succ_right),Ig);R::Bd(Jj,GE);R::Ay(K::Ac<AT>(m,GE),Hk);rebal=Ig;}EN{rebal=Hk;}R::Bp(Jj,Hh);R::Ay(K::Ac<AT>(m,Hh),Hk);R::Ay(Jj,BX);KI(m,AD,BX,As,Hk);K::JD(BPPtr(m,Hk));}R::Bp(EK,AT::k);R::Bd(EK,AT::k);R::Ay(EK,AT::k);R::DI(EK,0);K::DA(BPPtr(m,rebal),AD->Am);}
 /*
 ### pmm-avlfreetree-find_best_fit
 */
+N A GI(Y*m,K::q<AT>*AD,A needed_granules){A EC=K::Fi<AT>(AD->S);A Ek=AD->Am,AM=AT::k;Fa(Ek!=AT::k){J V*Iu=K::Ac<AT>(m,Ek);A node_next=R::AU(Iu);A cur_gran=(node_next!=AT::k)?(node_next-Ek):(EC-Ek);if(cur_gran>=needed_granules){AM=Ek;Ek=R::Ca(Iu);}EN{Ek=R::CQ(Iu);}}B AM;}Ew:N V KI(Y*m,K::q<AT>*AD,A BX,A old_child,A HC){if(BX==AT::k){AD->Am=HC;B;}V*p=K::Ac<AT>(m,BX);if(R::Ca(p)==old_child)R::Bp(p,HC);EN R::Bd(p,HC);}};AK(EU<EA<W>,W>,"");}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
-namespace pmm{using std::size_t;using std::uint8_t;template<typename Backend>concept StorageBackendConcept=requires(Backend&b,const Backend&cb,size_t n){{b.base_ptr()}->std::convertible_to<uint8_t*>;{cb.total_size()}->std::convertible_to<size_t>;{b.expand(n)}->std::convertible_to<bool>;{cb.owns_memory()}->std::convertible_to<bool>;};template<typename Backend>inline constexpr bool is_storage_backend_v=StorageBackendConcept<Backend>;}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
+
+AY Ap{j AL::H;j AL::Y;I<F Backend>Hc StorageBackendConcept=Eg(Backend&b,J Backend&cb,H n){{b.AR()}->AL::Bw<Y*>;{cb.S()}->AL::Bw<H>;{b.expand(n)}->AL::Bw<AN>;{cb.HT()}->AL::Bw<AN>;};I<F Backend>AO Q AN Fu=StorageBackendConcept<Backend>;}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <cassert>
 #include <cstddef>
@@ -370,72 +13444,4443 @@ namespace pmm{using std::size_t;using std::uint8_t;template<typename Backend>con
 #include <cstdlib>
 #include <cstring>
 #include <limits>
-namespace pmm{
-/*
-## pmm-heapstorage
-*/
-template<typename AT=DefaultAddressTraits>class HeapStorage{public:using address_traits=AT;HeapStorage()noexcept=default;explicit HeapStorage(size_t initial_size)noexcept{if(initial_size==0)return;size_t aligned=((initial_size+AT::granule_size-1)/AT::granule_size)*AT::granule_size;_buffer=static_cast<uint8_t*>(std::malloc(aligned));if(_buffer!=nullptr){_size=aligned;_owns_memory=true;}}HeapStorage(const HeapStorage&)=delete;HeapStorage&operator=(const HeapStorage&)=delete;HeapStorage(HeapStorage&&other)noexcept:_buffer(other._buffer),_size(other._size),_owns_memory(other._owns_memory){other._buffer=nullptr;other._size=0;other._owns_memory=false;}HeapStorage&operator=(HeapStorage&&other)noexcept{if(this!=&other){if(_owns_memory&&_buffer!=nullptr)std::free(_buffer);_buffer=other._buffer;_size=other._size;_owns_memory=other._owns_memory;other._buffer=nullptr;other._size=0;other._owns_memory=false;}return*this;}~HeapStorage(){if(_owns_memory&&_buffer!=nullptr)std::free(_buffer);}void attach(void*memory,size_t size)noexcept{if(_owns_memory&&_buffer!=nullptr)std::free(_buffer);_buffer=static_cast<uint8_t*>(memory);_size=size;_owns_memory=false;}uint8_t*base_ptr()noexcept{return _buffer;}const uint8_t*base_ptr()const noexcept{return _buffer;}size_t total_size()const noexcept{return _size;}bool expand(size_t additional_bytes)noexcept{if(additional_bytes==0)return _size>0;static constexpr size_t kMinInitialSize=4096;size_t growth=(_size>0)?(_size/4+additional_bytes):std::max(additional_bytes,kMinInitialSize);size_t new_size=_size+growth;new_size=((new_size+AT::granule_size-1)/AT::granule_size)*AT::granule_size;if(new_size<=_size)return false;void*new_buf=std::malloc(new_size);if(new_buf==nullptr)return false;if(_buffer!=nullptr)std::memcpy(new_buf,_buffer,_size);if(_owns_memory&&_buffer!=nullptr)std::free(_buffer);_buffer=static_cast<uint8_t*>(new_buf);_size=new_size;_owns_memory=true;return true;}bool owns_memory()const noexcept{return _owns_memory;}private:uint8_t*_buffer=nullptr;size_t _size=0;bool _owns_memory=false;};static_assert(is_storage_backend_v<HeapStorage<>>,"");}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
 
+AY Ap{
 /*
 ## pmm-heapstorage
 */
+I<F AT=W>Dt Cv{DF:j E=AT;Cv()D=GL;Eh Cv(H Eb)D{if(Eb==0)B;H II=((Eb+AT::P-1)/AT::P)*AT::P;CW=G<Y*>(AL::malloc(II));if(CW!=M){Al=II;CR=Bi;}}Cv(J Cv&)=EO;Cv&Af=(J Cv&)=EO;Cv(Cv&&An)D:CW(An.CW),Al(An.Al),CR(An.CR){An.CW=M;An.Al=0;An.CR=X;}Cv&Af=(Cv&&An)D{if(BN!=&An){if(CR&&CW!=M)AL::free(CW);CW=An.CW;Al=An.Al;CR=An.CR;An.CW=M;An.Al=0;An.CR=X;}B*BN;}~Cv(){if(CR&&CW!=M)AL::free(CW);}V attach(V*memory,H IZ)D{if(CR&&CW!=M)AL::free(CW);CW=G<Y*>(memory);Al=IZ;CR=X;}Y*AR()D{B CW;}J Y*AR()J D{B CW;}H S()J D{B Al;}AN expand(H Dd)D{if(Dd==0)B Al>0;N Q H kMinInitialSize=4096;H KR=(Al>0)?(Al/4+Dd):AL::IQ(Dd,kMinInitialSize);H BM=Al+KR;BM=((BM+AT::P-1)/AT::P)*AT::P;if(BM<=Al)B X;V*new_buf=AL::malloc(BM);if(new_buf==M)B X;if(CW!=M)AL::Hz(new_buf,CW,Al);if(CR&&CW!=M)AL::free(CW);CW=G<Y*>(new_buf);Al=BM;CR=Bi;B Bi;}AN HT()J D{B CR;}Ew:Y*CW=M;H Al=0;AN CR=X;};AK(Fu<Cv<>>,"");}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <cstddef>
 #include <cstdio>
-namespace pmm{namespace logging{
-/*
-### pmm-logging-nologging
-*/
-struct NoLogging{static void on_allocation_failure(size_t,PmmError)noexcept{}static void on_expand(size_t,size_t)noexcept{}static void on_corruption_detected(PmmError)noexcept{}static void on_create(size_t)noexcept{}static void on_destroy()noexcept{}static void on_load()noexcept{}};
-/*
-### pmm-logging-stderrlogging
-*/
-struct StderrLogging{static void on_allocation_failure(size_t user_size,PmmError err)noexcept{std::fprintf(stderr,"[pmm] allocation_failure: size=%zu error=%d\n",user_size,static_cast<int>(err));}static void on_expand(size_t old_size,size_t new_size)noexcept{std::fprintf(stderr,"[pmm] expand: %zu -> %zu\n",old_size,new_size);}static void on_corruption_detected(PmmError err)noexcept{std::fprintf(stderr,"[pmm] corruption_detected: error=%d\n",static_cast<int>(err));}static void on_create(size_t initial_size)noexcept{std::fprintf(stderr,"[pmm] create: size=%zu\n",initial_size);}static void on_destroy()noexcept{std::fprintf(stderr,"[pmm] destroy\n");}static void on_load()noexcept{std::fprintf(stderr,"[pmm] load\n");}};}}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
 
+AY Ap{AY logging{
 /*
 ### pmm-logging-nologging
 */
+Au NoLogging{N V By(H,AE)D{}N V on_expand(H,H)D{}N V Cg(AE)D{}N V on_create(H)D{}N V on_destroy()D{}N V on_load()D{}};
 /*
 ### pmm-logging-stderrlogging
 */
+Au StderrLogging{N V By(H Bs,AE err)D{AL::LA(stderr,"[pmm] allocation_failure: size=%zu error=%d\n",Bs,G<int>(err));}N V on_expand(H Ho,H BM)D{AL::LA(stderr,"[pmm] expand: %zu -> %zu\n",Ho,BM);}N V Cg(AE err)D{AL::LA(stderr,"[pmm] corruption_detected: error=%d\n",G<int>(err));}N V on_create(H Eb)D{AL::LA(stderr,"[pmm] create: size=%zu\n",Eb);}N V on_destroy()D{AL::LA(stderr,"[pmm] destroy\n");}N V on_load()D{AL::LA(stderr,"[pmm] load\n");}};}}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <cstddef>
 #include <cstdint>
-namespace pmm{
-/*
-## pmm-staticstorage
-*/
-template<size_t Size,typename AT=DefaultAddressTraits>class StaticStorage{static_assert(Size>0,"");static_assert(Size%AT::granule_size==0,"");public:using address_traits=AT;StaticStorage()noexcept=default;StaticStorage(const StaticStorage&)=delete;StaticStorage&operator=(const StaticStorage&)=delete;StaticStorage(StaticStorage&&)=delete;StaticStorage&operator=(StaticStorage&&)=delete;uint8_t*base_ptr()noexcept{return _buffer;}const uint8_t*base_ptr()const noexcept{return _buffer;}constexpr size_t total_size()const noexcept{return Size;}
-/*
-### pmm-staticstorage-expand
-*/
-bool expand(size_t)noexcept{return false;}constexpr bool owns_memory()const noexcept{return false;}private:alignas(AT::granule_size)uint8_t _buffer[Size]{};};static_assert(is_storage_backend_v<StaticStorage<64>>,"");}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
 
+AY Ap{
 /*
 ## pmm-staticstorage
 */
+I<H Size,F AT=W>Dt Cn{AK(Size>0,"");AK(Size%AT::P==0,"");DF:j E=AT;Cn()D=GL;Cn(J Cn&)=EO;Cn&Af=(J Cn&)=EO;Cn(Cn&&)=EO;Cn&Af=(Cn&&)=EO;Y*AR()D{B CW;}J Y*AR()J D{B CW;}Q H S()J D{B Size;}
 /*
 ### pmm-staticstorage-expand
 */
+AN expand(H)D{B X;}Q AN HT()J D{B X;}Ew:alignas(AT::P)Y CW[Size]{};};AK(Fu<Cn<64>>,"");}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <concepts>
 #include <cstddef>
-namespace pmm{inline constexpr size_t kMinGranuleSize=4;template<typename AT>concept ValidPmmAddressTraits=(AT::granule_size>=kMinGranuleSize)&&((AT::granule_size&(AT::granule_size-1))==0);static_assert(ValidPmmAddressTraits<DefaultAddressTraits>,"");static_assert(ValidPmmAddressTraits<SmallAddressTraits>,"");static_assert(ValidPmmAddressTraits<LargeAddressTraits>,"");template<typename AT=DefaultAddressTraits,typename LockPolicyT=config::NoLock,size_t GrowNum=config::kDefaultGrowNumerator,size_t GrowDen=config::kDefaultGrowDenominator,size_t MaxMemoryGB=64,typename LoggingPolicyT=logging::NoLogging>
-/*
-## pmm-basicconfig
-*/
-struct BasicConfig{static_assert(ValidPmmAddressTraits<AT>,"");using address_traits=AT;using storage_backend=HeapStorage<AT>;using free_block_tree=AvlFreeTree<AT>;using lock_policy=LockPolicyT;using logging_policy=LoggingPolicyT;static constexpr size_t granule_size=AT::granule_size;static constexpr size_t max_memory_gb=MaxMemoryGB;static constexpr size_t grow_numerator=GrowNum;static constexpr size_t grow_denominator=GrowDen;};template<typename AT,size_t BufferSize,size_t GrowNum=3,size_t GrowDen=2>
-/*
-## pmm-staticconfig
-*/
-struct StaticConfig{static_assert(ValidPmmAddressTraits<AT>,"");using address_traits=AT;using storage_backend=StaticStorage<BufferSize,AT>;using free_block_tree=AvlFreeTree<AT>;using lock_policy=config::NoLock;using logging_policy=logging::NoLogging;static constexpr size_t granule_size=AT::granule_size;static constexpr size_t max_memory_gb=0;static constexpr size_t grow_numerator=GrowNum;static constexpr size_t grow_denominator=GrowDen;};template<size_t BufferSize=1024>using SmallEmbeddedStaticConfig=StaticConfig<SmallAddressTraits,BufferSize>;template<size_t BufferSize=4096>using EmbeddedStaticConfig=StaticConfig<DefaultAddressTraits,BufferSize>;using CacheManagerConfig=BasicConfig<DefaultAddressTraits,config::NoLock,config::kDefaultGrowNumerator,config::kDefaultGrowDenominator,64>;using PersistentDataConfig=BasicConfig<DefaultAddressTraits,config::SharedMutexLock,config::kDefaultGrowNumerator,config::kDefaultGrowDenominator,64>;using EmbeddedManagerConfig=BasicConfig<DefaultAddressTraits,config::NoLock,3,2,64>;using IndustrialDBConfig=BasicConfig<DefaultAddressTraits,config::SharedMutexLock,2,1,64>;using LargeDBConfig=BasicConfig<LargeAddressTraits,config::SharedMutexLock,2,1,0>;}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
 
+AY Ap{AO Q H kMinGranuleSize=4;I<F AT>Hc De=(AT::P>=kMinGranuleSize)&&((AT::P&(AT::P-1))==0);AK(De<W>,"");AK(De<Ib>,"");AK(De<Ic>,"");I<F AT=W,F LockPolicyT=Gb::NoLock,H GrowNum=Gb::Fe,H GrowDen=Gb::FG,H MaxMemoryGB=64,F LoggingPolicyT=logging::NoLogging>
 /*
 ## pmm-basicconfig
 */
+Au Hf{AK(De<AT>,"");j E=AT;j Bu=Cv<AT>;j Az=EA<AT>;j lock_policy=LockPolicyT;j AS=LoggingPolicyT;N Q H P=AT::P;N Q H max_memory_gb=MaxMemoryGB;N Q H grow_numerator=GrowNum;N Q H grow_denominator=GrowDen;};I<F AT,H FE,H GrowNum=3,H GrowDen=2>
 /*
 ## pmm-staticconfig
 */
+Au StaticConfig{AK(De<AT>,"");j E=AT;j Bu=Cn<FE,AT>;j Az=EA<AT>;j lock_policy=Gb::NoLock;j AS=logging::NoLogging;N Q H P=AT::P;N Q H max_memory_gb=0;N Q H grow_numerator=GrowNum;N Q H grow_denominator=GrowDen;};I<H FE=1024>j SmallEmbeddedStaticConfig=StaticConfig<Ib,FE>;I<H FE=4096>j EmbeddedStaticConfig=StaticConfig<W,FE>;j Ie=Hf<W,Gb::NoLock,Gb::Fe,Gb::FG,64>;j PersistentDataConfig=Hf<W,Gb::Hx,Gb::Fe,Gb::FG,64>;j EmbeddedManagerConfig=Hf<W,Gb::NoLock,3,2,64>;j IndustrialDBConfig=Hf<W,Gb::Hx,2,1,64>;j LargeDBConfig=Hf<Ic,Gb::Hx,2,1,0>;}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #if defined(_MSVC_LANG)
 #if _MSVC_LANG < 202002L
@@ -450,176 +17895,11110 @@ struct StaticConfig{static_assert(ValidPmmAddressTraits<AT>,"");using address_tr
 #include <cstdint>
 #include <cstring>
 #include <limits>
-namespace pmm{template<typename FT=AvlFreeTree<DefaultAddressTraits>,typename AT=DefaultAddressTraits>
-/*
-## pmm-allocatorpolicy
-*/
-class AllocatorPolicy{static_assert(FreeBlockTreePolicyForTraitsConcept<FT,AT>,"");public:using address_traits=AT;using free_block_tree=FT;using index_type=typename AT::index_type;using BlockT=Block<AT>;using BlockState=BlockStateBase<AT>;AllocatorPolicy()=delete;AllocatorPolicy(const AllocatorPolicy&)=delete;AllocatorPolicy&operator=(const AllocatorPolicy&)=delete;static void*allocate_from_block(uint8_t*base,detail::ManagerHeader<AT>*hdr,index_type blk_idx,size_t user_size){FT::remove(base,hdr,blk_idx);FreeBlock<AT>*fb=FreeBlock<AT>::cast_from_raw(detail::block_at<AT>(base,blk_idx));FreeBlockRemovedAVL<AT>*removed=fb->remove_from_avl();static constexpr index_type kBlkHdrGran=detail::kBlockHeaderGranules_t<AT>;index_type blk_total_gran=detail::block_total_granules(base,hdr,detail::block_at<AT>(base,blk_idx));index_type data_gran=detail::bytes_to_granules_t<AT>(user_size);if(data_gran>std::numeric_limits<index_type>::max()-kBlkHdrGran)return nullptr;index_type needed_gran=kBlkHdrGran+data_gran;index_type min_rem_gran=kBlkHdrGran+1;bool can_split=false;if(needed_gran<=std::numeric_limits<index_type>::max()-min_rem_gran)can_split=(blk_total_gran>=needed_gran+min_rem_gran);if(can_split){SplittingBlock<AT>*splitting=removed->begin_splitting();index_type new_idx=blk_idx+needed_gran;void*new_blk_ptr=detail::block_at<AT>(base,new_idx);index_type curr_next=splitting->next_offset();BlockT*old_next=(curr_next!=AT::no_block)?detail::block_at<AT>(base,curr_next):nullptr;splitting->initialize_new_block(new_blk_ptr,new_idx,blk_idx);splitting->link_new_block(old_next,new_idx);if(old_next==nullptr)hdr->last_block_offset=new_idx;hdr->block_count++;hdr->free_count++;hdr->used_size+=kBlkHdrGran;FT::insert(base,hdr,new_idx);AllocatedBlock<AT>*alloc=splitting->finalize_split(data_gran,blk_idx);(void)alloc;}else{AllocatedBlock<AT>*alloc=removed->mark_as_allocated(data_gran,blk_idx);(void)alloc;}hdr->alloc_count++;hdr->free_count--;hdr->used_size+=data_gran;return detail::user_ptr<AT>(detail::block_at<AT>(base,blk_idx));}static void coalesce(uint8_t*base,detail::ManagerHeader<AT>*hdr,index_type blk_idx){FreeBlockNotInAVL<AT>*not_avl=FreeBlockNotInAVL<AT>::cast_from_raw(detail::block_at<AT>(base,blk_idx));CoalescingBlock<AT>*coalescing=not_avl->begin_coalescing();static constexpr index_type kBlkHdrGran=detail::kBlockHeaderGranules_t<AT>;index_type b_idx=blk_idx;index_type curr_next=coalescing->next_offset();if(curr_next!=AT::no_block){void*nxt_raw=detail::block_at<AT>(base,curr_next);if(BlockState::get_weight(nxt_raw)==0){index_type nxt_idx=curr_next;index_type nxt_next=BlockState::get_next_offset(nxt_raw);BlockT*nxt_nxt_blk=(nxt_next!=AT::no_block)?detail::block_at<AT>(base,nxt_next):nullptr;FT::remove(base,hdr,nxt_idx);coalescing->coalesce_with_next(detail::block_at<AT>(base,nxt_idx),nxt_nxt_blk,b_idx);if(nxt_nxt_blk==nullptr)hdr->last_block_offset=b_idx;hdr->block_count--;hdr->free_count--;if(hdr->used_size>=kBlkHdrGran)hdr->used_size-=kBlkHdrGran;}}index_type curr_prev=coalescing->prev_offset();if(curr_prev!=AT::no_block){void*prv_raw=detail::block_at<AT>(base,curr_prev);if(BlockState::get_weight(prv_raw)==0){index_type prv_idx=curr_prev;index_type blk_next=coalescing->next_offset();BlockT*next_blk=(blk_next!=AT::no_block)?detail::block_at<AT>(base,blk_next):nullptr;FT::remove(base,hdr,prv_idx);CoalescingBlock<AT>*result_coalescing=coalescing->coalesce_with_prev(prv_raw,next_blk,prv_idx);if(next_blk==nullptr)hdr->last_block_offset=prv_idx;hdr->block_count--;hdr->free_count--;if(hdr->used_size>=kBlkHdrGran)hdr->used_size-=kBlkHdrGran;FreeBlock<AT>*fb=result_coalescing->finalize_coalesce();(void)fb;FT::insert(base,hdr,prv_idx);return;}}FreeBlock<AT>*fb=coalescing->finalize_coalesce();(void)fb;FT::insert(base,hdr,b_idx);}static void rebuild_free_tree(uint8_t*base,detail::ManagerHeader<AT>*hdr){hdr->free_tree_root=AT::no_block;hdr->last_block_offset=AT::no_block;index_type idx=hdr->first_block_offset;while(idx!=AT::no_block){void*blk_ptr=detail::block_at<AT>(base,idx);BlockState::recover_state(blk_ptr,idx);if(BlockState::get_weight(blk_ptr)==0){BlockState::reset_avl_fields_of(blk_ptr);FT::insert(base,hdr,idx);}index_type next_idx=BlockState::get_next_offset(blk_ptr);if(next_idx==AT::no_block)hdr->last_block_offset=idx;idx=next_idx;}}static void repair_linked_list(uint8_t*base,detail::ManagerHeader<AT>*hdr){index_type idx=hdr->first_block_offset;index_type prev=AT::no_block;while(idx!=AT::no_block){if(static_cast<size_t>(idx)*AT::granule_size+sizeof(BlockT)>hdr->total_size)break;void*blk_ptr=detail::block_at<AT>(base,idx);BlockState::repair_prev_offset(blk_ptr,prev);prev=idx;index_type next_offset=BlockState::get_next_offset(blk_ptr);idx=next_offset;}}static void recompute_counters(uint8_t*base,detail::ManagerHeader<AT>*hdr){static constexpr index_type kBlkHdrGran=detail::kBlockHeaderGranules_t<AT>;index_type block_count=0,free_count=0,alloc_count=0;index_type used_gran=0;index_type idx=hdr->first_block_offset;while(idx!=AT::no_block){if(static_cast<size_t>(idx)*AT::granule_size+sizeof(BlockT)>hdr->total_size)break;const void*blk_ptr=detail::block_at<AT>(base,idx);block_count++;used_gran+=kBlkHdrGran;index_type w=BlockState::get_weight(blk_ptr);if(w>0){alloc_count++;used_gran+=w;}else{free_count++;}idx=BlockState::get_next_offset(blk_ptr);}hdr->block_count=block_count;hdr->free_count=free_count;hdr->alloc_count=alloc_count;hdr->used_size=used_gran;}static void verify_linked_list(const uint8_t*base,const detail::ManagerHeader<AT>*hdr,VerifyResult&result)noexcept{index_type idx=hdr->first_block_offset;index_type prev=AT::no_block;while(idx!=AT::no_block){if(static_cast<size_t>(idx)*AT::granule_size+sizeof(BlockT)>hdr->total_size)break;const void*blk_ptr=detail::block_at<AT>(base,idx);index_type stored_prev=BlockState::get_prev_offset(blk_ptr);if(stored_prev!=prev){result.add(ViolationType::PrevOffsetMismatch,DiagnosticAction::NoAction,static_cast<uint64_t>(idx),static_cast<uint64_t>(prev),static_cast<uint64_t>(stored_prev));}prev=idx;index_type next_offset=BlockState::get_next_offset(blk_ptr);idx=next_offset;}}static void verify_counters(const uint8_t*base,const detail::ManagerHeader<AT>*hdr,VerifyResult&result)noexcept{static constexpr index_type kBlkHdrGran=detail::kBlockHeaderGranules_t<AT>;index_type block_count=0,free_count=0,alloc_count=0;index_type used_gran=0;index_type idx=hdr->first_block_offset;while(idx!=AT::no_block){if(static_cast<size_t>(idx)*AT::granule_size+sizeof(BlockT)>hdr->total_size)break;const void*blk_ptr=detail::block_at<AT>(base,idx);block_count++;used_gran+=kBlkHdrGran;index_type w=BlockState::get_weight(blk_ptr);if(w>0){alloc_count++;used_gran+=w;}else{free_count++;}idx=BlockState::get_next_offset(blk_ptr);}if(hdr->block_count!=block_count||hdr->free_count!=free_count||hdr->alloc_count!=alloc_count||hdr->used_size!=used_gran){result.add(ViolationType::CounterMismatch,DiagnosticAction::NoAction,0,static_cast<uint64_t>(block_count),static_cast<uint64_t>(hdr->block_count));}}static void verify_block_states(const uint8_t*base,const detail::ManagerHeader<AT>*hdr,VerifyResult&result)noexcept{index_type idx=hdr->first_block_offset;while(idx!=AT::no_block){if(static_cast<size_t>(idx)*AT::granule_size+sizeof(BlockT)>hdr->total_size)break;const void*blk_ptr=detail::block_at<AT>(base,idx);BlockState::verify_state(blk_ptr,idx,result);idx=BlockState::get_next_offset(blk_ptr);}}static void verify_free_tree(const uint8_t*base,const detail::ManagerHeader<AT>*hdr,VerifyResult&result)noexcept{size_t expected_count=0;index_type idx=hdr->first_block_offset;while(idx!=AT::no_block){if(static_cast<size_t>(idx)*AT::granule_size+sizeof(BlockT)>hdr->total_size)break;const void*blk_ptr=detail::block_at<AT>(base,idx);if(BlockState::get_weight(blk_ptr)==0)++expected_count;idx=BlockState::get_next_offset(blk_ptr);}const bool root_present=(hdr->free_tree_root!=AT::no_block);if(expected_count==0){if(root_present){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,0,0,static_cast<uint64_t>(hdr->free_tree_root));}return;}if(!root_present){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,0,static_cast<uint64_t>(expected_count),static_cast<uint64_t>(hdr->free_tree_root));return;}if(!detail::validate_block_index<AT>(hdr->total_size,hdr->free_tree_root)){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,static_cast<uint64_t>(hdr->free_tree_root),1,0);return;}const void*root=detail::block_at<AT>(base,hdr->free_tree_root);if(BlockState::get_weight(root)!=0||BlockState::get_parent_offset(root)!=AT::no_block){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,static_cast<uint64_t>(hdr->free_tree_root),0,static_cast<uint64_t>(BlockState::get_parent_offset(root)));}size_t visited_count=0;verify_free_tree_node(base,hdr,hdr->free_tree_root,AT::no_block,{},false,{},false,expected_count,visited_count,result);idx=hdr->first_block_offset;while(idx!=AT::no_block){if(static_cast<size_t>(idx)*AT::granule_size+sizeof(BlockT)>hdr->total_size)break;const void*blk_ptr=detail::block_at<AT>(base,idx);if(BlockState::get_weight(blk_ptr)==0&&!free_tree_contains(base,hdr,hdr->free_tree_root,idx,expected_count)){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,static_cast<uint64_t>(idx),1,0);}idx=BlockState::get_next_offset(blk_ptr);}if(visited_count!=expected_count){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,0,static_cast<uint64_t>(expected_count),static_cast<uint64_t>(visited_count));}}static index_type free_tree_block_granules(const uint8_t*base,const detail::ManagerHeader<AT>*hdr,index_type block_idx)noexcept{const void*n=detail::block_at<AT>(base,block_idx);index_type n_next=BlockState::get_next_offset(n);index_type total=detail::byte_off_to_idx_t<AT>(hdr->total_size);return(n_next!=AT::no_block)?static_cast<index_type>(n_next-block_idx):static_cast<index_type>(total-block_idx);}static bool free_tree_less_key(const uint8_t*base,const detail::ManagerHeader<AT>*hdr,index_type a,index_type b)noexcept{index_type a_gran=free_tree_block_granules(base,hdr,a);index_type b_gran=free_tree_block_granules(base,hdr,b);return(a_gran<b_gran)||(a_gran==b_gran&&a<b);}static bool free_tree_contains(const uint8_t*base,const detail::ManagerHeader<AT>*hdr,index_type node_idx,index_type target,size_t step_limit)noexcept{while(node_idx!=AT::no_block&&step_limit-->0){if(!detail::validate_block_index<AT>(hdr->total_size,node_idx))return false;const void*node=detail::block_at<AT>(base,node_idx);if(BlockState::get_weight(node)!=0)return false;if(node_idx==target)return true;node_idx=free_tree_less_key(base,hdr,target,node_idx)?BlockState::get_left_offset(node):BlockState::get_right_offset(node);}return false;}static std::int16_t verify_free_tree_node(const uint8_t*base,const detail::ManagerHeader<AT>*hdr,index_type node_idx,index_type parent,index_type lower,bool has_lower,index_type upper,bool has_upper,size_t expected_count,size_t&visited_count,VerifyResult&result)noexcept{if(node_idx==AT::no_block)return 0;if(visited_count>=expected_count){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,static_cast<uint64_t>(node_idx),1,2);return 0;}++visited_count;if(!detail::validate_block_index<AT>(hdr->total_size,node_idx)){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,static_cast<uint64_t>(parent),0,static_cast<uint64_t>(node_idx));return 0;}const void*node=detail::block_at<AT>(base,node_idx);if(BlockState::get_weight(node)!=0){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,static_cast<uint64_t>(node_idx),0,static_cast<uint64_t>(BlockState::get_weight(node)));return 0;}if(BlockState::get_parent_offset(node)!=parent){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,static_cast<uint64_t>(node_idx),static_cast<uint64_t>(parent),static_cast<uint64_t>(BlockState::get_parent_offset(node)));}if(has_lower&&!free_tree_less_key(base,hdr,lower,node_idx)){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,static_cast<uint64_t>(node_idx),static_cast<uint64_t>(lower),static_cast<uint64_t>(node_idx));}if(has_upper&&!free_tree_less_key(base,hdr,node_idx,upper)){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,static_cast<uint64_t>(node_idx),static_cast<uint64_t>(node_idx),static_cast<uint64_t>(upper));}index_type left=BlockState::get_left_offset(node);index_type right=BlockState::get_right_offset(node);std::int16_t left_h=verify_free_tree_node(base,hdr,left,node_idx,lower,has_lower,node_idx,true,expected_count,visited_count,result);std::int16_t right_h=verify_free_tree_node(base,hdr,right,node_idx,node_idx,true,upper,has_upper,expected_count,visited_count,result);std::int16_t expected_h=static_cast<std::int16_t>(1+(left_h>right_h?left_h:right_h));std::int16_t stored_h=BlockState::get_avl_height(node);if(stored_h!=expected_h||left_h-right_h>1||right_h-left_h>1){result.add(ViolationType::FreeTreeStale,DiagnosticAction::NoAction,static_cast<uint64_t>(node_idx),static_cast<uint64_t>(expected_h),static_cast<uint64_t>(stored_h));}return expected_h;}static void realloc_shrink(uint8_t*base,detail::ManagerHeader<AT>*hdr,index_type blk_idx,void*blk_raw,index_type old_data_gran,index_type new_data_gran)noexcept{static constexpr index_type kBlkHdrGran=detail::kBlockHeaderGranules_t<AT>;index_type remainder=old_data_gran-new_data_gran;if(remainder>=kBlkHdrGran+1){index_type new_free_idx=blk_idx+kBlkHdrGran+new_data_gran;void*new_free_blk=detail::block_at<AT>(base,new_free_idx);index_type old_next=BlockState::get_next_offset(blk_raw);auto*old_next_blk=(old_next!=AT::no_block)?detail::block_at<AT>(base,old_next):nullptr;std::memset(new_free_blk,0,sizeof(BlockT));BlockState::init_fields(new_free_blk,blk_idx,old_next,1,0,0);BlockState::set_next_offset_of(blk_raw,new_free_idx);if(old_next_blk!=nullptr)BlockState::set_prev_offset_of(old_next_blk,new_free_idx);else hdr->last_block_offset=new_free_idx;BlockState::set_weight_of(blk_raw,new_data_gran);hdr->block_count++;hdr->free_count++;hdr->used_size+=kBlkHdrGran;hdr->used_size-=(old_data_gran-new_data_gran);coalesce(base,hdr,new_free_idx);}else{BlockState::set_weight_of(blk_raw,new_data_gran);hdr->used_size-=(old_data_gran-new_data_gran);}}static bool realloc_grow(uint8_t*base,detail::ManagerHeader<AT>*hdr,index_type blk_idx,void*blk_raw,index_type old_data_gran,index_type new_data_gran)noexcept{static constexpr index_type kBlkHdrGran=detail::kBlockHeaderGranules_t<AT>;index_type next_idx=BlockState::get_next_offset(blk_raw);if(next_idx==AT::no_block)return false;void*next_blk=detail::block_at<AT>(base,next_idx);if(BlockState::get_weight(next_blk)!=0)return false;index_type next_total=detail::block_total_granules(base,hdr,detail::block_at<AT>(base,next_idx));index_type available=old_data_gran+next_total;if(available<new_data_gran)return false;FT::remove(base,hdr,next_idx);index_type next_next=BlockState::get_next_offset(next_blk);BlockState::set_next_offset_of(blk_raw,next_next);if(next_next!=AT::no_block)BlockState::set_prev_offset_of(detail::block_at<AT>(base,next_next),blk_idx);else hdr->last_block_offset=blk_idx;std::memset(next_blk,0,sizeof(BlockT));hdr->block_count--;hdr->free_count--;if(hdr->used_size>=kBlkHdrGran)hdr->used_size-=kBlkHdrGran;index_type rem=available-new_data_gran;if(rem>=kBlkHdrGran+1){index_type rem_idx=blk_idx+kBlkHdrGran+new_data_gran;void*rem_blk=detail::block_at<AT>(base,rem_idx);index_type blk_new_next=BlockState::get_next_offset(blk_raw);std::memset(rem_blk,0,sizeof(BlockT));BlockState::init_fields(rem_blk,blk_idx,blk_new_next,1,0,0);BlockState::set_next_offset_of(blk_raw,rem_idx);if(blk_new_next!=AT::no_block)BlockState::set_prev_offset_of(detail::block_at<AT>(base,blk_new_next),rem_idx);else hdr->last_block_offset=rem_idx;hdr->block_count++;hdr->free_count++;hdr->used_size+=kBlkHdrGran;FT::insert(base,hdr,rem_idx);}BlockState::set_weight_of(blk_raw,new_data_gran);hdr->used_size+=(new_data_gran-old_data_gran);return true;}};using DefaultAllocatorPolicy=AllocatorPolicy<AvlFreeTree<DefaultAddressTraits>,DefaultAddressTraits>;}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
 
+AY Ap{I<F FT=EA<W>,F AT=W>
 /*
 ## pmm-allocatorpolicy
 */
+Dt Du{AK(EU<FT,AT>,"");DF:j E=AT;j Az=FT;j A=F AT::A;j GB=Ao<AT>;j R=Z<AT>;Du()=EO;Du(J Du&)=EO;Du&Af=(J Du&)=EO;N V*GR(Y*m,K::q<AT>*AD,A As,H Bs){FT::JQ(m,AD,As);DL<AT>*fb=DL<AT>::Cm(K::Ac<AT>(m,As));DS<AT>*removed=fb->remove_from_avl();N Q A BK=K::Bo<AT>;A blk_total_gran=K::En(m,AD,K::Ac<AT>(m,As));A FK=K::DR<AT>(Bs);if(FK>AL::Ag<A>::IQ()-BK)B M;A KN=BK+FK;A min_rem_gran=BK+1;AN can_split=X;if(KN<=AL::Ag<A>::IQ()-min_rem_gran)can_split=(blk_total_gran>=KN+min_rem_gran);if(can_split){Et<AT>*KH=removed->begin_splitting();A Ey=As+KN;V*Ii=K::Ac<AT>(m,Ey);A Hu=KH->DG();GB*In=(Hu!=AT::k)?K::Ac<AT>(m,Hu):M;KH->initialize_new_block(Ii,Ey,As);KH->link_new_block(In,Ey);if(In==M)AD->BB=Ey;AD->BP++;AD->Be++;AD->Bb+=BK;FT::GZ(m,AD,Ey);Bh<AT>*alloc=KH->finalize_split(FK,As);(V)alloc;}EN{Bh<AT>*alloc=removed->mark_as_allocated(FK,As);(V)alloc;}AD->Cf++;AD->Be--;AD->Bb+=FK;B K::user_ptr<AT>(K::Ac<AT>(m,As));}N V coalesce(Y*m,K::q<AT>*AD,A As){DK<AT>*not_avl=DK<AT>::Cm(K::Ac<AT>(m,As));Cw<AT>*HL=not_avl->begin_coalescing();N Q A BK=K::Bo<AT>;A b_idx=As;A Hu=HL->DG();if(Hu!=AT::k){V*nxt_raw=K::Ac<AT>(m,Hu);if(R::Ar(nxt_raw)==0){A nxt_idx=Hu;A nxt_next=R::AU(nxt_raw);GB*nxt_nxt_blk=(nxt_next!=AT::k)?K::Ac<AT>(m,nxt_next):M;FT::JQ(m,AD,nxt_idx);HL->coalesce_with_next(K::Ac<AT>(m,nxt_idx),nxt_nxt_blk,b_idx);if(nxt_nxt_blk==M)AD->BB=b_idx;AD->BP--;AD->Be--;if(AD->Bb>=BK)AD->Bb-=BK;}}A curr_prev=HL->HS();if(curr_prev!=AT::k){V*prv_raw=K::Ac<AT>(m,curr_prev);if(R::Ar(prv_raw)==0){A prv_idx=curr_prev;A Jx=HL->DG();GB*Er=(Jx!=AT::k)?K::Ac<AT>(m,Jx):M;FT::JQ(m,AD,prv_idx);Cw<AT>*result_coalescing=HL->coalesce_with_prev(prv_raw,Er,prv_idx);if(Er==M)AD->BB=prv_idx;AD->BP--;AD->Be--;if(AD->Bb>=BK)AD->Bb-=BK;DL<AT>*fb=result_coalescing->JA();(V)fb;FT::GZ(m,AD,prv_idx);B;}}DL<AT>*fb=HL->JA();(V)fb;FT::GZ(m,AD,b_idx);}N V rebuild_free_tree(Y*m,K::q<AT>*AD){AD->Am=AT::k;AD->BB=AT::k;A At=AD->Aq;Fa(At!=AT::k){V*CL=K::Ac<AT>(m,At);R::recover_state(CL,At);if(R::Ar(CL)==0){R::reset_avl_fields_of(CL);FT::GZ(m,AD,At);}A FU=R::AU(CL);if(FU==AT::k)AD->BB=At;At=FU;}}N V repair_linked_list(Y*m,K::q<AT>*AD){A At=AD->Aq;A It=AT::k;Fa(At!=AT::k){if(G<H>(At)*AT::P+AG(GB)>AD->S)IV;V*CL=K::Ac<AT>(m,At);R::repair_prev_offset(CL,It);It=At;A DG=R::AU(CL);At=DG;}}N V recompute_counters(Y*m,K::q<AT>*AD){N Q A BK=K::Bo<AT>;A BP=0,Be=0,Cf=0;A HA=0;A At=AD->Aq;Fa(At!=AT::k){if(G<H>(At)*AT::P+AG(GB)>AD->S)IV;J V*CL=K::Ac<AT>(m,At);BP++;HA+=BK;A w=R::Ar(CL);if(w>0){Cf++;HA+=w;}EN{Be++;}At=R::AU(CL);}AD->BP=BP;AD->Be=Be;AD->Cf=Cf;AD->Bb=HA;}N V IY(J Y*m,J K::q<AT>*AD,Bq&AM)D{A At=AD->Aq;A It=AT::k;Fa(At!=AT::k){if(G<H>(At)*AT::P+AG(GB)>AD->S)IV;J V*CL=K::Ac<AT>(m,At);A stored_prev=R::FX(CL);if(stored_prev!=It){AM.Fw(AF::PrevOffsetMismatch,o::Bg,G<z>(At),G<z>(It),G<z>(stored_prev));}It=At;A DG=R::AU(CL);At=DG;}}N V Jg(J Y*m,J K::q<AT>*AD,Bq&AM)D{N Q A BK=K::Bo<AT>;A BP=0,Be=0,Cf=0;A HA=0;A At=AD->Aq;Fa(At!=AT::k){if(G<H>(At)*AT::P+AG(GB)>AD->S)IV;J V*CL=K::Ac<AT>(m,At);BP++;HA+=BK;A w=R::Ar(CL);if(w>0){Cf++;HA+=w;}EN{Be++;}At=R::AU(CL);}if(AD->BP!=BP||AD->Be!=Be||AD->Cf!=Cf||AD->Bb!=HA){AM.Fw(AF::CounterMismatch,o::Bg,0,G<z>(BP),G<z>(AD->BP));}}N V IE(J Y*m,J K::q<AT>*AD,Bq&AM)D{A At=AD->Aq;Fa(At!=AT::k){if(G<H>(At)*AT::P+AG(GB)>AD->S)IV;J V*CL=K::Ac<AT>(m,At);R::Jb(CL,At,AM);At=R::AU(CL);}}N V JK(J Y*m,J K::q<AT>*AD,Bq&AM)D{H CV=0;A At=AD->Aq;Fa(At!=AT::k){if(G<H>(At)*AT::P+AG(GB)>AD->S)IV;J V*CL=K::Ac<AT>(m,At);if(R::Ar(CL)==0)++CV;At=R::AU(CL);}J AN root_present=(AD->Am!=AT::k);if(CV==0){if(root_present){AM.Fw(AF::CN,o::Bg,0,0,G<z>(AD->Am));}B;}if(!root_present){AM.Fw(AF::CN,o::Bg,0,G<z>(CV),G<z>(AD->Am));B;}if(!K::Ah<AT>(AD->S,AD->Am)){AM.Fw(AF::CN,o::Bg,G<z>(AD->Am),1,0);B;}J V*DV=K::Ac<AT>(m,AD->Am);if(R::Ar(DV)!=0||R::CA(DV)!=AT::k){AM.Fw(AF::CN,o::Bg,G<z>(AD->Am),0,G<z>(R::CA(DV)));}H EB=0;Fb(m,AD,AD->Am,AT::k,{},X,{},X,CV,EB,AM);At=AD->Aq;Fa(At!=AT::k){if(G<H>(At)*AT::P+AG(GB)>AD->S)IV;J V*CL=K::Ac<AT>(m,At);if(R::Ar(CL)==0&&!free_tree_contains(m,AD,AD->Am,At,CV)){AM.Fw(AF::CN,o::Bg,G<z>(At),1,0);}At=R::AU(CL);}if(EB!=CV){AM.Fw(AF::CN,o::Bg,0,G<z>(CV),G<z>(EB));}}N A Ge(J Y*m,J K::q<AT>*AD,A block_idx)D{J V*n=K::Ac<AT>(m,block_idx);A n_next=R::AU(n);A total=K::Fi<AT>(AD->S);B(n_next!=AT::k)?G<A>(n_next-block_idx):G<A>(total-block_idx);}N AN Gj(J Y*m,J K::q<AT>*AD,A a,A b)D{A a_gran=Ge(m,AD,a);A b_gran=Ge(m,AD,b);B(a_gran<b_gran)||(a_gran==b_gran&&a<b);}N AN free_tree_contains(J Y*m,J K::q<AT>*AD,A BT,A Gu,H step_limit)D{Fa(BT!=AT::k&&step_limit-->0){if(!K::Ah<AT>(AD->S,BT))B X;J V*Iu=K::Ac<AT>(m,BT);if(R::Ar(Iu)!=0)B X;if(BT==Gu)B Bi;BT=Gj(m,AD,Gu,BT)?R::Ca(Iu):R::CQ(Iu);}B X;}N AL::Bk Fb(J Y*m,J K::q<AT>*AD,A BT,A BX,A lower,AN has_lower,A upper,AN has_upper,H CV,H&EB,Bq&AM)D{if(BT==AT::k)B 0;if(EB>=CV){AM.Fw(AF::CN,o::Bg,G<z>(BT),1,2);B 0;}++EB;if(!K::Ah<AT>(AD->S,BT)){AM.Fw(AF::CN,o::Bg,G<z>(BX),0,G<z>(BT));B 0;}J V*Iu=K::Ac<AT>(m,BT);if(R::Ar(Iu)!=0){AM.Fw(AF::CN,o::Bg,G<z>(BT),0,G<z>(R::Ar(Iu)));B 0;}if(R::CA(Iu)!=BX){AM.Fw(AF::CN,o::Bg,G<z>(BT),G<z>(BX),G<z>(R::CA(Iu)));}if(has_lower&&!Gj(m,AD,lower,BT)){AM.Fw(AF::CN,o::Bg,G<z>(BT),G<z>(lower),G<z>(BT));}if(has_upper&&!Gj(m,AD,BT,upper)){AM.Fw(AF::CN,o::Bg,G<z>(BT),G<z>(BT),G<z>(upper));}A Hh=R::Ca(Iu);A GE=R::CQ(Iu);AL::Bk left_h=Fb(m,AD,Hh,BT,lower,has_lower,BT,Bi,CV,EB,AM);AL::Bk right_h=Fb(m,AD,GE,BT,BT,Bi,upper,has_upper,CV,EB,AM);AL::Bk expected_h=G<AL::Bk>(1+(left_h>right_h?left_h:right_h));AL::Bk stored_h=R::Fo(Iu);if(stored_h!=expected_h||left_h-right_h>1||right_h-left_h>1){AM.Fw(AF::CN,o::Bg,G<z>(BT),G<z>(expected_h),G<z>(stored_h));}B expected_h;}N V realloc_shrink(Y*m,K::q<AT>*AD,A As,V*BU,A CU,A BD)D{N Q A BK=K::Bo<AT>;A remainder=CU-BD;if(remainder>=BK+1){A Gr=As+BK+BD;V*new_free_blk=K::Ac<AT>(m,Gr);A In=R::AU(BU);DH*Gq=(In!=AT::k)?K::Ac<AT>(m,In):M;AL::Gv(new_free_blk,0,AG(GB));R::Fh(new_free_blk,As,In,1,0,0);R::Cy(BU,Gr);if(Gq!=M)R::CH(Gq,Gr);EN AD->BB=Gr;R::FR(BU,BD);AD->BP++;AD->Be++;AD->Bb+=BK;AD->Bb-=(CU-BD);coalesce(m,AD,Gr);}EN{R::FR(BU,BD);AD->Bb-=(CU-BD);}}N AN realloc_grow(Y*m,K::q<AT>*AD,A As,V*BU,A CU,A BD)D{N Q A BK=K::Bo<AT>;A FU=R::AU(BU);if(FU==AT::k)B X;V*Er=K::Ac<AT>(m,FU);if(R::Ar(Er)!=0)B X;A next_total=K::En(m,AD,K::Ac<AT>(m,FU));A available=CU+next_total;if(available<BD)B X;FT::JQ(m,AD,FU);A next_next=R::AU(Er);R::Cy(BU,next_next);if(next_next!=AT::k)R::CH(K::Ac<AT>(m,next_next),As);EN AD->BB=As;AL::Gv(Er,0,AG(GB));AD->BP--;AD->Be--;if(AD->Bb>=BK)AD->Bb-=BK;A rem=available-BD;if(rem>=BK+1){A Kp=As+BK+BD;V*rem_blk=K::Ac<AT>(m,Kp);A Je=R::AU(BU);AL::Gv(rem_blk,0,AG(GB));R::Fh(rem_blk,As,Je,1,0,0);R::Cy(BU,Kp);if(Je!=AT::k)R::CH(K::Ac<AT>(m,Je),Kp);EN AD->BB=Kp;AD->BP++;AD->Be++;AD->Bb+=BK;FT::GZ(m,AD,Kp);}R::FR(BU,BD);AD->Bb+=(BD-CU);B Bi;}};j DefaultAllocatorPolicy=Du<EA<W>,W>;}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <type_traits>
-namespace pmm::detail{inline constexpr size_t kForestDomainNameCapacity=48;inline constexpr size_t kMaxForestDomains=32;inline constexpr const char*kSystemDomainFreeTree="system/free_tree";inline constexpr const char*kSystemDomainSymbols="system/symbols";inline constexpr const char*kSystemDomainRegistry="system/domain_registry";inline constexpr const char*kSystemTypeForestRegistry="type/forest_registry";inline constexpr const char*kSystemTypeForestDomainRecord="type/forest_domain_record";inline constexpr const char*kSystemTypePstringview="type/pstringview";inline constexpr const char*kServiceNameDomainRoot="service/domain_root";inline constexpr const char*kServiceNameDomainSymbol="service/domain_symbol";inline constexpr uint32_t kForestRegistryMagic=0x50465247U;inline constexpr uint16_t kForestRegistryVersion=1;inline constexpr uint8_t kForestBindingDirectRoot=0;inline constexpr uint8_t kForestBindingFreeTree=1;inline constexpr uint8_t kForestDomainFlagSystem=0x01;
-/*
-### pmm-detail-forestdomainrecord
-*/
-template<typename AT>struct ForestDomainRecord{using index_type=typename AT::index_type;index_type binding_id;index_type root_offset;index_type symbol_offset;uint8_t binding_kind;uint8_t flags;uint16_t reserved;char name[kForestDomainNameCapacity];constexpr ForestDomainRecord()noexcept:binding_id(0),root_offset(0),symbol_offset(0),binding_kind(kForestBindingDirectRoot),flags(0),reserved(0),name{}{}};
-/*
-### pmm-detail-forestdomainregistry
-*/
-template<typename AT>struct ForestDomainRegistry{using index_type=typename AT::index_type;uint32_t magic;uint16_t version;uint16_t domain_count;index_type next_binding_id;ForestDomainRecord<AT>domains[kMaxForestDomains];constexpr ForestDomainRegistry()noexcept:magic(kForestRegistryMagic),version(kForestRegistryVersion),domain_count(0),next_binding_id(1),domains{}{}};template<typename AT>inline bool forest_domain_name_equals(const ForestDomainRecord<AT>&rec,const char*name)noexcept{if(name==nullptr)return false;return std::strncmp(rec.name,name,kForestDomainNameCapacity)==0;}inline bool forest_domain_name_fits(const char*name)noexcept{if(name==nullptr||name[0]=='\0')return false;return std::strlen(name)<kForestDomainNameCapacity;}template<typename AT>inline bool forest_domain_name_copy(ForestDomainRecord<AT>&rec,const char*name)noexcept{if(!forest_domain_name_fits(name))return false;std::memset(rec.name,0,sizeof(rec.name));std::memcpy(rec.name,name,std::strlen(name));return true;}static_assert(std::is_trivially_copyable_v<ForestDomainRecord<DefaultAddressTraits>>,"");static_assert(std::is_nothrow_default_constructible_v<ForestDomainRegistry<DefaultAddressTraits>>,"");}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
 
+AY Ap::K{AO Q H Bj=48;AO Q H HE=32;AO Q J BG*Ct="system/free_tree";AO Q J BG*Cd="system/symbols";AO Q J BG*Cs="system/domain_registry";AO Q J BG*kSystemTypeForestRegistry="type/forest_registry";AO Q J BG*Hr="type/forest_domain_record";AO Q J BG*kSystemTypePstringview="type/pstringview";AO Q J BG*Bn="service/domain_root";AO Q J BG*kServiceNameDomainSymbol="service/domain_symbol";AO Q Ak DB=0x50465247U;AO Q BV DN=1;AO Q Y Ai=0;AO Q Y EM=1;AO Q Y BA=0x01;
 /*
 ### pmm-detail-forestdomainrecord
 */
+I<F AT>Au Dj{j A=F AT::A;A CF;A BW;A DD;Y Cq;Y Iz;BV reserved;BG CP[Bj];Q Dj()D:CF(0),BW(0),DD(0),Cq(Ai),Iz(0),reserved(0),CP{}{}};
 /*
 ### pmm-detail-forestdomainregistry
 */
+I<F AT>Au Fx{j A=F AT::A;Ak HD;BV Kk;BV DW;A Hp;Dj<AT>FB[HE];Q Fx()D:HD(DB),Kk(DN),DW(0),Hp(1),FB{}{}};I<F AT>AO AN forest_domain_name_equals(J Dj<AT>&Ep,J BG*CP)D{if(CP==M)B X;B AL::strncmp(Ep.CP,CP,Bj)==0;}AO AN FJ(J BG*CP)D{if(CP==M||CP[0]=='\0')B X;B AL::strlen(CP)<Bj;}I<F AT>AO AN forest_domain_name_copy(Dj<AT>&Ep,J BG*CP)D{if(!FJ(CP))B X;AL::Gv(Ep.CP,0,AG(Ep.CP));AL::Hz(Ep.CP,CP,AL::strlen(CP));B Bi;}AK(AL::FH<Dj<W>>,"");AK(AL::is_nothrow_default_constructible_v<Fx<W>>,"");}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-namespace pmm::detail{template<typename ManagerAccess>struct ManagerLayoutOps{using address_traits=typename ManagerAccess::address_traits;using free_block_tree=typename ManagerAccess::free_block_tree;using index_type=typename address_traits::index_type;using logging_policy=typename ManagerAccess::logging_policy;using storage_backend=typename ManagerAccess::storage_backend;using BlockState=BlockStateBase<address_traits>;static bool init_layout(storage_backend&backend,uint8_t*base,size_t size)noexcept{static constexpr index_type kHdrBlkIdx=0;static constexpr index_type kFreeBlkIdx=ManagerAccess::kFreeBlkIdxLayout;static constexpr size_t kGranSz=address_traits::granule_size;static constexpr size_t kMinBlockDataSize=kGranSz;if(static_cast<size_t>(kFreeBlkIdx)*kGranSz+sizeof(Block<address_traits>)+kMinBlockDataSize>size)return false;void*hdr_blk=base;std::memset(hdr_blk,0,ManagerAccess::kBlockHdrByteSize);BlockState::init_fields(hdr_blk,address_traits::no_block,kFreeBlkIdx,0,ManagerAccess::kMgrHdrGranules,kHdrBlkIdx);ManagerHeader<address_traits>*hdr=ManagerAccess::get_header(base);std::memset(hdr,0,sizeof(ManagerHeader<address_traits>));hdr->magic=ManagerAccess::kMagic;hdr->total_size=size;hdr->first_block_offset=kHdrBlkIdx;hdr->last_block_offset=address_traits::no_block;hdr->free_tree_root=address_traits::no_block;hdr->image_version=kCurrentImageVersion;hdr->granule_size=static_cast<uint16_t>(kGranSz);hdr->root_offset=address_traits::no_block;void*blk=base+static_cast<size_t>(kFreeBlkIdx)*kGranSz;std::memset(blk,0,sizeof(Block<address_traits>));BlockState::init_fields(blk,kHdrBlkIdx,address_traits::no_block,1,0,0);hdr->last_block_offset=kFreeBlkIdx;hdr->free_tree_root=kFreeBlkIdx;hdr->block_count=2;hdr->free_count=1;hdr->alloc_count=1;hdr->used_size=kFreeBlkIdx+ManagerAccess::kBlockHdrGranules;(void)backend;ManagerAccess::set_initialized();return true;}static bool do_expand(storage_backend&backend,bool initialized,size_t user_size)noexcept{if(!initialized)return false;uint8_t*base=backend.base_ptr();ManagerHeader<address_traits>*hdr=ManagerAccess::get_header(base);size_t old_size=hdr->total_size;static constexpr size_t kGranSz=address_traits::granule_size;index_type data_gran_need=bytes_to_granules_t<address_traits>(user_size);if(data_gran_need==0)data_gran_need=1;size_t min_need=static_cast<size_t>(ManagerAccess::kBlockHdrGranules+data_gran_need+ManagerAccess::kBlockHdrGranules)*kGranSz;size_t growth=old_size/4;if(growth<min_need)growth=min_need;if(!backend.expand(growth))return false;uint8_t*new_base=backend.base_ptr();size_t new_size=backend.total_size();if(new_base==nullptr||new_size<=old_size)return false;logging_policy::on_expand(old_size,new_size);hdr=ManagerAccess::get_header(new_base);index_type extra_idx=byte_off_to_idx_t<address_traits>(old_size);size_t extra_size=new_size-old_size;void*last_blk_raw=(hdr->last_block_offset!=address_traits::no_block)?static_cast<void*>(new_base+static_cast<size_t>(hdr->last_block_offset)*kGranSz):nullptr;if(last_blk_raw!=nullptr&&BlockState::get_weight(last_blk_raw)==0){Block<address_traits>*last_blk=reinterpret_cast<Block<address_traits>*>(last_blk_raw);index_type loff=block_idx_t<address_traits>(new_base,last_blk);free_block_tree::remove(new_base,hdr,loff);hdr->total_size=new_size;free_block_tree::insert(new_base,hdr,loff);}else{if(extra_size<sizeof(Block<address_traits>)+kGranSz)return false;void*nb_blk=new_base+static_cast<size_t>(extra_idx)*kGranSz;std::memset(nb_blk,0,sizeof(Block<address_traits>));if(last_blk_raw!=nullptr){Block<address_traits>*last_blk=reinterpret_cast<Block<address_traits>*>(last_blk_raw);index_type loff=block_idx_t<address_traits>(new_base,last_blk);BlockState::init_fields(nb_blk,loff,address_traits::no_block,1,0,0);BlockState::set_next_offset_of(last_blk_raw,static_cast<index_type>(extra_idx));}else{BlockState::init_fields(nb_blk,address_traits::no_block,address_traits::no_block,1,0,0);hdr->first_block_offset=extra_idx;}hdr->last_block_offset=extra_idx;hdr->block_count++;hdr->free_count++;hdr->total_size=new_size;free_block_tree::insert(new_base,hdr,extra_idx);}return true;}};}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
+
+AY Ap::K{I<F Bl>Au Ja{j E=F Bl::E;j Az=F Bl::Az;j A=F E::A;j AS=F Bl::AS;j Bu=F Bl::Bu;j R=Z<E>;N AN Il(Bu&EG,Y*m,H IZ)D{N Q A kHdrBlkIdx=0;N Q A GY=Bl::Fd;N Q H BH=E::P;N Q H kMinBlockDataSize=BH;if(G<H>(GY)*BH+AG(Ao<E>)+kMinBlockDataSize>IZ)B X;V*hdr_blk=m;AL::Gv(hdr_blk,0,Bl::Ff);R::Fh(hdr_blk,E::k,GY,0,Bl::GX,kHdrBlkIdx);q<E>*AD=Bl::Cc(m);AL::Gv(AD,0,AG(q<E>));AD->HD=Bl::JT;AD->S=IZ;AD->Aq=kHdrBlkIdx;AD->BB=E::k;AD->Am=E::k;AD->CK=DC;AD->P=G<BV>(BH);AD->BW=E::k;V*EK=m+G<H>(GY)*BH;AL::Gv(EK,0,AG(Ao<E>));R::Fh(EK,kHdrBlkIdx,E::k,1,0,0);AD->BB=GY;AD->Am=GY;AD->BP=2;AD->Be=1;AD->Cf=1;AD->Bb=GY+Bl::Aj;(V)EG;Bl::set_initialized();B Bi;}N AN KU(Bu&EG,AN initialized,H Bs)D{if(!initialized)B X;Y*m=EG.AR();q<E>*AD=Bl::Cc(m);H Ho=AD->S;N Q H BH=E::P;A IT=DR<E>(Bs);if(IT==0)IT=1;H min_need=G<H>(Bl::Aj+IT+Bl::Aj)*BH;H KR=Ho/4;if(KR<min_need)KR=min_need;if(!EG.expand(KR))B X;Y*GW=EG.AR();H BM=EG.S();if(GW==M||BM<=Ho)B X;AS::on_expand(Ho,BM);AD=Bl::Cc(GW);A JC=Fi<E>(Ho);H extra_size=BM-Ho;V*Fs=(AD->BB!=E::k)?G<V*>(GW+G<H>(AD->BB)*BH):M;if(Fs!=M&&R::Ar(Fs)==0){Ao<E>*last_blk=AI<Ao<E>*>(Fs);A loff=KW<E>(GW,last_blk);Az::JQ(GW,AD,loff);AD->S=BM;Az::GZ(GW,AD,loff);}EN{if(extra_size<AG(Ao<E>)+BH)B X;V*nb_blk=GW+G<H>(JC)*BH;AL::Gv(nb_blk,0,AG(Ao<E>));if(Fs!=M){Ao<E>*last_blk=AI<Ao<E>*>(Fs);A loff=KW<E>(GW,last_blk);R::Fh(nb_blk,loff,E::k,1,0,0);R::Cy(Fs,G<A>(JC));}EN{R::Fh(nb_blk,E::k,E::k,1,0,0);AD->Aq=JC;}AD->BB=JC;AD->BP++;AD->Be++;AD->S=BM;Az::GZ(GW,AD,JC);}B Bi;}};}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <cstddef>
 #include <limits>
 #include <new>
-namespace pmm{
-/*
-## pmm-pallocator
-*/
-template<typename T,typename ManagerT>struct pallocator{using value_type=T;using size_type=size_t;using difference_type=std::ptrdiff_t;using propagate_on_container_copy_assignment=std::true_type;using propagate_on_container_move_assignment=std::true_type;using propagate_on_container_swap=std::true_type;using is_always_equal=std::true_type;constexpr pallocator()noexcept=default;constexpr pallocator(const pallocator&)noexcept=default;template<typename U>constexpr pallocator(const pallocator<U,ManagerT>&)noexcept{}[[nodiscard]]T*allocate(size_t n){if(n==0)throw std::bad_alloc();if(n>max_size())throw std::bad_alloc();void*raw=ManagerT::allocate(n*sizeof(T));if(raw==nullptr)throw std::bad_alloc();return static_cast<T*>(raw);}void deallocate(T*p,size_t)noexcept{ManagerT::deallocate(static_cast<void*>(p));}size_t max_size()const noexcept{return(std::numeric_limits<size_t>::max)()/sizeof(T);}template<typename U>bool operator==(const pallocator<U,ManagerT>&)const noexcept{return true;}template<typename U>bool operator!=(const pallocator<U,ManagerT>&)const noexcept{return false;}};}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
 
+AY Ap{
 /*
 ## pmm-pallocator
 */
+I<F T,F O>Au Ex{j HH=T;j size_type=H;j difference_type=AL::EP;j propagate_on_container_copy_assignment=AL::true_type;j propagate_on_container_move_assignment=AL::true_type;j propagate_on_container_swap=AL::true_type;j is_always_equal=AL::true_type;Q Ex()D=GL;Q Ex(J Ex&)D=GL;I<F U>Q Ex(J Ex<U,O>&)D{}[[nodiscard]]T*HM(H n){if(n==0)throw AL::bad_alloc();if(n>max_size())throw AL::bad_alloc();V*CC=O::HM(n*AG(T));if(CC==M)throw AL::bad_alloc();B G<T*>(CC);}V Ec(T*p,H)D{O::Ec(G<V*>(p));}H max_size()J D{B(AL::Ag<H>::IQ)()/AG(T);}I<F U>AN Af==(J Ex<U,O>&)J D{B Bi;}I<F U>AN Af!=(J Ex<U,O>&)J D{B X;}};}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <type_traits>
-namespace pmm{
-/*
-## pmm-parray
-*/
-template<typename T,typename ManagerT>struct parray{static_assert(std::is_trivially_copyable_v<T>,"");using manager_type=ManagerT;using index_type=typename ManagerT::index_type;using value_type=T;uint32_t _size;uint32_t _capacity;index_type _data_idx;parray()noexcept:_size(0),_capacity(0),_data_idx(detail::kNullIdx_v<typename ManagerT::address_traits>){}~parray()noexcept=default;size_t size()const noexcept{return static_cast<size_t>(_size);}bool empty()const noexcept{return _size==0;}size_t capacity()const noexcept{return static_cast<size_t>(_capacity);}T*at(size_t i)noexcept{if(i>=static_cast<size_t>(_size))return nullptr;T*data=resolve_data();return(data!=nullptr)?(data+i):nullptr;}const T*at(size_t i)const noexcept{if(i>=static_cast<size_t>(_size))return nullptr;const T*data=resolve_data();return(data!=nullptr)?(data+i):nullptr;}T operator[](size_t i)const noexcept{const T*data=resolve_data();return(data!=nullptr)?data[i]:T{};}T*front()noexcept{return at(0);}const T*front()const noexcept{return at(0);}T*back()noexcept{return(_size>0)?at(static_cast<size_t>(_size)-1):nullptr;}const T*back()const noexcept{return(_size>0)?at(static_cast<size_t>(_size)-1):nullptr;}T*data()noexcept{return resolve_data();}const T*data()const noexcept{return resolve_data();}bool push_back(const T&value)noexcept{if(!ensure_capacity(_size+1))return false;T*d=resolve_data();if(d==nullptr)return false;d[_size]=value;++_size;return true;}void pop_back()noexcept{if(_size>0)--_size;}bool set(size_t i,const T&value)noexcept{if(i>=static_cast<size_t>(_size))return false;T*d=resolve_data();if(d==nullptr)return false;d[i]=value;return true;}bool reserve(size_t n)noexcept{if(n>static_cast<size_t>(std::numeric_limits<uint32_t>::max()))return false;return ensure_capacity(static_cast<uint32_t>(n));}bool resize(size_t n)noexcept{if(n>static_cast<size_t>(std::numeric_limits<uint32_t>::max()))return false;auto new_size=static_cast<uint32_t>(n);if(new_size>_size){if(!ensure_capacity(new_size))return false;T*d=resolve_data();if(d==nullptr)return false;std::memset(d+_size,0,static_cast<size_t>(new_size-_size)*sizeof(T));}_size=new_size;return true;}bool insert(size_t index,const T&value)noexcept{if(index>static_cast<size_t>(_size))return false;if(!ensure_capacity(_size+1))return false;T*d=resolve_data();if(d==nullptr)return false;if(index<static_cast<size_t>(_size))std::memmove(d+index+1,d+index,(static_cast<size_t>(_size)-index)*sizeof(T));d[index]=value;++_size;return true;}bool erase(size_t index)noexcept{if(index>=static_cast<size_t>(_size))return false;T*d=resolve_data();if(d==nullptr)return false;if(index+1<static_cast<size_t>(_size))std::memmove(d+index,d+index+1,(static_cast<size_t>(_size)-index-1)*sizeof(T));--_size;return true;}void clear()noexcept{_size=0;}void free_data()noexcept{if(_data_idx!=detail::kNullIdx_v<typename ManagerT::address_traits>){ManagerT::deallocate(detail::resolve_granule_ptr<typename ManagerT::address_traits>(ManagerT::backend().base_ptr(),_data_idx));_data_idx=detail::kNullIdx_v<typename ManagerT::address_traits>;}_size=0;_capacity=0;}bool operator==(const parray&other)const noexcept{if(this==&other)return true;if(_size!=other._size)return false;if(_size==0)return true;const T*a=resolve_data();const T*b=other.resolve_data();if(a==nullptr||b==nullptr)return(a==b);return std::memcmp(a,b,static_cast<size_t>(_size)*sizeof(T))==0;}bool operator!=(const parray&other)const noexcept{return!(*this==other);}private:T*resolve_data()const noexcept{return reinterpret_cast<T*>(detail::resolve_granule_ptr<typename ManagerT::address_traits>(ManagerT::backend().base_ptr(),_data_idx));}bool ensure_capacity(uint32_t required)noexcept{if(required<=_capacity)return true;uint32_t new_cap=_capacity*2;if(new_cap<required)new_cap=required;if(new_cap<4)new_cap=4;size_t alloc_size=static_cast<size_t>(new_cap)*sizeof(T);if(sizeof(T)>0&&alloc_size/sizeof(T)!=static_cast<size_t>(new_cap))return false;void*new_raw=ManagerT::allocate(alloc_size);if(new_raw==nullptr)return false;uint8_t*base=ManagerT::backend().base_ptr();index_type new_dat_idx=detail::ptr_to_granule_idx<typename ManagerT::address_traits>(base,new_raw);if(_size>0&&_data_idx!=detail::kNullIdx_v<typename ManagerT::address_traits>){T*old_data=resolve_data();if(old_data!=nullptr)std::memcpy(new_raw,old_data,static_cast<size_t>(_size)*sizeof(T));}if(_data_idx!=detail::kNullIdx_v<typename ManagerT::address_traits>)ManagerT::deallocate(detail::resolve_granule_ptr<typename ManagerT::address_traits>(base,_data_idx));_data_idx=new_dat_idx;_capacity=new_cap;return true;}};}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
 
+AY Ap{
 /*
 ## pmm-parray
 */
+I<F T,F O>Au parray{AK(AL::FH<T>,"");j Ae=O;j A=F O::A;j HH=T;Ak Al;Ak ER;A CB;parray()D:Al(0),ER(0),CB(K::Dl<F O::E>){}~parray()D=GL;H IZ()J D{B G<H>(Al);}AN empty()J D{B Al==0;}H capacity()J D{B G<H>(ER);}T*at(H i)D{if(i>=G<H>(Al))B M;T*Dm=BO();B(Dm!=M)?(Dm+i):M;}J T*at(H i)J D{if(i>=G<H>(Al))B M;J T*Dm=BO();B(Dm!=M)?(Dm+i):M;}T Af[](H i)J D{J T*Dm=BO();B(Dm!=M)?Dm[i]:T{};}T*front()D{B at(0);}J T*front()J D{B at(0);}T*back()D{B(Al>0)?at(G<H>(Al)-1):M;}J T*back()J D{B(Al>0)?at(G<H>(Al)-1):M;}T*Dm()D{B BO();}J T*Dm()J D{B BO();}AN push_back(J T&DX)D{if(!Ds(Al+1))B X;T*d=BO();if(d==M)B X;d[Al]=DX;++Al;B Bi;}V pop_back()D{if(Al>0)--Al;}AN set(H i,J T&DX)D{if(i>=G<H>(Al))B X;T*d=BO();if(d==M)B X;d[i]=DX;B Bi;}AN reserve(H n)D{if(n>G<H>(AL::Ag<Ak>::IQ()))B X;B Ds(G<Ak>(n));}AN resize(H n)D{if(n>G<H>(AL::Ag<Ak>::IQ()))B X;DH BM=G<Ak>(n);if(BM>Al){if(!Ds(BM))B X;T*d=BO();if(d==M)B X;AL::Gv(d+Al,0,G<H>(BM-Al)*AG(T));}Al=BM;B Bi;}AN GZ(H Ha,J T&DX)D{if(Ha>G<H>(Al))B X;if(!Ds(Al+1))B X;T*d=BO();if(d==M)B X;if(Ha<G<H>(Al))AL::memmove(d+Ha+1,d+Ha,(G<H>(Al)-Ha)*AG(T));d[Ha]=DX;++Al;B Bi;}AN erase(H Ha)D{if(Ha>=G<H>(Al))B X;T*d=BO();if(d==M)B X;if(Ha+1<G<H>(Al))AL::memmove(d+Ha,d+Ha+1,(G<H>(Al)-Ha-1)*AG(T));--Al;B Bi;}V clear()D{Al=0;}V free_data()D{if(CB!=K::Dl<F O::E>){O::Ec(K::DM<F O::E>(O::EG().AR(),CB));CB=K::Dl<F O::E>;}Al=0;ER=0;}AN Af==(J parray&An)J D{if(BN==&An)B Bi;if(Al!=An.Al)B X;if(Al==0)B Bi;J T*a=BO();J T*b=An.BO();if(a==M||b==M)B(a==b);B AL::memcmp(a,b,G<H>(Al)*AG(T))==0;}AN Af!=(J parray&An)J D{B!(*BN==An);}Ew:T*BO()J D{B AI<T*>(K::DM<F O::E>(O::EG().AR(),CB));}AN Ds(Ak Hn)D{if(Hn<=ER)B Bi;Ak FA=ER*2;if(FA<Hn)FA=Hn;if(FA<4)FA=4;H HN=G<H>(FA)*AG(T);if(AG(T)>0&&HN/AG(T)!=G<H>(FA))B X;V*GG=O::HM(HN);if(GG==M)B X;Y*m=O::EG().AR();A KM=K::Gh<F O::E>(m,GG);if(Al>0&&CB!=K::Dl<F O::E>){T*Jo=BO();if(Jo!=M)AL::Hz(GG,Jo,G<H>(Al)*AG(T));}if(CB!=K::Dl<F O::E>)O::Ec(K::DM<F O::E>(m,CB));CB=KM;ER=FA;B Bi;}};}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
-namespace pmm{template<typename _K,typename _V,typename ManagerT>struct pmap;template<typename T>struct pmap_type_identity{static constexpr const char*tag="";};template<typename _K,typename _V>struct pmap_node{_K key;_V value;};namespace detail{constexpr uint32_t pmap_fnv1a(uint32_t h,uint64_t v,unsigned bytes)noexcept{for(unsigned i=0;i<bytes;++i,v>>=8){h^=static_cast<uint8_t>(v&0xffull);h*=16777619u;}return h;}template<typename T>constexpr uint32_t pmap_type_fp()noexcept{const uint64_t traits=(uint64_t{std::is_integral_v<T>}<<0)|(uint64_t{std::is_floating_point_v<T>}<<1)|(uint64_t{std::is_signed_v<T>}<<2)|(uint64_t{std::is_unsigned_v<T>}<<3)|(uint64_t{std::is_pointer_v<T>}<<4)|(uint64_t{std::is_class_v<T>}<<5)|(uint64_t{std::is_enum_v<T>}<<6)|(uint64_t{std::is_trivially_copyable_v<T>}<<7)|(uint64_t{std::is_standard_layout_v<T>}<<8);uint32_t h=2166136261u;h=pmap_fnv1a(h,sizeof(T),8);h=pmap_fnv1a(h,alignof(T),8);h=pmap_fnv1a(h,traits,8);for(const char*t=pmm::pmap_type_identity<T>::tag;t!=nullptr&&*t!='\0';++t)h=pmap_fnv1a(h,static_cast<uint8_t>(*t),1);return h;}inline uint64_t pmap_key_hash(const char*key)noexcept{uint64_t h=14695981039346656037ull;for(;key!=nullptr&&*key!='\0';++key){h^=static_cast<uint8_t>(*key);h*=1099511628211ull;}return h;}inline bool pmap_write_name(char(&out)[kForestDomainNameCapacity],uint32_t type_fp,char kind,uint64_t value,unsigned value_hex_digits)noexcept{constexpr const char*kPrefix="container/pmap/";const unsigned needed=15+8+1+1+value_hex_digits+1;if(needed>kForestDomainNameCapacity)return false;size_t p=0;for(const char*s=kPrefix;*s!='\0';++s)out[p++]=*s;auto put_hex=[&](uint64_t v,unsigned digits){for(unsigned i=digits;i-->0;){const uint8_t nib=static_cast<uint8_t>((v>>(i*4))&0x0full);out[p++]=static_cast<char>(nib<10?('0'+nib):('a'+(nib-10)));}};put_hex(type_fp,8);out[p++]='/';out[p++]=kind;put_hex(value,value_hex_digits);out[p]='\0';return true;}}
-/*
-## pmm-pmap
-*/
-template<typename _K,typename _V,typename ManagerT>struct pmap{using manager_type=ManagerT;using index_type=typename ManagerT::index_type;using node_type=pmap_node<_K,_V>;using node_pptr=typename ManagerT::template pptr<node_type>;static constexpr uint32_t domain_type_hash=detail::pmap_fnv1a(detail::pmap_fnv1a(2166136261u,detail::pmap_type_fp<_K>(),4),detail::pmap_type_fp<_V>(),4);struct forest_domain_descriptor{using index_type=typename ManagerT::index_type;using node_type=pmap_node<_K,_V>;using node_pptr=typename ManagerT::template pptr<node_type>;index_type binding_id;constexpr explicit forest_domain_descriptor(index_type id=0)noexcept:binding_id(id){}const char*name()const noexcept{const auto*d=ManagerT::find_domain_by_binding_unlocked(binding_id);return d!=nullptr?d->name:"";}index_type root_index()const noexcept{return ManagerT::forest_domain_root_index_unlocked(ManagerT::find_domain_by_binding_unlocked(binding_id));}index_type*root_index_ptr()noexcept{return binding_id==0?nullptr:ManagerT::forest_domain_root_index_ptr_unlocked(ManagerT::find_domain_by_binding_unlocked(binding_id));}static node_type*resolve_node(node_pptr p)noexcept{return ManagerT::template resolve<node_type>(p);}static int compare_key(const _K&key,node_pptr cur)noexcept{node_type*obj=resolve_node(cur);return obj==nullptr?0:((key==obj->key)?0:((key<obj->key)?-1:1));}static bool less_node(node_pptr lhs,node_pptr rhs)noexcept{node_type*l=resolve_node(lhs);node_type*r=resolve_node(rhs);return l!=nullptr&&r!=nullptr&&l->key<r->key;}static bool validate_node(node_pptr p)noexcept{return resolve_node(p)!=nullptr;}};using forest_domain_view_policy=detail::ForestDomainViewOps<forest_domain_descriptor>;using forest_domain_policy=detail::ForestDomainOps<forest_domain_descriptor>;static constexpr index_type no_block=ManagerT::address_traits::no_block;private:index_type _binding_id;bool bind(const char*domain_key)noexcept{if(!ManagerT::is_initialized())return false;char buf[detail::kForestDomainNameCapacity]{};if(domain_key!=nullptr&&domain_key[0]!='\0'){if(!detail::pmap_write_name(buf,domain_type_hash,'n',detail::pmap_key_hash(domain_key),16))return false;}else{static uint64_t seq=1;do{if(!detail::pmap_write_name(buf,domain_type_hash,'g',seq++,8))return false;}while(ManagerT::has_domain(buf));}if(!ManagerT::has_domain(buf)&&!ManagerT::register_domain(buf))return false;_binding_id=ManagerT::find_domain_by_name(buf);return _binding_id!=0;}forest_domain_descriptor descriptor()const noexcept{return forest_domain_descriptor(_binding_id);}public:pmap()noexcept:_binding_id(0){}explicit pmap(const char*domain_key)noexcept:_binding_id(0){bind(domain_key);}const char*domain_name()const noexcept{return descriptor().name();}index_type root_index()const noexcept{return descriptor().root_index();}forest_domain_policy forest_domain_ops()noexcept{if(_binding_id==0||ManagerT::find_domain_by_binding_unlocked(_binding_id)==nullptr)bind(nullptr);return forest_domain_policy(descriptor());}forest_domain_view_policy forest_domain_view_ops()const noexcept{return forest_domain_view_policy(descriptor());}bool empty()const noexcept{return root_index()==static_cast<index_type>(0);}
-/*
-### pmm-pmap-size
-*/
-size_t size()const noexcept{const index_type root=root_index();return root==static_cast<index_type>(0)?0:detail::avl_subtree_count(node_pptr(root));}
-/*
-### pmm-pmap-insert
-*/
-node_pptr insert(const _K&key,const _V&val)noexcept{auto ops=forest_domain_ops();if(ops.root_index_ptr()==nullptr)return node_pptr();node_pptr existing=ops.find(key);if(!existing.is_null()){if(node_type*obj=ManagerT::template resolve<node_type>(existing);obj!=nullptr)obj->value=val;return existing;}node_pptr new_node=ManagerT::template allocate_typed<node_type>();node_type*obj=new_node.is_null()?nullptr:ManagerT::template resolve<node_type>(new_node);if(obj==nullptr)return node_pptr();obj->key=key;obj->value=val;detail::avl_init_node(new_node);ops.insert(new_node);return new_node;}node_pptr find(const _K&key)const noexcept{return forest_domain_view_ops().find(key);}bool contains(const _K&key)const noexcept{return!find(key).is_null();}
-/*
-### pmm-pmap-erase
-*/
-bool erase(const _K&key)noexcept{auto ops=forest_domain_policy(descriptor());index_type*root=ops.root_index_ptr();node_pptr t=root==nullptr?node_pptr():ops.find(key);if(t.is_null())return false;detail::avl_remove(t,*root);ManagerT::template deallocate_typed<node_type>(t);return true;}
-/*
-### pmm-pmap-clear
-*/
-void clear()noexcept{auto ops=forest_domain_policy(descriptor());index_type*root=ops.root_index_ptr();if(root==nullptr)return;if(*root!=static_cast<index_type>(0))detail::avl_clear_subtree(node_pptr(*root),[](node_pptr p){ManagerT::template deallocate_typed<node_type>(p);});*root=static_cast<index_type>(0);}void reset()noexcept{forest_domain_policy(descriptor()).reset_root();}using iterator=detail::AvlInorderIterator<node_pptr>;
-/*
-### pmm-pmap-begin
-*/
-iterator begin()const noexcept{const index_type root=root_index();if(root==static_cast<index_type>(0))return iterator();return iterator(detail::avl_min_node(node_pptr(root)).offset());}iterator end()const noexcept{return iterator(static_cast<index_type>(0));}};}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
 
+AY Ap{I<F _K,F _V,F O>Au pmap;I<F T>Au pmap_type_identity{N Q J BG*tag="";};I<F _K,F _V>Au pmap_node{_K HQ;_V DX;};AY K{Q Ak HJ(Ak h,z v,Jh IU)D{for(Jh i=0;i<IU;++i,v>>=8){h^=G<Y>(v&0xffull);h*=16777619u;}B h;}I<F T>Q Ak pmap_type_fp()D{J z traits=(z{AL::is_integral_v<T>}<<0)|(z{AL::is_floating_point_v<T>}<<1)|(z{AL::is_signed_v<T>}<<2)|(z{AL::is_unsigned_v<T>}<<3)|(z{AL::is_pointer_v<T>}<<4)|(z{AL::is_class_v<T>}<<5)|(z{AL::is_enum_v<T>}<<6)|(z{AL::FH<T>}<<7)|(z{AL::is_standard_layout_v<T>}<<8);Ak h=2166136261u;h=HJ(h,AG(T),8);h=HJ(h,alignof(T),8);h=HJ(h,traits,8);for(J BG*t=Ap::pmap_type_identity<T>::tag;t!=M&&*t!='\0';++t)h=HJ(h,G<Y>(*t),1);B h;}AO z pmap_key_hash(J BG*HQ)D{z h=14695981039346656037ull;for(;HQ!=M&&*HQ!='\0';++HQ){h^=G<Y>(*HQ);h*=1099511628211ull;}B h;}AO AN Jn(BG(&out)[Bj],Ak type_fp,BG kind,z DX,Jh JL)D{Q J BG*kPrefix="container/pmap/";J Jh KO=15+8+1+1+JL+1;if(KO>Bj)B X;H p=0;for(J BG*s=kPrefix;*s!='\0';++s)out[p++]=*s;DH put_hex=[&](z v,Jh digits){for(Jh i=digits;i-->0;){J Y nib=G<Y>((v>>(i*4))&0x0full);out[p++]=G<BG>(nib<10?('0'+nib):('a'+(nib-10)));}};put_hex(type_fp,8);out[p++]='/';out[p++]=kind;put_hex(DX,JL);out[p]='\0';B Bi;}}
 /*
 ## pmm-pmap
 */
+I<F _K,F _V,F O>Au pmap{j Ae=O;j A=F O::A;j AW=pmap_node<_K,_V>;j Ab=F O::I AV<AW>;N Q Ak JW=K::HJ(K::HJ(2166136261u,K::pmap_type_fp<_K>(),4),K::pmap_type_fp<_V>(),4);Au Bt{j A=F O::A;j AW=pmap_node<_K,_V>;j Ab=F O::I AV<AW>;A CF;Q Eh Bt(A id=0)D:CF(id){}J BG*CP()J D{J DH*d=O::Bz(CF);B d!=M?d->CP:"";}A Cj()J D{B O::BR(O::Bz(CF));}A*Cp()D{B CF==0?M:O::Cl(O::Bz(CF));}N AW*CZ(Ab p)D{B O::I Go<AW>(p);}N int KV(J _K&HQ,Ab Ek)D{AW*IP=CZ(Ek);B IP==M?0:((HQ==IP->HQ)?0:((HQ<IP->HQ)?-1:1));}N AN less_node(Ab lhs,Ab rhs)D{AW*l=CZ(lhs);AW*r=CZ(rhs);B l!=M&&r!=M&&l->HQ<r->HQ;}N AN Ip(Ab p)D{B CZ(p)!=M;}};j GH=K::FC<Bt>;j CE=K::Hy<Bt>;N Q A k=O::E::k;Ew:A Fk;AN bind(J BG*IG)D{if(!O::Es())B X;BG buf[K::Bj]{};if(IG!=M&&IG[0]!='\0'){if(!K::Jn(buf,JW,'n',K::pmap_key_hash(IG),16))B X;}EN{N z seq=1;do{if(!K::Jn(buf,JW,'g',seq++,8))B X;}Fa(O::has_domain(buf));}if(!O::has_domain(buf)&&!O::register_domain(buf))B X;Fk=O::IF(buf);B Fk!=0;}Bt GK()J D{B Bt(Fk);}DF:pmap()D:Fk(0){}Eh pmap(J BG*IG)D:Fk(0){bind(IG);}J BG*domain_name()J D{B GK().CP();}A Cj()J D{B GK().Cj();}CE DJ()D{if(Fk==0||O::Bz(Fk)==M)bind(M);B CE(GK());}GH forest_domain_view_ops()J D{B GH(GK());}AN empty()J D{B Cj()==G<A>(0);}
 /*
 ### pmm-pmap-size
 */
+H IZ()J D{J A DV=Cj();B DV==G<A>(0)?0:K::HF(Ab(DV));}
 /*
 ### pmm-pmap-insert
 */
+Ab GZ(J _K&HQ,J _V&val)D{DH ops=DJ();if(ops.Cp()==M)B Ab();Ab Ga=ops.find(HQ);if(!Ga.AQ()){if(AW*IP=O::I Go<AW>(Ga);IP!=M)IP->DX=val;B Ga;}Ab Ba=O::I IW<AW>();AW*IP=Ba.AQ()?M:O::I Go<AW>(Ba);if(IP==M)B Ab();IP->HQ=HQ;IP->DX=val;K::avl_init_node(Ba);ops.GZ(Ba);B Ba;}Ab find(J _K&HQ)J D{B forest_domain_view_ops().find(HQ);}AN contains(J _K&HQ)J D{B!find(HQ).AQ();}
 /*
 ### pmm-pmap-erase
 */
+AN erase(J _K&HQ)D{DH ops=CE(GK());A*DV=ops.Cp();Ab t=DV==M?Ab():ops.find(HQ);if(t.AQ())B X;K::avl_remove(t,*DV);O::I JX<AW>(t);B Bi;}
 /*
 ### pmm-pmap-clear
 */
+V clear()D{DH ops=CE(GK());A*DV=ops.Cp();if(DV==M)B;if(*DV!=G<A>(0))K::HG(Ab(*DV),[](Ab p){O::I JX<AW>(p);});*DV=G<A>(0);}V reset()D{CE(GK()).reset_root();}j Js=K::Dk<Ab>;
 /*
 ### pmm-pmap-begin
 */
+Js begin()J D{J A DV=Cj();if(DV==G<A>(0))B Js();B Js(K::IC(Ab(DV)).Bc());}Js end()J D{B Js(G<A>(0));}};}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
-namespace pmm{namespace detail{template<typename ManagerT>struct manager_index_type{using type=uint32_t;};template<typename ManagerT>requires requires{typename ManagerT::address_traits::index_type;}struct manager_index_type<ManagerT>{using type=typename ManagerT::address_traits::index_type;};}template<class T,class ManagerT>requires(!std::is_void_v<ManagerT>)
-/*
-## pmm-pptr
-*/
-class pptr{public:using element_type=T;using manager_type=ManagerT;using index_type=typename detail::manager_index_type<ManagerT>::type;private:index_type _idx;public:constexpr pptr()noexcept:_idx(0){}constexpr explicit pptr(index_type idx)noexcept:_idx(idx){}constexpr pptr(const pptr&)noexcept=default;constexpr pptr&operator=(const pptr&)noexcept=default;~pptr()noexcept=default;pptr&operator++()=delete;pptr operator++(int)=delete;pptr&operator--()=delete;pptr operator--(int)=delete;constexpr bool is_null()const noexcept{return _idx==0;}constexpr explicit operator bool()const noexcept{return _idx!=0;}constexpr index_type offset()const noexcept{return _idx;}
-/*
-### pmm-pptr-byte_offset
-*/
-constexpr size_t byte_offset()const noexcept{return static_cast<size_t>(_idx)*ManagerT::address_traits::granule_size;}constexpr bool operator==(const pptr&other)const noexcept{return _idx==other._idx;}constexpr bool operator!=(const pptr&other)const noexcept{return _idx!=other._idx;}bool operator<(const pptr&other)const noexcept{static_assert(requires(const T&a,const T&b){{a<b}->std::convertible_to<bool>;},"");if(is_null()&&!other.is_null())return true;if(!is_null()&&other.is_null())return false;if(is_null()&&other.is_null())return false;return**this<*other;}T&operator*()const noexcept{return*ManagerT::template resolve_checked<T>(*this);}T*operator->()const noexcept{return ManagerT::template resolve_checked<T>(*this);}T*resolve()const noexcept{return ManagerT::template resolve_checked<T>(*this);}T*resolve_unchecked()const noexcept{return ManagerT::template resolve_unchecked<T>(*this);}auto&tree_node()const noexcept{return ManagerT::tree_node(*this);}};}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
 
+AY Ap{AY K{I<F O>Au Ia{j Ji=Ak;};I<F O>Eg Eg{F O::E::A;}Au Ia<O>{j Ji=F O::E::A;};}I<Dt T,Dt O>Eg(!AL::is_void_v<O>)
 /*
 ## pmm-pptr
 */
+Dt AV{DF:j element_type=T;j Ae=O;j A=F K::Ia<O>::Ji;Ew:A HO;DF:Q AV()D:HO(0){}Q Eh AV(A At)D:HO(At){}Q AV(J AV&)D=GL;Q AV&Af=(J AV&)D=GL;~AV()D=GL;AV&Af++()=EO;AV Af++(int)=EO;AV&Af--()=EO;AV Af--(int)=EO;Q AN AQ()J D{B HO==0;}Q Eh Af AN()J D{B HO!=0;}Q A Bc()J D{B HO;}
 /*
 ### pmm-pptr-byte_offset
 */
+Q H byte_offset()J D{B G<H>(HO)*O::E::P;}Q AN Af==(J AV&An)J D{B HO==An.HO;}Q AN Af!=(J AV&An)J D{B HO!=An.HO;}AN Af<(J AV&An)J D{AK(Eg(J T&a,J T&b){{a<b}->AL::Bw<AN>;},"");if(AQ()&&!An.AQ())B Bi;if(!AQ()&&An.AQ())B X;if(AQ()&&An.AQ())B X;B**BN<*An;}T&Af*()J D{B*O::I Ef<T>(*BN);}T*Af->()J D{B O::I Ef<T>(*BN);}T*Go()J D{B O::I Ef<T>(*BN);}T*Ck()J D{B O::I Ck<T>(*BN);}DH&DY()J D{B O::DY(*BN);}};}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <type_traits>
-namespace pmm{
-/*
-## pmm-pstring
-*/
-template<typename ManagerT>struct pstring{using manager_type=ManagerT;using index_type=typename ManagerT::index_type;uint32_t _length;uint32_t _capacity;index_type _data_idx;pstring()noexcept:_length(0),_capacity(0),_data_idx(detail::kNullIdx_v<typename ManagerT::address_traits>){}~pstring()noexcept=default;const char*c_str()const noexcept{if(_data_idx==detail::kNullIdx_v<typename ManagerT::address_traits>)return "";char*data=resolve_data();return(data!=nullptr)?data:"";}size_t size()const noexcept{return static_cast<size_t>(_length);}bool empty()const noexcept{return _length==0;}char operator[](size_t i)const noexcept{char*data=resolve_data();return(data!=nullptr)?data[i]:'\0';}bool assign(const char*s)noexcept{if(s==nullptr)s="";auto len=static_cast<uint32_t>(std::strlen(s));if(!ensure_capacity(len))return false;char*data=resolve_data();if(data==nullptr)return false;std::memcpy(data,s,static_cast<size_t>(len)+1);_length=len;return true;}bool append(const char*s)noexcept{if(s==nullptr)s="";auto add_len=static_cast<uint32_t>(std::strlen(s));if(add_len==0)return true;uint32_t new_len=_length+add_len;if(new_len<_length)return false;if(!ensure_capacity(new_len))return false;char*data=resolve_data();if(data==nullptr)return false;std::memcpy(data+_length,s,static_cast<size_t>(add_len)+1);_length=new_len;return true;}void clear()noexcept{_length=0;if(_data_idx!=detail::kNullIdx_v<typename ManagerT::address_traits>){char*data=resolve_data();if(data!=nullptr)data[0]='\0';}}void free_data()noexcept{if(_data_idx!=detail::kNullIdx_v<typename ManagerT::address_traits>){ManagerT::deallocate(detail::resolve_granule_ptr<typename ManagerT::address_traits>(ManagerT::backend().base_ptr(),_data_idx));_data_idx=detail::kNullIdx_v<typename ManagerT::address_traits>;}_length=0;_capacity=0;}bool operator==(const char*s)const noexcept{if(s==nullptr)return _length==0;return std::strcmp(c_str(),s)==0;}bool operator!=(const char*s)const noexcept{return!(*this==s);}bool operator==(const pstring&other)const noexcept{if(this==&other)return true;if(_length!=other._length)return false;if(_length==0)return true;return std::strcmp(c_str(),other.c_str())==0;}bool operator!=(const pstring&other)const noexcept{return!(*this==other);}bool operator<(const pstring&other)const noexcept{return std::strcmp(c_str(),other.c_str())<0;}private:char*resolve_data()const noexcept{return reinterpret_cast<char*>(detail::resolve_granule_ptr<typename ManagerT::address_traits>(ManagerT::backend().base_ptr(),_data_idx));}bool ensure_capacity(uint32_t required)noexcept{if(required<=_capacity)return true;uint32_t new_cap=_capacity*2;if(new_cap<required)new_cap=required;if(new_cap<16)new_cap=16;size_t alloc_size=static_cast<size_t>(new_cap)+1;void*new_raw=ManagerT::allocate(alloc_size);if(new_raw==nullptr)return false;uint8_t*base=ManagerT::backend().base_ptr();index_type new_dat_idx=detail::ptr_to_granule_idx<typename ManagerT::address_traits>(base,new_raw);if(_length>0&&_data_idx!=detail::kNullIdx_v<typename ManagerT::address_traits>){char*old_data=resolve_data();if(old_data!=nullptr)std::memcpy(new_raw,old_data,static_cast<size_t>(_length)+1);}else{static_cast<char*>(new_raw)[0]='\0';}if(_data_idx!=detail::kNullIdx_v<typename ManagerT::address_traits>)ManagerT::deallocate(detail::resolve_granule_ptr<typename ManagerT::address_traits>(base,_data_idx));_data_idx=new_dat_idx;_capacity=new_cap;return true;}};}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
 
+AY Ap{
 /*
 ## pmm-pstring
 */
+I<F O>Au Is{j Ae=O;j A=F O::A;Ak ET;Ak ER;A CB;Is()D:ET(0),ER(0),CB(K::Dl<F O::E>){}~Is()D=GL;J BG*GN()J D{if(CB==K::Dl<F O::E>)B "";BG*Dm=BO();B(Dm!=M)?Dm:"";}H IZ()J D{B G<H>(ET);}AN empty()J D{B ET==0;}BG Af[](H i)J D{BG*Dm=BO();B(Dm!=M)?Dm[i]:'\0';}AN assign(J BG*s)D{if(s==M)s="";DH len=G<Ak>(AL::strlen(s));if(!Ds(len))B X;BG*Dm=BO();if(Dm==M)B X;AL::Hz(Dm,s,G<H>(len)+1);ET=len;B Bi;}AN append(J BG*s)D{if(s==M)s="";DH add_len=G<Ak>(AL::strlen(s));if(add_len==0)B Bi;Ak new_len=ET+add_len;if(new_len<ET)B X;if(!Ds(new_len))B X;BG*Dm=BO();if(Dm==M)B X;AL::Hz(Dm+ET,s,G<H>(add_len)+1);ET=new_len;B Bi;}V clear()D{ET=0;if(CB!=K::Dl<F O::E>){BG*Dm=BO();if(Dm!=M)Dm[0]='\0';}}V free_data()D{if(CB!=K::Dl<F O::E>){O::Ec(K::DM<F O::E>(O::EG().AR(),CB));CB=K::Dl<F O::E>;}ET=0;ER=0;}AN Af==(J BG*s)J D{if(s==M)B ET==0;B AL::KG(GN(),s)==0;}AN Af!=(J BG*s)J D{B!(*BN==s);}AN Af==(J Is&An)J D{if(BN==&An)B Bi;if(ET!=An.ET)B X;if(ET==0)B Bi;B AL::KG(GN(),An.GN())==0;}AN Af!=(J Is&An)J D{B!(*BN==An);}AN Af<(J Is&An)J D{B AL::KG(GN(),An.GN())<0;}Ew:BG*BO()J D{B AI<BG*>(K::DM<F O::E>(O::EG().AR(),CB));}AN Ds(Ak Hn)D{if(Hn<=ER)B Bi;Ak FA=ER*2;if(FA<Hn)FA=Hn;if(FA<16)FA=16;H HN=G<H>(FA)+1;V*GG=O::HM(HN);if(GG==M)B X;Y*m=O::EG().AR();A KM=K::Gh<F O::E>(m,GG);if(ET>0&&CB!=K::Dl<F O::E>){BG*Jo=BO();if(Jo!=M)AL::Hz(GG,Jo,G<H>(ET)+1);}EN{G<BG*>(GG)[0]='\0';}if(CB!=K::Dl<F O::E>)O::Ec(K::DM<F O::E>(m,CB));CB=KM;ER=FA;B Bi;}};}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-namespace pmm{template<typename ManagerT>struct pstringview;
-/*
-## pmm-pstringview
-*/
-template<typename ManagerT>struct pstringview{using manager_type=ManagerT;using index_type=typename ManagerT::index_type;using psview_pptr=typename ManagerT::template pptr<pstringview>;struct forest_domain_descriptor{using manager_type=ManagerT;using index_type=typename ManagerT::index_type;using node_type=pstringview;using node_pptr=psview_pptr;static constexpr const char*name()noexcept{return detail::kSystemDomainSymbols;}static index_type root_index()noexcept{auto*domain=ManagerT::symbol_domain_record_unlocked();return ManagerT::forest_domain_root_index_unlocked(domain);}static index_type*root_index_ptr()noexcept{auto*domain=ManagerT::symbol_domain_record_unlocked();return ManagerT::forest_domain_root_index_ptr_unlocked(domain);}static node_type*resolve_node(node_pptr p)noexcept{return ManagerT::template resolve<node_type>(p);}static int compare_key(const char*key,node_pptr cur)noexcept{if(key==nullptr)key="";node_type*obj=resolve_node(cur);return(obj!=nullptr)?std::strcmp(key,obj->c_str()):0;}static bool less_node(node_pptr lhs,node_pptr rhs)noexcept{node_type*lhs_obj=resolve_node(lhs);node_type*rhs_obj=resolve_node(rhs);return lhs_obj!=nullptr&&rhs_obj!=nullptr&&std::strcmp(lhs_obj->c_str(),rhs_obj->c_str())<0;}static bool validate_node(node_pptr p)noexcept{return resolve_node(p)!=nullptr;}};using forest_domain_policy=detail::ForestDomainOps<forest_domain_descriptor>;static forest_domain_policy forest_domain_ops()noexcept{return forest_domain_policy{};}uint32_t length;char str[1];explicit pstringview(const char*s)noexcept:length(0),str{'\0'}{_interned=_intern(s);}operator psview_pptr()const noexcept{return _interned;}const char*c_str()const noexcept{return str;}size_t size()const noexcept{return static_cast<size_t>(length);}bool empty()const noexcept{return length==0;}bool operator==(const char*s)const noexcept{if(s==nullptr)return length==0;return std::strcmp(c_str(),s)==0;}bool operator==(const pstringview&other)const noexcept{if(this==&other)return true;if(length!=other.length)return false;return std::strcmp(str,other.str)==0;}bool operator!=(const char*s)const noexcept{return!(*this==s);}bool operator!=(const pstringview&other)const noexcept{return!(*this==other);}bool operator<(const pstringview&other)const noexcept{return std::strcmp(c_str(),other.c_str())<0;}
-/*
-### pmm-pstringview-intern
-*/
-static psview_pptr intern(const char*s)noexcept{return _intern(s);}static void reset()noexcept{if(!ManagerT::is_initialized())return;typename ManagerT::thread_policy::unique_lock_type lock(ManagerT::_mutex);forest_domain_ops().reset_root();}static index_type root_index()noexcept{if(!ManagerT::is_initialized())return static_cast<index_type>(0);typename ManagerT::thread_policy::shared_lock_type lock(ManagerT::_mutex);return forest_domain_ops().root_index();}~pstringview()=default;private:psview_pptr _interned;static psview_pptr _intern(const char*s)noexcept{if(!ManagerT::is_initialized())return psview_pptr();typename ManagerT::thread_policy::unique_lock_type lock(ManagerT::_mutex);return ManagerT::intern_symbol_unlocked(s);}};}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
 
+AY Ap{I<F O>Au Aa;
 /*
 ## pmm-pstringview
 */
+I<F O>Au Aa{j Ae=O;j A=F O::A;j GV=F O::I AV<Aa>;Au Bt{j Ae=O;j A=F O::A;j AW=Aa;j Ab=GV;N Q J BG*CP()D{B K::Cd;}N A Cj()D{DH*Ch=O::FQ();B O::BR(Ch);}N A*Cp()D{DH*Ch=O::FQ();B O::Cl(Ch);}N AW*CZ(Ab p)D{B O::I Go<AW>(p);}N int KV(J BG*HQ,Ab Ek)D{if(HQ==M)HQ="";AW*IP=CZ(Ek);B(IP!=M)?AL::KG(HQ,IP->GN()):0;}N AN less_node(Ab lhs,Ab rhs)D{AW*lhs_obj=CZ(lhs);AW*rhs_obj=CZ(rhs);B lhs_obj!=M&&rhs_obj!=M&&AL::KG(lhs_obj->GN(),rhs_obj->GN())<0;}N AN Ip(Ab p)D{B CZ(p)!=M;}};j CE=K::Hy<Bt>;N CE DJ()D{B CE{};}Ak HV;BG str[1];Eh Aa(J BG*s)D:HV(0),str{'\0'}{_interned=_intern(s);}Af GV()J D{B _interned;}J BG*GN()J D{B str;}H IZ()J D{B G<H>(HV);}AN empty()J D{B HV==0;}AN Af==(J BG*s)J D{if(s==M)B HV==0;B AL::KG(GN(),s)==0;}AN Af==(J Aa&An)J D{if(BN==&An)B Bi;if(HV!=An.HV)B X;B AL::KG(str,An.str)==0;}AN Af!=(J BG*s)J D{B!(*BN==s);}AN Af!=(J Aa&An)J D{B!(*BN==An);}AN Af<(J Aa&An)J D{B AL::KG(GN(),An.GN())<0;}
 /*
 ### pmm-pstringview-intern
 */
+N GV intern(J BG*s)D{B _intern(s);}N V reset()D{if(!O::Es())B;F O::AP::Aw Eo(O::CY);DJ().reset_root();}N A Cj()D{if(!O::Es())B G<A>(0);F O::AP::Ax Eo(O::CY);B DJ().Cj();}~Aa()=GL;Ew:GV _interned;N GV _intern(J BG*s)D{if(!O::Es())B GV();F O::AP::Aw Eo(O::CY);B O::DO(s);}};}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <type_traits>
 #include <utility>
-namespace pmm{template<typename T>concept HasFreeData=requires(T&t){{t.free_data()}noexcept;};template<typename T>concept HasFreeAll=requires(T&t){{t.free_all()}noexcept;};template<typename T>concept HasPersistentCleanup=HasFreeData<T>||HasFreeAll<T>;template<typename T,typename ManagerT>class typed_guard{public:using pptr_type=typename ManagerT::template pptr<T>;explicit typed_guard(pptr_type p)noexcept:_ptr(p){}typed_guard()noexcept=default;typed_guard(const typed_guard&)=delete;typed_guard&operator=(const typed_guard&)=delete;typed_guard(typed_guard&&other)noexcept:_ptr(other._ptr){other._ptr=pptr_type();}typed_guard&operator=(typed_guard&&other)noexcept{if(this!=&other){reset();_ptr=other._ptr;other._ptr=pptr_type();}return*this;}~typed_guard(){reset();}void reset()noexcept{if(!_ptr.is_null()){cleanup(*_ptr);ManagerT::destroy_typed(_ptr);_ptr=pptr_type();}}pptr_type release()noexcept{pptr_type p=_ptr;_ptr=pptr_type();return p;}T*operator->()const noexcept{return&(*_ptr);}T&operator*()const noexcept{return*_ptr;}pptr_type get()const noexcept{return _ptr;}explicit operator bool()const noexcept{return!_ptr.is_null();}private:pptr_type _ptr;static void cleanup(T&obj)noexcept{if constexpr(HasFreeData<T>)obj.free_data();else if constexpr(HasFreeAll<T>)obj.free_all();}};}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
+
+AY Ap{I<F T>Hc HasFreeData=Eg(T&t){{t.free_data()}D;};I<F T>Hc HasFreeAll=Eg(T&t){{t.free_all()}D;};I<F T>Hc HasPersistentCleanup=HasFreeData<T>||HasFreeAll<T>;I<F T,F O>Dt Cr{DF:j Fc=F O::I AV<T>;Eh Cr(Fc p)D:IJ(p){}Cr()D=GL;Cr(J Cr&)=EO;Cr&Af=(J Cr&)=EO;Cr(Cr&&An)D:IJ(An.IJ){An.IJ=Fc();}Cr&Af=(Cr&&An)D{if(BN!=&An){reset();IJ=An.IJ;An.IJ=Fc();}B*BN;}~Cr(){reset();}V reset()D{if(!IJ.AQ()){cleanup(*IJ);O::destroy_typed(IJ);IJ=Fc();}}Fc release()D{Fc p=IJ;IJ=Fc();B p;}T*Af->()J D{B&(*IJ);}T&Af*()J D{B*IJ;}Fc get()J D{B IJ;}Eh Af AN()J D{B!IJ.AQ();}Ew:Fc IJ;N V cleanup(T&IP)D{if Q(HasFreeData<T>)IP.free_data();EN if Q(HasFreeAll<T>)IP.free_all();}};}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <cstddef>
 #include <cstdint>
@@ -627,11 +29006,1110 @@ namespace pmm{template<typename T>concept HasFreeData=requires(T&t){{t.free_data
 #include <limits>
 #include <new>
 #include <type_traits>
-namespace pmm::detail{template<typename ManagerT>class PersistMemoryTypedApi{public:template<typename T>static pmm::pptr<T,ManagerT>allocate_typed()noexcept{void*raw=ManagerT::allocate(sizeof(T));if(raw==nullptr)return pmm::pptr<T,ManagerT>();return ManagerT::template make_pptr_from_raw<T>(raw);}template<typename T>static pmm::pptr<T,ManagerT>allocate_typed(size_t count)noexcept{if(count==0)return pmm::pptr<T,ManagerT>();if(sizeof(T)>0&&count>(std::numeric_limits<size_t>::max)()/sizeof(T))return pmm::pptr<T,ManagerT>();void*raw=ManagerT::allocate(sizeof(T)*count);if(raw==nullptr)return pmm::pptr<T,ManagerT>();return ManagerT::template make_pptr_from_raw<T>(raw);}template<typename T>static void deallocate_typed(pmm::pptr<T,ManagerT>p)noexcept{if(p.is_null()||!ManagerT::_initialized)return;void*raw=ManagerT::template raw_block_user_ptr_from_pptr<T>(p);ManagerT::deallocate(raw);}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
+
+namespace pmm::detail{template<typename ManagerT>class PersistMemoryTypedApi{public:I<F T>N Ap::AV<T,O>IW()D{V*CC=O::HM(AG(T));if(CC==M)B Ap::AV<T,O>();B O::I Di<T>(CC);}I<F T>N Ap::AV<T,O>IW(H count)D{if(count==0)B Ap::AV<T,O>();if(AG(T)>0&&count>(AL::Ag<H>::IQ)()/AG(T))B Ap::AV<T,O>();V*CC=O::HM(AG(T)*count);if(CC==M)B Ap::AV<T,O>();B O::I Di<T>(CC);}I<F T>N V JX(Ap::AV<T,O>p)D{if(p.AQ()||!O::AH)B;V*CC=O::I FZ<T>(p);O::Ec(CC);}
 /*
 #### pmm-detail-persistmemorytypedapi-reallocate_typed
 */
-template<typename T>static pmm::pptr<T,ManagerT>reallocate_typed(pmm::pptr<T, ManagerT> p,size_t old_count,size_t new_count)noexcept{using address_traits=typename ManagerT::address_traits;using allocator=typename ManagerT::allocator;using free_block_tree=typename ManagerT::free_block_tree;using index_type=typename ManagerT::index_type;using logging_policy=typename ManagerT::logging_policy;using thread_policy=typename ManagerT::thread_policy;static_assert(std::is_trivially_copyable_v<T>,"");if(new_count==0){ManagerT::_last_error=PmmError::InvalidSize;return pmm::pptr<T,ManagerT>();}if(p.is_null())return allocate_typed<T>(new_count);if(sizeof(T)>0&&new_count>(std::numeric_limits<size_t>::max)()/sizeof(T)){ManagerT::_last_error=PmmError::Overflow;return pmm::pptr<T,ManagerT>();}size_t new_user_size=sizeof(T)*new_count;typename thread_policy::unique_lock_type lock(ManagerT::_mutex);if(!ManagerT::_initialized){ManagerT::_last_error=PmmError::NotInitialized;return pmm::pptr<T,ManagerT>();}uint8_t*base=ManagerT::_backend.base_ptr();detail::ManagerHeader<address_traits>*hdr=ManagerT::get_header(base);index_type blk_idx=ManagerT::template block_idx_from_pptr<T>(p);void*blk_raw=detail::block_at<address_traits>(base,blk_idx);index_type old_data_gran=BlockStateBase<address_traits>::get_weight(blk_raw);index_type new_data_gran=detail::bytes_to_granules_t<address_traits>(new_user_size);if(new_data_gran==0)new_data_gran=1;if(new_data_gran==old_data_gran){ManagerT::_last_error=PmmError::Ok;return p;}static constexpr bool kBlockAligned=(sizeof(Block<address_traits>)%address_traits::granule_size==0);if constexpr(kBlockAligned){if(new_data_gran<old_data_gran){allocator::realloc_shrink(base,hdr,blk_idx,blk_raw,old_data_gran,new_data_gran);ManagerT::_last_error=PmmError::Ok;return p;}if(new_data_gran>old_data_gran){if(allocator::realloc_grow(base,hdr,blk_idx,blk_raw,old_data_gran,new_data_gran)){ManagerT::_last_error=PmmError::Ok;return p;}}}index_type new_data_gran_alloc=detail::bytes_to_granules_t<address_traits>(new_user_size);if(new_data_gran_alloc==0)new_data_gran_alloc=1;if(new_data_gran_alloc>std::numeric_limits<index_type>::max()-ManagerT::kBlockHdrGranules){ManagerT::_last_error=PmmError::Overflow;return pmm::pptr<T,ManagerT>();}index_type needed=ManagerT::kBlockHdrGranules+new_data_gran_alloc;index_type new_idx=free_block_tree::find_best_fit(base,hdr,needed);if(new_idx==address_traits::no_block){if(!ManagerT::do_expand(new_user_size)){ManagerT::_last_error=PmmError::OutOfMemory;logging_policy::on_allocation_failure(new_user_size,PmmError::OutOfMemory);return pmm::pptr<T,ManagerT>();}base=ManagerT::_backend.base_ptr();hdr=ManagerT::get_header(base);new_idx=free_block_tree::find_best_fit(base,hdr,needed);if(new_idx==address_traits::no_block){ManagerT::_last_error=PmmError::OutOfMemory;logging_policy::on_allocation_failure(new_user_size,PmmError::OutOfMemory);return pmm::pptr<T,ManagerT>();}}void*new_raw=allocator::allocate_from_block(base,hdr,new_idx,new_user_size);if(new_raw==nullptr){ManagerT::_last_error=PmmError::OutOfMemory;return pmm::pptr<T,ManagerT>();}pmm::pptr<T,ManagerT>new_p=ManagerT::template make_pptr_from_raw<T>(new_raw);if(new_p.is_null()){ManagerT::_last_error=PmmError::InvalidPointer;return pmm::pptr<T,ManagerT>();}void*new_dst=resolve_unchecked<T>(new_p);void*old_src=resolve_unchecked<T>(p);size_t copy_sz=(new_count<old_count?new_count:old_count)*sizeof(T);std::memmove(new_dst,old_src,copy_sz);index_type old_blk_idx=ManagerT::template block_idx_from_pptr<T>(p);void*old_blk_raw=detail::block_at<address_traits>(base,old_blk_idx);index_type freed_w=BlockStateBase<address_traits>::get_weight(old_blk_raw);if(BlockStateBase<address_traits>::get_node_type(old_blk_raw)!=pmm::kNodeReadOnly){auto*old_alloc=AllocatedBlock<address_traits>::cast_from_raw(old_blk_raw);if(old_alloc!=nullptr){old_alloc->mark_as_free();hdr->alloc_count--;hdr->free_count++;if(hdr->used_size>=freed_w)hdr->used_size-=freed_w;allocator::coalesce(base,hdr,old_blk_idx);}}ManagerT::_last_error=PmmError::Ok;return new_p;}template<typename T,typename...Args>static pmm::pptr<T,ManagerT>create_typed(Args&&...args)noexcept{static_assert(std::is_nothrow_constructible_v<T,Args...>,"");void*raw=ManagerT::allocate(sizeof(T));if(raw==nullptr)return pmm::pptr<T,ManagerT>();pmm::pptr<T,ManagerT>p=ManagerT::template make_pptr_from_raw<T>(raw);T*obj=resolve_unchecked<T>(p);if(obj==nullptr){ManagerT::deallocate(raw);return pmm::pptr<T,ManagerT>();}::new(obj)T(static_cast<Args&&>(args)...);return p;}template<typename T>static void destroy_typed(pmm::pptr<T,ManagerT>p)noexcept{static_assert(std::is_nothrow_destructible_v<T>,"");if(p.is_null()||!ManagerT::_initialized)return;T*obj=resolve_unchecked<T>(p);void*raw=ManagerT::template raw_block_user_ptr_from_pptr<T>(p);if(obj==nullptr||raw==nullptr)return;obj->~T();ManagerT::deallocate(raw);}template<typename T,typename...Args>static typed_guard<T,ManagerT>make_guard(Args&&...args){return typed_guard<T,ManagerT>(create_typed<T>(static_cast<Args&&>(args)...));}template<typename T>static T*resolve_unchecked(pmm::pptr<T,ManagerT>p)noexcept{if(p.is_null()||!ManagerT::_initialized)return nullptr;void*raw=ManagerT::template raw_user_ptr_from_pptr<T>(p);if(raw==nullptr){ManagerT::_last_error=PmmError::InvalidPointer;return nullptr;}ManagerT::_last_error=PmmError::Ok;return reinterpret_cast<T*>(raw);}template<typename T>static T*resolve_checked(pmm::pptr<T,ManagerT>p)noexcept{using address_traits=typename ManagerT::address_traits;using index_type=typename ManagerT::index_type;if(p.is_null()||!ManagerT::_initialized)return nullptr;const void*blk_raw=ManagerT::template block_raw_ptr_from_pptr<T>(p);if(blk_raw==nullptr){ManagerT::_last_error=PmmError::InvalidPointer;return nullptr;}index_type blk_idx=ManagerT::template block_idx_from_pptr<T>(p);if(BlockStateBase<address_traits>::get_weight(blk_raw)==0||BlockStateBase<address_traits>::get_root_offset(blk_raw)!=blk_idx){ManagerT::_last_error=PmmError::InvalidPointer;return nullptr;}const uint16_t node_type=BlockStateBase<address_traits>::get_node_type(blk_raw);if(node_type!=pmm::kNodeReadWrite&&node_type!=pmm::kNodeReadOnly){ManagerT::_last_error=PmmError::InvalidPointer;return nullptr;}T*raw=resolve_unchecked<T>(p);if(raw==nullptr)return nullptr;ManagerT::_last_error=PmmError::Ok;return raw;}template<typename T>static T*resolve(pmm::pptr<T,ManagerT>p)noexcept{return resolve_checked<T>(p);}template<typename T>static T*resolve_at(pmm::pptr<T,ManagerT>p,size_t i)noexcept{T*base_elem=resolve_checked<T>(p);return(base_elem==nullptr)?nullptr:base_elem+i;}template<typename T>static pmm::pptr<T,ManagerT>pptr_from_byte_offset(size_t byte_off)noexcept{using address_traits=typename ManagerT::address_traits;using index_type=typename ManagerT::index_type;if(byte_off==0)return pmm::pptr<T,ManagerT>();if(byte_off%address_traits::granule_size!=0){ManagerT::_last_error=PmmError::InvalidPointer;return pmm::pptr<T,ManagerT>();}size_t idx=byte_off/address_traits::granule_size;if(idx>static_cast<size_t>(std::numeric_limits<index_type>::max())){ManagerT::_last_error=PmmError::Overflow;return pmm::pptr<T,ManagerT>();}return pmm::pptr<T,ManagerT>(static_cast<index_type>(idx));}template<typename T>static bool is_valid_ptr(pmm::pptr<T,ManagerT>p)noexcept{return resolve_checked<T>(p)!=nullptr;}};}
+template<typename T>static pmm::pptr<T, ManagerT> reallocate_typed(pmm::pptr<T, ManagerT> p,H old_count,H Hq)D{j E=F O::E;j CM=F O::CM;j Az=F O::Az;j A=F O::A;j AS=F O::AS;j AP=F O::AP;AK(AL::FH<T>,"");if(Hq==0){O::AA=AE::Gd;B Ap::AV<T,O>();}if(p.AQ())B IW<T>(Hq);if(AG(T)>0&&Hq>(AL::Ag<H>::IQ)()/AG(T)){O::AA=AE::Io;B Ap::AV<T,O>();}H FV=AG(T)*Hq;F AP::Aw Eo(O::CY);if(!O::AH){O::AA=AE::IX;B Ap::AV<T,O>();}Y*m=O::AJ.AR();K::q<E>*AD=O::Cc(m);A As=O::I GO<T>(p);V*BU=K::Ac<E>(m,As);A CU=Z<E>::Ar(BU);A BD=K::DR<E>(FV);if(BD==0)BD=1;if(BD==CU){O::AA=AE::Ok;B p;}N Q AN kBlockAligned=(AG(Ao<E>)%E::P==0);if Q(kBlockAligned){if(BD<CU){CM::realloc_shrink(m,AD,As,BU,CU,BD);O::AA=AE::Ok;B p;}if(BD>CU){if(CM::realloc_grow(m,AD,As,BU,CU,BD)){O::AA=AE::Ok;B p;}}}A Ez=K::DR<E>(FV);if(Ez==0)Ez=1;if(Ez>AL::Ag<A>::IQ()-O::Aj){O::AA=AE::Io;B Ap::AV<T,O>();}A KO=O::Aj+Ez;A Ey=Az::GI(m,AD,KO);if(Ey==E::k){if(!O::KU(FV)){O::AA=AE::Dy;AS::By(FV,AE::Dy);B Ap::AV<T,O>();}m=O::AJ.AR();AD=O::Cc(m);Ey=Az::GI(m,AD,KO);if(Ey==E::k){O::AA=AE::Dy;AS::By(FV,AE::Dy);B Ap::AV<T,O>();}}V*GG=CM::GR(m,AD,Ey,FV);if(GG==M){O::AA=AE::Dy;B Ap::AV<T,O>();}Ap::AV<T,O>new_p=O::I Di<T>(GG);if(new_p.AQ()){O::AA=AE::CX;B Ap::AV<T,O>();}V*new_dst=Ck<T>(new_p);V*old_src=Ck<T>(p);H copy_sz=(Hq<old_count?Hq:old_count)*AG(T);AL::memmove(new_dst,old_src,copy_sz);A old_blk_idx=O::I GO<T>(p);V*KL=K::Ac<E>(m,old_blk_idx);A freed_w=Z<E>::Ar(KL);if(Z<E>::Dc(KL)!=Ap::Db){DH*old_alloc=Bh<E>::Cm(KL);if(old_alloc!=M){old_alloc->mark_as_free();AD->Cf--;AD->Be++;if(AD->Bb>=freed_w)AD->Bb-=freed_w;CM::coalesce(m,AD,old_blk_idx);}}O::AA=AE::Ok;B new_p;}I<F T,F...Args>N Ap::AV<T,O>create_typed(Args&&...args)D{AK(AL::is_nothrow_constructible_v<T,Args...>,"");V*CC=O::HM(AG(T));if(CC==M)B Ap::AV<T,O>();Ap::AV<T,O>p=O::I Di<T>(CC);T*IP=Ck<T>(p);if(IP==M){O::Ec(CC);B Ap::AV<T,O>();}::new(IP)T(G<Args&&>(args)...);B p;}I<F T>N V destroy_typed(Ap::AV<T,O>p)D{AK(AL::is_nothrow_destructible_v<T>,"");if(p.AQ()||!O::AH)B;T*IP=Ck<T>(p);V*CC=O::I FZ<T>(p);if(IP==M||CC==M)B;IP->~T();O::Ec(CC);}I<F T,F...Args>N Cr<T,O>make_guard(Args&&...args){B Cr<T,O>(create_typed<T>(G<Args&&>(args)...));}I<F T>N T*Ck(Ap::AV<T,O>p)D{if(p.AQ()||!O::AH)B M;V*CC=O::I EL<T>(p);if(CC==M){O::AA=AE::CX;B M;}O::AA=AE::Ok;B AI<T*>(CC);}I<F T>N T*Ef(Ap::AV<T,O>p)D{j E=F O::E;j A=F O::A;if(p.AQ()||!O::AH)B M;J V*BU=O::I Gs<T>(p);if(BU==M){O::AA=AE::CX;B M;}A As=O::I GO<T>(p);if(Z<E>::Ar(BU)==0||Z<E>::DP(BU)!=As){O::AA=AE::CX;B M;}J BV AW=Z<E>::Dc(BU);if(AW!=Ap::Gw&&AW!=Ap::Db){O::AA=AE::CX;B M;}T*CC=Ck<T>(p);if(CC==M)B M;O::AA=AE::Ok;B CC;}I<F T>N T*Go(Ap::AV<T,O>p)D{B Ef<T>(p);}I<F T>N T*resolve_at(Ap::AV<T,O>p,H i)D{T*base_elem=Ef<T>(p);B(base_elem==M)?M:base_elem+i;}I<F T>N Ap::AV<T,O>pptr_from_byte_offset(H BI)D{j E=F O::E;j A=F O::A;if(BI==0)B Ap::AV<T,O>();if(BI%E::P!=0){O::AA=AE::CX;B Ap::AV<T,O>();}H At=BI/E::P;if(At>G<H>(AL::Ag<A>::IQ())){O::AA=AE::Io;B Ap::AV<T,O>();}B Ap::AV<T,O>(G<A>(At));}I<F T>N AN is_valid_ptr(Ap::AV<T,O>p)D{B Ef<T>(p)!=M;}};}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <atomic>
 #include <cassert>
@@ -641,24 +30119,1123 @@ template<typename T>static pmm::pptr<T,ManagerT>reallocate_typed(pmm::pptr<T, Ma
 #include <cstring>
 #include <limits>
 #include <new>
-namespace pmm{namespace detail{template<typename C,typename=void>struct config_logging_policy{using type=logging::NoLogging;};template<typename C>struct config_logging_policy<C,std::void_t<typename C::logging_policy>>{using type=typename C::logging_policy;};}template<typename ConfigT=CacheManagerConfig,size_t InstanceId=0>
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
+
+AY Ap{AY K{I<F C,F=V>Au Hb{j Ji=logging::NoLogging;};I<F C>Au Hb<C,AL::void_t<F C::AS>>{j Ji=F C::AS;};}template<typename ConfigT=CacheManagerConfig,size_t InstanceId=0>
 /*
 ## pmm-persistmemorymanager
 */
-class PersistMemoryManager:public detail::PersistMemoryTypedApi<PersistMemoryManager<ConfigT, InstanceId>>{public:using address_traits=typename ConfigT::address_traits;using storage_backend=typename ConfigT::storage_backend;using free_block_tree=typename ConfigT::free_block_tree;using thread_policy=typename ConfigT::lock_policy;using logging_policy=typename detail::config_logging_policy<ConfigT>::type;using allocator=AllocatorPolicy<free_block_tree,address_traits>;using index_type=typename address_traits::index_type;using forest_registry=detail::ForestDomainRegistry<address_traits>;using forest_domain=detail::ForestDomainRecord<address_traits>;using manager_type=PersistMemoryManager<ConfigT,InstanceId>;template<typename>friend struct pstringview;template<typename,typename,typename>friend struct pmap;friend class detail::PersistMemoryTypedApi<manager_type>;template<typename>friend bool save_manager(const char*);template<typename T>using pptr=pmm::pptr<T,manager_type>;using pstringview=pmm::pstringview<manager_type>;using pstring=pmm::pstring<manager_type>;template<typename _K,typename _V>using pmap=pmm::pmap<_K,_V,manager_type>;template<typename T>using parray=pmm::parray<T,manager_type>;template<typename T>using pallocator=pmm::pallocator<T,manager_type>;static PmmError last_error()noexcept{return _last_error;}static void clear_error()noexcept{_last_error=PmmError::Ok;}static void set_last_error(PmmError err)noexcept{_last_error=err;}static bool create(size_t initial_size)noexcept{typename thread_policy::unique_lock_type lock(_mutex);if(initial_size<detail::kMinMemorySize){_last_error=PmmError::InvalidSize;return false;}static constexpr size_t kGranSzCreate=address_traits::granule_size;if(initial_size>std::numeric_limits<size_t>::max()-(kGranSzCreate-1)){_last_error=PmmError::Overflow;return false;}size_t aligned=((initial_size+kGranSzCreate-1)/kGranSzCreate)*kGranSzCreate;if(_backend.base_ptr()==nullptr||_backend.total_size()<aligned){size_t additional=(_backend.total_size()<aligned)?(aligned-_backend.total_size()):aligned;if(!_backend.expand(additional)){_last_error=PmmError::ExpandFailed;return false;}}if(_backend.base_ptr()==nullptr||_backend.total_size()<aligned){_last_error=PmmError::BackendError;return false;}bool ok=init_layout(_backend.base_ptr(),_backend.total_size());if(ok)ok=bootstrap_forest_registry_unlocked();if(ok)ok=validate_bootstrap_invariants_unlocked();if(ok){_last_error=PmmError::Ok;logging_policy::on_create(_backend.total_size());}return ok;}static bool create()noexcept{typename thread_policy::unique_lock_type lock(_mutex);if(_backend.base_ptr()==nullptr||_backend.total_size()<detail::kMinMemorySize){_last_error=(_backend.base_ptr()==nullptr)?PmmError::BackendError:PmmError::InvalidSize;return false;}bool ok=init_layout(_backend.base_ptr(),_backend.total_size());if(ok)ok=bootstrap_forest_registry_unlocked();if(ok)ok=validate_bootstrap_invariants_unlocked();if(ok){_last_error=PmmError::Ok;logging_policy::on_create(_backend.total_size());}return ok;}static bool load(VerifyResult&result)noexcept{result.mode=RecoveryMode::Repair;result.ok=true;typename thread_policy::unique_lock_type lock(_mutex);if(_backend.base_ptr()==nullptr||_backend.total_size()<detail::kMinMemorySize){_last_error=(_backend.base_ptr()==nullptr)?PmmError::BackendError:PmmError::InvalidSize;result.add(ViolationType::HeaderCorruption,DiagnosticAction::Aborted);return false;}uint8_t*base=_backend.base_ptr();detail::ManagerHeader<address_traits>*hdr=get_header(base);if(hdr->magic!=kMagic){_last_error=PmmError::InvalidMagic;logging_policy::on_corruption_detected(PmmError::InvalidMagic);result.add(ViolationType::HeaderCorruption,DiagnosticAction::Aborted,0,static_cast<uint64_t>(kMagic),static_cast<uint64_t>(hdr->magic));return false;}if(!detail::is_supported_image_version(hdr->image_version)){_last_error=PmmError::UnsupportedImageVersion;logging_policy::on_corruption_detected(PmmError::UnsupportedImageVersion);result.add(ViolationType::HeaderCorruption,DiagnosticAction::Aborted,0,detail::kCurrentImageVersion,static_cast<uint64_t>(hdr->image_version));return false;}if(hdr->total_size!=_backend.total_size()){_last_error=PmmError::SizeMismatch;logging_policy::on_corruption_detected(PmmError::SizeMismatch);result.add(ViolationType::HeaderCorruption,DiagnosticAction::Aborted,0,_backend.total_size(),static_cast<uint64_t>(hdr->total_size));return false;}if(hdr->granule_size!=static_cast<uint16_t>(address_traits::granule_size)){_last_error=PmmError::GranuleMismatch;logging_policy::on_corruption_detected(PmmError::GranuleMismatch);result.add(ViolationType::HeaderCorruption,DiagnosticAction::Aborted,0,address_traits::granule_size,static_cast<uint64_t>(hdr->granule_size));return false;}auto mark_entries=[](VerifyResult&r,size_t from,DiagnosticAction act){for(size_t i=from;i<r.entry_count;++i)r.entries[i].action=act;};size_t pre=result.entry_count;allocator::verify_block_states(base,hdr,result);mark_entries(result,pre,DiagnosticAction::Repaired);pre=result.entry_count;allocator::verify_linked_list(base,hdr,result);mark_entries(result,pre,DiagnosticAction::Repaired);pre=result.entry_count;allocator::verify_counters(base,hdr,result);mark_entries(result,pre,DiagnosticAction::Rebuilt);pre=result.entry_count;allocator::verify_free_tree(base,hdr,result);mark_entries(result,pre,DiagnosticAction::Rebuilt);if(detail::image_version_requires_migration(hdr->image_version))hdr->image_version=detail::kCurrentImageVersion;hdr->owns_memory=false;hdr->prev_total_size=0;allocator::repair_linked_list(base,hdr);allocator::recompute_counters(base,hdr);allocator::rebuild_free_tree(base,hdr);_initialized=true;{VerifyResult forest_verify;verify_forest_registry_unlocked(forest_verify);for(size_t i=0;i<forest_verify.entry_count;++i){const auto&e=forest_verify.entries[i];result.add(e.type,DiagnosticAction::Repaired,e.block_index,e.expected,e.actual);}}if(!validate_or_bootstrap_forest_registry_unlocked()){for(size_t i=0;i<result.entry_count;++i){if(result.entries[i].type==ViolationType::ForestRegistryMissing||result.entries[i].type==ViolationType::ForestDomainMissing||result.entries[i].type==ViolationType::ForestDomainFlagsMissing)result.entries[i].action=DiagnosticAction::Aborted;}_initialized=false;return false;}if(!validate_bootstrap_invariants_unlocked()){_initialized=false;return false;}_last_error=PmmError::Ok;logging_policy::on_load();return true;}
+class PersistMemoryManager:public detail::PersistMemoryTypedApi<PersistMemoryManager<ConfigT, InstanceId>>{public:j E=F JG::E;j Bu=F JG::Bu;j Az=F JG::Az;j AP=F JG::lock_policy;j AS=F K::Hb<JG>::Ji;j CM=Du<Az,E>;j A=F E::A;j BY=K::Fx<E>;j BF=K::Dj<E>;j Ae=Bm<JG,InstanceId>;I<F>friend Au Aa;I<F,F,F>friend Au pmap;friend Dt K::Hd<Ae>;I<F>friend AN save_manager(J BG*);I<F T>j AV=Ap::AV<T,Ae>;j Aa=Ap::Aa<Ae>;j Is=Ap::Is<Ae>;I<F _K,F _V>j pmap=Ap::pmap<_K,_V,Ae>;I<F T>j parray=Ap::parray<T,Ae>;I<F T>j Ex=Ap::Ex<T,Ae>;N AE last_error()D{B AA;}N V clear_error()D{AA=AE::Ok;}N V set_last_error(AE err)D{AA=err;}N AN create(H Eb)D{F AP::Aw Eo(CY);if(Eb<K::Fm){AA=AE::Gd;B X;}N Q H HZ=E::P;if(Eb>AL::Ag<H>::IQ()-(HZ-1)){AA=AE::Io;B X;}H II=((Eb+HZ-1)/HZ)*HZ;if(AJ.AR()==M||AJ.S()<II){H additional=(AJ.S()<II)?(II-AJ.S()):II;if(!AJ.expand(additional)){AA=AE::ExpandFailed;B X;}}if(AJ.AR()==M||AJ.S()<II){AA=AE::Ee;B X;}AN ok=Il(AJ.AR(),AJ.S());if(ok)ok=DE();if(ok)ok=Br();if(ok){AA=AE::Ok;AS::on_create(AJ.S());}B ok;}N AN create()D{F AP::Aw Eo(CY);if(AJ.AR()==M||AJ.S()<K::Fm){AA=(AJ.AR()==M)?AE::Ee:AE::Gd;B X;}AN ok=Il(AJ.AR(),AJ.S());if(ok)ok=DE();if(ok)ok=Br();if(ok){AA=AE::Ok;AS::on_create(AJ.S());}B ok;}N AN load(Bq&AM)D{AM.mode=ID::Repair;AM.ok=Bi;F AP::Aw Eo(CY);if(AJ.AR()==M||AJ.S()<K::Fm){AA=(AJ.AR()==M)?AE::Ee:AE::Gd;AM.Fw(AF::CS,o::GT);B X;}Y*m=AJ.AR();K::q<E>*AD=Cc(m);if(AD->HD!=JT){AA=AE::InvalidMagic;AS::Cg(AE::InvalidMagic);AM.Fw(AF::CS,o::GT,0,G<z>(JT),G<z>(AD->HD));B X;}if(!K::GA(AD->CK)){AA=AE::Gt;AS::Cg(AE::Gt);AM.Fw(AF::CS,o::GT,0,K::DC,G<z>(AD->CK));B X;}if(AD->S!=AJ.S()){AA=AE::SizeMismatch;AS::Cg(AE::SizeMismatch);AM.Fw(AF::CS,o::GT,0,AJ.S(),G<z>(AD->S));B X;}if(AD->P!=G<BV>(E::P)){AA=AE::KB;AS::Cg(AE::KB);AM.Fw(AF::CS,o::GT,0,E::P,G<z>(AD->P));B X;}DH IA=[](Bq&r,H from,o act){for(H i=from;i<r.Ce;++i)r.GJ[i].action=act;};H pre=AM.Ce;CM::IE(m,AD,AM);IA(AM,pre,o::Repaired);pre=AM.Ce;CM::IY(m,AD,AM);IA(AM,pre,o::Repaired);pre=AM.Ce;CM::Jg(m,AD,AM);IA(AM,pre,o::Rebuilt);pre=AM.Ce;CM::JK(m,AD,AM);IA(AM,pre,o::Rebuilt);if(K::HR(AD->CK))AD->CK=K::DC;AD->HT=X;AD->prev_total_size=0;CM::repair_linked_list(m,AD);CM::recompute_counters(m,AD);CM::rebuild_free_tree(m,AD);AH=Bi;{Bq Ix;Eu(Ix);for(H i=0;i<Ix.Ce;++i){J DH&e=Ix.GJ[i];AM.Fw(e.Ji,o::Repaired,e.Im,e.expected,e.actual);}}if(!Ev()){for(H i=0;i<AM.Ce;++i){if(AM.GJ[i].Ji==AF::Fl||AM.GJ[i].Ji==AF::IK||AM.GJ[i].Ji==AF::Gf)AM.GJ[i].action=o::GT;}AH=X;B X;}if(!Br()){AH=X;B X;}AA=AE::Ok;AS::on_load();B Bi;}
 /*
 ### pmm-persistmemorymanager-destroy
 */
-static void destroy()noexcept{typename thread_policy::unique_lock_type lock(_mutex);if(!_initialized)return;_initialized=false;logging_policy::on_destroy();}static void destroy_image()noexcept{typename thread_policy::unique_lock_type lock(_mutex);uint8_t*base=_backend.base_ptr();if(base!=nullptr&&_backend.total_size()>=detail::kMinMemorySize)get_header(base)->magic=0;_initialized=false;logging_policy::on_destroy();}static bool is_initialized()noexcept{return _initialized.load(std::memory_order_acquire);}
+N V destroy()D{F AP::Aw Eo(CY);if(!AH)B;AH=X;AS::on_destroy();}N V destroy_image()D{F AP::Aw Eo(CY);Y*m=AJ.AR();if(m!=M&&AJ.S()>=K::Fm)Cc(m)->HD=0;AH=X;AS::on_destroy();}N AN Es()D{B AH.load(AL::Hg);}
 /*
 ### pmm-persistmemorymanager-allocate
 */
-static void*allocate(size_t user_size)noexcept{typename thread_policy::unique_lock_type lock(_mutex);return allocate_unlocked(user_size);}static void deallocate(void*ptr)noexcept{typename thread_policy::unique_lock_type lock(_mutex);deallocate_unlocked(ptr);}static bool lock_block_permanent(void*ptr)noexcept{typename thread_policy::unique_lock_type lock(_mutex);return lock_block_permanent_unlocked(ptr);}static bool is_permanently_locked(const void*ptr)noexcept{typename thread_policy::shared_lock_type lock(_mutex);if(!_initialized||ptr==nullptr)return false;const pmm::Block<address_traits>*blk=find_block_from_user_ptr(ptr);if(blk==nullptr)return false;return BlockStateBase<address_traits>::get_node_type(blk)==pmm::kNodeReadOnly;}template<typename T>static void set_root(pptr<T>p)noexcept{typename thread_policy::unique_lock_type lock(_mutex);if(!_initialized)return;set_forest_domain_root_index_unlocked(find_domain_by_name_unlocked(detail::kServiceNameDomainRoot),p.is_null()?static_cast<index_type>(0):p.offset());}template<typename T>static pptr<T>get_root()noexcept{typename thread_policy::shared_lock_type lock(_mutex);if(!_initialized)return pptr<T>();index_type root=forest_domain_root_index_unlocked(find_domain_by_name_unlocked(detail::kServiceNameDomainRoot));if(root==static_cast<index_type>(0))return pptr<T>();return pptr<T>(root);}static index_type find_domain_by_name(const char*name)noexcept{typename thread_policy::shared_lock_type lock(_mutex);if(!_initialized)return 0;const forest_domain*rec=find_domain_by_name_unlocked(name);return(rec!=nullptr)?rec->binding_id:static_cast<index_type>(0);}static index_type find_domain_by_symbol(pptr<pstringview>symbol)noexcept{typename thread_policy::shared_lock_type lock(_mutex);if(!_initialized)return 0;const forest_domain*rec=find_domain_by_symbol_unlocked(symbol);return(rec!=nullptr)?rec->binding_id:static_cast<index_type>(0);}static bool has_domain(const char*name)noexcept{return find_domain_by_name(name)!=0;}static bool validate_bootstrap_invariants()noexcept{typename thread_policy::shared_lock_type lock(_mutex);return validate_bootstrap_invariants_unlocked();}static bool register_domain(const char*name)noexcept{typename thread_policy::unique_lock_type lock(_mutex);if(!_initialized)return false;return register_domain_unlocked(name,0,detail::kForestBindingDirectRoot,0);}static bool register_system_domain(const char*name)noexcept{typename thread_policy::unique_lock_type lock(_mutex);if(!_initialized)return false;return register_domain_unlocked(name,detail::kForestDomainFlagSystem,detail::kForestBindingDirectRoot,0);}static index_type get_domain_root_offset(const char*name)noexcept{typename thread_policy::shared_lock_type lock(_mutex);if(!_initialized)return 0;const forest_domain*rec=find_domain_by_name_unlocked(name);return forest_domain_root_index_unlocked(rec);}static index_type get_domain_root_offset(index_type binding_id)noexcept{typename thread_policy::shared_lock_type lock(_mutex);if(!_initialized)return 0;const forest_domain*rec=find_domain_by_binding_unlocked(binding_id);return forest_domain_root_index_unlocked(rec);}static index_type get_domain_root_offset(pptr<pstringview>symbol)noexcept{typename thread_policy::shared_lock_type lock(_mutex);if(!_initialized)return 0;const forest_domain*rec=find_domain_by_symbol_unlocked(symbol);return forest_domain_root_index_unlocked(rec);}template<typename T>static pptr<T>get_domain_root(const char*name)noexcept{index_type root=get_domain_root_offset(name);return(root==0)?pptr<T>():pptr<T>(root);}template<typename T>static pptr<T>get_domain_root(index_type binding_id)noexcept{index_type root=get_domain_root_offset(binding_id);return(root==0)?pptr<T>():pptr<T>(root);}template<typename T>static pptr<T>get_domain_root(pptr<pstringview>symbol)noexcept{index_type root=get_domain_root_offset(symbol);return(root==0)?pptr<T>():pptr<T>(root);}template<typename T>static bool set_domain_root(const char*name,pptr<T>root)noexcept{typename thread_policy::unique_lock_type lock(_mutex);if(!_initialized)return false;forest_domain*rec=find_domain_by_name_unlocked(name);return set_forest_domain_root_index_unlocked(rec,root.is_null()?static_cast<index_type>(0):root.offset());}private:template<typename T,typename ValueT>static ValueT get_tree_field(pptr<T>p,ValueT(*getter)(const void*))noexcept{if(p.is_null()||!_initialized)return ValueT{};const void*blk=block_raw_ptr_from_pptr(p);if(blk==nullptr){_last_error=PmmError::InvalidPointer;return ValueT{};}return getter(blk);}template<typename T,typename ValueT>static void set_tree_field(pptr<T>p,void(*setter)(void*,ValueT),ValueT value)noexcept{if(p.is_null()||!_initialized)return;void*blk=block_raw_mut_ptr_from_pptr(p);if(blk==nullptr){_last_error=PmmError::InvalidPointer;return;}setter(blk,value);}template<typename T>static index_type get_tree_idx_field(pptr<T>p,index_type(*getter)(const void*))noexcept{index_type v=get_tree_field(p,getter);return(v==address_traits::no_block)?static_cast<index_type>(0):v;}template<typename T>static void set_tree_idx_field(pptr<T>p,void(*setter)(void*,index_type),index_type val)noexcept{set_tree_field(p,setter,(val==0)?address_traits::no_block:val);}public:template<typename T>static index_type get_tree_left_offset(pptr<T>p)noexcept{return get_tree_idx_field(p,&BlockStateBase<address_traits>::get_left_offset);}template<typename T>static index_type get_tree_right_offset(pptr<T>p)noexcept{return get_tree_idx_field(p,&BlockStateBase<address_traits>::get_right_offset);}template<typename T>static index_type get_tree_parent_offset(pptr<T>p)noexcept{return get_tree_idx_field(p,&BlockStateBase<address_traits>::get_parent_offset);}template<typename T>static void set_tree_left_offset(pptr<T>p,index_type v)noexcept{set_tree_idx_field(p,&BlockStateBase<address_traits>::set_left_offset_of,v);}template<typename T>static void set_tree_right_offset(pptr<T>p,index_type v)noexcept{set_tree_idx_field(p,&BlockStateBase<address_traits>::set_right_offset_of,v);}template<typename T>static void set_tree_parent_offset(pptr<T>p,index_type v)noexcept{set_tree_idx_field(p,&BlockStateBase<address_traits>::set_parent_offset_of,v);}template<typename T>static index_type get_tree_weight(pptr<T>p)noexcept{return get_tree_field(p,&BlockStateBase<address_traits>::get_weight);}template<typename T>static void set_tree_weight(pptr<T>p,index_type w)noexcept{set_tree_field(p,&BlockStateBase<address_traits>::set_weight_of,w);}template<typename T>static std::int16_t get_tree_height(pptr<T>p)noexcept{return get_tree_field(p,&BlockStateBase<address_traits>::get_avl_height);}template<typename T>static void set_tree_height(pptr<T>p,std::int16_t h)noexcept{set_tree_field(p,&BlockStateBase<address_traits>::set_avl_height_of,h);}template<typename T>static TreeNode<address_traits>&tree_node(pptr<T>p)noexcept{assert(!p.is_null()&&"tree_node: pptr must not be null");assert(_initialized&&"tree_node: manager must be initialized before calling tree_node");void*blk=block_raw_mut_ptr_from_pptr(p);if(blk==nullptr){_last_error=PmmError::InvalidPointer;static thread_local TreeNode<address_traits>sentinel{};sentinel={};return sentinel;}return*reinterpret_cast<TreeNode<address_traits>*>(blk);}private:template<typename Fn>static size_t read_stat(Fn fn)noexcept{if(!_initialized.load(std::memory_order_acquire))return 0;typename thread_policy::shared_lock_type lock(_mutex);if(!_initialized.load(std::memory_order_relaxed))return 0;return fn(get_header_c(_backend.base_ptr()));}public:static size_t total_size()noexcept{if(!_initialized.load(std::memory_order_acquire))return 0;typename thread_policy::shared_lock_type lock(_mutex);return _initialized.load(std::memory_order_relaxed)?_backend.total_size():0;}static size_t used_size()noexcept{return read_stat([](const auto*h){return address_traits::granules_to_bytes(h->used_size);});}static size_t free_size()noexcept{return read_stat([](const auto*h){size_t used=address_traits::granules_to_bytes(h->used_size);return(h->total_size>used)?(h->total_size-used):size_t(0);});}static size_t block_count()noexcept{return read_stat([](const auto*h){return static_cast<size_t>(h->block_count);});}static size_t free_block_count()noexcept{return read_stat([](const auto*h){return static_cast<size_t>(h->free_count);});}static size_t alloc_block_count()noexcept{return read_stat([](const auto*h){return static_cast<size_t>(h->alloc_count);});}static VerifyResult verify()noexcept{VerifyResult result;typename thread_policy::shared_lock_type lock(_mutex);if(!_initialized||_backend.base_ptr()==nullptr){result.add(ViolationType::HeaderCorruption,DiagnosticAction::Aborted);return result;}verify_image_unlocked(result);return result;}template<typename Callback>static bool for_each_block(Callback&&callback)noexcept{typename thread_policy::shared_lock_type lock(_mutex);if(!_initialized)return false;const uint8_t*base=_backend.base_ptr();using BlockState=BlockStateBase<address_traits>;const detail::ManagerHeader<address_traits>*hdr=get_header_c(base);index_type idx=hdr->first_block_offset;static constexpr size_t kGranSz=address_traits::granule_size;while(idx!=address_traits::no_block){if(static_cast<size_t>(idx)*kGranSz+sizeof(Block<address_traits>)>hdr->total_size)break;const void*blk_raw=base+static_cast<size_t>(idx)*kGranSz;const Block<address_traits>*blk=reinterpret_cast<const Block<address_traits>*>(blk_raw);index_type total_gran=detail::block_total_granules(base,hdr,blk);auto w=BlockState::get_weight(blk_raw);bool is_used=(w>0);size_t hdr_bytes=sizeof(Block<address_traits>);size_t data_bytes=is_used?static_cast<size_t>(w)*kGranSz:0;BlockView view;view.index=idx;view.offset=static_cast<std::ptrdiff_t>(static_cast<size_t>(idx)*kGranSz);view.total_size=static_cast<size_t>(total_gran)*kGranSz;view.header_size=hdr_bytes;view.user_size=data_bytes;view.alignment=kGranSz;view.used=is_used;callback(view);idx=BlockState::get_next_offset(blk_raw);}return true;}template<typename Callback>static bool for_each_free_block(Callback&&callback)noexcept{typename thread_policy::shared_lock_type lock(_mutex);if(!_initialized)return false;const uint8_t*base=_backend.base_ptr();const detail::ManagerHeader<address_traits>*hdr=get_header_c(base);for_each_free_block_inorder(base,hdr,hdr->free_tree_root,0,callback);return true;}static storage_backend&backend()noexcept{return _backend;}private:static inline storage_backend _backend{};static inline std::atomic<bool>_initialized{false};static inline typename thread_policy::mutex_type _mutex{};static inline thread_local PmmError _last_error{PmmError::Ok};static bool is_valid_user_offset_unlocked(index_type off,size_t size_bytes)noexcept{if(off==0||_backend.base_ptr()==nullptr||_backend.total_size()==0)return false;size_t byte_off=static_cast<size_t>(off)*address_traits::granule_size;return byte_off+size_bytes<=_backend.total_size();}static void*allocate_unlocked(size_t user_size)noexcept{if(!_initialized){_last_error=PmmError::NotInitialized;logging_policy::on_allocation_failure(user_size,PmmError::NotInitialized);return nullptr;}if(user_size==0){_last_error=PmmError::InvalidSize;logging_policy::on_allocation_failure(user_size,PmmError::InvalidSize);return nullptr;}uint8_t*base=_backend.base_ptr();detail::ManagerHeader<address_traits>*hdr=get_header(base);index_type data_gran=detail::bytes_to_granules_t<address_traits>(user_size);if(data_gran==0)data_gran=1;if(data_gran>std::numeric_limits<index_type>::max()-kBlockHdrGranules){_last_error=PmmError::Overflow;logging_policy::on_allocation_failure(user_size,PmmError::Overflow);return nullptr;}index_type needed=kBlockHdrGranules+data_gran;index_type idx=free_block_tree::find_best_fit(base,hdr,needed);if(idx!=address_traits::no_block){_last_error=PmmError::Ok;return allocator::allocate_from_block(base,hdr,idx,user_size);}if(!do_expand(user_size)){_last_error=PmmError::OutOfMemory;logging_policy::on_allocation_failure(user_size,PmmError::OutOfMemory);return nullptr;}base=_backend.base_ptr();hdr=get_header(base);idx=free_block_tree::find_best_fit(base,hdr,needed);if(idx!=address_traits::no_block){_last_error=PmmError::Ok;return allocator::allocate_from_block(base,hdr,idx,user_size);}_last_error=PmmError::OutOfMemory;logging_policy::on_allocation_failure(user_size,PmmError::OutOfMemory);return nullptr;}static void deallocate_unlocked(void*ptr)noexcept{if(!_initialized||ptr==nullptr)return;pmm::Block<address_traits>*blk=find_block_from_user_ptr(ptr);if(blk==nullptr)return;index_type freed=BlockStateBase<address_traits>::get_weight(blk);if(freed==0)return;if(BlockStateBase<address_traits>::get_node_type(blk)==pmm::kNodeReadOnly)return;uint8_t*base=_backend.base_ptr();detail::ManagerHeader<address_traits>*hdr=get_header(base);index_type blk_idx=detail::block_idx_t<address_traits>(base,blk);AllocatedBlock<address_traits>*alloc=AllocatedBlock<address_traits>::cast_from_raw(blk);alloc->mark_as_free();hdr->alloc_count--;hdr->free_count++;if(hdr->used_size>=freed)hdr->used_size-=freed;allocator::coalesce(base,hdr,blk_idx);}static bool lock_block_permanent_unlocked(void*ptr)noexcept{if(!_initialized||ptr==nullptr)return false;pmm::Block<address_traits>*blk=find_block_from_user_ptr(ptr);if(blk==nullptr)return false;index_type w=BlockStateBase<address_traits>::get_weight(blk);if(w==0)return false;BlockStateBase<address_traits>::set_node_type_of(blk,pmm::kNodeReadOnly);return true;}template<typename T,typename...Args>static pptr<T>create_typed_unlocked(Args&&...args)noexcept{static_assert(std::is_nothrow_constructible_v<T,Args...>,"");void*raw=allocate_unlocked(sizeof(T));if(raw==nullptr)return pptr<T>();pptr<T>p=make_pptr_from_raw<T>(raw);T*obj=manager_type::template resolve_unchecked<T>(p);if(obj==nullptr){deallocate_unlocked(raw);return pptr<T>();}::new(obj)T(static_cast<Args&&>(args)...);return p;}
-static forest_registry*forest_registry_root_unlocked()noexcept{if(!_initialized||_backend.base_ptr()==nullptr)return nullptr;detail::ManagerHeader<address_traits>*hdr=get_header(_backend.base_ptr());if(hdr->root_offset==address_traits::no_block||!is_valid_user_offset_unlocked(hdr->root_offset,sizeof(forest_registry)))return nullptr;auto*reg=reinterpret_cast<forest_registry*>(_backend.base_ptr()+static_cast<size_t>(hdr->root_offset)*address_traits::granule_size);if(reg->magic!=detail::kForestRegistryMagic||reg->version!=detail::kForestRegistryVersion||reg->domain_count>detail::kMaxForestDomains)return nullptr;return reg;}static forest_domain*find_domain_by_name_unlocked(const char*name)noexcept{if(!detail::forest_domain_name_fits(name))return nullptr;forest_registry*reg=forest_registry_root_unlocked();if(reg==nullptr)return nullptr;for(uint16_t i=0;i<reg->domain_count;++i){if(detail::forest_domain_name_equals(reg->domains[i],name))return&reg->domains[i];}return nullptr;}static forest_domain*find_domain_by_binding_unlocked(index_type binding_id)noexcept{if(binding_id==0)return nullptr;forest_registry*reg=forest_registry_root_unlocked();if(reg==nullptr)return nullptr;for(uint16_t i=0;i<reg->domain_count;++i){if(reg->domains[i].binding_id==binding_id)return&reg->domains[i];}return nullptr;}static forest_domain*find_domain_by_symbol_unlocked(pptr<pstringview>symbol)noexcept{if(symbol.is_null())return nullptr;const char*sym_str=pstringview_c_str_unlocked(symbol);if(sym_str==nullptr)return nullptr;forest_registry*reg=forest_registry_root_unlocked();if(reg==nullptr)return nullptr;for(uint16_t i=0;i<reg->domain_count;++i){if(reg->domains[i].symbol_offset==symbol.offset()||std::strncmp(reg->domains[i].name,sym_str,detail::kForestDomainNameCapacity)==0){reg->domains[i].symbol_offset=symbol.offset();return&reg->domains[i];}}return nullptr;}static index_type forest_domain_root_index_unlocked(const forest_domain*rec)noexcept{const detail::ManagerHeader<address_traits>*hdr=(_backend.base_ptr()!=nullptr)?get_header_c(_backend.base_ptr()):nullptr;if(rec==nullptr||hdr==nullptr)return 0;if(rec->binding_kind==detail::kForestBindingFreeTree)return(hdr->free_tree_root==address_traits::no_block)?static_cast<index_type>(0):hdr->free_tree_root;return rec->root_offset;}static index_type*forest_domain_root_index_ptr_unlocked(forest_domain*rec)noexcept{if(rec==nullptr||rec->binding_kind!=detail::kForestBindingDirectRoot)return nullptr;return&rec->root_offset;}static bool set_forest_domain_root_index_unlocked(forest_domain*rec,index_type root)noexcept{index_type*root_ptr=forest_domain_root_index_ptr_unlocked(rec);if(root_ptr==nullptr)return false;*root_ptr=root;return true;}static forest_domain*symbol_domain_record_unlocked()noexcept{return find_domain_by_name_unlocked(detail::kSystemDomainSymbols);}static bool register_domain_unlocked(const char*name,uint8_t flags,uint8_t binding_kind,index_type initial_root)noexcept{if(!detail::forest_domain_name_fits(name))return false;forest_registry*reg=forest_registry_root_unlocked();if(reg==nullptr)return false;if(forest_domain*existing=find_domain_by_name_unlocked(name)){existing->flags|=flags;existing->binding_kind=binding_kind;if(binding_kind==detail::kForestBindingDirectRoot&&initial_root!=0)existing->root_offset=initial_root;if(existing->symbol_offset==0){pptr<pstringview>symbol=intern_symbol_unlocked(name);if(!symbol.is_null())existing->symbol_offset=symbol.offset();}return true;}if(reg->domain_count>=detail::kMaxForestDomains)return false;forest_domain rec{};if(!detail::forest_domain_name_copy(rec,name))return false;rec.binding_id=reg->next_binding_id++;rec.root_offset=(binding_kind==detail::kForestBindingDirectRoot)?initial_root:static_cast<index_type>(0);rec.binding_kind=binding_kind;rec.flags=flags;rec.symbol_offset=0;pptr<pstringview>symbol=intern_symbol_unlocked(name);if(!symbol.is_null())rec.symbol_offset=symbol.offset();reg->domains[reg->domain_count++]=rec;return true;}static pptr<pstringview>intern_symbol_unlocked(const char*s)noexcept{if(s==nullptr)s="";auto symbol_policy=pstringview::forest_domain_ops();if(symbol_policy.root_index_ptr()==nullptr)return pptr<pstringview>();pptr<pstringview>found=symbol_policy.find(s);if(!found.is_null())return found;uint32_t len=static_cast<uint32_t>(std::strlen(s));size_t alloc_size=offsetof(pstringview,str)+static_cast<size_t>(len)+1;void*raw=allocate_unlocked(alloc_size);if(raw==nullptr)return pptr<pstringview>();pptr<pstringview>new_node=make_pptr_from_raw<pstringview>(raw);void*public_raw=raw_user_ptr_from_pptr(new_node);if(public_raw==nullptr){deallocate_unlocked(raw);return pptr<pstringview>();}std::memcpy(public_raw,&len,sizeof(len));char*str_dst=static_cast<char*>(public_raw)+offsetof(pstringview,str);std::memcpy(str_dst,s,static_cast<size_t>(len)+1);detail::avl_init_node(new_node);if(!lock_block_permanent_unlocked(public_raw))return pptr<pstringview>();symbol_policy.insert(new_node);return new_node;}static bool bootstrap_system_symbols_unlocked()noexcept{static constexpr const char*kBootstrapSymbols[]={detail::kSystemDomainFreeTree,detail::kSystemDomainSymbols,detail::kSystemDomainRegistry,detail::kSystemTypeForestRegistry,detail::kSystemTypeForestDomainRecord,detail::kSystemTypePstringview,detail::kServiceNameDomainRoot,detail::kServiceNameDomainSymbol,};for(const char*sym:kBootstrapSymbols){if(intern_symbol_unlocked(sym).is_null())return false;}forest_registry*reg=forest_registry_root_unlocked();if(reg==nullptr)return false;for(uint16_t i=0;i<reg->domain_count;++i){if(reg->domains[i].name[0]=='\0')continue;if(reg->domains[i].symbol_offset!=0)continue;pptr<pstringview>symbol=intern_symbol_unlocked(reg->domains[i].name);if(symbol.is_null())return false;reg->domains[i].symbol_offset=symbol.offset();}return true;}static bool bootstrap_forest_registry_unlocked()noexcept{static constexpr size_t kGranSz=address_traits::granule_size;void*raw=allocate_unlocked(sizeof(forest_registry)+(kGranSz-1));if(raw==nullptr){if(_last_error==PmmError::Ok)_last_error=PmmError::OutOfMemory;return false;}uint8_t*base=_backend.base_ptr();size_t raw_off=static_cast<size_t>(static_cast<uint8_t*>(raw)-base);size_t aligned_off=(raw_off+(kGranSz-1))&~(kGranSz-1);forest_registry*reg=reinterpret_cast<forest_registry*>(base+aligned_off);if(reg==nullptr){_last_error=PmmError::InvalidPointer;return false;}std::memset(reg,0,sizeof(forest_registry));reg->magic=detail::kForestRegistryMagic;reg->version=detail::kForestRegistryVersion;reg->domain_count=0;reg->next_binding_id=1;if(!lock_block_permanent_unlocked(raw)){_last_error=PmmError::InvalidPointer;return false;}get_header(_backend.base_ptr())->root_offset=detail::ptr_to_granule_idx<address_traits>(_backend.base_ptr(),reg);if(!register_domain_unlocked(detail::kSystemDomainFreeTree,detail::kForestDomainFlagSystem,detail::kForestBindingFreeTree,0)){_last_error=PmmError::BackendError;return false;}if(!register_domain_unlocked(detail::kSystemDomainSymbols,detail::kForestDomainFlagSystem,detail::kForestBindingDirectRoot,0)){_last_error=PmmError::BackendError;return false;}if(!register_domain_unlocked(detail::kSystemDomainRegistry,detail::kForestDomainFlagSystem,detail::kForestBindingDirectRoot,get_header(_backend.base_ptr())->root_offset)){_last_error=PmmError::BackendError;return false;}if(!register_domain_unlocked(detail::kServiceNameDomainRoot,detail::kForestDomainFlagSystem,detail::kForestBindingDirectRoot,0)){_last_error=PmmError::BackendError;return false;}if(!bootstrap_system_symbols_unlocked()){_last_error=PmmError::BackendError;return false;}return true;}static bool validate_bootstrap_invariants_unlocked()noexcept{if(!_initialized)return false;uint8_t*base=_backend.base_ptr();if(base==nullptr)return false;const auto*hdr=get_header_c(base);if(hdr->magic!=kMagic)return false;if(hdr->image_version!=detail::kCurrentImageVersion)return false;if(hdr->total_size!=_backend.total_size())return false;if(hdr->granule_size!=static_cast<uint16_t>(address_traits::granule_size))return false;const forest_registry*reg=forest_registry_root_unlocked();if(reg==nullptr)return false;if(reg->magic!=detail::kForestRegistryMagic)return false;if(reg->version!=detail::kForestRegistryVersion)return false;if(reg->domain_count<4)return false;static constexpr const char*kRequired[]={detail::kSystemDomainFreeTree,detail::kSystemDomainSymbols,detail::kSystemDomainRegistry,detail::kServiceNameDomainRoot};for(const char*name:kRequired){const forest_domain*rec=find_domain_by_name_unlocked(name);if(rec==nullptr)return false;if((rec->flags&detail::kForestDomainFlagSystem)==0)return false;if(rec->symbol_offset==0)return false;}const forest_domain*free_rec=find_domain_by_name_unlocked(detail::kSystemDomainFreeTree);if(free_rec->binding_kind!=detail::kForestBindingFreeTree)return false;if(pstringview::forest_domain_ops().root_index()==0)return false;const forest_domain*reg_rec=find_domain_by_name_unlocked(detail::kSystemDomainRegistry);if(reg_rec->root_offset!=hdr->root_offset)return false;const forest_domain*root_rec=find_domain_by_name_unlocked(detail::kServiceNameDomainRoot);if(root_rec->binding_kind!=detail::kForestBindingDirectRoot)return false;return true;}static bool validate_or_bootstrap_forest_registry_unlocked()noexcept{detail::ManagerHeader<address_traits>*hdr=get_header(_backend.base_ptr());if(forest_registry_root_unlocked()!=nullptr){if(!register_domain_unlocked(detail::kSystemDomainFreeTree,detail::kForestDomainFlagSystem,detail::kForestBindingFreeTree,0))return false;if(!register_domain_unlocked(detail::kSystemDomainSymbols,detail::kForestDomainFlagSystem,detail::kForestBindingDirectRoot,pstringview::forest_domain_ops().root_index()))return false;if(!register_domain_unlocked(detail::kSystemDomainRegistry,detail::kForestDomainFlagSystem,detail::kForestBindingDirectRoot,hdr->root_offset))return false;if(!register_domain_unlocked(detail::kServiceNameDomainRoot,detail::kForestDomainFlagSystem,detail::kForestBindingDirectRoot,0))return false;return bootstrap_system_symbols_unlocked();}hdr->root_offset=address_traits::no_block;return bootstrap_forest_registry_unlocked();}template<typename Callback>static void for_each_free_block_inorder(const uint8_t*base,const detail::ManagerHeader<address_traits>*hdr,index_type node_idx,int depth,Callback&&callback)noexcept{using BlockState=BlockStateBase<address_traits>;static constexpr size_t kGranSz=address_traits::granule_size;if(node_idx==address_traits::no_block)return;if(static_cast<size_t>(node_idx)*kGranSz+sizeof(Block<address_traits>)>hdr->total_size)return;const void*blk_raw=base+static_cast<size_t>(node_idx)*kGranSz;const Block<address_traits>*blk=reinterpret_cast<const Block<address_traits>*>(blk_raw);index_type left_off=BlockState::get_left_offset(blk_raw);index_type right_off=BlockState::get_right_offset(blk_raw);index_type parent_off=BlockState::get_parent_offset(blk_raw);for_each_free_block_inorder(base,hdr,left_off,depth+1,callback);index_type total_gran=detail::block_total_granules(base,hdr,blk);FreeBlockView view;view.offset=static_cast<std::ptrdiff_t>(static_cast<size_t>(node_idx)*kGranSz);view.total_size=static_cast<size_t>(total_gran)*kGranSz;view.free_size=static_cast<size_t>(total_gran-kBlockHdrGranules)*kGranSz;view.left_offset=(left_off!=address_traits::no_block)?static_cast<std::ptrdiff_t>(static_cast<size_t>(left_off)*kGranSz):-1;view.right_offset=(right_off!=address_traits::no_block)?static_cast<std::ptrdiff_t>(static_cast<size_t>(right_off)*kGranSz):-1;view.parent_offset=(parent_off!=address_traits::no_block)?static_cast<std::ptrdiff_t>(static_cast<size_t>(parent_off)*kGranSz):-1;view.avl_height=BlockState::get_avl_height(blk_raw);view.avl_depth=depth;callback(view);for_each_free_block_inorder(base,hdr,right_off,depth+1,callback);}static pmm::Block<address_traits>*find_block_from_user_ptr(void*ptr)noexcept{return const_cast<pmm::Block<address_traits>*>(find_block_from_user_ptr(static_cast<const void*>(ptr)));}static const pmm::Block<address_traits>*find_block_from_user_ptr(const void*ptr)noexcept{const uint8_t*base=_backend.base_ptr();const auto*hdr=get_header_c(base);if constexpr(sizeof(Block<address_traits>)%address_traits::granule_size!=0){constexpr size_t rounded_header_size=static_cast<size_t>(kBlockHdrGranules)*address_traits::granule_size;constexpr size_t min_public_user_offset=static_cast<size_t>(kFreeBlkIdxLayout+kBlockHdrGranules)*address_traits::granule_size;if(ptr!=nullptr&&base!=nullptr){const auto*raw=static_cast<const uint8_t*>(ptr);if(raw>=base+min_public_user_offset&&raw<base+static_cast<size_t>(hdr->total_size)){const uint8_t*cand=raw-rounded_header_size;if((static_cast<size_t>(cand-base)%address_traits::granule_size)==0&&cand+sizeof(Block<address_traits>)<=base+static_cast<size_t>(hdr->total_size)&&detail::is_canonical_allocated_block_header<address_traits>(base,static_cast<size_t>(hdr->total_size),cand))return reinterpret_cast<const pmm::Block<address_traits>*>(cand);}}}return detail::header_from_ptr_t<address_traits>(const_cast<uint8_t*>(base),const_cast<void*>(ptr),static_cast<size_t>(hdr->total_size));}template<typename T>static pptr<T>make_pptr_from_raw(void*raw)noexcept{if(raw==nullptr||!_initialized)return pptr<T>();uint8_t*base=_backend.base_ptr();auto*raw_byte=static_cast<uint8_t*>(raw);if(base==nullptr)return pptr<T>();const std::uintptr_t base_addr=reinterpret_cast<std::uintptr_t>(base);const std::uintptr_t raw_addr=reinterpret_cast<std::uintptr_t>(raw_byte);if(raw_addr<base_addr)return pptr<T>();const size_t raw_off=static_cast<size_t>(raw_addr-base_addr);if(raw_off<sizeof(Block<address_traits>)||raw_off>=_backend.total_size())return pptr<T>();const size_t blk_off=raw_off-sizeof(Block<address_traits>);if(blk_off%address_traits::granule_size!=0)return pptr<T>();const size_t blk_idx_raw=blk_off/address_traits::granule_size;if(blk_idx_raw>static_cast<size_t>(std::numeric_limits<index_type>::max()))return pptr<T>();index_type blk_idx=static_cast<index_type>(blk_idx_raw);if(!detail::validate_block_index<address_traits>(_backend.total_size(),blk_idx))return pptr<T>();const void*blk=detail::block_at<address_traits>(base,blk_idx);if(BlockStateBase<address_traits>::get_weight(blk)==0||BlockStateBase<address_traits>::get_root_offset(blk)!=blk_idx)return pptr<T>();const uint16_t node_type=BlockStateBase<address_traits>::get_node_type(blk);if(node_type!=pmm::kNodeReadWrite&&node_type!=pmm::kNodeReadOnly)return pptr<T>();if(blk_idx>std::numeric_limits<index_type>::max()-kBlockHdrGranules)return pptr<T>();return pptr<T>(static_cast<index_type>(blk_idx+kBlockHdrGranules));}template<typename T>static const void*block_raw_ptr_from_pptr(pptr<T>p)noexcept{const uint8_t*base=_backend.base_ptr();if(p.offset()<kBlockHdrGranules)return nullptr;size_t blk_off=static_cast<size_t>(p.offset()-kBlockHdrGranules)*address_traits::granule_size;if(blk_off+sizeof(Block<address_traits>)>_backend.total_size())return nullptr;return base+blk_off;}template<typename T>static void*block_raw_mut_ptr_from_pptr(pptr<T>p)noexcept{uint8_t*base=_backend.base_ptr();if(p.offset()<kBlockHdrGranules)return nullptr;size_t blk_off=static_cast<size_t>(p.offset()-kBlockHdrGranules)*address_traits::granule_size;if(blk_off+sizeof(Block<address_traits>)>_backend.total_size())return nullptr;return base+blk_off;}template<typename T>static constexpr index_type block_idx_from_pptr(pptr<T>p)noexcept{constexpr index_type kHdrGranules=static_cast<index_type>((sizeof(Block<address_traits>)+address_traits::granule_size-1)/address_traits::granule_size);return static_cast<index_type>(p.offset()-kHdrGranules);}template<typename T>static void*raw_user_ptr_from_pptr(pptr<T>p)noexcept{if(p.is_null()||!_initialized)return nullptr;uint8_t*base=_backend.base_ptr();size_t byte_off=static_cast<size_t>(p.offset())*address_traits::granule_size;if(byte_off+sizeof(T)>_backend.total_size())return nullptr;return base+byte_off;}template<typename T>static void*raw_block_user_ptr_from_pptr(pptr<T>p)noexcept{if(p.is_null()||!_initialized)return nullptr;uint8_t*base=_backend.base_ptr();if constexpr(sizeof(Block<address_traits>)%address_traits::granule_size==0){return raw_user_ptr_from_pptr(p);}else{constexpr index_type kHdrGranules=static_cast<index_type>((sizeof(Block<address_traits>)+address_traits::granule_size-1)/address_traits::granule_size);if(p.offset()<kHdrGranules)return nullptr;size_t blk_off=static_cast<size_t>(p.offset()-kHdrGranules)*address_traits::granule_size;if(blk_off+sizeof(Block<address_traits>)>_backend.total_size())return nullptr;return base+blk_off+sizeof(Block<address_traits>);}}static const char*pstringview_c_str_unlocked(pptr<pstringview>p)noexcept{const void*raw=raw_user_ptr_from_pptr(p);if(raw==nullptr)return nullptr;return static_cast<const char*>(raw)+offsetof(pstringview,str);}
+N V*HM(H Bs)D{F AP::Aw Eo(CY);B Fj(Bs);}N V Ec(V*Gp)D{F AP::Aw Eo(CY);GM(Gp);}N AN lock_block_permanent(V*Gp)D{F AP::Aw Eo(CY);B Dr(Gp);}N AN is_permanently_locked(J V*Gp)D{F AP::Ax Eo(CY);if(!AH||Gp==M)B X;J Ap::Ao<E>*EK=Cx(Gp);if(EK==M)B X;B Z<E>::Dc(EK)==Ap::Db;}I<F T>N V set_root(AV<T>p)D{F AP::Aw Eo(CY);if(!AH)B;ED(AX(K::Bn),p.AQ()?G<A>(0):p.Bc());}I<F T>N AV<T>get_root()D{F AP::Ax Eo(CY);if(!AH)B AV<T>();A DV=BR(AX(K::Bn));if(DV==G<A>(0))B AV<T>();B AV<T>(DV);}N A IF(J BG*CP)D{F AP::Ax Eo(CY);if(!AH)B 0;J BF*Ep=AX(CP);B(Ep!=M)?Ep->CF:G<A>(0);}N A find_domain_by_symbol(AV<Aa>EW)D{F AP::Ax Eo(CY);if(!AH)B 0;J BF*Ep=FN(EW);B(Ep!=M)?Ep->CF:G<A>(0);}N AN has_domain(J BG*CP)D{B IF(CP)!=0;}N AN validate_bootstrap_invariants()D{F AP::Ax Eo(CY);B Br();}N AN register_domain(J BG*CP)D{F AP::Aw Eo(CY);if(!AH)B X;B BC(CP,0,K::Ai,0);}N AN register_system_domain(J BG*CP)D{F AP::Aw Eo(CY);if(!AH)B X;B BC(CP,K::BA,K::Ai,0);}N A DQ(J BG*CP)D{F AP::Ax Eo(CY);if(!AH)B 0;J BF*Ep=AX(CP);B BR(Ep);}N A DQ(A CF)D{F AP::Ax Eo(CY);if(!AH)B 0;J BF*Ep=Bz(CF);B BR(Ep);}N A DQ(AV<Aa>EW)D{F AP::Ax Eo(CY);if(!AH)B 0;J BF*Ep=FN(EW);B BR(Ep);}I<F T>N AV<T>Jt(J BG*CP)D{A DV=DQ(CP);B(DV==0)?AV<T>():AV<T>(DV);}I<F T>N AV<T>Jt(A CF)D{A DV=DQ(CF);B(DV==0)?AV<T>():AV<T>(DV);}I<F T>N AV<T>Jt(AV<Aa>EW)D{A DV=DQ(EW);B(DV==0)?AV<T>():AV<T>(DV);}I<F T>N AN set_domain_root(J BG*CP,AV<T>DV)D{F AP::Aw Eo(CY);if(!AH)B X;BF*Ep=AX(CP);B ED(Ep,DV.AQ()?G<A>(0):DV.Bc());}Ew:I<F T,F Gy>N Gy IR(AV<T>p,Gy(*getter)(J V*))D{if(p.AQ()||!AH)B Gy{};J V*EK=Gs(p);if(EK==M){AA=AE::CX;B Gy{};}B getter(EK);}I<F T,F Gy>N V IN(AV<T>p,V(*setter)(V*,Gy),Gy DX)D{if(p.AQ()||!AH)B;V*EK=Fp(p);if(EK==M){AA=AE::CX;B;}setter(EK,DX);}I<F T>N A Gi(AV<T>p,A(*getter)(J V*))D{A v=IR(p,getter);B(v==E::k)?G<A>(0):v;}I<F T>N V Gg(AV<T>p,V(*setter)(V*,A),A val)D{IN(p,setter,(val==0)?E::k:val);}DF:I<F T>N A get_tree_left_offset(AV<T>p)D{B Gi(p,&Z<E>::Ca);}I<F T>N A get_tree_right_offset(AV<T>p)D{B Gi(p,&Z<E>::CQ);}I<F T>N A get_tree_parent_offset(AV<T>p)D{B Gi(p,&Z<E>::CA);}I<F T>N V set_tree_left_offset(AV<T>p,A v)D{Gg(p,&Z<E>::Bp,v);}I<F T>N V set_tree_right_offset(AV<T>p,A v)D{Gg(p,&Z<E>::Bd,v);}I<F T>N V set_tree_parent_offset(AV<T>p,A v)D{Gg(p,&Z<E>::Ay,v);}I<F T>N A get_tree_weight(AV<T>p)D{B IR(p,&Z<E>::Ar);}I<F T>N V set_tree_weight(AV<T>p,A w)D{IN(p,&Z<E>::FR,w);}I<F T>N AL::Bk get_tree_height(AV<T>p)D{B IR(p,&Z<E>::Fo);}I<F T>N V set_tree_height(AV<T>p,AL::Bk h)D{IN(p,&Z<E>::DI,h);}I<F T>N HP<E>&DY(AV<T>p)D{Gx(!p.AQ()&&"tree_node: pptr must not be null");Gx(AH&&"tree_node: manager must be initialized before calling tree_node");V*EK=Fp(p);if(EK==M){AA=AE::CX;N thread_local HP<E>sentinel{};sentinel={};B sentinel;}B*AI<HP<E>*>(EK);}Ew:I<F Fn>N H Ir(Fn fn)D{if(!AH.load(AL::Hg))B 0;F AP::Ax Eo(CY);if(!AH.load(AL::memory_order_relaxed))B 0;B fn(FI(AJ.AR()));}DF:N H S()D{if(!AH.load(AL::Hg))B 0;F AP::Ax Eo(CY);B AH.load(AL::memory_order_relaxed)?AJ.S():0;}N H Bb()D{B Ir([](J DH*h){B E::Iw(h->Bb);});}N H free_size()D{B Ir([](J DH*h){H used=E::Iw(h->Bb);B(h->S>used)?(h->S-used):H(0);});}N H BP()D{B Ir([](J DH*h){B G<H>(h->BP);});}N H free_block_count()D{B Ir([](J DH*h){B G<H>(h->Be);});}N H alloc_block_count()D{B Ir([](J DH*h){B G<H>(h->Cf);});}N Bq verify()D{Bq AM;F AP::Ax Eo(CY);if(!AH||AJ.AR()==M){AM.Fw(AF::CS,o::GT);B AM;}verify_image_unlocked(AM);B AM;}I<F KD>N AN for_each_block(KD&&Hw)D{F AP::Ax Eo(CY);if(!AH)B X;J Y*m=AJ.AR();j R=Z<E>;J K::q<E>*AD=FI(m);A At=AD->Aq;N Q H BH=E::P;Fa(At!=E::k){if(G<H>(At)*BH+AG(Ao<E>)>AD->S)IV;J V*BU=m+G<H>(At)*BH;J Ao<E>*EK=AI<J Ao<E>*>(BU);A EC=K::En(m,AD,EK);DH w=R::Ar(BU);AN is_used=(w>0);H hdr_bytes=AG(Ao<E>);H HK=is_used?G<H>(w)*BH:0;BlockView FP;FP.Ha=At;FP.Bc=G<AL::EP>(G<H>(At)*BH);FP.S=G<H>(EC)*BH;FP.header_size=hdr_bytes;FP.Bs=HK;FP.alignment=BH;FP.used=is_used;Hw(FP);At=R::AU(BU);}B Bi;}I<F KD>N AN for_each_free_block(KD&&Hw)D{F AP::Ax Eo(CY);if(!AH)B X;J Y*m=AJ.AR();J K::q<E>*AD=FI(m);EQ(m,AD,AD->Am,0,Hw);B Bi;}N Bu&EG()D{B AJ;}Ew:N AO Bu AJ{};N AO AL::atomic<AN>AH{X};N AO F AP::JS CY{};N AO thread_local AE AA{AE::Ok};N AN Hs(A off,H CD)D{if(off==0||AJ.AR()==M||AJ.S()==0)B X;H BI=G<H>(off)*E::P;B BI+CD<=AJ.S();}N V*Fj(H Bs)D{if(!AH){AA=AE::IX;AS::By(Bs,AE::IX);B M;}if(Bs==0){AA=AE::Gd;AS::By(Bs,AE::Gd);B M;}Y*m=AJ.AR();K::q<E>*AD=Cc(m);A FK=K::DR<E>(Bs);if(FK==0)FK=1;if(FK>AL::Ag<A>::IQ()-Aj){AA=AE::Io;AS::By(Bs,AE::Io);B M;}A KO=Aj+FK;A At=Az::GI(m,AD,KO);if(At!=E::k){AA=AE::Ok;B CM::GR(m,AD,At,Bs);}if(!KU(Bs)){AA=AE::Dy;AS::By(Bs,AE::Dy);B M;}m=AJ.AR();AD=Cc(m);At=Az::GI(m,AD,KO);if(At!=E::k){AA=AE::Ok;B CM::GR(m,AD,At,Bs);}AA=AE::Dy;AS::By(Bs,AE::Dy);B M;}N V GM(V*Gp)D{if(!AH||Gp==M)B;Ap::Ao<E>*EK=Cx(Gp);if(EK==M)B;A freed=Z<E>::Ar(EK);if(freed==0)B;if(Z<E>::Dc(EK)==Ap::Db)B;Y*m=AJ.AR();K::q<E>*AD=Cc(m);A As=K::KW<E>(m,EK);Bh<E>*alloc=Bh<E>::Cm(EK);alloc->mark_as_free();AD->Cf--;AD->Be++;if(AD->Bb>=freed)AD->Bb-=freed;CM::coalesce(m,AD,As);}N AN Dr(V*Gp)D{if(!AH||Gp==M)B X;Ap::Ao<E>*EK=Cx(Gp);if(EK==M)B X;A w=Z<E>::Ar(EK);if(w==0)B X;Z<E>::JN(EK,Ap::Db);B Bi;}I<F T,F...Args>N AV<T>create_typed_unlocked(Args&&...args)D{AK(AL::is_nothrow_constructible_v<T,Args...>,"");V*CC=Fj(AG(T));if(CC==M)B AV<T>();AV<T>p=Di<T>(CC);T*IP=Ae::I Ck<T>(p);if(IP==M){GM(CC);B AV<T>();}::new(IP)T(G<Args&&>(args)...);B p;}
+N BY*BE()D{if(!AH||AJ.AR()==M)B M;K::q<E>*AD=Cc(AJ.AR());if(AD->BW==E::k||!Hs(AD->BW,AG(BY)))B M;DH*EJ=AI<BY*>(AJ.AR()+G<H>(AD->BW)*E::P);if(EJ->HD!=K::DB||EJ->Kk!=K::DN||EJ->DW>K::HE)B M;B EJ;}N BF*AX(J BG*CP)D{if(!K::FJ(CP))B M;BY*EJ=BE();if(EJ==M)B M;for(BV i=0;i<EJ->DW;++i){if(K::forest_domain_name_equals(EJ->FB[i],CP))B&EJ->FB[i];}B M;}N BF*Bz(A CF)D{if(CF==0)B M;BY*EJ=BE();if(EJ==M)B M;for(BV i=0;i<EJ->DW;++i){if(EJ->FB[i].CF==CF)B&EJ->FB[i];}B M;}N BF*FN(AV<Aa>EW)D{if(EW.AQ())B M;J BG*sym_str=pstringview_c_str_unlocked(EW);if(sym_str==M)B M;BY*EJ=BE();if(EJ==M)B M;for(BV i=0;i<EJ->DW;++i){if(EJ->FB[i].DD==EW.Bc()||AL::strncmp(EJ->FB[i].CP,sym_str,K::Bj)==0){EJ->FB[i].DD=EW.Bc();B&EJ->FB[i];}}B M;}N A BR(J BF*Ep)D{J K::q<E>*AD=(AJ.AR()!=M)?FI(AJ.AR()):M;if(Ep==M||AD==M)B 0;if(Ep->Cq==K::EM)B(AD->Am==E::k)?G<A>(0):AD->Am;B Ep->BW;}N A*Cl(BF*Ep)D{if(Ep==M||Ep->Cq!=K::Ai)B M;B&Ep->BW;}N AN ED(BF*Ep,A DV)D{A*root_ptr=Cl(Ep);if(root_ptr==M)B X;*root_ptr=DV;B Bi;}N BF*FQ()D{B AX(K::Cd);}N AN BC(J BG*CP,Y Iz,Y Cq,A Jc)D{if(!K::FJ(CP))B X;BY*EJ=BE();if(EJ==M)B X;if(BF*Ga=AX(CP)){Ga->Iz|=Iz;Ga->Cq=Cq;if(Cq==K::Ai&&Jc!=0)Ga->BW=Jc;if(Ga->DD==0){AV<Aa>EW=DO(CP);if(!EW.AQ())Ga->DD=EW.Bc();}B Bi;}if(EJ->DW>=K::HE)B X;BF Ep{};if(!K::forest_domain_name_copy(Ep,CP))B X;Ep.CF=EJ->Hp++;Ep.BW=(Cq==K::Ai)?Jc:G<A>(0);Ep.Cq=Cq;Ep.Iz=Iz;Ep.DD=0;AV<Aa>EW=DO(CP);if(!EW.AQ())Ep.DD=EW.Bc();EJ->FB[EJ->DW++]=Ep;B Bi;}N AV<Aa>DO(J BG*s)D{if(s==M)s="";DH Iq=Aa::DJ();if(Iq.Cp()==M)B AV<Aa>();AV<Aa>found=Iq.find(s);if(!found.AQ())B found;Ak len=G<Ak>(AL::strlen(s));H HN=Jp(Aa,str)+G<H>(len)+1;V*CC=Fj(HN);if(CC==M)B AV<Aa>();AV<Aa>Ba=Di<Aa>(CC);V*JR=EL(Ba);if(JR==M){GM(CC);B AV<Aa>();}AL::Hz(JR,&len,AG(len));BG*str_dst=G<BG*>(JR)+Jp(Aa,str);AL::Hz(str_dst,s,G<H>(len)+1);K::avl_init_node(Ba);if(!Dr(JR))B AV<Aa>();Iq.GZ(Ba);B Ba;}N AN El()D{N Q J BG*kBootstrapSymbols[]={K::Ct,K::Cd,K::Cs,K::kSystemTypeForestRegistry,K::Hr,K::kSystemTypePstringview,K::Bn,K::kServiceNameDomainSymbol,};for(J BG*sym:kBootstrapSymbols){if(DO(sym).AQ())B X;}BY*EJ=BE();if(EJ==M)B X;for(BV i=0;i<EJ->DW;++i){if(EJ->FB[i].CP[0]=='\0')continue;if(EJ->FB[i].DD!=0)continue;AV<Aa>EW=DO(EJ->FB[i].CP);if(EW.AQ())B X;EJ->FB[i].DD=EW.Bc();}B Bi;}N AN DE()D{N Q H BH=E::P;V*CC=Fj(AG(BY)+(BH-1));if(CC==M){if(AA==AE::Ok)AA=AE::Dy;B X;}Y*m=AJ.AR();H Kr=G<H>(G<Y*>(CC)-m);H aligned_off=(Kr+(BH-1))&~(BH-1);BY*EJ=AI<BY*>(m+aligned_off);if(EJ==M){AA=AE::CX;B X;}AL::Gv(EJ,0,AG(BY));EJ->HD=K::DB;EJ->Kk=K::DN;EJ->DW=0;EJ->Hp=1;if(!Dr(CC)){AA=AE::CX;B X;}Cc(AJ.AR())->BW=K::Gh<E>(AJ.AR(),EJ);if(!BC(K::Ct,K::BA,K::EM,0)){AA=AE::Ee;B X;}if(!BC(K::Cd,K::BA,K::Ai,0)){AA=AE::Ee;B X;}if(!BC(K::Cs,K::BA,K::Ai,Cc(AJ.AR())->BW)){AA=AE::Ee;B X;}if(!BC(K::Bn,K::BA,K::Ai,0)){AA=AE::Ee;B X;}if(!El()){AA=AE::Ee;B X;}B Bi;}N AN Br()D{if(!AH)B X;Y*m=AJ.AR();if(m==M)B X;J DH*AD=FI(m);if(AD->HD!=JT)B X;if(AD->CK!=K::DC)B X;if(AD->S!=AJ.S())B X;if(AD->P!=G<BV>(E::P))B X;J BY*EJ=BE();if(EJ==M)B X;if(EJ->HD!=K::DB)B X;if(EJ->Kk!=K::DN)B X;if(EJ->DW<4)B X;N Q J BG*kRequired[]={K::Ct,K::Cd,K::Cs,K::Bn};for(J BG*CP:kRequired){J BF*Ep=AX(CP);if(Ep==M)B X;if((Ep->Iz&K::BA)==0)B X;if(Ep->DD==0)B X;}J BF*free_rec=AX(K::Ct);if(free_rec->Cq!=K::EM)B X;if(Aa::DJ().Cj()==0)B X;J BF*reg_rec=AX(K::Cs);if(reg_rec->BW!=AD->BW)B X;J BF*root_rec=AX(K::Bn);if(root_rec->Cq!=K::Ai)B X;B Bi;}N AN Ev()D{K::q<E>*AD=Cc(AJ.AR());if(BE()!=M){if(!BC(K::Ct,K::BA,K::EM,0))B X;if(!BC(K::Cd,K::BA,K::Ai,Aa::DJ().Cj()))B X;if(!BC(K::Cs,K::BA,K::Ai,AD->BW))B X;if(!BC(K::Bn,K::BA,K::Ai,0))B X;B El();}AD->BW=E::k;B DE();}I<F KD>N V EQ(J Y*m,J K::q<E>*AD,A BT,int depth,KD&&Hw)D{j R=Z<E>;N Q H BH=E::P;if(BT==E::k)B;if(G<H>(BT)*BH+AG(Ao<E>)>AD->S)B;J V*BU=m+G<H>(BT)*BH;J Ao<E>*EK=AI<J Ao<E>*>(BU);A left_off=R::Ca(BU);A right_off=R::CQ(BU);A parent_off=R::CA(BU);EQ(m,AD,left_off,depth+1,Hw);A EC=K::En(m,AD,EK);FreeBlockView FP;FP.Bc=G<AL::EP>(G<H>(BT)*BH);FP.S=G<H>(EC)*BH;FP.free_size=G<H>(EC-Aj)*BH;FP.HX=(left_off!=E::k)?G<AL::EP>(G<H>(left_off)*BH):-1;FP.Gn=(right_off!=E::k)?G<AL::EP>(G<H>(right_off)*BH):-1;FP.GF=(parent_off!=E::k)?G<AL::EP>(G<H>(parent_off)*BH):-1;FP.Ed=R::Fo(BU);FP.avl_depth=depth;Hw(FP);EQ(m,AD,right_off,depth+1,Hw);}N Ap::Ao<E>*Cx(V*Gp)D{B const_cast<Ap::Ao<E>*>(Cx(G<J V*>(Gp)));}N J Ap::Ao<E>*Cx(J V*Gp)D{J Y*m=AJ.AR();J DH*AD=FI(m);if Q(AG(Ao<E>)%E::P!=0){Q H rounded_header_size=G<H>(Aj)*E::P;Q H min_public_user_offset=G<H>(Fd+Aj)*E::P;if(Gp!=M&&m!=M){J DH*CC=G<J Y*>(Gp);if(CC>=m+min_public_user_offset&&CC<m+G<H>(AD->S)){J Y*cand=CC-rounded_header_size;if((G<H>(cand-m)%E::P)==0&&cand+AG(Ao<E>)<=m+G<H>(AD->S)&&K::ES<E>(m,G<H>(AD->S),cand))B AI<J Ap::Ao<E>*>(cand);}}}B K::header_from_ptr_t<E>(const_cast<Y*>(m),const_cast<V*>(Gp),G<H>(AD->S));}I<F T>N AV<T>Di(V*CC)D{if(CC==M||!AH)B AV<T>();Y*m=AJ.AR();DH*raw_byte=G<Y*>(CC);if(m==M)B AV<T>();J AL::Ei GQ=AI<AL::Ei>(m);J AL::Ei Jl=AI<AL::Ei>(raw_byte);if(Jl<GQ)B AV<T>();J H Kr=G<H>(Jl-GQ);if(Kr<AG(Ao<E>)||Kr>=AJ.S())B AV<T>();J H GP=Kr-AG(Ao<E>);if(GP%E::P!=0)B AV<T>();J H blk_idx_raw=GP/E::P;if(blk_idx_raw>G<H>(AL::Ag<A>::IQ()))B AV<T>();A As=G<A>(blk_idx_raw);if(!K::Ah<E>(AJ.S(),As))B AV<T>();J V*EK=K::Ac<E>(m,As);if(Z<E>::Ar(EK)==0||Z<E>::DP(EK)!=As)B AV<T>();J BV AW=Z<E>::Dc(EK);if(AW!=Ap::Gw&&AW!=Ap::Db)B AV<T>();if(As>AL::Ag<A>::IQ()-Aj)B AV<T>();B AV<T>(G<A>(As+Aj));}I<F T>N J V*Gs(AV<T>p)D{J Y*m=AJ.AR();if(p.Bc()<Aj)B M;H GP=G<H>(p.Bc()-Aj)*E::P;if(GP+AG(Ao<E>)>AJ.S())B M;B m+GP;}I<F T>N V*Fp(AV<T>p)D{Y*m=AJ.AR();if(p.Bc()<Aj)B M;H GP=G<H>(p.Bc()-Aj)*E::P;if(GP+AG(Ao<E>)>AJ.S())B M;B m+GP;}I<F T>N Q A GO(AV<T>p)D{Q A IB=G<A>((AG(Ao<E>)+E::P-1)/E::P);B G<A>(p.Bc()-IB);}I<F T>N V*EL(AV<T>p)D{if(p.AQ()||!AH)B M;Y*m=AJ.AR();H BI=G<H>(p.Bc())*E::P;if(BI+AG(T)>AJ.S())B M;B m+BI;}I<F T>N V*FZ(AV<T>p)D{if(p.AQ()||!AH)B M;Y*m=AJ.AR();if Q(AG(Ao<E>)%E::P==0){B EL(p);}EN{Q A IB=G<A>((AG(Ao<E>)+E::P-1)/E::P);if(p.Bc()<IB)B M;H GP=G<H>(p.Bc()-IB)*E::P;if(GP+AG(Ao<E>)>AJ.S())B M;B m+GP+AG(Ao<E>);}}N J BG*pstringview_c_str_unlocked(AV<Aa>p)D{J V*CC=EL(p);if(CC==M)B M;B G<J BG*>(CC)+Jp(Aa,str);}
 
-static void verify_image_unlocked(VerifyResult&result)noexcept{result.mode=RecoveryMode::Verify;result.ok=true;const uint8_t*base=_backend.base_ptr();const detail::ManagerHeader<address_traits>*hdr=get_header_c(base);if(hdr->magic!=kMagic){result.add(ViolationType::HeaderCorruption,DiagnosticAction::Aborted,0,static_cast<uint64_t>(kMagic),static_cast<uint64_t>(hdr->magic));return;}if(!detail::is_supported_image_version(hdr->image_version)){result.add(ViolationType::HeaderCorruption,DiagnosticAction::Aborted,0,detail::kCurrentImageVersion,static_cast<uint64_t>(hdr->image_version));return;}if(hdr->total_size!=_backend.total_size()){result.add(ViolationType::HeaderCorruption,DiagnosticAction::Aborted,0,_backend.total_size(),static_cast<uint64_t>(hdr->total_size));return;}if(hdr->granule_size!=static_cast<uint16_t>(address_traits::granule_size)){result.add(ViolationType::HeaderCorruption,DiagnosticAction::Aborted,0,address_traits::granule_size,static_cast<uint64_t>(hdr->granule_size));return;}{using BlockState=BlockStateBase<address_traits>;index_type idx=hdr->first_block_offset;while(idx!=address_traits::no_block){if(!detail::validate_block_index<address_traits>(hdr->total_size,idx))break;detail::validate_block_header_full<address_traits>(base,hdr->total_size,idx,result);const void*blk_ptr=base+static_cast<size_t>(idx)*address_traits::granule_size;idx=BlockState::get_next_offset(blk_ptr);}}allocator::verify_block_states(base,hdr,result);allocator::verify_linked_list(base,hdr,result);allocator::verify_counters(base,hdr,result);allocator::verify_free_tree(base,hdr,result);verify_forest_registry_unlocked(result);}static void verify_forest_registry_unlocked(VerifyResult&result)noexcept{const forest_registry*reg=forest_registry_root_unlocked();if(reg==nullptr){result.add(ViolationType::ForestRegistryMissing,DiagnosticAction::NoAction);return;}if(reg->magic!=detail::kForestRegistryMagic||reg->version!=detail::kForestRegistryVersion){result.add(ViolationType::ForestRegistryMissing,DiagnosticAction::NoAction,0,static_cast<uint64_t>(detail::kForestRegistryMagic),static_cast<uint64_t>(reg->magic));return;}static constexpr const char*kRequired[]={detail::kSystemDomainFreeTree,detail::kSystemDomainSymbols,detail::kSystemDomainRegistry,detail::kServiceNameDomainRoot};for(const char*name:kRequired){const forest_domain*rec=find_domain_by_name_unlocked(name);if(rec==nullptr){result.add(ViolationType::ForestDomainMissing,DiagnosticAction::NoAction);continue;}if((rec->flags&detail::kForestDomainFlagSystem)==0){result.add(ViolationType::ForestDomainFlagsMissing,DiagnosticAction::NoAction);}}}
+N V verify_image_unlocked(Bq&AM)D{AM.mode=ID::Verify;AM.ok=Bi;J Y*m=AJ.AR();J K::q<E>*AD=FI(m);if(AD->HD!=JT){AM.Fw(AF::CS,o::GT,0,G<z>(JT),G<z>(AD->HD));B;}if(!K::GA(AD->CK)){AM.Fw(AF::CS,o::GT,0,K::DC,G<z>(AD->CK));B;}if(AD->S!=AJ.S()){AM.Fw(AF::CS,o::GT,0,AJ.S(),G<z>(AD->S));B;}if(AD->P!=G<BV>(E::P)){AM.Fw(AF::CS,o::GT,0,E::P,G<z>(AD->P));B;}{j R=Z<E>;A At=AD->Aq;Fa(At!=E::k){if(!K::Ah<E>(AD->S,At))IV;K::validate_block_header_full<E>(m,AD->S,At,AM);J V*CL=m+G<H>(At)*E::P;At=R::AU(CL);}}CM::IE(m,AD,AM);CM::IY(m,AD,AM);CM::Jg(m,AD,AM);CM::JK(m,AD,AM);Eu(AM);}N V Eu(Bq&AM)D{J BY*EJ=BE();if(EJ==M){AM.Fw(AF::Fl,o::Bg);B;}if(EJ->HD!=K::DB||EJ->Kk!=K::DN){AM.Fw(AF::Fl,o::Bg,0,G<z>(K::DB),G<z>(EJ->HD));B;}N Q J BG*kRequired[]={K::Ct,K::Cd,K::Cs,K::Bn};for(J BG*CP:kRequired){J BF*Ep=AX(CP);if(Ep==M){AM.Fw(AF::IK,o::Bg);continue;}if((Ep->Iz&K::BA)==0){AM.Fw(AF::Gf,o::Bg);}}}
 
-static constexpr size_t kBlockHdrByteSize=detail::manager_header_offset_bytes_v<address_traits>;static constexpr index_type kBlockHdrGranules=static_cast<index_type>(kBlockHdrByteSize/address_traits::granule_size);static constexpr index_type kMgrHdrGranules=detail::kManagerHeaderGranules_t<address_traits>;static constexpr index_type kFreeBlkIdxLayout=kBlockHdrGranules+kMgrHdrGranules;static detail::ManagerHeader<address_traits>*get_header(uint8_t*base)noexcept{return detail::manager_header_at<address_traits>(base);}static const detail::ManagerHeader<address_traits>*get_header_c(const uint8_t*base)noexcept{return detail::manager_header_at<address_traits>(base);}struct layout_access{using address_traits=manager_type::address_traits;using free_block_tree=manager_type::free_block_tree;using logging_policy=manager_type::logging_policy;using storage_backend=manager_type::storage_backend;using index_type=manager_type::index_type;static constexpr uint64_t kMagic=pmm::kMagic;static constexpr size_t kBlockHdrByteSize=manager_type::kBlockHdrByteSize;static constexpr index_type kBlockHdrGranules=manager_type::kBlockHdrGranules;static constexpr index_type kMgrHdrGranules=manager_type::kMgrHdrGranules;static constexpr index_type kFreeBlkIdxLayout=manager_type::kFreeBlkIdxLayout;static detail::ManagerHeader<address_traits>*get_header(uint8_t*base)noexcept{return manager_type::get_header(base);}static void set_initialized()noexcept{manager_type::_initialized=true;}};static bool init_layout(uint8_t*base,size_t size)noexcept{return detail::ManagerLayoutOps<layout_access>::init_layout(_backend,base,size);}static bool do_expand(size_t user_size)noexcept{return detail::ManagerLayoutOps<layout_access>::do_expand(_backend,_initialized,user_size);}};}
+N Q H Ff=K::Bf<E>;N Q A Aj=G<A>(Ff/E::P);N Q A GX=K::kManagerHeaderGranules_t<E>;N Q A Fd=Aj+GX;N K::q<E>*Cc(Y*m)D{B K::Dq<E>(m);}N J K::q<E>*FI(J Y*m)D{B K::Dq<E>(m);}Au layout_access{j E=Ae::E;j Az=Ae::Az;j AS=Ae::AS;j Bu=Ae::Bu;j A=Ae::A;N Q z JT=Ap::JT;N Q H Ff=Ae::Ff;N Q A Aj=Ae::Aj;N Q A GX=Ae::GX;N Q A Fd=Ae::Fd;N K::q<E>*Cc(Y*m)D{B Ae::Cc(m);}N V set_initialized()D{Ae::AH=Bi;}};N AN Il(Y*m,H IZ)D{B K::Ja<layout_access>::Il(AJ,m,IZ);}N AN KU(H Bs)D{B K::Ja<layout_access>::KU(AJ,AH,Bs);}};}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <cstdint>
 #include <cstdio>
@@ -679,33 +31256,1132 @@ static constexpr size_t kBlockHdrByteSize=detail::manager_header_offset_bytes_v<
 #include <fcntl.h>
 #include <unistd.h>
 #endif
-namespace pmm{namespace detail{inline bool atomic_rename(const char*tmp_path,const char*final_path)noexcept{
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
+
+AY Ap{AY K{AO AN atomic_rename(J BG*Hj,J BG*final_path)D{
 #if defined(_WIN32) || defined(_WIN64)
-return MoveFileExA(tmp_path,final_path,MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)!=0;
+B MoveFileExA(Hj,final_path,MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)!=0;
 #else
-return std::rename(tmp_path,final_path)==0;
+B AL::rename(Hj,final_path)==0;
 #endif
-}inline bool flush_file_to_storage(std::FILE*file)noexcept{if(file==nullptr)return false;if(std::fflush(file)!=0)return false;
+}AO AN flush_file_to_storage(AL::FILE*file)D{if(file==M)B X;if(AL::fflush(file)!=0)B X;
 #if defined(_WIN32) || defined(_WIN64)
-int fd=::_fileno(file);return fd>=0&&::_commit(fd)==0;
+int fd=::_fileno(file);B fd>=0&&::_commit(fd)==0;
 #else
-int fd=::fileno(file);return fd>=0&&::fsync(fd)==0;
+int fd=::fileno(file);B fd>=0&&::fsync(fd)==0;
 #endif
 }
 #if !defined(_WIN32) && !defined(_WIN64)
-inline std::string parent_directory_path(const char*path){std::string value(path);size_t slash=value.find_last_of('/');if(slash==std::string::npos)return ".";if(slash==0)return "/";return value.substr(0,slash);}
+AO AL::string parent_directory_path(J BG*path){AL::string DX(path);H slash=DX.find_last_of('/');if(slash==AL::string::npos)B ".";if(slash==0)B "/";B DX.substr(0,slash);}
 #endif
-inline bool flush_parent_directory(const char*path){
+AO AN flush_parent_directory(J BG*path){
 #if defined(_WIN32) || defined(_WIN64)
-(void)path;return true;
+(V)path;B Bi;
 #else
-std::string parent=parent_directory_path(path);int flags=O_RDONLY;
+AL::string BX=parent_directory_path(path);int Iz=O_RDONLY;
 #ifdef O_DIRECTORY
-flags|=O_DIRECTORY;
+Iz|=O_DIRECTORY;
 #endif
-int fd=::open(parent.c_str(),flags);if(fd<0)return false;bool ok=::fsync(fd)==0;if(::close(fd)!=0)ok=false;return ok;
+int fd=::open(BX.GN(),Iz);if(fd<0)B X;AN ok=::fsync(fd)==0;if(::close(fd)!=0)ok=X;B ok;
 #endif
-}}template<typename MgrT>inline bool save_manager(const char*filename){using address_traits=typename MgrT::address_traits;if(filename==nullptr)return false;std::vector<uint8_t>snapshot;{typename MgrT::thread_policy::shared_lock_type lock(MgrT::_mutex);if(!MgrT::is_initialized())return false;const uint8_t*data=MgrT::backend().base_ptr();size_t total=MgrT::backend().total_size();if(data==nullptr||total==0)return false;snapshot.resize(total);std::memcpy(snapshot.data(),data,total);}auto*hdr=detail::manager_header_at<address_traits>(snapshot.data());hdr->crc32=detail::compute_image_crc32<address_traits>(snapshot.data(),snapshot.size());std::string tmp_path=std::string(filename)+".tmp";std::FILE*f=std::fopen(tmp_path.c_str(),"wb");if(f==nullptr)return false;size_t written=std::fwrite(snapshot.data(),1,snapshot.size(),f);bool ok=written==snapshot.size();if(ok)ok=detail::flush_file_to_storage(f);if(std::fclose(f)!=0)ok=false;if(!ok){std::remove(tmp_path.c_str());return false;}if(!detail::atomic_rename(tmp_path.c_str(),filename)){std::remove(tmp_path.c_str());return false;}if(!detail::flush_parent_directory(filename))return false;return true;}template<typename MgrT>inline bool load_manager_from_file(const char*filename,VerifyResult&result){using address_traits=typename MgrT::address_traits;if(filename==nullptr)return false;uint8_t*buf=MgrT::backend().base_ptr();size_t size=MgrT::backend().total_size();if(buf==nullptr||size<detail::kMinMemorySize)return false;std::FILE*f=std::fopen(filename,"rb");if(f==nullptr)return false;if(std::fseek(f,0,SEEK_END)!=0){std::fclose(f);return false;}long file_size_long=std::ftell(f);if(file_size_long<=0){std::fclose(f);return false;}std::rewind(f);size_t file_size=static_cast<size_t>(file_size_long);if(file_size>size){std::fclose(f);return false;}size_t read_bytes=std::fread(buf,1,file_size,f);std::fclose(f);if(read_bytes!=file_size)return false;constexpr size_t kHdrOffset=detail::manager_header_offset_bytes_v<address_traits>;if(file_size>=kHdrOffset+sizeof(detail::ManagerHeader<address_traits>)){auto*hdr=detail::manager_header_at<address_traits>(buf);uint32_t stored_crc=hdr->crc32;uint32_t computed_crc=detail::compute_image_crc32<address_traits>(buf,file_size);if(stored_crc!=computed_crc){MgrT::set_last_error(PmmError::CrcMismatch);MgrT::logging_policy::on_corruption_detected(PmmError::CrcMismatch);return false;}}return MgrT::load(result);}}
+}}I<F KA>AO AN save_manager(J BG*Ht){j E=F KA::E;if(Ht==M)B X;AL::vector<Y>HI;{F KA::AP::Ax Eo(KA::CY);if(!KA::Es())B X;J Y*Dm=KA::EG().AR();H total=KA::EG().S();if(Dm==M||total==0)B X;HI.resize(total);AL::Hz(HI.Dm(),Dm,total);}DH*AD=K::Dq<E>(HI.Dm());AD->crc32=K::IH<E>(HI.Dm(),HI.IZ());AL::string Hj=AL::string(Ht)+".tmp";AL::FILE*f=AL::fopen(Hj.GN(),"wb");if(f==M)B X;H written=AL::fwrite(HI.Dm(),1,HI.IZ(),f);AN ok=written==HI.IZ();if(ok)ok=K::flush_file_to_storage(f);if(AL::fclose(f)!=0)ok=X;if(!ok){AL::JQ(Hj.GN());B X;}if(!K::atomic_rename(Hj.GN(),Ht)){AL::JQ(Hj.GN());B X;}if(!K::flush_parent_directory(Ht))B X;B Bi;}I<F KA>AO AN load_manager_from_file(J BG*Ht,Bq&AM){j E=F KA::E;if(Ht==M)B X;Y*buf=KA::EG().AR();H IZ=KA::EG().S();if(buf==M||IZ<K::Fm)B X;AL::FILE*f=AL::fopen(Ht,"rb");if(f==M)B X;if(AL::fseek(f,0,SEEK_END)!=0){AL::fclose(f);B X;}long file_size_long=AL::ftell(f);if(file_size_long<=0){AL::fclose(f);B X;}AL::rewind(f);H JB=G<H>(file_size_long);if(JB>IZ){AL::fclose(f);B X;}H read_bytes=AL::fread(buf,1,JB,f);AL::fclose(f);if(read_bytes!=JB)B X;Q H kHdrOffset=K::Bf<E>;if(JB>=kHdrOffset+AG(K::q<E>)){DH*AD=K::Dq<E>(buf);Ak stored_crc=AD->crc32;Ak computed_crc=K::IH<E>(buf,JB);if(stored_crc!=computed_crc){KA::set_last_error(AE::CrcMismatch);KA::AS::Cg(AE::CrcMismatch);B X;}}B KA::load(AM);}}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <cstddef>
 #include <cstdint>
@@ -724,43 +32400,2234 @@ int fd=::open(parent.c_str(),flags);if(fd<0)return false;bool ok=::fsync(fd)==0;
 #include <sys/stat.h>
 #include <unistd.h>
 #endif
-namespace pmm{
-/*
-## pmm-mmapstorage
-*/
-template<typename AT=DefaultAddressTraits>class MMapStorage{public:using address_traits=AT;MMapStorage()noexcept=default;MMapStorage(const MMapStorage&)=delete;MMapStorage&operator=(const MMapStorage&)=delete;MMapStorage(MMapStorage&&other)noexcept:_base(other._base),_size(other._size),_mapped(other._mapped)
-#if defined(_WIN32) || defined(_WIN64)
-,_file_handle(other._file_handle),_map_handle(other._map_handle)
-#else
-,_fd(other._fd)
-#endif
-{other._base=nullptr;other._size=0;other._mapped=false;
-#if defined(_WIN32) || defined(_WIN64)
-other._file_handle=INVALID_HANDLE_VALUE;other._map_handle=nullptr;
-#else
-other._fd=-1;
-#endif
-}~MMapStorage(){close();}bool open(const char*path,size_t size_bytes)noexcept{if(_mapped)return false;if(path==nullptr||size_bytes==0)return false;size_bytes=((size_bytes+AT::granule_size-1)/AT::granule_size)*AT::granule_size;return open_impl(path,size_bytes);}void close()noexcept{if(!_mapped)return;close_impl();_base=nullptr;_size=0;_mapped=false;}bool is_open()const noexcept{return _mapped;}uint8_t*base_ptr()noexcept{return _base;}const uint8_t*base_ptr()const noexcept{return _base;}size_t total_size()const noexcept{return _size;}
-/*
-### pmm-mmapstorage-expand
-*/
-bool expand(size_t additional_bytes)noexcept{if(!_mapped||additional_bytes==0)return _mapped&&additional_bytes==0;size_t growth=_size/4+additional_bytes;size_t new_size=_size+growth;new_size=((new_size+AT::granule_size-1)/AT::granule_size)*AT::granule_size;if(new_size<=_size)return false;return expand_impl(new_size);}bool owns_memory()const noexcept{return false;}private:
-#if defined(_WIN32) || defined(_WIN64)
-uint8_t*_base=nullptr;size_t _size=0;bool _mapped=false;HANDLE _file_handle=INVALID_HANDLE_VALUE;HANDLE _map_handle=nullptr;bool open_impl(const char*path,size_t size_bytes)noexcept{_file_handle=CreateFileA(path,GENERIC_READ|GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,nullptr,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,nullptr);if(_file_handle==INVALID_HANDLE_VALUE)return false;LARGE_INTEGER existing_size{};if(!GetFileSizeEx(_file_handle,&existing_size)){CloseHandle(_file_handle);_file_handle=INVALID_HANDLE_VALUE;return false;}if(static_cast<size_t>(existing_size.QuadPart)<size_bytes){LARGE_INTEGER new_size_li{};new_size_li.QuadPart=static_cast<LONGLONG>(size_bytes);if(!SetFilePointerEx(_file_handle,new_size_li,nullptr,FILE_BEGIN)||!SetEndOfFile(_file_handle)){CloseHandle(_file_handle);_file_handle=INVALID_HANDLE_VALUE;return false;}}DWORD size_hi=static_cast<DWORD>(size_bytes>>32);DWORD size_lo=static_cast<DWORD>(size_bytes&0xFFFFFFFF);_map_handle=CreateFileMappingA(_file_handle,nullptr,PAGE_READWRITE,size_hi,size_lo,nullptr);if(_map_handle==nullptr){CloseHandle(_file_handle);_file_handle=INVALID_HANDLE_VALUE;return false;}void*view=MapViewOfFile(_map_handle,FILE_MAP_ALL_ACCESS,0,0,size_bytes);if(view==nullptr){CloseHandle(_map_handle);CloseHandle(_file_handle);_map_handle=nullptr;_file_handle=INVALID_HANDLE_VALUE;return false;}_base=static_cast<uint8_t*>(view);_size=size_bytes;_mapped=true;return true;}void close_impl()noexcept{if(_base!=nullptr){FlushViewOfFile(_base,_size);UnmapViewOfFile(_base);}if(_map_handle!=nullptr){CloseHandle(_map_handle);_map_handle=nullptr;}if(_file_handle!=INVALID_HANDLE_VALUE){CloseHandle(_file_handle);_file_handle=INVALID_HANDLE_VALUE;}}bool expand_impl(size_t new_size)noexcept{if(_base!=nullptr){FlushViewOfFile(_base,_size);UnmapViewOfFile(_base);_base=nullptr;}if(_map_handle!=nullptr){CloseHandle(_map_handle);_map_handle=nullptr;}LARGE_INTEGER new_size_li{};new_size_li.QuadPart=static_cast<LONGLONG>(new_size);if(!SetFilePointerEx(_file_handle,new_size_li,nullptr,FILE_BEGIN)||!SetEndOfFile(_file_handle)){DWORD hi=static_cast<DWORD>(_size>>32);DWORD lo=static_cast<DWORD>(_size&0xFFFFFFFF);_map_handle=CreateFileMappingA(_file_handle,nullptr,PAGE_READWRITE,hi,lo,nullptr);if(_map_handle!=nullptr){void*view=MapViewOfFile(_map_handle,FILE_MAP_ALL_ACCESS,0,0,_size);if(view!=nullptr)_base=static_cast<uint8_t*>(view);}return false;}DWORD size_hi=static_cast<DWORD>(new_size>>32);DWORD size_lo=static_cast<DWORD>(new_size&0xFFFFFFFF);_map_handle=CreateFileMappingA(_file_handle,nullptr,PAGE_READWRITE,size_hi,size_lo,nullptr);if(_map_handle==nullptr)return false;void*view=MapViewOfFile(_map_handle,FILE_MAP_ALL_ACCESS,0,0,new_size);if(view==nullptr){CloseHandle(_map_handle);_map_handle=nullptr;return false;}_base=static_cast<uint8_t*>(view);_size=new_size;return true;}
-#else
-uint8_t*_base=nullptr;size_t _size=0;bool _mapped=false;int _fd=-1;bool open_impl(const char*path,size_t size_bytes)noexcept{_fd=::open(path,O_RDWR|O_CREAT,0600);if(_fd<0)return false;struct stat st{};if(::fstat(_fd,&st)!=0){::close(_fd);_fd=-1;return false;}if(static_cast<size_t>(st.st_size)<size_bytes){if(::ftruncate(_fd,static_cast<off_t>(size_bytes))!=0){::close(_fd);_fd=-1;return false;}}void*addr=::mmap(nullptr,size_bytes,PROT_READ|PROT_WRITE,MAP_SHARED,_fd,0);if(addr==MAP_FAILED){::close(_fd);_fd=-1;return false;}_base=static_cast<uint8_t*>(addr);_size=size_bytes;_mapped=true;return true;}void close_impl()noexcept{if(_base!=nullptr)::munmap(_base,_size);if(_fd>=0){::close(_fd);_fd=-1;}}bool expand_impl(size_t new_size)noexcept{if(_base!=nullptr){::munmap(_base,_size);_base=nullptr;}if(::ftruncate(_fd,static_cast<off_t>(new_size))!=0){void*addr=::mmap(nullptr,_size,PROT_READ|PROT_WRITE,MAP_SHARED,_fd,0);if(addr!=MAP_FAILED)_base=static_cast<uint8_t*>(addr);return false;}void*addr=::mmap(nullptr,new_size,PROT_READ|PROT_WRITE,MAP_SHARED,_fd,0);if(addr==MAP_FAILED)return false;_base=static_cast<uint8_t*>(addr);_size=new_size;return true;}
-#endif
-};static_assert(is_storage_backend_v<MMapStorage<>>,"");}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
 
+AY Ap{
 /*
 ## pmm-mmapstorage
 */
+I<F AT=W>Dt EY{DF:j E=AT;EY()D=GL;EY(J EY&)=EO;EY&Af=(J EY&)=EO;EY(EY&&An)D:DU(An.DU),Al(An.Al),Fq(An.Fq)
+#if defined(_WIN32) || defined(_WIN64)
+,Av(An.Av),BQ(An.BQ)
+#else
+,_fd(An._fd)
+#endif
+{An.DU=M;An.Al=0;An.Fq=X;
+#if defined(_WIN32) || defined(_WIN64)
+An.Av=CG;An.BQ=M;
+#else
+An._fd=-1;
+#endif
+}~EY(){close();}AN open(J BG*path,H CD)D{if(Fq)B X;if(path==M||CD==0)B X;CD=((CD+AT::P-1)/AT::P)*AT::P;B open_impl(path,CD);}V close()D{if(!Fq)B;close_impl();DU=M;Al=0;Fq=X;}AN is_open()J D{B Fq;}Y*AR()D{B DU;}J Y*AR()J D{B DU;}H S()J D{B Al;}
 /*
 ### pmm-mmapstorage-expand
 */
+AN expand(H Dd)D{if(!Fq||Dd==0)B Fq&&Dd==0;H KR=Al/4+Dd;H BM=Al+KR;BM=((BM+AT::P-1)/AT::P)*AT::P;if(BM<=Al)B X;B expand_impl(BM);}AN HT()J D{B X;}Ew:
+#if defined(_WIN32) || defined(_WIN64)
+Y*DU=M;H Al=0;AN Fq=X;HANDLE Av=CG;HANDLE BQ=M;AN open_impl(J BG*path,H CD)D{Av=CreateFileA(path,GENERIC_READ|GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,M,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,M);if(Av==CG)B X;LARGE_INTEGER existing_size{};if(!GetFileSizeEx(Av,&existing_size)){FD(Av);Av=CG;B X;}if(G<H>(existing_size.QuadPart)<CD){LARGE_INTEGER HU{};HU.QuadPart=G<LONGLONG>(CD);if(!SetFilePointerEx(Av,HU,M,FILE_BEGIN)||!SetEndOfFile(Av)){FD(Av);Av=CG;B X;}}JF size_hi=G<JF>(CD>>32);JF size_lo=G<JF>(CD&0xFFFFFFFF);BQ=Id(Av,M,PAGE_READWRITE,size_hi,size_lo,M);if(BQ==M){FD(Av);Av=CG;B X;}V*FP=MapViewOfFile(BQ,IM,0,0,CD);if(FP==M){FD(BQ);FD(Av);BQ=M;Av=CG;B X;}DU=G<Y*>(FP);Al=CD;Fq=Bi;B Bi;}V close_impl()D{if(DU!=M){FlushViewOfFile(DU,Al);UnmapViewOfFile(DU);}if(BQ!=M){FD(BQ);BQ=M;}if(Av!=CG){FD(Av);Av=CG;}}AN expand_impl(H BM)D{if(DU!=M){FlushViewOfFile(DU,Al);UnmapViewOfFile(DU);DU=M;}if(BQ!=M){FD(BQ);BQ=M;}LARGE_INTEGER HU{};HU.QuadPart=G<LONGLONG>(BM);if(!SetFilePointerEx(Av,HU,M,FILE_BEGIN)||!SetEndOfFile(Av)){JF hi=G<JF>(Al>>32);JF lo=G<JF>(Al&0xFFFFFFFF);BQ=Id(Av,M,PAGE_READWRITE,hi,lo,M);if(BQ!=M){V*FP=MapViewOfFile(BQ,IM,0,0,Al);if(FP!=M)DU=G<Y*>(FP);}B X;}JF size_hi=G<JF>(BM>>32);JF size_lo=G<JF>(BM&0xFFFFFFFF);BQ=Id(Av,M,PAGE_READWRITE,size_hi,size_lo,M);if(BQ==M)B X;V*FP=MapViewOfFile(BQ,IM,0,0,BM);if(FP==M){FD(BQ);BQ=M;B X;}DU=G<Y*>(FP);Al=BM;B Bi;}
+#else
+Y*DU=M;H Al=0;AN Fq=X;int _fd=-1;AN open_impl(J BG*path,H CD)D{_fd=::open(path,O_RDWR|O_CREAT,0600);if(_fd<0)B X;Au stat st{};if(::fstat(_fd,&st)!=0){::close(_fd);_fd=-1;B X;}if(G<H>(st.st_size)<CD){if(::ftruncate(_fd,G<off_t>(CD))!=0){::close(_fd);_fd=-1;B X;}}V*addr=::mmap(M,CD,PROT_READ|PROT_WRITE,MAP_SHARED,_fd,0);if(addr==MAP_FAILED){::close(_fd);_fd=-1;B X;}DU=G<Y*>(addr);Al=CD;Fq=Bi;B Bi;}V close_impl()D{if(DU!=M)::munmap(DU,Al);if(_fd>=0){::close(_fd);_fd=-1;}}AN expand_impl(H BM)D{if(DU!=M){::munmap(DU,Al);DU=M;}if(::ftruncate(_fd,G<off_t>(BM))!=0){V*addr=::mmap(M,Al,PROT_READ|PROT_WRITE,MAP_SHARED,_fd,0);if(addr!=MAP_FAILED)DU=G<Y*>(addr);B X;}V*addr=::mmap(M,BM,PROT_READ|PROT_WRITE,MAP_SHARED,_fd,0);if(addr==MAP_FAILED)B X;DU=G<Y*>(addr);Al=BM;B Bi;}
+#endif
+};AK(Fu<EY<>>,"");}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
 #include <concepts>
 #include <cstddef>
 #include <type_traits>
-namespace pmm{using std::size_t;template<typename T>concept PersistMemoryManagerConcept=requires{typename T::manager_type;typename T::address_traits;typename T::storage_backend;{T::is_initialized()};{T::allocate(size_t{})}->std::convertible_to<void*>;{T::deallocate(static_cast<void*>(nullptr))};{T::total_size()}->std::convertible_to<size_t>;{T::destroy()};};template<typename T>struct is_persist_memory_manager:std::bool_constant<PersistMemoryManagerConcept<T>>{};template<typename T>inline constexpr bool is_persist_memory_manager_v=PersistMemoryManagerConcept<T>;}
+#define A index_type
+#define B return
+#define D noexcept
+#define E address_traits
+#define F typename
+#define G static_cast
+#define H size_t
+#define I template
+#define J const
+#define K detail
+#define M nullptr
+#define N static
+#define O ManagerT
+#define P granule_size
+#define Q constexpr
+#define R BlockState
+#define S total_size
+#define V void
+#define W DefaultAddressTraits
+#define X false
+#define Y uint8_t
+#define Z BlockStateBase
+#define j using
+#define k no_block
+#define m base
+#define o DiagnosticAction
+#define q ManagerHeader
+#define z uint64_t
+#define AA _last_error
+#define AD hdr
+#define AE PmmError
+#define AF ViolationType
+#define AG sizeof
+#define AH _initialized
+#define AI reinterpret_cast
+#define AJ _backend
+#define AK static_assert
+#define AL std
+#define AM result
+#define AN bool
+#define AO inline
+#define AP thread_policy
+#define AQ is_null
+#define AR base_ptr
+#define AS logging_policy
+#define AU get_next_offset
+#define AV pptr
+#define AW node_type
+#define AX find_domain_by_name_unlocked
+#define AY namespace
+#define AZ raw_blk
+#define Aa pstringview
+#define Ab node_pptr
+#define Ac block_at
+#define Ad PPtr
+#define Ae manager_type
+#define Af operator
+#define Ag numeric_limits
+#define Ah validate_block_index
+#define Ai kForestBindingDirectRoot
+#define Aj kBlockHdrGranules
+#define Ak uint32_t
+#define Al _size
+#define Am free_tree_root
+#define An other
+#define Ao Block
+#define Ap pmm
+#define Aq first_block_offset
+#define Ar get_weight
+#define As blk_idx
+#define At idx
+#define Au struct
+#define Av _file_handle
+#define Aw unique_lock_type
+#define Ax shared_lock_type
+#define Ay set_parent_offset_of
+#define Az free_block_tree
+#define BA kForestDomainFlagSystem
+#define BB last_block_offset
+#define BC register_domain_unlocked
+#define BD new_data_gran
+#define BE forest_registry_root_unlocked
+#define BF forest_domain
+#define BG char
+#define BH kGranSz
+#define BI byte_off
+#define BJ IndexT
+#define BK kBlkHdrGran
+#define BL pptr_set_parent
+#define BM new_size
+#define BN this
+#define BO resolve_data
+#define BP block_count
+#define BQ _map_handle
+#define BR forest_domain_root_index_unlocked
+#define BS update_node
+#define BT node_idx
+#define BU blk_raw
+#define BV uint16_t
+#define BW root_offset
+#define BX parent
+#define BY forest_registry
+#define BZ root_idx
+#define Ba new_node
+#define Bb used_size
+#define Bc offset
+#define Bd set_right_offset_of
+#define Be free_count
+#define Bf manager_header_offset_bytes_v
+#define Bg NoAction
+#define Bh AllocatedBlock
+#define Bi true
+#define Bj kForestDomainNameCapacity
+#define Bk int16_t
+#define Bl ManagerAccess
+#define Bm PersistMemoryManager
+#define Bn kServiceNameDomainRoot
+#define Bo kBlockHeaderGranules_t
+#define Bp set_left_offset_of
+#define Bq VerifyResult
+#define Br validate_bootstrap_invariants_unlocked
+#define Bs user_size
+#define Bt forest_domain_descriptor
+#define Bu storage_backend
+#define Bv pptr_get_right
+#define Bw convertible_to
+#define Bx FieldTag
+#define By on_allocation_failure
+#define Bz find_domain_by_binding_unlocked
+#define CA get_parent_offset
+#define CB _data_idx
+#define CC raw
+#define CD size_bytes
+#define CE forest_domain_policy
+#define CF binding_id
+#define CG INVALID_HANDLE_VALUE
+#define CH set_prev_offset_of
+#define CI pptr_get_left
+#define CJ own_idx
+#define CK image_version
+#define CL blk_ptr
+#define CM allocator
+#define CN FreeTreeStale
+#define CO BlockStateInconsistent
+#define CP name
+#define CQ get_right_offset
+#define CR _owns_memory
+#define CS HeaderCorruption
+#define CT Domain
+#define CU old_data_gran
+#define CV expected_count
+#define CW _buffer
+#define CX InvalidPointer
+#define CY _mutex
+#define CZ resolve_node
+#define Ca get_left_offset
+#define Cb _current_idx
+#define Cc get_header
+#define Cd kSystemDomainSymbols
+#define Ce entry_count
+#define Cf alloc_count
+#define Cg on_corruption_detected
+#define Ch domain
+#define Ci write_block_field
+#define Cj root_index
+#define Ck resolve_unchecked
+#define Cl forest_domain_root_index_ptr_unlocked
+#define Cm cast_from_raw
+#define Cn StaticStorage
+#define Co state_from_raw
+#define Cp root_index_ptr
+#define Cq binding_kind
+#define Cr typed_guard
+#define Cs kSystemDomainRegistry
+#define Ct kSystemDomainFreeTree
+#define Cu PMM_BLOCK_INDEX_FIELD
+#define Cv HeapStorage
+#define Cw CoalescingBlock
+#define Cx find_block_from_user_ptr
+#define Cy set_next_offset_of
+#define Cz read_block_field
+#define DA avl_rebalance_up
+#define DB kForestRegistryMagic
+#define DC kCurrentImageVersion
+#define DD symbol_offset
+#define DE bootstrap_forest_registry_unlocked
+#define DF public
+#define DG next_offset
+#define DH auto
+#define DI set_avl_height_of
+#define DJ forest_domain_ops
+#define DK FreeBlockNotInAVL
+#define DL FreeBlock
+#define DM resolve_granule_ptr
+#define DN kForestRegistryVersion
+#define DO intern_symbol_unlocked
+#define DP get_root_offset
+#define DQ get_domain_root_offset
+#define DR bytes_to_granules_t
+#define DS FreeBlockRemovedAVL
+#define DT BlockParentOffsetField
+#define DU _base
+#define DV root
+#define DW domain_count
+#define DX value
+#define DY tree_node
+#define DZ pptr_set_left
+#define Da pptr_no_block
+#define Db kNodeReadOnly
+#define Dc get_node_type
+#define Dd additional_bytes
+#define De ValidPmmAddressTraits
+#define Df IndexType
+#define Dg BlockRightOffsetField
+#define Dh Base
+#define Di make_pptr_from_raw
+#define Dj ForestDomainRecord
+#define Dk AvlInorderIterator
+#define Dl kNullIdx_v
+#define Dm data
+#define Dn BlockRootOffsetField
+#define Do BlockLeftOffsetField
+#define Dp successor
+#define Dq manager_header_at
+#define Dr lock_block_permanent_unlocked
+#define Ds ensure_capacity
+#define Dt class
+#define Du AllocatorPolicy
+#define Dv set_field_of
+#define Dw get_field_of
+#define Dx field_offset
+#define Dy OutOfMemory
+#define Dz NodeUpdateFn
+#define EA AvlFreeTree
+#define EB visited_count
+#define EC total_gran
+#define ED set_forest_domain_root_index_unlocked
+#define EE kBlockSize
+#define EF block_field_value_t
+#define EG backend
+#define EH BlockAvlHeightField
+#define EI AvlUpdateHeightOnly
+#define EJ reg
+#define EK blk
+#define EL raw_user_ptr_from_pptr
+#define EM kForestBindingFreeTree
+#define EN else
+#define EO delete
+#define EP ptrdiff_t
+#define EQ for_each_free_block_inorder
+#define ER _capacity
+#define ES is_canonical_allocated_block_header
+#define ET _length
+#define EU FreeBlockTreePolicyForTraitsConcept
+#define EV BlockNodeTypeField
+#define EW symbol
+#define EX crc32_accumulate_byte
+#define EY MMapStorage
+#define EZ ForestDomainViewDescriptor
+#define Ea kGranuleSize
+#define Eb initial_size
+#define Ec deallocate
+#define Ed avl_height
+#define Ee BackendError
+#define Ef resolve_checked
+#define Eg requires
+#define Eh explicit
+#define Ei uintptr_t
+#define Ej data_granules
+#define Ek cur
+#define El bootstrap_system_symbols_unlocked
+#define Em avl_set_child
+#define En block_total_granules
+#define Eo lock
+#define Ep rec
+#define Eq pptr_set_right
+#define Er next_blk
+#define Es is_initialized
+#define Et SplittingBlock
+#define Eu verify_forest_registry_unlocked
+#define Ev validate_or_bootstrap_forest_registry_unlocked
+#define Ew private
+#define Ex pallocator
+#define Ey new_idx
+#define Ez new_data_gran_alloc
+#define FA new_cap
+#define FB domains
+#define FC ForestDomainViewOps
+#define FD CloseHandle
+#define FE BufferSize
+#define FF BlockWeightField
+#define FG kDefaultGrowDenominator
+#define FH is_trivially_copyable_v
+#define FI get_header_c
+#define FJ forest_domain_name_fits
+#define FK data_gran
+#define FL cand_addr
+#define FM kLegacyUnversionedImageVersion
+#define FN find_domain_by_symbol_unlocked
+#define FO set_root_offset_of
+#define FP view
+#define FQ symbol_domain_record_unlocked
+#define FR set_weight_of
+#define FS pptr_get_parent
+#define FU next_idx
+#define FV new_user_size
+#define FW min_user_offset
+#define FX get_prev_offset
+#define FY cand_idx
+#define FZ raw_block_user_ptr_from_pptr
+#define Fa while
+#define Fb verify_free_tree_node
+#define Fc pptr_type
+#define Fd kFreeBlkIdxLayout
+#define Fe kDefaultGrowNumerator
+#define Ff kBlockHdrByteSize
+#define Fg is_block_header_linked_in_canonical_chain
+#define Fh init_fields
+#define Fi byte_off_to_idx_t
+#define Fj allocate_unlocked
+#define Fk _binding_id
+#define Fl ForestRegistryMissing
+#define Fm kMinMemorySize
+#define Fo get_avl_height
+#define Fp block_raw_mut_ptr_from_pptr
+#define Fq _mapped
+#define Fr PersistMemoryManagerConcept
+#define Fs last_blk_raw
+#define Ft granules
+#define Fu is_storage_backend_v
+#define Fv block_field_offset_v
+#define Fw add
+#define Fx ForestDomainRegistry
+#define Fy BlockPrevOffsetField
+#define Fz BlockNextOffsetField
+#define GA is_supported_image_version
+#define GB BlockT
+#define GC BlockFieldLayout
+#define GD weight_val
+#define GE right
+#define GF parent_offset
+#define GG new_raw
+#define GH forest_domain_view_policy
+#define GI find_best_fit
+#define GJ entries
+#define GK descriptor
+#define GL default
+#define GM deallocate_unlocked
+#define GN c_str
+#define GO block_idx_from_pptr
+#define GP blk_off
+#define GQ base_addr
+#define GR allocate_from_block
+#define GS BlockPPtr
+#define GT Aborted
+#define GU state_as
+#define GV psview_pptr
+#define GW new_base
+#define GX kMgrHdrGranules
+#define GY kFreeBlkIdx
+#define GZ insert
+#define Ga existing
+#define Gb config
+#define Gc NodePPtr
+#define Gd InvalidSize
+#define Ge free_tree_block_granules
+#define Gf ForestDomainFlagsMissing
+#define Gg set_tree_idx_field
+#define Gh ptr_to_granule_idx
+#define Gi get_tree_idx_field
+#define Gj free_tree_less_key
+#define Gk avl_balance_factor
+#define Gl BlockTreeNodeProxy
+#define Gm right_p
+#define Gn right_offset
+#define Go resolve
+#define Gp ptr
+#define Gq old_next_blk
+#define Gr new_free_idx
+#define Gs block_raw_ptr_from_pptr
+#define Gt UnsupportedImageVersion
+#define Gu target
+#define Gv memset
+#define Gw kNodeReadWrite
+#define Gx assert
+#define Gy ValueT
+#define Gz view_base
+#define HA used_gran
+#define HB par_p
+#define HC new_child
+#define HD magic
+#define HE kMaxForestDomains
+#define HF avl_subtree_count
+#define HG avl_clear_subtree
+#define HH value_type
+#define HI snapshot
+#define HJ pmap_fnv1a
+#define HK data_bytes
+#define HL coalescing
+#define HM allocate
+#define HN alloc_size
+#define HO _idx
+#define HP TreeNode
+#define HQ key
+#define HR image_version_requires_migration
+#define HS prev_offset
+#define HT owns_memory
+#define HU new_size_li
+#define HV length
+#define HW left_p
+#define HX left_offset
+#define HY kMaxDiagnosticEntries
+#define HZ kGranSzCreate
+#define Ha index
+#define Hb config_logging_policy
+#define Hc concept
+#define Hd PersistMemoryTypedApi
+#define He BlockFieldTraits
+#define Hf BasicConfig
+#define Hg memory_order_acquire
+#define Hh left
+#define Hi BlockFieldByteAccess
+#define Hj tmp_path
+#define Hk succ_idx
+#define Hl set_root_offset
+#define Hm root_val
+#define Hn required
+#define Ho old_size
+#define Hp next_binding_id
+#define Hq new_count
+#define Hr kSystemTypeForestDomainRecord
+#define Hs is_valid_user_offset_unlocked
+#define Ht filename
+#define Hu curr_next
+#define Hv cand_off
+#define Hw callback
+#define Hx SharedMutexLock
+#define Hy ForestDomainOps
+#define Hz memcpy
+#define IA mark_entries
+#define IB kHdrGranules
+#define IC avl_min_node
+#define ID RecoveryMode
+#define IE verify_block_states
+#define IF find_domain_by_name
+#define IG domain_key
+#define IH compute_image_crc32
+#define II aligned
+#define IJ _ptr
+#define IK ForestDomainMissing
+#define IL ForestDomainDescriptorForKey
+#define IM FILE_MAP_ALL_ACCESS
+#define IN set_tree_field
+#define IO set_avl_height
+#define IP obj
+#define IQ max
+#define IR get_tree_field
+#define IS forest_domain_validate_node
+#define IT data_gran_need
+#define IU bytes
+#define IV break
+#define IW allocate_typed
+#define IX NotInitialized
+#define IY verify_linked_list
+#define IZ size
+#define Ia manager_index_type
+#define Ib SmallAddressTraits
+#define Ic LargeAddressTraits
+#define Id CreateFileMappingA
+#define Ie CacheManagerConfig
+#define Ig succ_parent
+#define Ii new_blk_ptr
+#define Ik is_free_raw
+#define Il init_layout
+#define Im block_index
+#define In old_next
+#define Io Overflow
+#define Ip validate_node
+#define Iq symbol_policy
+#define Ir read_stat
+#define Is pstring
+#define It prev
+#define Iu node
+#define Iw granules_to_bytes
+#define Ix forest_verify
+#define Iz flags
+#define JA finalize_coalesce
+#define JB file_size
+#define JC extra_idx
+#define JD avl_update_height
+#define JF DWORD
+#define JG ConfigT
+#define JH AddressTraits
+#define JK verify_free_tree
+#define JL value_hex_digits
+#define JM set_weight
+#define JN set_node_type_of
+#define JO set_height
+#define JP reset_avl_fields
+#define JQ remove
+#define JR public_raw
+#define JS mutex_type
+#define JT kMagic
+#define JU is_allocated_raw
+#define JV field_value_type
+#define JW domain_type_hash
+#define JX deallocate_typed
+#define JY avl_rotate_right
+#define JZ StateT
+#define Ja ManagerLayoutOps
+#define Jb verify_state
+#define Jc initial_root
+#define Je blk_new_next
+#define Jf AccessPolicy
+#define Jg verify_counters
+#define Jh unsigned
+#define Ji type
+#define Jj succ_raw
+#define Jk set_next_offset
+#define Jl raw_addr
+#define Jm prev_idx
+#define Jn pmap_write_name
+#define Jo old_data
+#define Jp offsetof
+#define Js iterator
+#define Jt get_domain_root
+#define Jx blk_next
+#define Jy avl_rotate_left
+#define KA MgrT
+#define KB GranuleMismatch
+#define KD Callback
+#define KE weight
+#define KG strcmp
+#define KH splitting
+#define KI set_child
+#define KJ pptr_make
+#define KL old_blk_raw
+#define KM new_dat_idx
+#define KN needed_gran
+#define KO needed
+#define KR growth
+#define KU do_expand
+#define KV compare_key
+#define KW block_idx_t
+#define KZ GranuleSz
+#define Kk version
+#define Kp rem_idx
+#define Kr raw_off
+#define LA fprintf
+
+AY Ap{j AL::H;I<F T>Hc Fr=Eg{F T::Ae;F T::E;F T::Bu;{T::Es()};{T::HM(H{})}->AL::Bw<V*>;{T::Ec(G<V*>(M))};{T::S()}->AL::Bw<H>;{T::destroy()};};I<F T>Au is_persist_memory_manager:AL::bool_constant<Fr<T>>{};I<F T>AO Q AN is_persist_memory_manager_v=Fr<T>;}
+#undef A
+#undef B
+#undef D
+#undef E
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef K
+#undef M
+#undef N
+#undef O
+#undef P
+#undef Q
+#undef R
+#undef S
+#undef V
+#undef W
+#undef X
+#undef Y
+#undef Z
+#undef j
+#undef k
+#undef m
+#undef o
+#undef q
+#undef z
+#undef AA
+#undef AD
+#undef AE
+#undef AF
+#undef AG
+#undef AH
+#undef AI
+#undef AJ
+#undef AK
+#undef AL
+#undef AM
+#undef AN
+#undef AO
+#undef AP
+#undef AQ
+#undef AR
+#undef AS
+#undef AU
+#undef AV
+#undef AW
+#undef AX
+#undef AY
+#undef AZ
+#undef Aa
+#undef Ab
+#undef Ac
+#undef Ad
+#undef Ae
+#undef Af
+#undef Ag
+#undef Ah
+#undef Ai
+#undef Aj
+#undef Ak
+#undef Al
+#undef Am
+#undef An
+#undef Ao
+#undef Ap
+#undef Aq
+#undef Ar
+#undef As
+#undef At
+#undef Au
+#undef Av
+#undef Aw
+#undef Ax
+#undef Ay
+#undef Az
+#undef BA
+#undef BB
+#undef BC
+#undef BD
+#undef BE
+#undef BF
+#undef BG
+#undef BH
+#undef BI
+#undef BJ
+#undef BK
+#undef BL
+#undef BM
+#undef BN
+#undef BO
+#undef BP
+#undef BQ
+#undef BR
+#undef BS
+#undef BT
+#undef BU
+#undef BV
+#undef BW
+#undef BX
+#undef BY
+#undef BZ
+#undef Ba
+#undef Bb
+#undef Bc
+#undef Bd
+#undef Be
+#undef Bf
+#undef Bg
+#undef Bh
+#undef Bi
+#undef Bj
+#undef Bk
+#undef Bl
+#undef Bm
+#undef Bn
+#undef Bo
+#undef Bp
+#undef Bq
+#undef Br
+#undef Bs
+#undef Bt
+#undef Bu
+#undef Bv
+#undef Bw
+#undef Bx
+#undef By
+#undef Bz
+#undef CA
+#undef CB
+#undef CC
+#undef CD
+#undef CE
+#undef CF
+#undef CG
+#undef CH
+#undef CI
+#undef CJ
+#undef CK
+#undef CL
+#undef CM
+#undef CN
+#undef CO
+#undef CP
+#undef CQ
+#undef CR
+#undef CS
+#undef CT
+#undef CU
+#undef CV
+#undef CW
+#undef CX
+#undef CY
+#undef CZ
+#undef Ca
+#undef Cb
+#undef Cc
+#undef Cd
+#undef Ce
+#undef Cf
+#undef Cg
+#undef Ch
+#undef Ci
+#undef Cj
+#undef Ck
+#undef Cl
+#undef Cm
+#undef Cn
+#undef Co
+#undef Cp
+#undef Cq
+#undef Cr
+#undef Cs
+#undef Ct
+#undef Cu
+#undef Cv
+#undef Cw
+#undef Cx
+#undef Cy
+#undef Cz
+#undef DA
+#undef DB
+#undef DC
+#undef DD
+#undef DE
+#undef DF
+#undef DG
+#undef DH
+#undef DI
+#undef DJ
+#undef DK
+#undef DL
+#undef DM
+#undef DN
+#undef DO
+#undef DP
+#undef DQ
+#undef DR
+#undef DS
+#undef DT
+#undef DU
+#undef DV
+#undef DW
+#undef DX
+#undef DY
+#undef DZ
+#undef Da
+#undef Db
+#undef Dc
+#undef Dd
+#undef De
+#undef Df
+#undef Dg
+#undef Dh
+#undef Di
+#undef Dj
+#undef Dk
+#undef Dl
+#undef Dm
+#undef Dn
+#undef Do
+#undef Dp
+#undef Dq
+#undef Dr
+#undef Ds
+#undef Dt
+#undef Du
+#undef Dv
+#undef Dw
+#undef Dx
+#undef Dy
+#undef Dz
+#undef EA
+#undef EB
+#undef EC
+#undef ED
+#undef EE
+#undef EF
+#undef EG
+#undef EH
+#undef EI
+#undef EJ
+#undef EK
+#undef EL
+#undef EM
+#undef EN
+#undef EO
+#undef EP
+#undef EQ
+#undef ER
+#undef ES
+#undef ET
+#undef EU
+#undef EV
+#undef EW
+#undef EX
+#undef EY
+#undef EZ
+#undef Ea
+#undef Eb
+#undef Ec
+#undef Ed
+#undef Ee
+#undef Ef
+#undef Eg
+#undef Eh
+#undef Ei
+#undef Ej
+#undef Ek
+#undef El
+#undef Em
+#undef En
+#undef Eo
+#undef Ep
+#undef Eq
+#undef Er
+#undef Es
+#undef Et
+#undef Eu
+#undef Ev
+#undef Ew
+#undef Ex
+#undef Ey
+#undef Ez
+#undef FA
+#undef FB
+#undef FC
+#undef FD
+#undef FE
+#undef FF
+#undef FG
+#undef FH
+#undef FI
+#undef FJ
+#undef FK
+#undef FL
+#undef FM
+#undef FN
+#undef FO
+#undef FP
+#undef FQ
+#undef FR
+#undef FS
+#undef FU
+#undef FV
+#undef FW
+#undef FX
+#undef FY
+#undef FZ
+#undef Fa
+#undef Fb
+#undef Fc
+#undef Fd
+#undef Fe
+#undef Ff
+#undef Fg
+#undef Fh
+#undef Fi
+#undef Fj
+#undef Fk
+#undef Fl
+#undef Fm
+#undef Fo
+#undef Fp
+#undef Fq
+#undef Fr
+#undef Fs
+#undef Ft
+#undef Fu
+#undef Fv
+#undef Fw
+#undef Fx
+#undef Fy
+#undef Fz
+#undef GA
+#undef GB
+#undef GC
+#undef GD
+#undef GE
+#undef GF
+#undef GG
+#undef GH
+#undef GI
+#undef GJ
+#undef GK
+#undef GL
+#undef GM
+#undef GN
+#undef GO
+#undef GP
+#undef GQ
+#undef GR
+#undef GS
+#undef GT
+#undef GU
+#undef GV
+#undef GW
+#undef GX
+#undef GY
+#undef GZ
+#undef Ga
+#undef Gb
+#undef Gc
+#undef Gd
+#undef Ge
+#undef Gf
+#undef Gg
+#undef Gh
+#undef Gi
+#undef Gj
+#undef Gk
+#undef Gl
+#undef Gm
+#undef Gn
+#undef Go
+#undef Gp
+#undef Gq
+#undef Gr
+#undef Gs
+#undef Gt
+#undef Gu
+#undef Gv
+#undef Gw
+#undef Gx
+#undef Gy
+#undef Gz
+#undef HA
+#undef HB
+#undef HC
+#undef HD
+#undef HE
+#undef HF
+#undef HG
+#undef HH
+#undef HI
+#undef HJ
+#undef HK
+#undef HL
+#undef HM
+#undef HN
+#undef HO
+#undef HP
+#undef HQ
+#undef HR
+#undef HS
+#undef HT
+#undef HU
+#undef HV
+#undef HW
+#undef HX
+#undef HY
+#undef HZ
+#undef Ha
+#undef Hb
+#undef Hc
+#undef Hd
+#undef He
+#undef Hf
+#undef Hg
+#undef Hh
+#undef Hi
+#undef Hj
+#undef Hk
+#undef Hl
+#undef Hm
+#undef Hn
+#undef Ho
+#undef Hp
+#undef Hq
+#undef Hr
+#undef Hs
+#undef Ht
+#undef Hu
+#undef Hv
+#undef Hw
+#undef Hx
+#undef Hy
+#undef Hz
+#undef IA
+#undef IB
+#undef IC
+#undef ID
+#undef IE
+#undef IF
+#undef IG
+#undef IH
+#undef II
+#undef IJ
+#undef IK
+#undef IL
+#undef IM
+#undef IN
+#undef IO
+#undef IP
+#undef IQ
+#undef IR
+#undef IS
+#undef IT
+#undef IU
+#undef IV
+#undef IW
+#undef IX
+#undef IY
+#undef IZ
+#undef Ia
+#undef Ib
+#undef Ic
+#undef Id
+#undef Ie
+#undef Ig
+#undef Ii
+#undef Ik
+#undef Il
+#undef Im
+#undef In
+#undef Io
+#undef Ip
+#undef Iq
+#undef Ir
+#undef Is
+#undef It
+#undef Iu
+#undef Iw
+#undef Ix
+#undef Iz
+#undef JA
+#undef JB
+#undef JC
+#undef JD
+#undef JF
+#undef JG
+#undef JH
+#undef JK
+#undef JL
+#undef JM
+#undef JN
+#undef JO
+#undef JP
+#undef JQ
+#undef JR
+#undef JS
+#undef JT
+#undef JU
+#undef JV
+#undef JW
+#undef JX
+#undef JY
+#undef JZ
+#undef Ja
+#undef Jb
+#undef Jc
+#undef Je
+#undef Jf
+#undef Jg
+#undef Jh
+#undef Ji
+#undef Jj
+#undef Jk
+#undef Jl
+#undef Jm
+#undef Jn
+#undef Jo
+#undef Jp
+#undef Js
+#undef Jt
+#undef Jx
+#undef Jy
+#undef KA
+#undef KB
+#undef KD
+#undef KE
+#undef KG
+#undef KH
+#undef KI
+#undef KJ
+#undef KL
+#undef KM
+#undef KN
+#undef KO
+#undef KR
+#undef KU
+#undef KV
+#undef KW
+#undef KZ
+#undef Kk
+#undef Kp
+#undef Kr
+#undef LA
 
