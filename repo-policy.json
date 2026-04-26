@@ -61,7 +61,7 @@
       "scope": "directory",
       "metric": "lines",
       "glob": "include/pmm/**",
-      "max": 9000,
+      "max": 7000,
       "count": "all_tracked",
       "level": "blocking"
     }
