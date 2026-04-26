@@ -71,7 +71,7 @@ jobs:
 
       - name: Regenerate single-header presets
         if: steps.check.outputs.should_release == 'true'
-        run: bash scripts/generate-single-headers.sh --strip-comments
+        run: bash scripts/generate-single-headers.sh
 
       - name: Commit version bump, changelog and single-header presets
         if: steps.check.outputs.should_release == 'true'
@@ -137,7 +137,7 @@ jobs:
         run: pip install quom
 
       - name: Regenerate single-header presets
-        run: bash scripts/generate-single-headers.sh --strip-comments
+        run: bash scripts/generate-single-headers.sh
 
       - name: Commit version bump, changelog and single-header presets
         run: |

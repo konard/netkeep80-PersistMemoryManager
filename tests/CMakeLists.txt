@@ -316,6 +316,10 @@ target_compile_definitions(test_issue352_kernel_subtree_size PRIVATE PMM_SOURCE_
 pmm_add_test(test_issue354_include_anchors test_issue354_include_anchors.cpp)
 target_compile_definitions(test_issue354_include_anchors PRIVATE PMM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
+# ─── Issue 358: release workflow single-header generation contract ──
+pmm_add_test(test_issue358_release_workflow test_issue358_release_workflow.cpp)
+target_compile_definitions(test_issue358_release_workflow PRIVATE PMM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+
 # ─── Issue 314: build graph compaction contract ─────────────────
 add_test(
     NAME test_issue314_build_graph_contract
