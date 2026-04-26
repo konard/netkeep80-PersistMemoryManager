@@ -25,15 +25,15 @@
 namespace pmm {
 
 /*
-## pmm::MMapStorage
+## pmm::mmapstorage
 */
 template <typename AddressTraitsT = DefaultAddressTraits> class MMapStorage {
 public:
   using address_traits = AddressTraitsT;
 
   /*
-### pmm::MMapStorage::MMapStorage
-  */
+### pmm::mmapstorage::mmapstorage
+*/
   MMapStorage() noexcept = default;
 
   MMapStorage(const MMapStorage &) = delete;
@@ -70,8 +70,8 @@ public:
   ~MMapStorage() { close(); }
 
   /*
-### pmm::MMapStorage::open
-  */
+### pmm::mmapstorage::open
+*/
   bool open(const char *path, std::size_t size_bytes) noexcept {
     if (_mapped)
       return false;
@@ -86,8 +86,8 @@ public:
   }
 
   /*
-### pmm::MMapStorage::close
-  */
+### pmm::mmapstorage::close
+*/
   void close() noexcept {
     if (!_mapped)
 
@@ -100,24 +100,24 @@ public:
   }
 
   /*
-### pmm::MMapStorage::is_open
-  */
+### pmm::mmapstorage::is_open
+*/
   bool is_open() const noexcept { return _mapped; }
 
   /*
-### pmm::MMapStorage::base_ptr
-  */
+### pmm::mmapstorage::base_ptr
+*/
   std::uint8_t *base_ptr() noexcept { return _base; }
   const std::uint8_t *base_ptr() const noexcept { return _base; }
 
   /*
-### pmm::MMapStorage::total_size
-  */
+### pmm::mmapstorage::total_size
+*/
   std::size_t total_size() const noexcept { return _size; }
 
   /*
-### pmm::MMapStorage::expand
-  */
+### pmm::mmapstorage::expand
+*/
   bool expand(std::size_t additional_bytes) noexcept {
     if (!_mapped || additional_bytes == 0)
       return _mapped && additional_bytes == 0;
@@ -134,8 +134,8 @@ public:
   }
 
   /*
-### pmm::MMapStorage::owns_memory
-  */
+### pmm::mmapstorage::owns_memory
+*/
   bool owns_memory() const noexcept { return false; }
 
 private:
@@ -150,8 +150,8 @@ private:
   HANDLE _map_handle = nullptr;
 
   /*
-### pmm::MMapStorage::open_impl
-  */
+### pmm::mmapstorage::open_impl
+*/
   bool open_impl(const char *path, std::size_t size_bytes) noexcept {
 
     _file_handle = CreateFileA(path, GENERIC_READ | GENERIC_WRITE,
@@ -207,8 +207,8 @@ private:
   }
 
   /*
-### pmm::MMapStorage::close_impl
-  */
+### pmm::mmapstorage::close_impl
+*/
   void close_impl() noexcept {
     if (_base != nullptr) {
       FlushViewOfFile(_base, _size);
@@ -225,8 +225,8 @@ private:
   }
 
   /*
-### pmm::MMapStorage::expand_impl
-  */
+### pmm::mmapstorage::expand_impl
+*/
   bool expand_impl(std::size_t new_size) noexcept {
 
     if (_base != nullptr) {
@@ -292,8 +292,8 @@ private:
       return false;
 
     /*
-## pmm::MMapStorage::stat
-    */
+### pmm::mmapstorage::stat
+*/
     struct stat st {};
     if (::fstat(_fd, &st) != 0) {
       ::close(_fd);

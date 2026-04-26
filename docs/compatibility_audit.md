@@ -27,7 +27,7 @@ If none apply, the path is **deleted**.
 | 8 | `is_valid_block()` (non-templated) | `types.h:451-489` | Compat overload | **Delete** | DefaultAddressTraits-specific overload. No callers in the codebase. Templated code uses `is_valid_block_t<AT>()` or inline structural checks. |
 | 9 | `block_idx()` (non-templated) | `types.h:375-381` | Compat overload | **Delete** | DefaultAddressTraits-specific overload. No callers — all code uses `block_idx_t<AT>()`. |
 | 10 | `load()` (no-arg overload) | `persist_memory_manager.h:293-303` | `[[deprecated]]` method | **Delete** | Wrapper around `load(VerifyResult&)`. 6 callers in tests — updated to use `load(VerifyResult&)` directly. |
-| 11 | `load_manager_from_file<MgrT>(filename)` (no-arg) | `io.h:238-242` | `[[deprecated]]` function | **Delete** | Wrapper around `load_manager_from_file<MgrT>(filename, result)`. Multiple callers in tests/examples — updated to pass [VerifyResult](../include/pmm/diagnostics.h#pmm::VerifyResult). |
+| 11 | `load_manager_from_file<MgrT>(filename)` (no-arg) | `io.h:238-242` | `[[deprecated]]` function | **Delete** | Wrapper around `load_manager_from_file<MgrT>(filename, result)`. Multiple callers in tests/examples — updated to pass [VerifyResult](../include/pmm/diagnostics.h#pmm::verifyresult). |
 | 12 | `FreeBlockTreePolicyConcept` (non-templated) | `free_block_tree.h:75-76` | Compat concept alias | **Delete** | Defaults to `DefaultAddressTraits`. Replaced by `FreeBlockTreePolicyForTraitsConcept<P, AT>`. |
 | 13 | `is_free_block_tree_policy_v` | `free_block_tree.h:83` | Compat trait variable | **Delete** | Uses `FreeBlockTreePolicyConcept` which is being removed. Replace usage with `FreeBlockTreePolicyForTraitsConcept<P, AT>` directly. |
 | 14 | `PersistentAvlTree` type alias | `free_block_tree.h:275` | Compat alias | **Delete** | Alias for `AvlFreeTree<DefaultAddressTraits>`. Used in 2 test files — updated to use `AvlFreeTree<DefaultAddressTraits>`. |
@@ -40,7 +40,7 @@ If none apply, the path is **deleted**.
 | 21 | `reserved_root_offset` in ForestDomainRegistry + `service/legacy_root` domain | `forest_registry.h`, `forest_domain_mixin.inc` | Migration field + domain | **Delete** (issue #339) | Transitional artifact from the pre-forest-registry root model. Removed together with the migration branch in `validate_or_bootstrap_forest_registry_unlocked()`. `set_root`/`get_root` now directly address the `service/domain_root` registry record. |
 | 22 | MSVC `_MSVC_LANG` check | `persist_memory_manager.h:15-21` | Platform detection | **Keep** | Platform-specific path required for MSVC (confirmed by CI). |
 | 23 | Windows file operations (`atomic_rename`, MMapStorage) | `io.h`, `mmap_storage.h` | Platform-specific code | **Keep** | Required for Windows support, gated by `_WIN32`/`_WIN64`. |
-| 24 | Logging policy SFINAE detection | `persist_memory_manager.h:74-85` | Config detection | **Keep** | Low-cost, non-breaking default ([NoLogging](../include/pmm/logging_policy.h#pmm::logging::NoLogging)). Part of the configuration API contract. |
+| 24 | Logging policy SFINAE detection | `persist_memory_manager.h:74-85` | Config detection | **Keep** | Low-cost, non-breaking default ([NoLogging](../include/pmm/logging_policy.h#pmm::logging::nologging)). Part of the configuration API contract. |
 
 ## Allowed Compatibility Seams (Remaining)
 

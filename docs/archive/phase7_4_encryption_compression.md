@@ -84,7 +84,7 @@ Issue: [#239](https://github.com/netkeep80/PersistMemoryManager/issues/239)
 
 1. **Полная перезапись при любом изменении**: изменение 1 байта → перезапись всего образа.
    Для образа 1 GB это ~1 GB записи на диск
-2. **Невозможность частичного обновления**: несовместимо с [MMapStorage](../../include/pmm/mmap_storage.h#pmm::MMapStorage) при online-записи.
+2. **Невозможность частичного обновления**: несовместимо с [MMapStorage](../../include/pmm/mmap_storage.h#pmm::mmapstorage) при online-записи.
    Нужно загрузить весь образ в память, расшифровать, работать, зашифровать и записать
 3. **Задержка при загрузке**: весь образ нужно расшифровать и распаковать до начала работы
 4. **Невозможность binary diff**: BinDiffSynchronizer не может вычислять diff между
@@ -429,10 +429,10 @@ struct ManagerHeader
 
 ### Этап 1: Инфраструктура (оценка: средняя сложность)
 
-1. Определить `encryption_policy` как шаблонный параметр в [BasicConfig](../../include/pmm/manager_configs.h#pmm::BasicConfig)
+1. Определить `encryption_policy` как шаблонный параметр в [BasicConfig](../../include/pmm/manager_configs.h#pmm::basicconfig)
 2. Добавить SFINAE-детекцию `encryption_policy` для обратной совместимости
    (аналогично `logging_policy`)
-3. Добавить `encryption_algo` в [ManagerHeader](../../include/pmm/types.h#pmm::detail::ManagerHeader) (использовать резервные байты)
+3. Добавить `encryption_algo` в [ManagerHeader](../../include/pmm/types.h#pmm::detail::managerheader) (использовать резервные байты)
 4. Реализовать `NoEncryption` политику (нулевые накладные расходы)
 
 ### Этап 2: Реализация шифрования блоков (оценка: средняя сложность)

@@ -209,7 +209,7 @@ Mgr::destroy();
   sentinel вместо 0 для корректной работы итератора и AVL-операций
 
 > **Примечание (Issue #188):** Все AVL-операции в pmap делегированы общим шаблонным
-> функциям из `avl_tree_mixin.h`. pmap использует стандартный [AvlUpdateHeightOnly](../../include/pmm/avl_tree_mixin.h#pmm::detail::AvlUpdateHeightOnly)
+> функциям из `avl_tree_mixin.h`. pmap использует стандартный [AvlUpdateHeightOnly](../../include/pmm/avl_tree_mixin.h#pmm::detail::avlupdateheightonly)
 > callback (обновление только высоты).
 
 ## ~~3.4 Доработка `pvector<T>` — метод `erase(index)`~~ УДАЛЕНО (#224)
@@ -373,7 +373,7 @@ Mgr::destroy();
 
 ### Описание
 
-Единственный именованный указатель `root_offset` в [ManagerHeader](../../include/pmm/types.h#pmm::detail::ManagerHeader), позволяющий хранить
+Единственный именованный указатель `root_offset` в [ManagerHeader](../../include/pmm/types.h#pmm::detail::managerheader), позволяющий хранить
 корневой объект (например, `pmap<pstringview, pptr<void>>`) и находить его после загрузки
 образа. Заменяет паттерн `pam_pmm.h` из BinDiffSynchronizer.
 
@@ -426,5 +426,5 @@ Mgr::destroy();
 - Один корневой указатель на менеджер (мультитон — у каждого экземпляра свой)
 - Типобезопасность: `set_root<T>()` / `get_root<T>()` — тип T должен совпадать
 - Потокобезопасность: `set_root` под `unique_lock`, `get_root` под `shared_lock`
-- Персистентность: корень сохраняется в образе через `root_offset` в [ManagerHeader](../../include/pmm/types.h#pmm::detail::ManagerHeader)
+- Персистентность: корень сохраняется в образе через `root_offset` в [ManagerHeader](../../include/pmm/types.h#pmm::detail::managerheader)
 - Работает со всеми address traits: `SmallAddressTraits`, `DefaultAddressTraits`, `LargeAddressTraits`

@@ -39,7 +39,7 @@ namespace pmm {
 namespace detail {
 
 /*
-## pmm::detail::config_logging_policy
+### pmm::detail::config_logging_policy
 */
 template <typename C, typename = void> struct config_logging_policy {
 
@@ -55,7 +55,7 @@ struct config_logging_policy<C, std::void_t<typename C::logging_policy>> {
 template <typename ConfigT = CacheManagerConfig, std::size_t InstanceId = 0>
 
 /*
-## pmm::PersistMemoryManager
+## pmm::persistmemorymanager
 */
 class PersistMemoryManager : public detail::PersistMemoryTypedApi<
                                  PersistMemoryManager<ConfigT, InstanceId>> {
@@ -99,23 +99,23 @@ public:
   template <typename T> using pallocator = pmm::pallocator<T, manager_type>;
 
   /*
-### pmm::PersistMemoryManager::last_error
-  */
+### pmm::persistmemorymanager::last_error
+*/
   static PmmError last_error() noexcept { return _last_error; }
 
   /*
-### pmm::PersistMemoryManager::clear_error
-  */
+### pmm::persistmemorymanager::clear_error
+*/
   static void clear_error() noexcept { _last_error = PmmError::Ok; }
 
   /*
-### pmm::PersistMemoryManager::set_last_error
-  */
+### pmm::persistmemorymanager::set_last_error
+*/
   static void set_last_error(PmmError err) noexcept { _last_error = err; }
 
   /*
-### pmm::PersistMemoryManager::create
-  */
+### pmm::persistmemorymanager::create
+*/
   static bool create(std::size_t initial_size) noexcept {
 
     typename thread_policy::unique_lock_type lock(_mutex);
@@ -183,8 +183,8 @@ public:
   }
 
   /*
-### pmm::PersistMemoryManager::load
-  */
+### pmm::persistmemorymanager::load
+*/
   static bool load(VerifyResult &result) noexcept {
 
     result.mode = RecoveryMode::Repair;
@@ -306,8 +306,8 @@ public:
   }
 
   /*
-### pmm::PersistMemoryManager::destroy
-  */
+### pmm::persistmemorymanager::destroy
+*/
   static void destroy() noexcept {
     typename thread_policy::unique_lock_type lock(_mutex);
     if (!_initialized)
@@ -319,8 +319,8 @@ public:
   }
 
   /*
-### pmm::PersistMemoryManager::destroy_image
-  */
+### pmm::persistmemorymanager::destroy_image
+*/
   static void destroy_image() noexcept {
     typename thread_policy::unique_lock_type lock(_mutex);
     std::uint8_t *base = _backend.base_ptr();
@@ -331,23 +331,23 @@ public:
   }
 
   /*
-### pmm::PersistMemoryManager::is_initialized
-  */
+### pmm::persistmemorymanager::is_initialized
+*/
   static bool is_initialized() noexcept {
     return _initialized.load(std::memory_order_acquire);
   }
 
   /*
-### pmm::PersistMemoryManager::allocate
-  */
+### pmm::persistmemorymanager::allocate
+*/
   static void *allocate(std::size_t user_size) noexcept {
     typename thread_policy::unique_lock_type lock(_mutex);
     return allocate_unlocked(user_size);
   }
 
   /*
-### pmm::PersistMemoryManager::deallocate
-  */
+### pmm::persistmemorymanager::deallocate
+*/
   static void deallocate(void *ptr) noexcept {
     typename thread_policy::unique_lock_type lock(_mutex);
 
@@ -355,16 +355,16 @@ public:
   }
 
   /*
-### pmm::PersistMemoryManager::lock_block_permanent
-  */
+### pmm::persistmemorymanager::lock_block_permanent
+*/
   static bool lock_block_permanent(void *ptr) noexcept {
     typename thread_policy::unique_lock_type lock(_mutex);
     return lock_block_permanent_unlocked(ptr);
   }
 
   /*
-### pmm::PersistMemoryManager::is_permanently_locked
-  */
+### pmm::persistmemorymanager::is_permanently_locked
+*/
   static bool is_permanently_locked(const void *ptr) noexcept {
     typename thread_policy::shared_lock_type lock(_mutex);
     if (!_initialized || ptr == nullptr)
@@ -402,8 +402,8 @@ public:
   }
 
   /*
-### pmm::PersistMemoryManager::find_domain_by_name
-  */
+### pmm::persistmemorymanager::find_domain_by_name
+*/
   static index_type find_domain_by_name(const char *name) noexcept {
     typename thread_policy::shared_lock_type lock(_mutex);
     if (!_initialized)
@@ -414,8 +414,8 @@ public:
   }
 
   /*
-### pmm::PersistMemoryManager::find_domain_by_symbol
-  */
+### pmm::persistmemorymanager::find_domain_by_symbol
+*/
   static index_type find_domain_by_symbol(pptr<pstringview> symbol) noexcept {
     typename thread_policy::shared_lock_type lock(_mutex);
     if (!_initialized)
@@ -426,23 +426,23 @@ public:
   }
 
   /*
-### pmm::PersistMemoryManager::has_domain
-  */
+### pmm::persistmemorymanager::has_domain
+*/
   static bool has_domain(const char *name) noexcept {
     return find_domain_by_name(name) != 0;
   }
 
   /*
-### pmm::PersistMemoryManager::validate_bootstrap_invariants
-  */
+### pmm::persistmemorymanager::validate_bootstrap_invariants
+*/
   static bool validate_bootstrap_invariants() noexcept {
     typename thread_policy::shared_lock_type lock(_mutex);
     return validate_bootstrap_invariants_unlocked();
   }
 
   /*
-### pmm::PersistMemoryManager::register_domain
-  */
+### pmm::persistmemorymanager::register_domain
+*/
   static bool register_domain(const char *name) noexcept {
     typename thread_policy::unique_lock_type lock(_mutex);
     if (!_initialized)
@@ -452,8 +452,8 @@ public:
   }
 
   /*
-### pmm::PersistMemoryManager::register_system_domain
-  */
+### pmm::persistmemorymanager::register_system_domain
+*/
   static bool register_system_domain(const char *name) noexcept {
     typename thread_policy::unique_lock_type lock(_mutex);
     if (!_initialized)
@@ -463,8 +463,8 @@ public:
   }
 
   /*
-### pmm::PersistMemoryManager::get_domain_root_offset
-  */
+### pmm::persistmemorymanager::get_domain_root_offset
+*/
   static index_type get_domain_root_offset(const char *name) noexcept {
     typename thread_policy::shared_lock_type lock(_mutex);
     if (!_initialized)
@@ -523,8 +523,8 @@ private:
   template <typename T>
 
   /*
-### pmm::PersistMemoryManager::get_tree_idx_field
-  */
+### pmm::persistmemorymanager::get_tree_idx_field
+*/
   static index_type
   get_tree_idx_field(pptr<T> p, index_type (*getter)(const void *)) noexcept {
     if (p.is_null() || !_initialized)
@@ -543,8 +543,8 @@ private:
   template <typename T>
 
   /*
-### pmm::PersistMemoryManager::set_tree_idx_field
-  */
+### pmm::persistmemorymanager::set_tree_idx_field
+*/
   static void set_tree_idx_field(pptr<T> p, void (*setter)(void *, index_type),
                                  index_type val) noexcept {
     if (p.is_null() || !_initialized)
@@ -669,8 +669,8 @@ private:
 
 public:
   /*
-### pmm::PersistMemoryManager::total_size
-  */
+### pmm::persistmemorymanager::total_size
+*/
   static std::size_t total_size() noexcept {
     if (!_initialized.load(std::memory_order_acquire))
       return 0;
@@ -680,8 +680,8 @@ public:
   }
 
   /*
-### pmm::PersistMemoryManager::used_size
-  */
+### pmm::persistmemorymanager::used_size
+*/
   static std::size_t used_size() noexcept {
     return read_stat([](const auto *h) {
       return address_traits::granules_to_bytes(h->used_size);
@@ -689,8 +689,8 @@ public:
   }
 
   /*
-### pmm::PersistMemoryManager::free_size
-  */
+### pmm::persistmemorymanager::free_size
+*/
   static std::size_t free_size() noexcept {
     return read_stat([](const auto *h) {
       std::size_t used = address_traits::granules_to_bytes(h->used_size);
@@ -699,32 +699,32 @@ public:
   }
 
   /*
-### pmm::PersistMemoryManager::block_count
-  */
+### pmm::persistmemorymanager::block_count
+*/
   static std::size_t block_count() noexcept {
     return read_stat(
         [](const auto *h) { return static_cast<std::size_t>(h->block_count); });
   }
 
   /*
-### pmm::PersistMemoryManager::free_block_count
-  */
+### pmm::persistmemorymanager::free_block_count
+*/
   static std::size_t free_block_count() noexcept {
     return read_stat(
         [](const auto *h) { return static_cast<std::size_t>(h->free_count); });
   }
 
   /*
-### pmm::PersistMemoryManager::alloc_block_count
-  */
+### pmm::persistmemorymanager::alloc_block_count
+*/
   static std::size_t alloc_block_count() noexcept {
     return read_stat(
         [](const auto *h) { return static_cast<std::size_t>(h->alloc_count); });
   }
 
   /*
-### pmm::PersistMemoryManager::verify
-  */
+### pmm::persistmemorymanager::verify
+*/
   static VerifyResult verify() noexcept {
 
     VerifyResult result;
@@ -795,8 +795,8 @@ public:
   }
 
   /*
-### pmm::PersistMemoryManager::backend
-  */
+### pmm::persistmemorymanager::backend
+*/
   static storage_backend &backend() noexcept { return _backend; }
 
 private:
@@ -809,8 +809,8 @@ private:
   static inline thread_local PmmError _last_error{PmmError::Ok};
 
   /*
-### pmm::PersistMemoryManager::is_valid_user_offset_unlocked
-  */
+### pmm::persistmemorymanager::is_valid_user_offset_unlocked
+*/
   static bool is_valid_user_offset_unlocked(index_type off,
                                             std::size_t size_bytes) noexcept {
     if (off == 0 || _backend.base_ptr() == nullptr ||
@@ -823,8 +823,8 @@ private:
   }
 
   /*
-### pmm::PersistMemoryManager::allocate_unlocked
-  */
+### pmm::persistmemorymanager::allocate_unlocked
+*/
   static void *allocate_unlocked(std::size_t user_size) noexcept {
     if (!_initialized) {
       _last_error = PmmError::NotInitialized;
@@ -882,8 +882,8 @@ private:
   }
 
   /*
-### pmm::PersistMemoryManager::deallocate_unlocked
-  */
+### pmm::persistmemorymanager::deallocate_unlocked
+*/
   static void deallocate_unlocked(void *ptr) noexcept {
     if (!_initialized || ptr == nullptr)
       return;
@@ -918,8 +918,8 @@ private:
   }
 
   /*
-### pmm::PersistMemoryManager::lock_block_permanent_unlocked
-  */
+### pmm::persistmemorymanager::lock_block_permanent_unlocked
+*/
   static bool lock_block_permanent_unlocked(void *ptr) noexcept {
     if (!_initialized || ptr == nullptr)
       return false;
@@ -971,8 +971,8 @@ private:
       kBlockHdrGranules + kMgrHdrGranules;
 
   /*
-### pmm::PersistMemoryManager::get_header
-  */
+### pmm::persistmemorymanager::get_header
+*/
   static detail::ManagerHeader<address_traits> *
   get_header(std::uint8_t *base) noexcept {
 
@@ -980,16 +980,16 @@ private:
   }
 
   /*
-### pmm::PersistMemoryManager::get_header_c
-  */
+### pmm::persistmemorymanager::get_header_c
+*/
   static const detail::ManagerHeader<address_traits> *
   get_header_c(const std::uint8_t *base) noexcept {
     return detail::manager_header_at<address_traits>(base);
   }
 
   /*
-## pmm::PersistMemoryManager::layout_access
-  */
+### pmm::persistmemorymanager::layout_access
+*/
   struct layout_access {
 
     using address_traits = manager_type::address_traits;
@@ -1015,32 +1015,32 @@ private:
         manager_type::kFreeBlkIdxLayout;
 
     /*
-### pmm::PersistMemoryManager::layout_access::get_header
-    */
+#### pmm::persistmemorymanager::layout_access::get_header
+*/
     static detail::ManagerHeader<address_traits> *
     get_header(std::uint8_t *base) noexcept {
       return manager_type::get_header(base);
     }
 
     /*
-### pmm::PersistMemoryManager::layout_access::set_initialized
-    */
+#### pmm::persistmemorymanager::layout_access::set_initialized
+*/
     static void set_initialized() noexcept {
       manager_type::_initialized = true;
     }
   };
 
   /*
-### pmm::PersistMemoryManager::init_layout
-  */
+### pmm::persistmemorymanager::init_layout
+*/
   static bool init_layout(std::uint8_t *base, std::size_t size) noexcept {
     return detail::ManagerLayoutOps<layout_access>::init_layout(_backend, base,
                                                                 size);
   }
 
   /*
-### pmm::PersistMemoryManager::do_expand
-  */
+### pmm::persistmemorymanager::do_expand
+*/
   static bool do_expand(std::size_t user_size) noexcept {
     return detail::ManagerLayoutOps<layout_access>::do_expand(
         _backend, _initialized, user_size);

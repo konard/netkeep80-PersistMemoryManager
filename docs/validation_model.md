@@ -110,7 +110,7 @@ The validation layer distinguishes three categories of invalid input:
 | Address correctness | Misaligned, index overflow, beyond image extent | Return `nullptr` / `false` (fast-path), report `InvalidPointer` or `Overflow` |
 | Header integrity | Inconsistent weight/root_offset, bad node_type, next/prev out of bounds | Report `BlockStateInconsistent` (verify/repair level) |
 
-These categories map to the existing [PmmError](../include/pmm/types.h#pmm::PmmError) and [ViolationType](../include/pmm/diagnostics.h#pmm::ViolationType) enums:
+These categories map to the existing [PmmError](../include/pmm/types.h#pmm::pmmerror) and [ViolationType](../include/pmm/diagnostics.h#pmm::violationtype) enums:
 
 - Pointer provenance / address correctness → `PmmError::InvalidPointer`, `PmmError::Overflow`
 - Header integrity → `ViolationType::BlockStateInconsistent`

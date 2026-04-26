@@ -3,7 +3,7 @@
 ## Purpose
 
 Этот документ определяет правила удаления, архивации, перемещения и сохранения
-материалов в репозитории [PersistMemoryManager](../include/pmm/persist_memory_manager.h#pmm::PersistMemoryManager).
+материалов в репозитории [PersistMemoryManager](../include/pmm/persist_memory_manager.h#pmm::persistmemorymanager).
 
 Цель — предотвратить бесконтрольное разрастание репозитория и дать чёткий критерий
 для принятия решений при каждом PR.

@@ -43,7 +43,7 @@ Related documents:
 
 ### M1a. `hdr->root_offset` — forest registry pointer
 
-The header's `root_offset` field points to the [ForestDomainRegistry](../include/pmm/forest_registry.h#pmm::detail::ForestDomainRegistry)
+The header's `root_offset` field points to the [ForestDomainRegistry](../include/pmm/forest_registry.h#pmm::detail::forestdomainregistry)
 block. It is written in two contexts:
 
 **Context 1: `create()` bootstrap**
@@ -82,7 +82,7 @@ mutations are possible.
 
 ### M1b. `ForestDomainRecord::root_offset` — per-domain root
 
-Each domain in the [ForestDomainRegistry](../include/pmm/forest_registry.h#pmm::detail::ForestDomainRegistry) has a `root_offset` field
+Each domain in the [ForestDomainRegistry](../include/pmm/forest_registry.h#pmm::detail::forestdomainregistry) has a `root_offset` field
 pointing to the root of that domain's AVL tree.
 
 **Updated by:** `set_domain_root()` (`persist_memory_manager.h:928`).
@@ -110,7 +110,7 @@ block that persists across saves, and if the write is interrupted:
 
 ### M2a. Domain registration
 
-Adding a new domain to the [ForestDomainRegistry](../include/pmm/forest_registry.h#pmm::detail::ForestDomainRegistry).
+Adding a new domain to the [ForestDomainRegistry](../include/pmm/forest_registry.h#pmm::detail::forestdomainregistry).
 
 | Step | Write | Critical? | Code |
 |------|-------|-----------|------|

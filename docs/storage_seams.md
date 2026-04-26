@@ -50,7 +50,7 @@ requirements for storage seams.
 ### Mode 1: Normal persistent image operation
 
 The primary mode. A single process owns the image (in-memory via
-[HeapStorage](../include/pmm/heap_storage.h#pmm::HeapStorage) or memory-mapped via [MMapStorage](../include/pmm/mmap_storage.h#pmm::MMapStorage)). Mutations happen
+[HeapStorage](../include/pmm/heap_storage.h#pmm::heapstorage) or memory-mapped via [MMapStorage](../include/pmm/mmap_storage.h#pmm::mmapstorage)). Mutations happen
 in-place. Persistence is achieved via periodic `save_manager()` calls
 or through OS-level `mmap` writeback.
 
@@ -190,11 +190,11 @@ metadata must remain accessible for structural recovery:
 
 | Metadata | Location | Why |
 |----------|----------|-----|
-| [ManagerHeader](../include/pmm/types.h#pmm::detail::ManagerHeader) (64 bytes) | Block_0 user data | Magic validation, size checks, `first_block_offset` — required by `load()` phase 1. |
+| [ManagerHeader](../include/pmm/types.h#pmm::detail::managerheader) (64 bytes) | Block_0 user data | Magic validation, size checks, `first_block_offset` — required by `load()` phase 1. |
 | `prev_offset` / `next_offset` | Every block header | Linked-list traversal — required by `repair_linked_list()` and `recompute_counters()`. |
 | `weight` / `root_offset` | Every block header | Block state determination — required by `recover_state()` and `rebuild_free_tree()`. |
 | `node_type` | Every block header | `kNodeReadOnly` check — prevents deallocation of system blocks. |
-| [ForestDomainRegistry](../include/pmm/forest_registry.h#pmm::detail::ForestDomainRegistry) | Allocated block pointed to by `hdr->root_offset` | Registry magic/version validation, domain enumeration. |
+| [ForestDomainRegistry](../include/pmm/forest_registry.h#pmm::detail::forestdomainregistry) | Allocated block pointed to by `hdr->root_offset` | Registry magic/version validation, domain enumeration. |
 | `free_tree_root` | ManagerHeader | Not strictly required (rebuilt on `load()`), but useful for hot-path validation. |
 
 **Implication:** whole-image encryption is simpler than per-block
