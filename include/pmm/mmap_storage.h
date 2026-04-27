@@ -73,9 +73,9 @@ template <typename AT = DefaultAddressTraits> class MMapStorage
     uint8_t*       base_ptr() noexcept { return _base; }
     const uint8_t* base_ptr() const noexcept { return _base; }
     size_t         total_size() const noexcept { return _size; }
-    /*
-    ### pmm-mmapstorage-expand
-    */
+/*
+### pmm-mmapstorage-expand
+*/
     bool expand( size_t additional_bytes ) noexcept
     {
         if ( !_mapped || additional_bytes == 0 )

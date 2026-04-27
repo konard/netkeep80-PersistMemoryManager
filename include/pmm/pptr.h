@@ -46,9 +46,9 @@ class pptr
     constexpr bool       is_null() const noexcept { return _idx == 0; }
     constexpr explicit   operator bool() const noexcept { return _idx != 0; }
     constexpr index_type offset() const noexcept { return _idx; }
-    /*
-    ### pmm-pptr-byte_offset
-    */
+/*
+### pmm-pptr-byte_offset
+*/
     constexpr size_t byte_offset() const noexcept
     {
         return static_cast<size_t>( _idx ) * ManagerT::address_traits::granule_size;

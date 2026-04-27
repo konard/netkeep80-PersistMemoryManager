@@ -23,9 +23,9 @@ template <size_t Size, typename AT = DefaultAddressTraits> class StaticStorage
     uint8_t*         base_ptr() noexcept { return _buffer; }
     const uint8_t*   base_ptr() const noexcept { return _buffer; }
     constexpr size_t total_size() const noexcept { return Size; }
-    /*
-    ### pmm-staticstorage-expand
-    */
+/*
+### pmm-staticstorage-expand
+*/
     bool           expand( size_t ) noexcept { return false; }
     constexpr bool owns_memory() const noexcept { return false; }
 

@@ -74,9 +74,9 @@ template <typename ManagerT> struct pstringview
     bool operator!=( const char* s ) const noexcept { return !( *this == s ); }
     bool operator!=( const pstringview& other ) const noexcept { return !( *this == other ); }
     bool operator<( const pstringview& other ) const noexcept { return std::strcmp( c_str(), other.c_str() ) < 0; }
-    /*
-    ### pmm-pstringview-intern
-    */
+/*
+### pmm-pstringview-intern
+*/
     static psview_pptr intern( const char* s ) noexcept { return _intern( s ); }
     static void        reset() noexcept
     {

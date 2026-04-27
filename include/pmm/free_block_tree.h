@@ -114,9 +114,9 @@ template <typename AT = DefaultAddressTraits> struct AvlFreeTree
         BlockState::set_avl_height_of( blk, 0 );
         detail::avl_rebalance_up( BPPtr( base, rebal ), hdr->free_tree_root );
     }
-    /*
-    ### pmm-avlfreetree-find_best_fit
-    */
+/*
+### pmm-avlfreetree-find_best_fit
+*/
     static index_type find_best_fit( uint8_t* base, detail::ManagerHeader<AT>* hdr, index_type needed_granules )
     {
         index_type total_gran = detail::byte_off_to_idx_t<AT>( hdr->total_size );

@@ -175,17 +175,17 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
         return forest_domain_view_policy( descriptor() );
     }
     bool empty() const noexcept { return root_index() == static_cast<index_type>( 0 ); }
-    /*
-    ### pmm-pmap-size
-    */
+/*
+### pmm-pmap-size
+*/
     size_t size() const noexcept
     {
         const index_type root = root_index();
         return root == static_cast<index_type>( 0 ) ? 0 : detail::avl_subtree_count( node_pptr( root ) );
     }
-    /*
-    ### pmm-pmap-insert
-    */
+/*
+### pmm-pmap-insert
+*/
     node_pptr insert( const _K& key, const _V& val ) noexcept
     {
         auto ops = forest_domain_ops();
@@ -210,9 +210,9 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
     }
     node_pptr find( const _K& key ) const noexcept { return forest_domain_view_ops().find( key ); }
     bool      contains( const _K& key ) const noexcept { return !find( key ).is_null(); }
-    /*
-    ### pmm-pmap-erase
-    */
+/*
+### pmm-pmap-erase
+*/
     bool erase( const _K& key ) noexcept
     {
         auto        ops  = forest_domain_policy( descriptor() );
@@ -224,9 +224,9 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
         ManagerT::template deallocate_typed<node_type>( t );
         return true;
     }
-    /*
-    ### pmm-pmap-clear
-    */
+/*
+### pmm-pmap-clear
+*/
     void clear() noexcept
     {
         auto        ops  = forest_domain_policy( descriptor() );
@@ -240,9 +240,9 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
     }
     void reset() noexcept { forest_domain_policy( descriptor() ).reset_root(); }
     using iterator = detail::AvlInorderIterator<node_pptr>;
-    /*
-    ### pmm-pmap-begin
-    */
+/*
+### pmm-pmap-begin
+*/
     iterator begin() const noexcept
     {
         const index_type root = root_index();

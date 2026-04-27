@@ -440,15 +440,15 @@ template <typename AT> class BlockStateBase : private Block<AT>
     std::int16_t avl_height() const noexcept { return get_avl_height( this ); }
     index_type   root_offset() const noexcept { return get_root_offset( this ); }
     uint16_t     node_type() const noexcept { return get_node_type( this ); }
-    /*
-    ### pmm-blockstatebase-is_free
-    */
+/*
+### pmm-blockstatebase-is_free
+*/
     bool is_free() const noexcept { return is_free_raw( this ); }
     bool is_allocated( index_type own_idx ) const noexcept { return is_allocated_raw( this, own_idx ); }
     bool is_permanently_locked() const noexcept { return node_type() == pmm::kNodeReadOnly; }
-    /*
-    ### pmm-blockstatebase-recover_state
-    */
+/*
+### pmm-blockstatebase-recover_state
+*/
     static void recover_state( void* raw_blk, index_type own_idx ) noexcept
     {
         const index_type weight_val = get_weight( raw_blk );
@@ -458,9 +458,9 @@ template <typename AT> class BlockStateBase : private Block<AT>
         if ( weight_val == 0 && root_val != 0 )
             set_root_offset_of( raw_blk, 0 );
     }
-    /*
-    ### pmm-blockstatebase-verify_state
-    */
+/*
+### pmm-blockstatebase-verify_state
+*/
     static void verify_state( const void* raw_blk, index_type own_idx, VerifyResult& result ) noexcept
     {
         const index_type weight_val = get_weight( raw_blk );
@@ -607,9 +607,9 @@ template <typename AT> class FreeBlock : public BlockStateBase<AT>
   public:
     using Base       = BlockStateBase<AT>;
     using index_type = typename AT::index_type;
-    /*
-    ### pmm-freeblock-cast_from_raw
-    */
+/*
+### pmm-freeblock-cast_from_raw
+*/
     static FreeBlock* cast_from_raw( void* raw ) noexcept
     {
         if ( raw == nullptr )
@@ -632,9 +632,9 @@ template <typename AT> class FreeBlock : public BlockStateBase<AT>
         }
         return Base::template state_from_raw<FreeBlock<AT>>( raw );
     }
-    /*
-    ### pmm-freeblock-verify_invariants
-    */
+/*
+### pmm-freeblock-verify_invariants
+*/
     bool                     verify_invariants() const noexcept { return Base::is_free(); }
     FreeBlockRemovedAVL<AT>* remove_from_avl() noexcept { return this->template state_as<FreeBlockRemovedAVL<AT>>(); }
 };
@@ -701,9 +701,9 @@ template <typename AT> class AllocatedBlock : public BlockStateBase<AT>
   public:
     using Base       = BlockStateBase<AT>;
     using index_type = typename AT::index_type;
-    /*
-    ### pmm-allocatedblock-cast_from_raw
-    */
+/*
+### pmm-allocatedblock-cast_from_raw
+*/
     static AllocatedBlock* cast_from_raw( void* raw ) noexcept
     {
         if ( raw == nullptr )
@@ -726,9 +726,9 @@ template <typename AT> class AllocatedBlock : public BlockStateBase<AT>
         }
         return Base::template state_from_raw<AllocatedBlock<AT>>( raw );
     }
-    /*
-    ### pmm-allocatedblock-verify_invariants
-    */
+/*
+### pmm-allocatedblock-verify_invariants
+*/
     bool        verify_invariants( index_type own_idx ) const noexcept { return Base::is_allocated( own_idx ); }
     void*       user_ptr() noexcept { return reinterpret_cast<uint8_t*>( this ) + sizeof( Block<AT> ); }
     const void* user_ptr() const noexcept { return reinterpret_cast<const uint8_t*>( this ) + sizeof( Block<AT> ); }
@@ -1942,9 +1942,9 @@ template <typename AT = DefaultAddressTraits> struct AvlFreeTree
         BlockState::set_avl_height_of( blk, 0 );
         detail::avl_rebalance_up( BPPtr( base, rebal ), hdr->free_tree_root );
     }
-    /*
-    ### pmm-avlfreetree-find_best_fit
-    */
+/*
+### pmm-avlfreetree-find_best_fit
+*/
     static index_type find_best_fit( uint8_t* base, detail::ManagerHeader<AT>* hdr, index_type needed_granules )
     {
         index_type total_gran = detail::byte_off_to_idx_t<AT>( hdr->total_size );
@@ -2172,9 +2172,9 @@ template <size_t Size, typename AT = DefaultAddressTraits> class StaticStorage
     uint8_t*         base_ptr() noexcept { return _buffer; }
     const uint8_t*   base_ptr() const noexcept { return _buffer; }
     constexpr size_t total_size() const noexcept { return Size; }
-    /*
-    ### pmm-staticstorage-expand
-    */
+/*
+### pmm-staticstorage-expand
+*/
     bool           expand( size_t ) noexcept { return false; }
     constexpr bool owns_memory() const noexcept { return false; }
 
@@ -3345,17 +3345,17 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
         return forest_domain_view_policy( descriptor() );
     }
     bool empty() const noexcept { return root_index() == static_cast<index_type>( 0 ); }
-    /*
-    ### pmm-pmap-size
-    */
+/*
+### pmm-pmap-size
+*/
     size_t size() const noexcept
     {
         const index_type root = root_index();
         return root == static_cast<index_type>( 0 ) ? 0 : detail::avl_subtree_count( node_pptr( root ) );
     }
-    /*
-    ### pmm-pmap-insert
-    */
+/*
+### pmm-pmap-insert
+*/
     node_pptr insert( const _K& key, const _V& val ) noexcept
     {
         auto ops = forest_domain_ops();
@@ -3380,9 +3380,9 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
     }
     node_pptr find( const _K& key ) const noexcept { return forest_domain_view_ops().find( key ); }
     bool      contains( const _K& key ) const noexcept { return !find( key ).is_null(); }
-    /*
-    ### pmm-pmap-erase
-    */
+/*
+### pmm-pmap-erase
+*/
     bool erase( const _K& key ) noexcept
     {
         auto        ops  = forest_domain_policy( descriptor() );
@@ -3394,9 +3394,9 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
         ManagerT::template deallocate_typed<node_type>( t );
         return true;
     }
-    /*
-    ### pmm-pmap-clear
-    */
+/*
+### pmm-pmap-clear
+*/
     void clear() noexcept
     {
         auto        ops  = forest_domain_policy( descriptor() );
@@ -3410,9 +3410,9 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
     }
     void reset() noexcept { forest_domain_policy( descriptor() ).reset_root(); }
     using iterator = detail::AvlInorderIterator<node_pptr>;
-    /*
-    ### pmm-pmap-begin
-    */
+/*
+### pmm-pmap-begin
+*/
     iterator begin() const noexcept
     {
         const index_type root = root_index();
@@ -3471,9 +3471,9 @@ class pptr
     constexpr bool       is_null() const noexcept { return _idx == 0; }
     constexpr explicit   operator bool() const noexcept { return _idx != 0; }
     constexpr index_type offset() const noexcept { return _idx; }
-    /*
-    ### pmm-pptr-byte_offset
-    */
+/*
+### pmm-pptr-byte_offset
+*/
     constexpr size_t byte_offset() const noexcept
     {
         return static_cast<size_t>( _idx ) * ManagerT::address_traits::granule_size;
@@ -3724,9 +3724,9 @@ template <typename ManagerT> struct pstringview
     bool operator!=( const char* s ) const noexcept { return !( *this == s ); }
     bool operator!=( const pstringview& other ) const noexcept { return !( *this == other ); }
     bool operator<( const pstringview& other ) const noexcept { return std::strcmp( c_str(), other.c_str() ) < 0; }
-    /*
-    ### pmm-pstringview-intern
-    */
+/*
+### pmm-pstringview-intern
+*/
     static psview_pptr intern( const char* s ) noexcept { return _intern( s ); }
     static void        reset() noexcept
     {
@@ -3858,9 +3858,9 @@ template <typename ManagerT> class PersistMemoryTypedApi
         void* raw = ManagerT::template raw_block_user_ptr_from_pptr<T>( p );
         ManagerT::deallocate( raw );
     }
-    /*
-    #### pmm-detail-persistmemorytypedapi-reallocate_typed
-    */
+/*
+#### pmm-detail-persistmemorytypedapi-reallocate_typed
+*/
     template <typename T>
     static pmm::pptr<T, ManagerT> reallocate_typed( pmm::pptr<T, ManagerT> p, size_t old_count,
                                                     size_t new_count ) noexcept
@@ -4305,9 +4305,9 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         logging_policy::on_load();
         return true;
     }
-    /*
-    ### pmm-persistmemorymanager-destroy
-    */
+/*
+### pmm-persistmemorymanager-destroy
+*/
     static void destroy() noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
@@ -4326,9 +4326,9 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         logging_policy::on_destroy();
     }
     static bool is_initialized() noexcept { return _initialized.load( std::memory_order_acquire ); }
-    /*
-    ### pmm-persistmemorymanager-allocate
-    */
+/*
+### pmm-persistmemorymanager-allocate
+*/
     static void* allocate( size_t user_size ) noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
@@ -5624,9 +5624,9 @@ template <typename AT = DefaultAddressTraits> class MMapStorage
     uint8_t*       base_ptr() noexcept { return _base; }
     const uint8_t* base_ptr() const noexcept { return _base; }
     size_t         total_size() const noexcept { return _size; }
-    /*
-    ### pmm-mmapstorage-expand
-    */
+/*
+### pmm-mmapstorage-expand
+*/
     bool expand( size_t additional_bytes ) noexcept
     {
         if ( !_mapped || additional_bytes == 0 )

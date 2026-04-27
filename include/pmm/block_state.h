@@ -67,15 +67,15 @@ template <typename AT> class BlockStateBase : private Block<AT>
     std::int16_t avl_height() const noexcept { return get_avl_height( this ); }
     index_type   root_offset() const noexcept { return get_root_offset( this ); }
     uint16_t     node_type() const noexcept { return get_node_type( this ); }
-    /*
-    ### pmm-blockstatebase-is_free
-    */
+/*
+### pmm-blockstatebase-is_free
+*/
     bool is_free() const noexcept { return is_free_raw( this ); }
     bool is_allocated( index_type own_idx ) const noexcept { return is_allocated_raw( this, own_idx ); }
     bool is_permanently_locked() const noexcept { return node_type() == pmm::kNodeReadOnly; }
-    /*
-    ### pmm-blockstatebase-recover_state
-    */
+/*
+### pmm-blockstatebase-recover_state
+*/
     static void recover_state( void* raw_blk, index_type own_idx ) noexcept
     {
         const index_type weight_val = get_weight( raw_blk );
@@ -85,9 +85,9 @@ template <typename AT> class BlockStateBase : private Block<AT>
         if ( weight_val == 0 && root_val != 0 )
             set_root_offset_of( raw_blk, 0 );
     }
-    /*
-    ### pmm-blockstatebase-verify_state
-    */
+/*
+### pmm-blockstatebase-verify_state
+*/
     static void verify_state( const void* raw_blk, index_type own_idx, VerifyResult& result ) noexcept
     {
         const index_type weight_val = get_weight( raw_blk );
@@ -234,9 +234,9 @@ template <typename AT> class FreeBlock : public BlockStateBase<AT>
   public:
     using Base       = BlockStateBase<AT>;
     using index_type = typename AT::index_type;
-    /*
-    ### pmm-freeblock-cast_from_raw
-    */
+/*
+### pmm-freeblock-cast_from_raw
+*/
     static FreeBlock* cast_from_raw( void* raw ) noexcept
     {
         if ( raw == nullptr )
@@ -259,9 +259,9 @@ template <typename AT> class FreeBlock : public BlockStateBase<AT>
         }
         return Base::template state_from_raw<FreeBlock<AT>>( raw );
     }
-    /*
-    ### pmm-freeblock-verify_invariants
-    */
+/*
+### pmm-freeblock-verify_invariants
+*/
     bool                     verify_invariants() const noexcept { return Base::is_free(); }
     FreeBlockRemovedAVL<AT>* remove_from_avl() noexcept { return this->template state_as<FreeBlockRemovedAVL<AT>>(); }
 };
@@ -328,9 +328,9 @@ template <typename AT> class AllocatedBlock : public BlockStateBase<AT>
   public:
     using Base       = BlockStateBase<AT>;
     using index_type = typename AT::index_type;
-    /*
-    ### pmm-allocatedblock-cast_from_raw
-    */
+/*
+### pmm-allocatedblock-cast_from_raw
+*/
     static AllocatedBlock* cast_from_raw( void* raw ) noexcept
     {
         if ( raw == nullptr )
@@ -353,9 +353,9 @@ template <typename AT> class AllocatedBlock : public BlockStateBase<AT>
         }
         return Base::template state_from_raw<AllocatedBlock<AT>>( raw );
     }
-    /*
-    ### pmm-allocatedblock-verify_invariants
-    */
+/*
+### pmm-allocatedblock-verify_invariants
+*/
     bool        verify_invariants( index_type own_idx ) const noexcept { return Base::is_allocated( own_idx ); }
     void*       user_ptr() noexcept { return reinterpret_cast<uint8_t*>( this ) + sizeof( Block<AT> ); }
     const void* user_ptr() const noexcept { return reinterpret_cast<const uint8_t*>( this ) + sizeof( Block<AT> ); }

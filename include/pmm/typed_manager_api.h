@@ -39,9 +39,9 @@ template <typename ManagerT> class PersistMemoryTypedApi
         void* raw = ManagerT::template raw_block_user_ptr_from_pptr<T>( p );
         ManagerT::deallocate( raw );
     }
-    /*
-    #### pmm-detail-persistmemorytypedapi-reallocate_typed
-    */
+/*
+#### pmm-detail-persistmemorytypedapi-reallocate_typed
+*/
     template <typename T>
     static pmm::pptr<T, ManagerT> reallocate_typed( pmm::pptr<T, ManagerT> p, size_t old_count,
                                                     size_t new_count ) noexcept

@@ -234,9 +234,9 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         logging_policy::on_load();
         return true;
     }
-    /*
-    ### pmm-persistmemorymanager-destroy
-    */
+/*
+### pmm-persistmemorymanager-destroy
+*/
     static void destroy() noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
@@ -255,9 +255,9 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         logging_policy::on_destroy();
     }
     static bool is_initialized() noexcept { return _initialized.load( std::memory_order_acquire ); }
-    /*
-    ### pmm-persistmemorymanager-allocate
-    */
+/*
+### pmm-persistmemorymanager-allocate
+*/
     static void* allocate( size_t user_size ) noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
