@@ -37,6 +37,16 @@ jobs:
             -print0 \
             | xargs -0 clang-format --dry-run --Werror
 
+  # ─── Include anchor comment check ────────────────────────────────────────────
+  include-anchors:
+    name: Include anchor comment check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check include anchor comments
+        run: bash scripts/check-include-anchor-comments.sh
+
   # ─── Static analysis ─────────────────────────────────────────────────────────
   static-analysis:
     name: cppcheck

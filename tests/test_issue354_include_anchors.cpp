@@ -52,12 +52,17 @@ bool is_anchor_name( std::string_view anchor )
 
 std::string validate_anchor_comment_format( std::string_view comment )
 {
-    static const std::regex comment_pattern( R"re(^/\*\n(#+) ([^\n]+)\n\s*\*/$)re" );
+    static const std::regex comment_pattern( R"re(^/\*\n(#+) ([^\n]+)\n\*/$)re" );
 
     std::smatch match;
     const auto  comment_text = std::string( comment );
     if ( !std::regex_match( comment_text, match, comment_pattern ) )
+    {
+        static const std::regex indented_anchor_pattern( R"re(^/\*\n\s+#+ [^\n]+\n\s*\*/$)re" );
+        if ( std::regex_match( comment_text, indented_anchor_pattern ) )
+            return "anchor heading marker must start at the beginning of the line";
         return "block comment is not a PMM anchor";
+    }
 
     const auto heading_depth = match[1].str().size();
     const auto anchor        = match[2].str();
@@ -193,6 +198,14 @@ std::vector<std::string> validate_comments_are_anchors( const std::filesystem::p
 
         if ( pos + 1 < text.size() && text[pos] == '/' && text[pos + 1] == '*' )
         {
+            if ( pos > 0 && text[pos - 1] != '\n' )
+            {
+                std::ostringstream failure;
+                failure << path << ':' << line_number_at( text, pos )
+                        << ": anchor block comment must start at the beginning of the line";
+                failures.push_back( failure.str() );
+            }
+
             const auto end = text.find( "*/", pos + 2 );
             if ( end == std::string::npos )
             {
@@ -222,7 +235,8 @@ std::vector<std::string> validate_comments_are_anchors( const std::filesystem::p
 
 std::vector<std::string> anchors_in( const std::string& text )
 {
-    static const std::regex  anchor_pattern( R"re(/\*\n(#+) ([a-z_~][a-z0-9_~]*(?:-[a-z_~][a-z0-9_~]*)*)\n\s*\*/)re" );
+    static const std::regex anchor_pattern(
+        R"re((?:^|\n)/\*\n(#+) ([a-z_~][a-z0-9_~]*(?:-[a-z_~][a-z0-9_~]*)*)\n\*/)re" );
     std::vector<std::string> anchors;
     for ( std::sregex_iterator it( text.begin(), text.end(), anchor_pattern ), end; it != end; ++it )
     {
