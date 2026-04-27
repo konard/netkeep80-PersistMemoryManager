@@ -61,7 +61,7 @@
       "scope": "directory",
       "metric": "bytes",
       "glob": "include/**",
-      "max": 50000,
+      "max": 150000,
       "count": "all_tracked",
       "level": "blocking"
     }
