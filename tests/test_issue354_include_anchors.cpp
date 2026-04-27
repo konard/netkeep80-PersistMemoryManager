@@ -52,7 +52,7 @@ bool is_anchor_name( std::string_view anchor )
 
 std::string validate_anchor_comment_format( std::string_view comment )
 {
-    static const std::regex comment_pattern( R"re(^/\*\n(#+) ([^\n]+)\n\s*\*/$)re" );
+    static const std::regex comment_pattern( R"re(^/\*\n\s*(#+) ([^\n]+)\n\s*\*/$)re" );
 
     std::smatch match;
     const auto  comment_text = std::string( comment );
@@ -222,7 +222,8 @@ std::vector<std::string> validate_comments_are_anchors( const std::filesystem::p
 
 std::vector<std::string> anchors_in( const std::string& text )
 {
-    static const std::regex  anchor_pattern( R"re(/\*\n(#+) ([a-z_~][a-z0-9_~]*(?:-[a-z_~][a-z0-9_~]*)*)\n\s*\*/)re" );
+    static const std::regex anchor_pattern(
+        R"re(/\*\n\s*(#+) ([a-z_~][a-z0-9_~]*(?:-[a-z_~][a-z0-9_~]*)*)\n\s*\*/)re" );
     std::vector<std::string> anchors;
     for ( std::sregex_iterator it( text.begin(), text.end(), anchor_pattern ), end; it != end; ++it )
     {
