@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog-insert-here -->
 
+## [3.0.6] - 2026-04-27
+
+### Changed
+- Reformatted the public include headers for readability.
+- Refreshed generated single headers and adjusted structural checks for the formatted include layout.
+- Added a CI guard for PMM include anchor comment formatting.
+
+
 ## [3.0.5] - 2026-04-26
 
 ### Changed
