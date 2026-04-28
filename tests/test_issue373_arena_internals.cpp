@@ -47,8 +47,7 @@ TEST_CASE( "I373-A: bytes_to_granules_checked returns nullopt on size_t overflow
     REQUIRE_FALSE( r.has_value() );
 }
 
-TEST_CASE( "I373-A: bytes_to_granules_checked returns nullopt above index_type::max",
-           "[issue373][arithmetic]" )
+TEST_CASE( "I373-A: bytes_to_granules_checked returns nullopt above index_type::max", "[issue373][arithmetic]" )
 {
     constexpr std::size_t too_many =
         ( static_cast<std::size_t>( std::numeric_limits<SmallAT::index_type>::max() ) + 2 ) * SmallAT::granule_size;
@@ -72,8 +71,7 @@ TEST_CASE( "I373-C: checked arithmetic detects overflow", "[issue373][arithmetic
     REQUIRE( pmm::detail::checked_add( 10, 20 ).value() == 30 );
     REQUIRE_FALSE( pmm::detail::checked_add( std::numeric_limits<std::size_t>::max(), 1 ).has_value() );
     REQUIRE( pmm::detail::checked_mul( 100, 100 ).value() == 10000 );
-    REQUIRE_FALSE(
-        pmm::detail::checked_mul( std::numeric_limits<std::size_t>::max(), 2 ).has_value() );
+    REQUIRE_FALSE( pmm::detail::checked_mul( std::numeric_limits<std::size_t>::max(), 2 ).has_value() );
     REQUIRE( pmm::detail::checked_mul( 0, std::numeric_limits<std::size_t>::max() ).value() == 0 );
 }
 
@@ -82,8 +80,8 @@ TEST_CASE( "I373-D: ArenaView reports valid blocks within the arena", "[issue373
 {
     using Mgr = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 373>;
     REQUIRE( Mgr::create( 4096 ) );
-    auto*  base = Mgr::backend().base_ptr();
-    auto*  hdr  = pmm::detail::manager_header_at<DefaultAT>( base );
+    auto*                             base = Mgr::backend().base_ptr();
+    auto*                             hdr  = pmm::detail::manager_header_at<DefaultAT>( base );
     pmm::detail::ArenaView<DefaultAT> view{ base, hdr };
     REQUIRE( view.valid() );
     REQUIRE( view.total_size() == hdr->total_size );
@@ -147,8 +145,7 @@ TEST_CASE( "I373-F: compute_growth rounds up to granule_size", "[issue373][growt
 }
 
 // I373-G: HeapStorage alignment for LargeAddressTraits
-TEST_CASE( "I373-G: HeapStorage<LargeAddressTraits> base_ptr is aligned to granule_size",
-           "[issue373][alignment]" )
+TEST_CASE( "I373-G: HeapStorage<LargeAddressTraits> base_ptr is aligned to granule_size", "[issue373][alignment]" )
 {
     pmm::HeapStorage<LargeAT> store( 1024 );
     auto*                     p = store.base_ptr();
@@ -156,8 +153,7 @@ TEST_CASE( "I373-G: HeapStorage<LargeAddressTraits> base_ptr is aligned to granu
     REQUIRE( reinterpret_cast<std::uintptr_t>( p ) % LargeAT::granule_size == 0 );
 }
 
-TEST_CASE( "I373-G: HeapStorage<DefaultAddressTraits> base_ptr is aligned to granule_size",
-           "[issue373][alignment]" )
+TEST_CASE( "I373-G: HeapStorage<DefaultAddressTraits> base_ptr is aligned to granule_size", "[issue373][alignment]" )
 {
     pmm::HeapStorage<DefaultAT> store( 1024 );
     auto*                       p = store.base_ptr();
@@ -193,9 +189,9 @@ TEST_CASE( "I373-I: for_each_physical_block walks all blocks of a healthy arena"
     auto*       base   = Mgr::backend().base_ptr();
     const auto* hdr    = pmm::detail::manager_header_at<DefaultAT>( base );
     std::size_t visits = 0;
-    bool clean = pmm::detail::for_each_physical_block<DefaultAT>( base, hdr,
-                                                                  [&]( DefaultAT::index_type, const void* ) noexcept
-                                                                  {
+    bool        clean  = pmm::detail::for_each_physical_block<DefaultAT>( base, hdr,
+                                                                          [&]( DefaultAT::index_type, const void* ) noexcept
+                                                                          {
                                                                       ++visits;
                                                                       return true;
                                                                   } );

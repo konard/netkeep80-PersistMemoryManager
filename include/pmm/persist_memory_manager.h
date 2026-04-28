@@ -43,6 +43,30 @@ template <typename C> struct config_logging_policy<C, std::void_t<typename C::lo
 {
     using type = typename C::logging_policy;
 };
+template <typename, typename = void> struct config_grow_numerator
+{
+    static constexpr size_t value = config::kDefaultGrowNumerator;
+};
+template <typename C> struct config_grow_numerator<C, std::void_t<decltype( C::grow_numerator )>>
+{
+    static constexpr size_t value = C::grow_numerator;
+};
+template <typename, typename = void> struct config_grow_denominator
+{
+    static constexpr size_t value = config::kDefaultGrowDenominator;
+};
+template <typename C> struct config_grow_denominator<C, std::void_t<decltype( C::grow_denominator )>>
+{
+    static constexpr size_t value = C::grow_denominator;
+};
+template <typename, typename = void> struct config_max_memory_gb
+{
+    static constexpr size_t value = 64;
+};
+template <typename C> struct config_max_memory_gb<C, std::void_t<decltype( C::max_memory_gb )>>
+{
+    static constexpr size_t value = C::max_memory_gb;
+};
 }
 template <typename ConfigT = CacheManagerConfig, size_t InstanceId = 0>
 /*
@@ -103,7 +127,26 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             _last_error = PmmError::BackendError;
             return false;
         }
-        return create_locked();
+        detail::InitGuard guard( _initialized );
+        if ( !init_layout( _backend.base_ptr(), _backend.total_size() ) )
+        {
+            _last_error = PmmError::BackendError;
+            return false;
+        }
+        if ( !bootstrap_forest_registry_unlocked() )
+        {
+            _last_error = PmmError::BackendError;
+            return false;
+        }
+        if ( !validate_bootstrap_invariants_unlocked() )
+        {
+            _last_error = PmmError::BackendError;
+            return false;
+        }
+        _last_error = PmmError::Ok;
+        logging_policy::on_create( _backend.total_size() );
+        guard.commit();
+        return true;
     }
     static bool create() noexcept
     {
@@ -113,7 +156,26 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             _last_error = ( _backend.base_ptr() == nullptr ) ? PmmError::BackendError : PmmError::InvalidSize;
             return false;
         }
-        return create_locked();
+        detail::InitGuard guard( _initialized );
+        if ( !init_layout( _backend.base_ptr(), _backend.total_size() ) )
+        {
+            _last_error = PmmError::BackendError;
+            return false;
+        }
+        if ( !bootstrap_forest_registry_unlocked() )
+        {
+            _last_error = PmmError::BackendError;
+            return false;
+        }
+        if ( !validate_bootstrap_invariants_unlocked() )
+        {
+            _last_error = PmmError::BackendError;
+            return false;
+        }
+        _last_error = PmmError::Ok;
+        logging_policy::on_create( _backend.total_size() );
+        guard.commit();
+        return true;
     }
     static bool load( VerifyResult& result ) noexcept
     {
@@ -577,20 +639,6 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         size_t byte_off = static_cast<size_t>( off ) * address_traits::granule_size;
         return byte_off + size_bytes <= _backend.total_size();
     }
-    static bool create_locked() noexcept
-    {
-        detail::InitGuard guard( _initialized );
-        if ( !init_layout( _backend.base_ptr(), _backend.total_size() ) || !bootstrap_forest_registry_unlocked() ||
-             !validate_bootstrap_invariants_unlocked() )
-        {
-            _last_error = PmmError::BackendError;
-            return false;
-        }
-        _last_error = PmmError::Ok;
-        logging_policy::on_create( _backend.total_size() );
-        guard.commit();
-        return true;
-    }
     static void* allocate_unlocked( size_t user_size ) noexcept
     {
         if ( !_initialized )
@@ -721,20 +769,19 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     }
     struct layout_access
     {
-        using address_traits                          = manager_type::address_traits;
-        using free_block_tree                         = manager_type::free_block_tree;
-        using logging_policy                          = manager_type::logging_policy;
-        using storage_backend                         = manager_type::storage_backend;
-        using index_type                              = manager_type::index_type;
-        static constexpr uint64_t   kMagic            = pmm::kMagic;
-        static constexpr size_t     kBlockHdrByteSize = manager_type::kBlockHdrByteSize;
-        static constexpr index_type kBlockHdrGranules = manager_type::kBlockHdrGranules;
-        static constexpr index_type kMgrHdrGranules   = manager_type::kMgrHdrGranules;
-        static constexpr index_type kFreeBlkIdxLayout = manager_type::kFreeBlkIdxLayout;
-        static constexpr size_t kGrowNumerator = detail::cfg_grow_num<ConfigT, config::kDefaultGrowNumerator>::value;
-        static constexpr size_t kGrowDenominator =
-            detail::cfg_grow_den<ConfigT, config::kDefaultGrowDenominator>::value;
-        static constexpr size_t                       kMaxMemoryGB = detail::cfg_max_gb<ConfigT, 64>::value;
+        using address_traits                                            = manager_type::address_traits;
+        using free_block_tree                                           = manager_type::free_block_tree;
+        using logging_policy                                            = manager_type::logging_policy;
+        using storage_backend                                           = manager_type::storage_backend;
+        using index_type                                                = manager_type::index_type;
+        static constexpr uint64_t                     kMagic            = pmm::kMagic;
+        static constexpr size_t                       kBlockHdrByteSize = manager_type::kBlockHdrByteSize;
+        static constexpr index_type                   kBlockHdrGranules = manager_type::kBlockHdrGranules;
+        static constexpr index_type                   kMgrHdrGranules   = manager_type::kMgrHdrGranules;
+        static constexpr index_type                   kFreeBlkIdxLayout = manager_type::kFreeBlkIdxLayout;
+        static constexpr size_t                       kGrowNumerator    = detail::config_grow_numerator<ConfigT>::value;
+        static constexpr size_t  kGrowDenominator                       = detail::config_grow_denominator<ConfigT>::value;
+        static constexpr size_t  kMaxMemoryGB                           = detail::config_max_memory_gb<ConfigT>::value;
         static detail::ManagerHeader<address_traits>* get_header( uint8_t* base ) noexcept
         {
             return manager_type::get_header( base );
