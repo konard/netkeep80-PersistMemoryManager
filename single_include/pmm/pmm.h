@@ -148,21 +148,10 @@ enum : uint16_t
 };
 namespace detail
 {
-template <std::size_t N> struct BlockHeaderPadding
+template <typename AT, bool NeedsPadding> struct BlockHeaderStorage;
+template <typename AT> struct BlockHeaderStorage<AT, false>
 {
-    std::uint8_t _bytes[N];
-};
-template <> struct BlockHeaderPadding<0>
-{
-};
-}
-/*
-## pmm-blockheader
-*/
-template <typename AT> struct BlockHeader
-{
-    using address_traits = AT;
-    using index_type     = typename AT::index_type;
+    using index_type = typename AT::index_type;
     index_type   weight;
     index_type   left_offset;
     index_type   right_offset;
@@ -172,18 +161,35 @@ template <typename AT> struct BlockHeader
     uint16_t     node_type;
     index_type   prev_offset;
     index_type   next_offset;
-
-  private:
-    static constexpr std::size_t _natural_size_aligned_to_index =
-        ( ( 7 * sizeof( index_type ) + sizeof( std::int16_t ) + sizeof( uint16_t ) + alignof( index_type ) - 1 ) /
-          alignof( index_type ) ) *
-        alignof( index_type );
-    static constexpr std::size_t _granule_aligned_size =
-        ( ( _natural_size_aligned_to_index + AT::granule_size - 1 ) / AT::granule_size ) * AT::granule_size;
-    static constexpr std::size_t _pad_size = _granule_aligned_size - _natural_size_aligned_to_index;
-
-  public:
-    [[no_unique_address]] detail::BlockHeaderPadding<_pad_size> _granule_padding;
+};
+template <typename AT> constexpr std::size_t block_header_natural_size_v = sizeof( BlockHeaderStorage<AT, false> );
+template <typename AT>
+constexpr std::size_t block_header_target_size_v =
+    ( ( block_header_natural_size_v<AT> + AT::granule_size - 1 ) / AT::granule_size ) * AT::granule_size;
+template <typename AT>
+constexpr bool block_header_needs_padding_v = block_header_natural_size_v<AT> != block_header_target_size_v<AT>;
+template <typename AT> struct BlockHeaderStorage<AT, true>
+{
+    using index_type = typename AT::index_type;
+    index_type   weight;
+    index_type   left_offset;
+    index_type   right_offset;
+    index_type   parent_offset;
+    index_type   root_offset;
+    std::int16_t avl_height;
+    uint16_t     node_type;
+    index_type   prev_offset;
+    index_type   next_offset;
+    std::uint8_t _granule_padding[block_header_target_size_v<AT> - block_header_natural_size_v<AT>];
+};
+}
+/*
+## pmm-blockheader
+*/
+template <typename AT> struct BlockHeader : detail::BlockHeaderStorage<AT, detail::block_header_needs_padding_v<AT>>
+{
+    using address_traits = AT;
+    using index_type     = typename AT::index_type;
 };
 /*
 ## pmm-blocklayoutcontract
