@@ -428,10 +428,10 @@ They are intended for advanced use cases, such as implementing persistent data s
 
 ```cpp
 template <typename T>
-static TreeNode<address_traits>& tree_node(pptr<T> p) noexcept;
+static BlockHeader<address_traits>& tree_node(pptr<T> p) noexcept;
 ```
 
-Returns a direct reference to the [TreeNode](../include/pmm/tree_node.h#pmm-treenode) embedded in the block header for `p`.
+Returns a direct reference to the [TreeNode](../include/pmm/block_header.h#pmm-blockheader) embedded in the block header for `p`.
 Provides unified access to all AVL fields via `get_left()`, `set_left()`, `get_right()`,
 `set_right()`, `get_parent()`, `set_parent()`, `get_height()`, `set_height()`,
 `get_weight()`, `set_weight()`.
@@ -521,11 +521,11 @@ Both operations call `ManagerT::resolve<T>(p)` internally.
 ### AVL tree node access
 
 ```cpp
-TreeNode<address_traits>& tree_node() const noexcept;  // direct reference to TreeNode
+BlockHeader<address_traits>& tree_node() const noexcept;  // direct reference to TreeNode
 ```
 
-Returns a reference to the [TreeNode](../include/pmm/tree_node.h#pmm-treenode) embedded in the block header. All AVL fields
-are accessed through the returned [TreeNode](../include/pmm/tree_node.h#pmm-treenode) reference:
+Returns a reference to the [TreeNode](../include/pmm/block_header.h#pmm-blockheader) embedded in the block header. All AVL fields
+are accessed through the returned [TreeNode](../include/pmm/block_header.h#pmm-blockheader) reference:
 
 ```cpp
 auto& tn = p.tree_node();
@@ -670,7 +670,7 @@ namespace pmm {
 ```
 
 A persistent associative container (dictionary) based on an AVL tree. Each node is an
-allocated block in PAP containing a key-value pair. The built-in [TreeNode](../include/pmm/tree_node.h#pmm-treenode) fields of
+allocated block in PAP containing a key-value pair. The built-in [TreeNode](../include/pmm/block_header.h#pmm-blockheader) fields of
 each block serve as AVL tree links (no separate node allocations). Inserting a duplicate
 key updates the existing value.
 

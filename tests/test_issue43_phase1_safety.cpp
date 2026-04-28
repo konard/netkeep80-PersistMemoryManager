@@ -180,25 +180,9 @@ TEST_CASE( "allocate_typed overflow", "[test_issue43_phase1_safety]" )
     M::destroy();
 }
 
-// =============================================================================
-// 1.4: Runtime checks in cast_from_raw
-// =============================================================================
-
-/// Test that FreeBlock::cast_from_raw returns nullptr for null input.
-TEST_CASE( "FreeBlock cast_from_raw null", "[test_issue43_phase1_safety]" )
-{
-    void* null_ptr = nullptr;
-    auto* result   = pmm::FreeBlock<pmm::DefaultAddressTraits>::cast_from_raw( null_ptr );
-    REQUIRE( result == nullptr );
-}
-
-/// Test that AllocatedBlock::cast_from_raw returns nullptr for null input.
-TEST_CASE( "AllocatedBlock cast_from_raw null", "[test_issue43_phase1_safety]" )
-{
-    void* null_ptr = nullptr;
-    auto* result   = pmm::AllocatedBlock<pmm::DefaultAddressTraits>::cast_from_raw( null_ptr );
-    REQUIRE( result == nullptr );
-}
+// Issue #367: cast_from_raw no longer accepts null pointers. Callers must validate
+// raw pointers before constructing typed views; passing nullptr is a precondition
+// violation and triggers a debug assertion.
 
 /// Test that normal allocation/deallocation cycle works after all safety changes.
 TEST_CASE( "full allocation cycle", "[test_issue43_phase1_safety]" )

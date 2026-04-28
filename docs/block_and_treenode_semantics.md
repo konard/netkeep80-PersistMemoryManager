@@ -3,7 +3,7 @@
 ## Статус документа
 
 Этот документ фиксирует **каноническую семантику полей `Block<AddressTraitsT>` и
-`TreeNode<AddressTraitsT>`** для [PersistMemoryManager](../include/pmm/persist_memory_manager.h#pmm-persistmemorymanager).
+`BlockHeader<AddressTraitsT> (AVL slot)`** для [PersistMemoryManager](../include/pmm/persist_memory_manager.h#pmm-persistmemorymanager).
 
 Это документ уровня **storage kernel / AVL-forest substrate**. Он определяет,
 как следует понимать поля блока и встроенного intrusive tree-slot,
@@ -17,7 +17,7 @@
 - общая forest-модель PMM: [pmm_avl_forest.md](pmm_avl_forest.md)
 - free-tree forest-policy: [free_tree_forest_policy.md](free_tree_forest_policy.md)
 - низкоуровневый layout и алгоритмы: [architecture.md](architecture.md)
-- фактические объявления: [../include/pmm/block.h](../include/pmm/block.h), [../include/pmm/tree_node.h](../include/pmm/tree_node.h)
+- фактические объявления: [../include/pmm/block.h](../include/pmm/block.h), [../include/pmm/block_header.h](../include/pmm/block_header.h)
 
 ## Что этот документ фиксирует
 
@@ -48,7 +48,7 @@
 Отсюда следует базовое правило:
 
 - поля [Block](../include/pmm/block.h#pmm-block) описывают **физическую линейную топологию ПАП**;
-- поля [TreeNode](../include/pmm/tree_node.h#pmm-treenode) описывают **участие блока в одном текущем intrusive AVL-дереве**.
+- поля [TreeNode](../include/pmm/block_header.h#pmm-blockheader) описывают **участие блока в одном текущем intrusive AVL-дереве**.
 
 Эти два слоя сосуществуют одновременно и не должны подменять друг друга.
 
@@ -115,9 +115,9 @@
 
 Следовательно, [Block](../include/pmm/block.h#pmm-block)-поля являются **неприкосновенным physical layer** PMM.
 
-## 3. Каноническая семантика [TreeNode](../include/pmm/tree_node.h#pmm-treenode)
+## 3. Каноническая семантика [TreeNode](../include/pmm/block_header.h#pmm-blockheader)
 
-[TreeNode](../include/pmm/tree_node.h#pmm-treenode) — это **один встроенный intrusive AVL-slot** текущего forest-домена.
+[TreeNode](../include/pmm/block_header.h#pmm-blockheader) — это **один встроенный intrusive AVL-slot** текущего forest-домена.
 
 Общее правило для всех его полей:
 
@@ -336,7 +336,7 @@ See [free_tree_forest_policy.md](free_tree_forest_policy.md) for the full orderi
 
 Текущий layout архитектурно ценен:
 
-- `TreeNode<DefaultAddressTraits>` = 24 байта;
+- `BlockHeader<DefaultAddressTraits>` (AVL slot) = 24 байта;
 - `Block<DefaultAddressTraits>` = 32 байта;
 - `Block<DefaultAddressTraits>` = 2 гранулы по 16 байт.
 

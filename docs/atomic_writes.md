@@ -46,10 +46,10 @@ The `granule_size` field is checked on `load()`: if it does not match the compil
 
 ### Block\<A\> (32 bytes = 2 granules for DefaultAddressTraits)
 
-`Block<A>` = `LinkedListNode<A>` + `TreeNode<A>`:
+`Block<A>` = `LinkedListNode<A>` + `BlockHeader<A>` (AVL slot):
 
 ```
-[TreeNode<A>]
+[BlockHeader<A>]
   Bytes 0–3:   weight        — user data size in granules (0 = free block)
   Bytes 4–7:   left_offset   — left AVL child (granule index)
   Bytes 8–11:  right_offset  — right AVL child (granule index)
@@ -62,7 +62,7 @@ The `granule_size` field is checked on `load()`: if it does not match the compil
   Bytes 28–31: next_offset   — next block (granule index)
 ```
 
-**Note:** The [TreeNode](../include/pmm/tree_node.h#pmm-treenode) fields (`left_offset`, `right_offset`, `parent_offset`,
+**Note:** The [TreeNode](../include/pmm/block_header.h#pmm-blockheader) fields (`left_offset`, `right_offset`, `parent_offset`,
 `avl_height`) are shared between two separate tree uses:
 1. **Free-block AVL tree** — used by the allocator when `weight == 0` (block is free).
 2. **User-data AVL trees** — used by [pstringview](../include/pmm/pstringview.h#pmm-pstringview) and [pmap](../include/pmm/pmap.h#pmm-pmap) when `weight > 0` (block
@@ -505,7 +505,7 @@ point**, where partially completed allocation operations are treated as "not per
 
 ## User-data AVL trees ([pstringview](../include/pmm/pstringview.h#pmm-pstringview), [pmap](../include/pmm/pmap.h#pmm-pmap))
 
-[pstringview](../include/pmm/pstringview.h#pmm-pstringview) and [pmap](../include/pmm/pmap.h#pmm-pmap) use the same [TreeNode](../include/pmm/tree_node.h#pmm-treenode) fields inside allocated blocks to
+[pstringview](../include/pmm/pstringview.h#pmm-pstringview) and [pmap](../include/pmm/pmap.h#pmm-pmap) use the same [TreeNode](../include/pmm/block_header.h#pmm-blockheader) fields inside allocated blocks to
 organize their own AVL trees. This is entirely separate from the free-block AVL tree.
 
 ### Persistence of user-data trees

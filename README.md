@@ -336,7 +336,7 @@ cmake --build build --target pmm_demo
 - [Validation Model](docs/validation_model.md) - уровни проверки указателей и блоков;
 - [Atomic Writes](docs/atomic_writes.md) - порядок мутаций и crash-consistency;
 - [Thread Safety](docs/thread_safety.md) - lock policies и concurrent usage;
-- [Block and TreeNode Semantics](docs/block_and_treenode_semantics.md) - семантика block header.
+- [Block Header Semantics](docs/block_and_treenode_semantics.md) - семантика block header.
 
 Исторические документы находятся в `docs/archive/` и не входят в основной
 маршрут чтения.

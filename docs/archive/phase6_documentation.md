@@ -199,7 +199,7 @@
 #### `BlockPPtr<AT>` адаптер
 
 Легковесная обёртка `(base_ptr, block_index)`, имитирующая интерфейс [pptr](../../include/pmm/pptr.h#pmm-pptr) через
-[BlockTreeNodeProxy](../../include/pmm/avl_tree_mixin.h#pmm-detail-blocktreenodeproxy). Позволяет [AvlFreeTree](../../include/pmm/free_block_tree.h#pmm-avlfreetree) делегировать ротации, ребалансировку
+[BlockHeader](../../include/pmm/block_header.h#pmm-blockheader). Позволяет [AvlFreeTree](../../include/pmm/free_block_tree.h#pmm-avlfreetree) делегировать ротации, ребалансировку
 и поиск минимума общим AVL-функциям вместо дублирования ~120 строк кода.
 
 #### `AvlInorderIterator<NodePPtr>`

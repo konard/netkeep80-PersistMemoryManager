@@ -152,16 +152,13 @@ template <typename ManagerT> class PersistMemoryTypedApi
         index_type freed_w     = BlockStateBase<address_traits>::get_weight( old_blk_raw );
         if ( BlockStateBase<address_traits>::get_node_type( old_blk_raw ) != pmm::kNodeReadOnly )
         {
-            auto* old_alloc = AllocatedBlock<address_traits>::cast_from_raw( old_blk_raw );
-            if ( old_alloc != nullptr )
-            {
-                old_alloc->mark_as_free();
-                hdr->alloc_count--;
-                hdr->free_count++;
-                if ( hdr->used_size >= freed_w )
-                    hdr->used_size -= freed_w;
-                allocator::coalesce( base, hdr, old_blk_idx );
-            }
+            auto old_alloc = AllocatedBlock<address_traits>::cast_from_raw( old_blk_raw );
+            old_alloc.mark_as_free();
+            hdr->alloc_count--;
+            hdr->free_count++;
+            if ( hdr->used_size >= freed_w )
+                hdr->used_size -= freed_w;
+            allocator::coalesce( base, hdr, old_blk_idx );
         }
         ManagerT::_last_error = PmmError::Ok;
         return new_p;

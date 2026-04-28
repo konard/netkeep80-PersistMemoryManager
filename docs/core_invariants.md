@@ -40,7 +40,7 @@ over it. PMM does not know `pjson` semantics or any upper-layer schema.
 ## B. Block and TreeNode Semantics
 
 Each block is an atom of the linear PAP **and** an atom of the intrusive forest.
-`Block<A>` carries the physical layer; `TreeNode<A>` carries the forest-slot.
+`Block<A>` carries the physical layer; `BlockHeader<A>` (AVL slot) carries the forest-slot.
 
 ### B1. Linear neighbors
 
@@ -61,7 +61,7 @@ Each block is an atom of the linear PAP **and** an atom of the intrusive forest.
 | ID | Invariant | Code checkpoint | Test |
 |----|-----------|-----------------|------|
 | B3a | `weight` is a universal `index_type` key/scalar whose semantics are determined by the owning forest domain. | Domain-specific interpretation: free-tree uses `weight` as state discriminator; [pmap](../include/pmm/pmap.h#pmm-pmap)/[pstringview](../include/pmm/pstringview.h#pmm-pstringview) use it as sort key. | `test_issue243_free_tree_policy.cpp`, `test_issue153_pmap.cpp`. |
-| B3b | In the free-tree domain: `weight == 0` means free block; `weight > 0` means allocated block (user data granule count). | [BlockStateBase::is_free()](../include/pmm/block_state.h#pmm-blockstatebase-is_free) and `is_allocated()` in `block_state.h`. [FreeBlock::cast_from_raw()](../include/pmm/block_state.h#pmm-freeblock-cast_from_raw) asserts `weight == 0` (`block_state.h:406`). | `test_block_state.cpp` — "is_free / is_allocated", "FreeBlock cast_from_raw and verify_invariants". |
+| B3b | In the free-tree domain: `weight == 0` means free block; `weight > 0` means allocated block (user data granule count). | [BlockStateBase::is_free_raw()](../include/pmm/block_state.h#pmm-blockstatebase) and `is_allocated_raw()` in `block_state.h`. [FreeBlock::cast_from_raw()](../include/pmm/block_state.h#pmm-freeblock-cast_from_raw) asserts `weight == 0`. | `test_block_header.cpp` — `detect_block_state and recover_block_state behave consistently`. |
 
 ### B4. Root offset
 
@@ -196,7 +196,7 @@ These are enforced by `static_assert` and are always checked at build time:
 |----|-----------|-----------------|
 | S1 | `sizeof(Block<DefaultAddressTraits>) == 32` | `block.h:78`, `types.h:152–158`, `block_state.h:369–372` |
 | S2 | `sizeof(ManagerHeader<DefaultAddressTraits>) == 64`, granule-aligned | `types.h:214,216` |
-| S3 | `TreeNode<DefaultAddressTraits>` size == 5 × `sizeof(uint32_t)` + 4 | `types.h:163` |
+| S3 | `BlockHeader<DefaultAddressTraits>` (AVL slot) size == 5 × `sizeof(uint32_t)` + 4 | `types.h:163` |
 | S4 | `kGranuleSize` is power of 2, equals `DefaultAddressTraits::granule_size` | `types.h:62–63` |
 | S5 | `BlockStateBase<AT>` is binary-compatible with `Block<AT>` | `block_state.h:369–372` |
 | S6 | [ForestDomainRecord](../include/pmm/forest_registry.h#pmm-detail-forestdomainrecord) is trivially copyable; [ForestDomainRegistry](../include/pmm/forest_registry.h#pmm-detail-forestdomainregistry) is nothrow-default-constructible | `forest_registry.h:206–209` |

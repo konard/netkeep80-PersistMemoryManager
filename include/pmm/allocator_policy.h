@@ -32,8 +32,8 @@ class AllocatorPolicy
                                           size_t user_size )
     {
         FT::remove( base, hdr, blk_idx );
-        FreeBlock<AT>*              fb          = FreeBlock<AT>::cast_from_raw( detail::block_at<AT>( base, blk_idx ) );
-        FreeBlockRemovedAVL<AT>*    removed     = fb->remove_from_avl();
+        FreeBlock<AT>               fb          = FreeBlock<AT>::cast_from_raw( detail::block_at<AT>( base, blk_idx ) );
+        FreeBlockRemovedAVL<AT>     removed     = fb.remove_from_avl();
         static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AT>;
         index_type blk_total_gran = detail::block_total_granules( base, hdr, detail::block_at<AT>( base, blk_idx ) );
         index_type data_gran      = detail::bytes_to_granules_t<AT>( user_size );
@@ -46,26 +46,24 @@ class AllocatorPolicy
             can_split = ( blk_total_gran >= needed_gran + min_rem_gran );
         if ( can_split )
         {
-            SplittingBlock<AT>* splitting   = removed->begin_splitting();
-            index_type          new_idx     = blk_idx + needed_gran;
-            void*               new_blk_ptr = detail::block_at<AT>( base, new_idx );
-            index_type          curr_next   = splitting->next_offset();
+            SplittingBlock<AT> splitting   = removed.begin_splitting();
+            index_type         new_idx     = blk_idx + needed_gran;
+            void*              new_blk_ptr = detail::block_at<AT>( base, new_idx );
+            index_type         curr_next   = splitting.next_offset();
             BlockT* old_next = ( curr_next != AT::no_block ) ? detail::block_at<AT>( base, curr_next ) : nullptr;
-            splitting->initialize_new_block( new_blk_ptr, new_idx, blk_idx );
-            splitting->link_new_block( old_next, new_idx );
+            splitting.initialize_new_block( new_blk_ptr, new_idx, blk_idx );
+            splitting.link_new_block( old_next, new_idx );
             if ( old_next == nullptr )
                 hdr->last_block_offset = new_idx;
             hdr->block_count++;
             hdr->free_count++;
             hdr->used_size += kBlkHdrGran;
             FT::insert( base, hdr, new_idx );
-            AllocatedBlock<AT>* alloc = splitting->finalize_split( data_gran, blk_idx );
-            (void)alloc;
+            (void)splitting.finalize_split( data_gran, blk_idx );
         }
         else
         {
-            AllocatedBlock<AT>* alloc = removed->mark_as_allocated( data_gran, blk_idx );
-            (void)alloc;
+            (void)removed.mark_as_allocated( data_gran, blk_idx );
         }
         hdr->alloc_count++;
         hdr->free_count--;
@@ -74,11 +72,11 @@ class AllocatorPolicy
     }
     static void coalesce( uint8_t* base, detail::ManagerHeader<AT>* hdr, index_type blk_idx )
     {
-        FreeBlockNotInAVL<AT>* not_avl = FreeBlockNotInAVL<AT>::cast_from_raw( detail::block_at<AT>( base, blk_idx ) );
-        CoalescingBlock<AT>*   coalescing       = not_avl->begin_coalescing();
+        FreeBlockNotInAVL<AT> not_avl     = FreeBlockNotInAVL<AT>::cast_from_raw( detail::block_at<AT>( base, blk_idx ) );
+        CoalescingBlock<AT>   coalescing  = not_avl.begin_coalescing();
         static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AT>;
         index_type                  b_idx       = blk_idx;
-        index_type                  curr_next   = coalescing->next_offset();
+        index_type                  curr_next   = coalescing.next_offset();
         if ( curr_next != AT::no_block )
         {
             void* nxt_raw = detail::block_at<AT>( base, curr_next );
@@ -88,7 +86,7 @@ class AllocatorPolicy
                 index_type nxt_next = BlockState::get_next_offset( nxt_raw );
                 BlockT* nxt_nxt_blk = ( nxt_next != AT::no_block ) ? detail::block_at<AT>( base, nxt_next ) : nullptr;
                 FT::remove( base, hdr, nxt_idx );
-                coalescing->coalesce_with_next( detail::block_at<AT>( base, nxt_idx ), nxt_nxt_blk, b_idx );
+                coalescing.coalesce_with_next( detail::block_at<AT>( base, nxt_idx ), nxt_nxt_blk, b_idx );
                 if ( nxt_nxt_blk == nullptr )
                     hdr->last_block_offset = b_idx;
                 hdr->block_count--;
@@ -97,31 +95,29 @@ class AllocatorPolicy
                     hdr->used_size -= kBlkHdrGran;
             }
         }
-        index_type curr_prev = coalescing->prev_offset();
+        index_type curr_prev = coalescing.prev_offset();
         if ( curr_prev != AT::no_block )
         {
             void* prv_raw = detail::block_at<AT>( base, curr_prev );
             if ( BlockState::get_weight( prv_raw ) == 0 )
             {
                 index_type prv_idx  = curr_prev;
-                index_type blk_next = coalescing->next_offset();
+                index_type blk_next = coalescing.next_offset();
                 BlockT*    next_blk = ( blk_next != AT::no_block ) ? detail::block_at<AT>( base, blk_next ) : nullptr;
                 FT::remove( base, hdr, prv_idx );
-                CoalescingBlock<AT>* result_coalescing = coalescing->coalesce_with_prev( prv_raw, next_blk, prv_idx );
+                CoalescingBlock<AT> result_coalescing = coalescing.coalesce_with_prev( prv_raw, next_blk, prv_idx );
                 if ( next_blk == nullptr )
                     hdr->last_block_offset = prv_idx;
                 hdr->block_count--;
                 hdr->free_count--;
                 if ( hdr->used_size >= kBlkHdrGran )
                     hdr->used_size -= kBlkHdrGran;
-                FreeBlock<AT>* fb = result_coalescing->finalize_coalesce();
-                (void)fb;
+                (void)result_coalescing.finalize_coalesce();
                 FT::insert( base, hdr, prv_idx );
                 return;
             }
         }
-        FreeBlock<AT>* fb = coalescing->finalize_coalesce();
-        (void)fb;
+        (void)coalescing.finalize_coalesce();
         FT::insert( base, hdr, b_idx );
     }
     static void rebuild_free_tree( uint8_t* base, detail::ManagerHeader<AT>* hdr )

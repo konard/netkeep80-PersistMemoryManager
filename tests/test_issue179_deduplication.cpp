@@ -187,9 +187,9 @@ TEST_CASE( "I179-C1: tree_node() and get_tree_X agree after refactoring", "[test
     using AT = pmm::DefaultAddressTraits;
 
     // Use tree_node to set fields, verify via get_tree_X that both agree
-    auto& tn = TestMgr::tree_node( p );
-    tn.set_left( static_cast<AT::index_type>( 4 ) );
-    tn.set_right( static_cast<AT::index_type>( 8 ) );
+    auto& tn        = TestMgr::tree_node( p );
+    tn.left_offset  = static_cast<AT::index_type>( 4 );
+    tn.right_offset = static_cast<AT::index_type>( 8 );
 
     REQUIRE( TestMgr::get_tree_left_offset( p ) == static_cast<AT::index_type>( 4 ) );
     REQUIRE( TestMgr::get_tree_right_offset( p ) == static_cast<AT::index_type>( 8 ) );

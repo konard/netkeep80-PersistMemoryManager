@@ -10,7 +10,7 @@ Single entry point for PMM documentation. The canonical set below must match
 | [PMM Target Model](pmm_target_model.md) | Normative top-level model: PMM as compact persistent storage kernel; boundary vs `pjson` / `pjson_db` / execution / product layers |
 | [PMM Transformation Rules](pmm_transformation_rules.md) | Normative operational rulebook: allowed issue types, atomic-issue / no-mixed-PR / extraction-first / surface-compression rules, PR review semantics |
 | [Comment Policy](comment_policy.md) | Canonical text discipline for comments, docs placement, and text-surface review |
-| [Block and TreeNode Semantics](block_and_treenode_semantics.md) | Field-level specification of [Block](../include/pmm/block.h#pmm-block) and [TreeNode](../include/pmm/tree_node.h#pmm-treenode) headers |
+| [Block and TreeNode Semantics](block_and_treenode_semantics.md) | Field-level specification of [Block](../include/pmm/block.h#pmm-block) and [TreeNode](../include/pmm/block_header.h#pmm-blockheader) headers |
 | [Architecture](architecture.md) | Layer stack, memory layout, algorithms, storage backends, configuration |
 | [API Reference](api_reference.md) | Complete public API: lifecycle, allocation, containers, I/O, error codes |
 | [Validation Model](validation_model.md) | Low-level pointer and block validation: cheap vs full modes, conversion paths, error categories |
