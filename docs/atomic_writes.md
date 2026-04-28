@@ -264,7 +264,7 @@ after `load() + rebuild_free_tree()`.
 ### Phase 1: Validate ManagerHeader
 
 ```
-1. Check hdr->magic == kMagic ("PMM_V083")
+1. Check hdr->magic == kMagic ("PMM_V098")
 2. Check hdr->total_size == passed size argument
 3. Check hdr->granule_size == kGranuleSize
 4. If any check fails: return false (image invalid)

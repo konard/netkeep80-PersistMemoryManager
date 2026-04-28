@@ -11,6 +11,16 @@ enum : uint16_t
     kNodeReadWrite = 0,
     kNodeReadOnly  = 1,
 };
+namespace detail
+{
+template <std::size_t N> struct BlockHeaderPadding
+{
+    std::uint8_t _bytes[N];
+};
+template <> struct BlockHeaderPadding<0>
+{
+};
+}
 /*
 ## pmm-blockheader
 */
@@ -27,6 +37,18 @@ template <typename AT> struct BlockHeader
     uint16_t     node_type;
     index_type   prev_offset;
     index_type   next_offset;
+
+  private:
+    static constexpr std::size_t _natural_size_aligned_to_index =
+        ( ( 7 * sizeof( index_type ) + sizeof( std::int16_t ) + sizeof( uint16_t ) + alignof( index_type ) - 1 ) /
+          alignof( index_type ) ) *
+        alignof( index_type );
+    static constexpr std::size_t _granule_aligned_size =
+        ( ( _natural_size_aligned_to_index + AT::granule_size - 1 ) / AT::granule_size ) * AT::granule_size;
+    static constexpr std::size_t _pad_size = _granule_aligned_size - _natural_size_aligned_to_index;
+
+  public:
+    [[no_unique_address]] detail::BlockHeaderPadding<_pad_size> _granule_padding;
 };
 /*
 ## pmm-blocklayoutcontract
@@ -40,6 +62,7 @@ template <typename AT> struct BlockLayoutContract
     static_assert( std::is_unsigned_v<I> );
     static_assert( AT::granule_size >= alignof( H ) );
     static_assert( ( AT::granule_size % alignof( H ) ) == 0 );
+    static_assert( ( sizeof( H ) % AT::granule_size ) == 0 );
     static constexpr std::size_t tree_slot_size = offsetof( H, prev_offset );
     static constexpr std::size_t layout_size    = sizeof( H );
 };
@@ -55,6 +78,9 @@ static_assert( offsetof( BlockHeader<DefaultAddressTraits>, avl_height ) == 20 )
 static_assert( offsetof( BlockHeader<DefaultAddressTraits>, node_type ) == 22 );
 static_assert( offsetof( BlockHeader<DefaultAddressTraits>, prev_offset ) == 24 );
 static_assert( offsetof( BlockHeader<DefaultAddressTraits>, next_offset ) == 28 );
+static_assert( ( sizeof( BlockHeader<SmallAddressTraits> ) % SmallAddressTraits::granule_size ) == 0 );
+static_assert( ( sizeof( BlockHeader<DefaultAddressTraits> ) % DefaultAddressTraits::granule_size ) == 0 );
+static_assert( ( sizeof( BlockHeader<LargeAddressTraits> ) % LargeAddressTraits::granule_size ) == 0 );
 namespace detail
 {
 template <typename AT> inline BlockHeader<AT>* block_header_at( void* raw ) noexcept

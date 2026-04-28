@@ -37,10 +37,13 @@ TEST_CASE( "I312: valid pptr resolves through checked and unchecked paths", "[te
     Mgr::destroy();
 }
 
-TEST_CASE( "I312: SmallAddressTraits resolves to canonical non-aligned user pointer", "[test_issue312]" )
+TEST_CASE( "I312: SmallAddressTraits resolves to canonical granule-aligned user pointer", "[test_issue312]" )
 {
-    static_assert( sizeof( pmm::Block<pmm::SmallAddressTraits> ) % pmm::SmallAddressTraits::granule_size != 0,
-                   "SmallAddressTraits must exercise the non-aligned block-header path" );
+    // After issue #367, BlockHeader<AT> is padded to a whole number of granules for every public AddressTraits,
+    // including SmallAddressTraits. The user pointer derived from sizeof(BlockHeader<AT>) is therefore always
+    // granule-aligned. This test continues to exercise the SmallAddressTraits public API end-to-end.
+    static_assert( sizeof( pmm::Block<pmm::SmallAddressTraits> ) % pmm::SmallAddressTraits::granule_size == 0,
+                   "SmallAddressTraits BlockHeader must be granule-aligned" );
 
     REQUIRE( SmallMgr::create() );
 
@@ -66,8 +69,8 @@ TEST_CASE( "I312: SmallAddressTraits resolves to canonical non-aligned user poin
 
 TEST_CASE( "I312: SmallAddressTraits create_typed returns canonical public pptr", "[test_issue312]" )
 {
-    static_assert( sizeof( pmm::Block<pmm::SmallAddressTraits> ) % pmm::SmallAddressTraits::granule_size != 0,
-                   "SmallAddressTraits must exercise the non-aligned block-header path" );
+    static_assert( sizeof( pmm::Block<pmm::SmallAddressTraits> ) % pmm::SmallAddressTraits::granule_size == 0,
+                   "SmallAddressTraits BlockHeader must be granule-aligned" );
 
     REQUIRE( SmallMgr::create() );
 
@@ -88,8 +91,8 @@ TEST_CASE( "I312: SmallAddressTraits create_typed returns canonical public pptr"
 
 TEST_CASE( "I312: SmallAddressTraits interned symbols use canonical public pptrs", "[test_issue312]" )
 {
-    static_assert( sizeof( pmm::Block<pmm::SmallAddressTraits> ) % pmm::SmallAddressTraits::granule_size != 0,
-                   "SmallAddressTraits must exercise the non-aligned block-header path" );
+    static_assert( sizeof( pmm::Block<pmm::SmallAddressTraits> ) % pmm::SmallAddressTraits::granule_size == 0,
+                   "SmallAddressTraits BlockHeader must be granule-aligned" );
 
     REQUIRE( SmallMgr::create() );
     REQUIRE( SmallMgr::register_domain( "app/issue312" ) );

@@ -60,6 +60,19 @@ TEST_CASE( "BlockLayoutContract compiles for Small/Default/Large address traits"
     static_assert( LC::layout_size > 0 );
 }
 
+TEST_CASE( "BlockHeader<AT> size is a whole number of granules for every public AddressTraits",
+           "[issue367][block_header][granule_contract]" )
+{
+    static_assert( sizeof( pmm::BlockHeader<pmm::SmallAddressTraits> ) % pmm::SmallAddressTraits::granule_size == 0 );
+    static_assert( sizeof( pmm::BlockHeader<pmm::DefaultAddressTraits> ) % pmm::DefaultAddressTraits::granule_size ==
+                   0 );
+    static_assert( sizeof( pmm::BlockHeader<pmm::LargeAddressTraits> ) % pmm::LargeAddressTraits::granule_size == 0 );
+
+    static_assert( sizeof( pmm::BlockHeader<pmm::SmallAddressTraits> ) == 32 );
+    static_assert( sizeof( pmm::BlockHeader<pmm::DefaultAddressTraits> ) == 32 );
+    static_assert( sizeof( pmm::BlockHeader<pmm::LargeAddressTraits> ) == 64 );
+}
+
 // ─── Direct access via block_header_at<AT> ────────────────────────────────────
 
 TEST_CASE( "block_header_at<AT> returns aligned pointer to BlockHeader", "[issue367][block_header]" )

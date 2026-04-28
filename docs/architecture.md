@@ -413,7 +413,7 @@ buffer_start (= Block<A>_0)
 │     prev_offset = kNoBlock
 │     next_offset ──────────────────────────┐
 │   [ManagerHeader inside (32 bytes offset)]│
-│     magic = "PMM_V083"                    │
+│     magic = "PMM_V098"                    │
 │     first_block_offset = 0 (self)         │
 │     free_tree_root ──────────────────┐    │
 │                                      │    │
