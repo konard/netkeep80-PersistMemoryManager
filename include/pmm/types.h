@@ -176,17 +176,6 @@ inline constexpr size_t   kMinBlockSize          = sizeof( pmm::Block<pmm::Defau
 inline constexpr size_t   kMinMemorySize         = sizeof( pmm::Block<pmm::DefaultAddressTraits> ) +
                                          sizeof( ManagerHeader<pmm::DefaultAddressTraits> ) +
                                          sizeof( pmm::Block<pmm::DefaultAddressTraits> ) + kMinBlockSize;
-template <typename AT> inline typename AT::index_type bytes_to_granules_t( size_t bytes )
-{
-    using IndexT                    = typename AT::index_type;
-    static constexpr size_t kGranSz = AT::granule_size;
-    if ( bytes > std::numeric_limits<size_t>::max() - ( kGranSz - 1 ) )
-        return static_cast<IndexT>( 0 );
-    size_t granules = ( bytes + kGranSz - 1 ) / kGranSz;
-    if ( granules > static_cast<size_t>( std::numeric_limits<IndexT>::max() ) )
-        return static_cast<IndexT>( 0 );
-    return static_cast<IndexT>( granules );
-}
 template <typename AT> inline typename AT::index_type bytes_to_idx_t( size_t bytes )
 {
     static constexpr size_t kGranSz = AT::granule_size;
@@ -431,14 +420,6 @@ template <typename AT> inline pmm::Block<AT>* header_from_ptr_t( uint8_t* base, 
         return nullptr;
     uint8_t* cand_addr = static_cast<uint8_t*>( ptr ) - kBlockSize;
     return reinterpret_cast<pmm::Block<AT>*>( cand_addr );
-}
-template <typename AT> inline typename AT::index_type required_block_granules_t( size_t user_bytes )
-{
-    using index_type         = typename AT::index_type;
-    index_type data_granules = bytes_to_granules_t<AT>( user_bytes );
-    if ( data_granules == 0 )
-        data_granules = 1;
-    return kBlockHeaderGranules_t<AT> + data_granules;
 }
 }
 }

@@ -10,7 +10,7 @@
  *   - ManagerHeader<LargeAddressTraits>   has index fields of type uint64_t
  *   - kManagerHeaderGranules_t<AT> returns AT::index_type (not uint32_t)
  *   - kBlockHeaderGranules_t<AT>   returns AT::index_type (not uint32_t)
- *   - required_block_granules_t<AT> returns AT::index_type
+ *   - bytes_to_granules_checked<AT>() returns std::optional<GranuleCount<AT>>
  *   - FreeBlockTreePolicyForTraitsConcept<Policy, AT> is satisfied by AvlFreeTree<AT>
  *   - SmallAddressTraits heap: create/alloc/dealloc/destroy with correct uint16_t indexes
  *   - LargeAddressTraits heap: create/alloc/dealloc/destroy with correct uint64_t indexes

@@ -7,6 +7,7 @@
 #error "pmm.h requires C++20 or later. Please compile with -std=c++20."
 #endif
 #include "pmm/allocator_policy.h"
+#include "pmm/arena_internals.h"
 #include "pmm/block.h"
 #include "pmm/block_state.h"
 #include "pmm/diagnostics.h"
@@ -55,6 +56,10 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     using free_block_tree = typename ConfigT::free_block_tree;
     using thread_policy   = typename ConfigT::lock_policy;
     using logging_policy  = typename detail::config_logging_policy<ConfigT>::type;
+    static_assert( ConfigT::grow_numerator >= 1, "ConfigT must define grow_numerator >= 1" );
+    static_assert( ConfigT::grow_denominator >= 1, "ConfigT must define grow_denominator >= 1" );
+    static_assert( ConfigT::grow_numerator >= ConfigT::grow_denominator,
+                   "ConfigT::grow_numerator must be >= grow_denominator" );
     using allocator       = AllocatorPolicy<free_block_tree, address_traits>;
     using index_type      = typename address_traits::index_type;
     using forest_registry = detail::ForestDomainRegistry<address_traits>;
@@ -82,16 +87,16 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             return false;
         }
         static constexpr size_t kGranSzCreate = address_traits::granule_size;
-        if ( initial_size > std::numeric_limits<size_t>::max() - ( kGranSzCreate - 1 ) )
+        auto                    aligned_opt   = detail::round_up_checked( initial_size, kGranSzCreate );
+        if ( !aligned_opt.has_value() )
         {
             _last_error = PmmError::Overflow;
             return false;
         }
-        size_t aligned = ( ( initial_size + kGranSzCreate - 1 ) / kGranSzCreate ) * kGranSzCreate;
+        size_t aligned = *aligned_opt;
         if ( _backend.base_ptr() == nullptr || _backend.total_size() < aligned )
         {
-            size_t additional = ( _backend.total_size() < aligned ) ? ( aligned - _backend.total_size() ) : aligned;
-            if ( !_backend.expand( additional ) )
+            if ( !_backend.resize_to( aligned ) )
             {
                 _last_error = PmmError::ExpandFailed;
                 return false;
@@ -102,17 +107,26 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             _last_error = PmmError::BackendError;
             return false;
         }
-        bool ok = init_layout( _backend.base_ptr(), _backend.total_size() );
-        if ( ok )
-            ok = bootstrap_forest_registry_unlocked();
-        if ( ok )
-            ok = validate_bootstrap_invariants_unlocked();
-        if ( ok )
+        detail::InitGuard guard( _initialized );
+        if ( !init_layout( _backend.base_ptr(), _backend.total_size() ) )
         {
-            _last_error = PmmError::Ok;
-            logging_policy::on_create( _backend.total_size() );
+            _last_error = PmmError::BackendError;
+            return false;
         }
-        return ok;
+        if ( !bootstrap_forest_registry_unlocked() )
+        {
+            _last_error = PmmError::BackendError;
+            return false;
+        }
+        if ( !validate_bootstrap_invariants_unlocked() )
+        {
+            _last_error = PmmError::BackendError;
+            return false;
+        }
+        _last_error = PmmError::Ok;
+        logging_policy::on_create( _backend.total_size() );
+        guard.commit();
+        return true;
     }
     static bool create() noexcept
     {
@@ -122,17 +136,26 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             _last_error = ( _backend.base_ptr() == nullptr ) ? PmmError::BackendError : PmmError::InvalidSize;
             return false;
         }
-        bool ok = init_layout( _backend.base_ptr(), _backend.total_size() );
-        if ( ok )
-            ok = bootstrap_forest_registry_unlocked();
-        if ( ok )
-            ok = validate_bootstrap_invariants_unlocked();
-        if ( ok )
+        detail::InitGuard guard( _initialized );
+        if ( !init_layout( _backend.base_ptr(), _backend.total_size() ) )
         {
-            _last_error = PmmError::Ok;
-            logging_policy::on_create( _backend.total_size() );
+            _last_error = PmmError::BackendError;
+            return false;
         }
-        return ok;
+        if ( !bootstrap_forest_registry_unlocked() )
+        {
+            _last_error = PmmError::BackendError;
+            return false;
+        }
+        if ( !validate_bootstrap_invariants_unlocked() )
+        {
+            _last_error = PmmError::BackendError;
+            return false;
+        }
+        _last_error = PmmError::Ok;
+        logging_policy::on_create( _backend.total_size() );
+        guard.commit();
+        return true;
     }
     static bool load( VerifyResult& result ) noexcept
     {
@@ -184,25 +207,27 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             for ( size_t i = from; i < r.entry_count; ++i )
                 r.entries[i].action = act;
         };
-        size_t pre = result.entry_count;
-        allocator::verify_block_states( base, hdr, result );
+        detail::ConstArenaView<address_traits> cview{ base, hdr };
+        size_t                                 pre = result.entry_count;
+        allocator::verify_block_states( cview, result );
         mark_entries( result, pre, DiagnosticAction::Repaired );
         pre = result.entry_count;
-        allocator::verify_linked_list( base, hdr, result );
+        allocator::verify_linked_list( cview, result );
         mark_entries( result, pre, DiagnosticAction::Repaired );
         pre = result.entry_count;
-        allocator::verify_counters( base, hdr, result );
+        allocator::verify_counters( cview, result );
         mark_entries( result, pre, DiagnosticAction::Rebuilt );
         pre = result.entry_count;
-        allocator::verify_free_tree( base, hdr, result );
+        allocator::verify_free_tree( cview, result );
         mark_entries( result, pre, DiagnosticAction::Rebuilt );
         if ( detail::image_version_requires_migration( hdr->image_version ) )
             hdr->image_version = detail::kCurrentImageVersion;
         hdr->owns_memory     = false;
         hdr->prev_total_size = 0;
-        allocator::repair_linked_list( base, hdr );
-        allocator::recompute_counters( base, hdr );
-        allocator::rebuild_free_tree( base, hdr );
+        detail::ArenaView<address_traits> arena_mut{ base, hdr };
+        allocator::repair_linked_list( arena_mut );
+        allocator::recompute_counters( arena_mut );
+        allocator::rebuild_free_tree( arena_mut );
         _initialized = true;
         {
             VerifyResult forest_verify;
@@ -546,31 +571,29 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         const uint8_t* base                                  = _backend.base_ptr();
         using BlockState                                     = BlockStateBase<address_traits>;
         const detail::ManagerHeader<address_traits>* hdr     = get_header_c( base );
-        index_type                                   idx     = hdr->first_block_offset;
         static constexpr size_t                      kGranSz = address_traits::granule_size;
-        while ( idx != address_traits::no_block )
-        {
-            if ( static_cast<size_t>( idx ) * kGranSz + sizeof( Block<address_traits> ) > hdr->total_size )
-                break;
-            const void*                  blk_raw    = base + static_cast<size_t>( idx ) * kGranSz;
-            const Block<address_traits>* blk        = reinterpret_cast<const Block<address_traits>*>( blk_raw );
-            index_type                   total_gran = detail::block_total_granules( base, hdr, blk );
-            auto                         w          = BlockState::get_weight( blk_raw );
-            bool                         is_used    = pmm::is_allocated( BlockState::get_node_type( blk_raw ) );
-            size_t                       hdr_bytes  = sizeof( Block<address_traits> );
-            size_t                       data_bytes = is_used ? static_cast<size_t>( w ) * kGranSz : 0;
-            BlockView                    view;
-            view.index       = idx;
-            view.offset      = static_cast<std::ptrdiff_t>( static_cast<size_t>( idx ) * kGranSz );
-            view.total_size  = static_cast<size_t>( total_gran ) * kGranSz;
-            view.header_size = hdr_bytes;
-            view.user_size   = data_bytes;
-            view.alignment   = kGranSz;
-            view.used        = is_used;
-            callback( view );
-            idx = BlockState::get_next_offset( blk_raw );
-        }
-        return true;
+        detail::ConstArenaView<address_traits>       cview{ base, hdr };
+        return detail::for_each_physical_block<address_traits>(
+            cview,
+            [&]( index_type idx, const void* blk_raw ) noexcept
+            {
+                const Block<address_traits>* blk        = reinterpret_cast<const Block<address_traits>*>( blk_raw );
+                index_type                   total_gran = detail::block_total_granules( base, hdr, blk );
+                auto                         w          = BlockState::get_weight( blk_raw );
+                bool                         is_used    = pmm::is_allocated( BlockState::get_node_type( blk_raw ) );
+                size_t                       hdr_bytes  = sizeof( Block<address_traits> );
+                size_t                       data_bytes = is_used ? static_cast<size_t>( w ) * kGranSz : 0;
+                BlockView                    view;
+                view.index       = idx;
+                view.offset      = static_cast<std::ptrdiff_t>( static_cast<size_t>( idx ) * kGranSz );
+                view.total_size  = static_cast<size_t>( total_gran ) * kGranSz;
+                view.header_size = hdr_bytes;
+                view.user_size   = data_bytes;
+                view.alignment   = kGranSz;
+                view.used        = is_used;
+                callback( view );
+                return true;
+            } );
     }
     template <typename Callback> static bool for_each_free_block( Callback&& callback ) noexcept
     {
@@ -593,8 +616,10 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     {
         if ( off == 0 || _backend.base_ptr() == nullptr || _backend.total_size() == 0 )
             return false;
-        size_t byte_off = static_cast<size_t>( off ) * address_traits::granule_size;
-        return byte_off + size_bytes <= _backend.total_size();
+        auto byte_off_opt = detail::checked_granule_offset<address_traits>( off );
+        if ( !byte_off_opt.has_value() )
+            return false;
+        return detail::fits_range( *byte_off_opt, size_bytes, _backend.total_size() );
     }
     static void* allocate_unlocked( size_t user_size ) noexcept
     {
@@ -610,25 +635,36 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             logging_policy::on_allocation_failure( user_size, PmmError::InvalidSize );
             return nullptr;
         }
-        uint8_t*                               base      = _backend.base_ptr();
-        detail::ManagerHeader<address_traits>* hdr       = get_header( base );
-        index_type                             data_gran = detail::bytes_to_granules_t<address_traits>( user_size );
+        auto checked = detail::bytes_to_granules_checked<address_traits>( user_size );
+        if ( !checked.has_value() )
+        {
+            _last_error = PmmError::Overflow;
+            logging_policy::on_allocation_failure( user_size, PmmError::Overflow );
+            return nullptr;
+        }
+        index_type data_gran = checked->value;
         if ( data_gran == 0 )
-            data_gran = 1;
+        {
+            _last_error = PmmError::InvalidSize;
+            logging_policy::on_allocation_failure( user_size, PmmError::InvalidSize );
+            return nullptr;
+        }
         if ( data_gran > std::numeric_limits<index_type>::max() - kBlockHdrGranules )
         {
             _last_error = PmmError::Overflow;
             logging_policy::on_allocation_failure( user_size, PmmError::Overflow );
             return nullptr;
         }
-        index_type needed = kBlockHdrGranules + data_gran;
-        index_type idx    = free_block_tree::find_best_fit( base, hdr, needed );
+        uint8_t*                               base   = _backend.base_ptr();
+        detail::ManagerHeader<address_traits>* hdr    = get_header( base );
+        index_type                             needed = kBlockHdrGranules + data_gran;
+        index_type                             idx    = free_block_tree::find_best_fit( base, hdr, needed );
         if ( idx != address_traits::no_block )
         {
             _last_error = PmmError::Ok;
-            return allocator::allocate_from_block( base, hdr, idx, user_size );
+            return allocator::allocate_from_block( detail::ArenaView<address_traits>{ base, hdr }, idx, data_gran );
         }
-        if ( !do_expand( user_size ) )
+        if ( !do_expand( data_gran ) )
         {
             _last_error = PmmError::OutOfMemory;
             logging_policy::on_allocation_failure( user_size, PmmError::OutOfMemory );
@@ -640,7 +676,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         if ( idx != address_traits::no_block )
         {
             _last_error = PmmError::Ok;
-            return allocator::allocate_from_block( base, hdr, idx, user_size );
+            return allocator::allocate_from_block( detail::ArenaView<address_traits>{ base, hdr }, idx, data_gran );
         }
         _last_error = PmmError::OutOfMemory;
         logging_policy::on_allocation_failure( user_size, PmmError::OutOfMemory );
@@ -670,7 +706,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         hdr->free_count++;
         if ( hdr->used_size >= freed )
             hdr->used_size -= freed;
-        allocator::coalesce( base, hdr, blk_idx );
+        allocator::coalesce( detail::ArenaView<address_traits>{ base, hdr }, blk_idx );
     }
     static bool lock_block_permanent_unlocked( void* ptr ) noexcept
     {
@@ -729,6 +765,9 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         static constexpr index_type                   kBlockHdrGranules = manager_type::kBlockHdrGranules;
         static constexpr index_type                   kMgrHdrGranules   = manager_type::kMgrHdrGranules;
         static constexpr index_type                   kFreeBlkIdxLayout = manager_type::kFreeBlkIdxLayout;
+        static constexpr size_t                       kGrowNumerator    = ConfigT::grow_numerator;
+        static constexpr size_t                       kGrowDenominator  = ConfigT::grow_denominator;
+        static constexpr size_t                       kMaxMemoryGB      = ConfigT::max_memory_gb;
         static detail::ManagerHeader<address_traits>* get_header( uint8_t* base ) noexcept
         {
             return manager_type::get_header( base );
@@ -739,9 +778,9 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     {
         return detail::ManagerLayoutOps<layout_access>::init_layout( _backend, base, size );
     }
-    static bool do_expand( size_t user_size ) noexcept
+    static bool do_expand( index_type data_gran ) noexcept
     {
-        return detail::ManagerLayoutOps<layout_access>::do_expand( _backend, _initialized, user_size );
+        return detail::ManagerLayoutOps<layout_access>::do_expand( _backend, _initialized, data_gran );
     }
 };
 }

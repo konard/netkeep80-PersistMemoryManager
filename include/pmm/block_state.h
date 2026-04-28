@@ -28,10 +28,7 @@ template <typename AT> class BlockStateBase
     BlockStateBase()     = delete;
     static Header*       header_of( void* raw_blk ) noexcept { return detail::block_header_at<AT>( raw_blk ); }
     static const Header* header_of( const void* raw_blk ) noexcept { return detail::block_header_at<AT>( raw_blk ); }
-    static bool          is_free_raw( const void* raw_blk ) noexcept
-    {
-        return pmm::is_free( header_of( raw_blk )->node_type );
-    }
+    static bool is_free_raw( const void* raw_blk ) noexcept { return pmm::is_free( header_of( raw_blk )->node_type ); }
     static bool is_allocated_raw( const void* raw_blk, index_type own_idx ) noexcept
     {
         const Header* h = header_of( raw_blk );

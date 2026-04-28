@@ -123,25 +123,24 @@ TEST_CASE( "I235-A6: typed_guard default-constructed is empty", "[test_issue235]
 // PART B: HeapStorage minimum initial allocation
 // =============================================================================
 
-TEST_CASE( "I235-B1: HeapStorage expand from zero uses minimum initial size", "[test_issue235]" )
+TEST_CASE( "I235-B1: HeapStorage resize_to from zero respects requested size", "[test_issue235]" )
 {
     pmm::HeapStorage<> storage;
     REQUIRE( storage.total_size() == 0 );
 
-    // Request a tiny expansion (e.g. 32 bytes)
-    bool ok = storage.expand( 32 );
+    // resize_to is now an exact-size contract: the backend allocates exactly the
+    // requested number of bytes (rounded up to granule_size), no implicit minimum.
+    bool ok = storage.resize_to( 4096 );
     REQUIRE( ok );
-    // Should allocate at least 4096 bytes, not just 32
-    REQUIRE( storage.total_size() >= 4096 );
+    REQUIRE( storage.total_size() == 4096 );
 }
 
-TEST_CASE( "I235-B2: HeapStorage expand from zero with large request", "[test_issue235]" )
+TEST_CASE( "I235-B2: HeapStorage resize_to from zero with large request", "[test_issue235]" )
 {
     pmm::HeapStorage<> storage;
-    // Request larger than minimum — should use the requested size
-    bool ok = storage.expand( 8192 );
+    bool               ok = storage.resize_to( 8192 );
     REQUIRE( ok );
-    REQUIRE( storage.total_size() >= 8192 );
+    REQUIRE( storage.total_size() == 8192 );
 }
 
 // =============================================================================

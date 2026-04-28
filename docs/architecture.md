@@ -242,6 +242,81 @@ All blocks are aligned to the granule size. User data starts immediately after t
 [Block<A> header (2 granules)][user_data (aligned to granule size)]
 ```
 
+`HeapStorage<A>` allocates the arena base via `posix_memalign` (POSIX) or
+`_aligned_malloc` (Windows) so that `reinterpret_cast<uintptr_t>(base) % A::granule_size == 0`,
+which matters in particular for `LargeAddressTraits` where `granule_size == 64` exceeds the
+default `malloc` alignment guarantee on most platforms.
+
+---
+
+## Arena internals (`pmm/arena_internals.h`)
+
+The physical-arena core is built on a small, explicit set of primitives. Allocation,
+verification, repair, growth and initialization use this single layer instead of
+duplicated `(base, hdr)` plumbing.
+
+### Checked granule arithmetic
+
+- [`detail::bytes_to_granules_checked<AT>(bytes)`](../include/pmm/arena_internals.h#pmm-detail-checkedarithmetic)
+  returns `std::optional<GranuleCount<AT>>`. `0` bytes returns `0` granules; arithmetic
+  overflow or a result that does not fit in `AT::index_type` returns `nullopt`.
+  Overflow is **never** encoded as `0` granules.
+- `detail::checked_add`, `detail::checked_mul`, `detail::round_up_checked`,
+  `detail::checked_granule_offset<AT>(idx)`, `detail::fits_range(off, len, total)` are
+  the overflow-safe building blocks used by the rest of the arena layer.
+
+### `ArenaView<AT>` and `ConstArenaView<AT>`
+
+[`detail::ArenaView<AT>`](../include/pmm/arena_internals.h#pmm-detail-arenaview) pairs the
+arena `base` pointer and `ManagerHeader<AT>*` so they cannot be mismatched between two
+backends. Internal allocator / verifier / recovery / layout APIs accept `ArenaView<AT>` (or
+`ConstArenaView<AT>` for read-only paths) instead of a loose `(base, hdr)` pair. `valid_block`
+and `fits` use `checked_granule_offset`, so an out-of-range index never triggers undefined
+overflow before the bounds check runs.
+
+### Walker `for_each_physical_block`
+
+[`detail::for_each_physical_block<AT>(arena, fn)`](../include/pmm/arena_internals.h#pmm-detail-blockwalker)
+is the single physical-chain walker. It bounds the traversal to `total_size / granule_size + 1`
+steps, validates every block index against the arena, and rejects backwards or non-progressing
+`next_offset` (so cyclic or backward-pointing chains terminate quickly with a failure).
+Callbacks may return `bool` (`false` propagates as walker failure) or `WalkControl`
+(`StopOk` / `Continue` / `Fail`) when the caller needs to distinguish early stop from
+corruption. `verify_linked_list`, `verify_counters`, `verify_block_states`,
+`verify_free_tree`, `recompute_counters` and `for_each_block` all share this walker; no
+hand-rolled `while (idx != no_block)` loop remains in the verifier / recovery paths.
+
+### Growth policy `compute_growth`
+
+[`detail::compute_growth(current, min_required, gran, num, den, max_gb)`](../include/pmm/arena_internals.h#pmm-detail-growthpolicy)
+is the only growth policy. It honours `Config::grow_numerator`, `Config::grow_denominator`
+and `Config::max_memory_gb`, picks the larger of the ratio target and `current + min_required`,
+rounds the result up to `granule_size` via `round_up_checked`, and returns `nullopt` on any
+overflow or cap violation. Storage backends (`HeapStorage`, `MMapStorage`, `StaticStorage`)
+expose `resize_to(new_total_size)` and do not run their own growth formula. `do_expand`
+calls `compute_growth` exactly once and then `backend.resize_to(*target)`.
+
+### Transactional `create()`
+
+[`detail::InitGuard`](../include/pmm/arena_internals.h#pmm-detail-initguard) makes
+`PersistMemoryManager::create(...)` transactional: every `create` path grabs an `InitGuard`
+on `_initialized`. If any phase (`init_layout`, `bootstrap_forest_registry_unlocked`,
+`validate_bootstrap_invariants_unlocked`) fails, the guard's destructor stores
+`_initialized = false` so no public allocation API ever observes a partially initialized
+manager. The successful path calls `guard.commit()` after every invariant is established.
+
+### Public allocation error contract
+
+- `allocate(0)` → `nullptr`, `last_error() == PmmError::InvalidSize`.
+- `allocate(size)` with `size` that overflows on the byte-to-granule conversion or above
+  `index_type::max` granules → `nullptr`, `last_error() == PmmError::Overflow` (no tiny
+  fallback allocation).
+- `reallocate_typed` runs `bytes_to_granules_checked` exactly once and reports the same
+  errors; in-place grow / shrink and out-of-place fallback all share that one checked
+  granule count.
+- `verify()` and `load(VerifyResult&)` always terminate, even on a corrupted physical
+  chain: the bounded walker rejects cycles and backward links instead of looping.
+
 ---
 
 ## Thread safety

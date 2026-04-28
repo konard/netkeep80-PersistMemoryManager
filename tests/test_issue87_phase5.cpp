@@ -64,15 +64,15 @@ TEST_CASE( "P5-A4: Non-backend type fails concept check", "[test_issue87_phase5]
 
 // ─── P5-B: StaticStorage — функциональность ───────────────────────────────────
 
-/// @brief StaticStorage<4096>: base_ptr(), total_size(), expand(), owns_memory().
+/// @brief StaticStorage<4096>: base_ptr(), total_size(), resize_to(), owns_memory().
 TEST_CASE( "P5-B1: StaticStorage<4096> interface methods", "[test_issue87_phase5]" )
 {
     pmm::StaticStorage<4096> storage;
 
     REQUIRE( storage.base_ptr() != nullptr );
     REQUIRE( storage.total_size() == 4096 );
-    REQUIRE( storage.expand( 1024 ) == false ); // статический буфер нельзя расширить
-    REQUIRE( storage.owns_memory() == false );  // не владеет динамической памятью
+    REQUIRE( storage.resize_to( 1024 ) == false ); // статический буфер нельзя расширить
+    REQUIRE( storage.owns_memory() == false );     // не владеет динамической памятью
 }
 
 /// @brief StaticStorage<4096>: буфер выровнен по granule_size.
@@ -105,29 +105,29 @@ TEST_CASE( "P5-C1: HeapStorage<> initial state (empty)", "[test_issue87_phase5]"
     REQUIRE( storage.owns_memory() == false );
 }
 
-/// @brief HeapStorage<>: expand() из нулевого состояния.
-TEST_CASE( "P5-C2: HeapStorage<> expand from zero", "[test_issue87_phase5]" )
+/// @brief HeapStorage<>: resize_to() из нулевого состояния.
+TEST_CASE( "P5-C2: HeapStorage<> resize_to from zero", "[test_issue87_phase5]" )
 {
     pmm::HeapStorage<> storage;
-    REQUIRE( storage.expand( 4096 ) == true );
+    REQUIRE( storage.resize_to( 4096 ) == true );
     REQUIRE( storage.base_ptr() != nullptr );
-    REQUIRE( storage.total_size() >= 4096 );
+    REQUIRE( storage.total_size() == 4096 );
     REQUIRE( storage.owns_memory() == true );
 }
 
-/// @brief HeapStorage<>: expand() из существующего буфера.
-TEST_CASE( "P5-C3: HeapStorage<> expand existing buffer", "[test_issue87_phase5]" )
+/// @brief HeapStorage<>: resize_to() из существующего буфера.
+TEST_CASE( "P5-C3: HeapStorage<> resize_to existing buffer", "[test_issue87_phase5]" )
 {
     pmm::HeapStorage<> storage;
-    REQUIRE( storage.expand( 4096 ) == true );
+    REQUIRE( storage.resize_to( 4096 ) == true );
     std::size_t old_size = storage.total_size();
 
     // Записываем данные и проверяем после расширения
     storage.base_ptr()[0] = 0xAB;
     storage.base_ptr()[1] = 0xCD;
 
-    REQUIRE( storage.expand( 4096 ) == true );
-    REQUIRE( storage.total_size() >= old_size );
+    REQUIRE( storage.resize_to( old_size + 4096 ) == true );
+    REQUIRE( storage.total_size() > old_size );
     REQUIRE( storage.base_ptr()[0] == 0xAB ); // данные скопированы
     REQUIRE( storage.base_ptr()[1] == 0xCD );
 }
@@ -162,7 +162,7 @@ TEST_CASE( "P5-D1: MMapStorage<> initial state (not open)", "[test_issue87_phase
     REQUIRE( storage.total_size() == 0 );
     REQUIRE( storage.is_open() == false );
     REQUIRE( storage.owns_memory() == false );
-    REQUIRE( storage.expand( 1024 ) == false ); // не поддерживается
+    REQUIRE( storage.resize_to( 1024 ) == false ); // не поддерживается на закрытом mmap
 }
 
 // =============================================================================

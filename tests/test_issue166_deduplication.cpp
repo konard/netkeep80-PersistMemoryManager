@@ -1,30 +1,9 @@
-// Suppress deprecation warnings — this test deliberately exercises deprecated functions.
-#if defined( __GNUC__ ) || defined( __clang__ )
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#elif defined( _MSC_VER )
-#pragma warning( push )
-#pragma warning( disable : 4996 )
-#endif
-
 /**
  * @file test_issue166_deduplication.cpp
- * @brief Тесты дедупликации функциональности ПАП.
- *
- * Проверяет:
- *   - detail::kNoBlock_v<AT> — новый шаблонный псевдоним для AT::no_block
- *   - detail::required_block_granules_t<AT>() — шаблонная версия для любого AT
- *   - Устранение дублирования: detail::granules_to_bytes() в persist_memory_manager.h
- *     заменён на address_traits::granules_to_bytes()
- *   - Удаление избыточных static_assert в SmallEmbeddedStaticConfig и EmbeddedStaticConfig
- *   - ValidPmmAddressTraits уже проверяется на уровне namespace — не нужны повторные assert в конфигах
- *
- * @see include/pmm/types.h — detail::kNoBlock_v<AT>, detail::required_block_granules_t<AT>
- * @see include/pmm/manager_configs.h — SmallEmbeddedStaticConfig, EmbeddedStaticConfig
- * @see include/pmm/persist_memory_manager.h — used_size(), free_size()
- * @version 0.1
+ * @brief Templated kNoBlock + checked block-granule sizing tests (issue #373).
  */
 
+#include "pmm/arena_internals.h"
 #include "pmm/manager_configs.h"
 #include "pmm/persist_memory_manager.h"
 #include "pmm/types.h"
@@ -90,63 +69,55 @@ TEST_CASE( "I166-A4: kNoBlock_v<AT> has correct index_type", "[test_issue166_ded
 }
 
 // =============================================================================
-// Required_block_granules_t<AT>
+// Block-granule sizing via bytes_to_granules_checked + kBlockHeaderGranules_t (issue #373)
 // =============================================================================
 
-/// @brief required_block_granules_t<DefaultAddressTraits>() == required_block_granules() for DefaultAddressTraits.
-TEST_CASE( "I166-B1: required_block_granules_t<DefaultAddressTraits> matches non-templated",
+namespace
+{
+template <typename AT> typename AT::index_type required_block_granules_checked( std::size_t user_bytes )
+{
+    using index_type = typename AT::index_type;
+    auto checked     = pmm::detail::bytes_to_granules_checked<AT>( user_bytes );
+    if ( !checked.has_value() )
+        return AT::no_block;
+    index_type data_gran = ( checked->value == 0 ) ? static_cast<index_type>( 1 ) : checked->value;
+    return static_cast<index_type>( pmm::detail::kBlockHeaderGranules_t<AT> + data_gran );
+}
+}
+
+TEST_CASE( "I166-B1: bytes_to_granules_checked matches expected for DefaultAddressTraits",
            "[test_issue166_deduplication]" )
 {
     using AT = pmm::DefaultAddressTraits;
-
-    for ( std::size_t bytes : { 0ul, 1ul, 16ul, 17ul, 32ul, 64ul, 128ul, 256ul } )
+    for ( std::size_t bytes : { std::size_t( 0 ), std::size_t( 1 ), std::size_t( 16 ), std::size_t( 17 ),
+                                std::size_t( 32 ), std::size_t( 64 ), std::size_t( 128 ), std::size_t( 256 ) } )
     {
-        std::uint32_t from_t   = pmm::detail::required_block_granules_t<AT>( bytes );
-        std::uint32_t from_old = pmm::detail::required_block_granules_t<pmm::DefaultAddressTraits>( bytes );
-        REQUIRE( from_t == from_old );
+        auto checked = pmm::detail::bytes_to_granules_checked<AT>( bytes );
+        REQUIRE( checked.has_value() );
+        std::size_t expected_data = ( bytes == 0 ) ? 0 : ( bytes + AT::granule_size - 1 ) / AT::granule_size;
+        REQUIRE( checked->value == expected_data );
     }
 }
 
-/// @brief required_block_granules_t<SmallAddressTraits>() uses SmallAddressTraits header granules.
-TEST_CASE( "I166-B2: required_block_granules_t<SmallAddressTraits> uses correct granule",
-           "[test_issue166_deduplication]" )
+TEST_CASE( "I166-B2: SmallAddressTraits block sizing is consistent", "[test_issue166_deduplication]" )
 {
-    using AT = pmm::SmallAddressTraits;
-
-    // Verify: result >= kBlockHeaderGranules_t<AT> + 1 (at least header + 1 data granule).
+    using AT                                = pmm::SmallAddressTraits;
     static constexpr std::uint32_t kHdrGran = pmm::detail::kBlockHeaderGranules_t<AT>;
-
-    for ( std::size_t bytes : { 0ul, 1ul, 16ul, 17ul, 32ul } )
-    {
-        std::uint32_t gran = pmm::detail::required_block_granules_t<AT>( bytes );
-        REQUIRE( gran >= kHdrGran + 1 );
-    }
-
-    // For 0 bytes: ceil(0/16)=0, clamp to 1 → hdr+1
-    REQUIRE( pmm::detail::required_block_granules_t<AT>( 0 ) == kHdrGran + 1 );
-
-    // For 16 bytes: ceil(16/16)=1 → hdr+1
-    REQUIRE( pmm::detail::required_block_granules_t<AT>( 16 ) == kHdrGran + 1 );
-
-    // For 17 bytes: ceil(17/16)=2 → hdr+2
-    REQUIRE( pmm::detail::required_block_granules_t<AT>( 17 ) == kHdrGran + 2 );
+    REQUIRE( required_block_granules_checked<AT>( 0 ) == kHdrGran + 1 );
+    REQUIRE( required_block_granules_checked<AT>( 16 ) == kHdrGran + 1 );
+    REQUIRE( required_block_granules_checked<AT>( 17 ) == kHdrGran + 2 );
 }
 
-/// @brief required_block_granules_t<LargeAddressTraits>() uses 64-byte granule.
-TEST_CASE( "I166-B3: required_block_granules_t<LargeAddressTraits> uses 64-byte granule",
-           "[test_issue166_deduplication]" )
+TEST_CASE( "I166-B3: LargeAddressTraits block sizing uses 64-byte granule", "[test_issue166_deduplication]" )
 {
-    using AT = pmm::LargeAddressTraits;
-
-    // Verify: granule_size=64, so 1..64 bytes → 1 data granule.
-    static constexpr std::uint32_t kHdrGran = pmm::detail::kBlockHeaderGranules_t<AT>;
-
-    REQUIRE( pmm::detail::required_block_granules_t<AT>( 0 ) == kHdrGran + 1 );
-    REQUIRE( pmm::detail::required_block_granules_t<AT>( 1 ) == kHdrGran + 1 );
-    REQUIRE( pmm::detail::required_block_granules_t<AT>( 64 ) == kHdrGran + 1 );
-    REQUIRE( pmm::detail::required_block_granules_t<AT>( 65 ) == kHdrGran + 2 );
-    REQUIRE( pmm::detail::required_block_granules_t<AT>( 128 ) == kHdrGran + 2 );
-    REQUIRE( pmm::detail::required_block_granules_t<AT>( 129 ) == kHdrGran + 3 );
+    using AT                                = pmm::LargeAddressTraits;
+    static constexpr std::uint64_t kHdrGran = pmm::detail::kBlockHeaderGranules_t<AT>;
+    REQUIRE( required_block_granules_checked<AT>( 0 ) == kHdrGran + 1 );
+    REQUIRE( required_block_granules_checked<AT>( 1 ) == kHdrGran + 1 );
+    REQUIRE( required_block_granules_checked<AT>( 64 ) == kHdrGran + 1 );
+    REQUIRE( required_block_granules_checked<AT>( 65 ) == kHdrGran + 2 );
+    REQUIRE( required_block_granules_checked<AT>( 128 ) == kHdrGran + 2 );
+    REQUIRE( required_block_granules_checked<AT>( 129 ) == kHdrGran + 3 );
 }
 
 // =============================================================================
@@ -270,10 +241,3 @@ TEST_CASE( "I166-D3: BasicConfig still validates ValidPmmAddressTraits for AT pa
 // =============================================================================
 // main
 // =============================================================================
-
-// Restore deprecation warnings
-#if defined( __GNUC__ ) || defined( __clang__ )
-#pragma GCC diagnostic pop
-#elif defined( _MSC_VER )
-#pragma warning( pop )
-#endif

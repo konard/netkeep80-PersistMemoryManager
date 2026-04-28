@@ -107,7 +107,8 @@ static bool register_domain_unlocked( const char* name, uint8_t flags, uint8_t b
         if ( existing->symbol_offset == 0 )
         {
             pptr<pstringview> symbol = intern_symbol_unlocked( name );
-            if ( !symbol.is_null() )
+            existing                 = find_domain_by_name_unlocked( name );
+            if ( existing != nullptr && !symbol.is_null() )
                 existing->symbol_offset = symbol.offset();
         }
         return true;
@@ -124,6 +125,11 @@ static bool register_domain_unlocked( const char* name, uint8_t flags, uint8_t b
     rec.flags                = flags;
     rec.symbol_offset        = 0;
     pptr<pstringview> symbol = intern_symbol_unlocked( name );
+    reg                      = forest_registry_root_unlocked();
+    if ( reg == nullptr )
+        return false;
+    if ( reg->domain_count >= detail::kMaxForestDomains )
+        return false;
     if ( !symbol.is_null() )
         rec.symbol_offset = symbol.offset();
     reg->domains[reg->domain_count++] = rec;
@@ -412,10 +418,9 @@ template <typename T> static pptr<T> make_pptr_from_raw( void* raw ) noexcept
     index_type blk_idx = static_cast<index_type>( blk_idx_raw );
     if ( !detail::validate_block_index<address_traits>( _backend.total_size(), blk_idx ) )
         return pptr<T>();
-    const void* blk = detail::block_at<address_traits>( base, blk_idx );
+    const void*         blk       = detail::block_at<address_traits>( base, blk_idx );
     const pmm::NodeType node_type = BlockStateBase<address_traits>::get_node_type( blk );
-    if ( !pmm::is_allocated( node_type ) ||
-         BlockStateBase<address_traits>::get_root_offset( blk ) != blk_idx )
+    if ( !pmm::is_allocated( node_type ) || BlockStateBase<address_traits>::get_root_offset( blk ) != blk_idx )
         return pptr<T>();
     if ( !pmm::is_known_node_type( static_cast<std::uint8_t>( node_type ) ) )
         return pptr<T>();

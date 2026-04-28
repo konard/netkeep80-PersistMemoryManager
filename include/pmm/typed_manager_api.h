@@ -1,4 +1,5 @@
 #pragma once
+#include "pmm/arena_internals.h"
 #include "pmm/block_state.h"
 #include "pmm/pptr.h"
 #include "pmm/typed_guard.h"
@@ -101,50 +102,57 @@ template <typename ManagerT> class PersistMemoryTypedApi
             ManagerT::_last_error = PmmError::NotInitialized;
             return pmm::pptr<T, ManagerT>();
         }
+        auto checked = pmm::detail::bytes_to_granules_checked<address_traits>( new_user_size );
+        if ( !checked.has_value() )
+        {
+            ManagerT::_last_error = PmmError::Overflow;
+            return pmm::pptr<T, ManagerT>();
+        }
+        index_type new_data_gran = checked->value;
+        if ( new_data_gran == 0 )
+        {
+            ManagerT::_last_error = PmmError::InvalidSize;
+            return pmm::pptr<T, ManagerT>();
+        }
+        if ( new_data_gran > std::numeric_limits<index_type>::max() - ManagerT::kBlockHdrGranules )
+        {
+            ManagerT::_last_error = PmmError::Overflow;
+            return pmm::pptr<T, ManagerT>();
+        }
         uint8_t*                               base          = ManagerT::_backend.base_ptr();
         detail::ManagerHeader<address_traits>* hdr           = ManagerT::get_header( base );
         index_type                             blk_idx       = ManagerT::template block_idx_from_pptr<T>( p );
         void*                                  blk_raw       = detail::block_at<address_traits>( base, blk_idx );
         index_type                             old_data_gran = BlockStateBase<address_traits>::get_weight( blk_raw );
-        index_type new_data_gran = detail::bytes_to_granules_t<address_traits>( new_user_size );
-        if ( new_data_gran == 0 )
-            new_data_gran = 1;
         if ( new_data_gran == old_data_gran )
         {
             ManagerT::_last_error = PmmError::Ok;
             return p;
         }
         static constexpr bool kBlockAligned = ( sizeof( Block<address_traits> ) % address_traits::granule_size == 0 );
+        detail::ArenaView<address_traits> arena{ base, hdr };
         if constexpr ( kBlockAligned )
         {
             if ( new_data_gran < old_data_gran )
             {
-                allocator::realloc_shrink( base, hdr, blk_idx, blk_raw, old_data_gran, new_data_gran );
+                allocator::realloc_shrink( arena, blk_idx, blk_raw, old_data_gran, new_data_gran );
                 ManagerT::_last_error = PmmError::Ok;
                 return p;
             }
             if ( new_data_gran > old_data_gran )
             {
-                if ( allocator::realloc_grow( base, hdr, blk_idx, blk_raw, old_data_gran, new_data_gran ) )
+                if ( allocator::realloc_grow( arena, blk_idx, blk_raw, old_data_gran, new_data_gran ) )
                 {
                     ManagerT::_last_error = PmmError::Ok;
                     return p;
                 }
             }
         }
-        index_type new_data_gran_alloc = detail::bytes_to_granules_t<address_traits>( new_user_size );
-        if ( new_data_gran_alloc == 0 )
-            new_data_gran_alloc = 1;
-        if ( new_data_gran_alloc > std::numeric_limits<index_type>::max() - ManagerT::kBlockHdrGranules )
-        {
-            ManagerT::_last_error = PmmError::Overflow;
-            return pmm::pptr<T, ManagerT>();
-        }
-        index_type needed  = ManagerT::kBlockHdrGranules + new_data_gran_alloc;
+        index_type needed  = ManagerT::kBlockHdrGranules + new_data_gran;
         index_type new_idx = free_block_tree::find_best_fit( base, hdr, needed );
         if ( new_idx == address_traits::no_block )
         {
-            if ( !ManagerT::do_expand( new_user_size ) )
+            if ( !ManagerT::do_expand( new_data_gran ) )
             {
                 ManagerT::_last_error = PmmError::OutOfMemory;
                 logging_policy::on_allocation_failure( new_user_size, PmmError::OutOfMemory );
@@ -160,7 +168,8 @@ template <typename ManagerT> class PersistMemoryTypedApi
                 return pmm::pptr<T, ManagerT>();
             }
         }
-        void* new_raw = allocator::allocate_from_block( base, hdr, new_idx, new_user_size );
+        detail::ArenaView<address_traits> arena_after{ base, hdr };
+        void* new_raw = allocator::allocate_from_block( arena_after, new_idx, new_data_gran );
         if ( new_raw == nullptr )
         {
             ManagerT::_last_error = PmmError::OutOfMemory;
@@ -183,17 +192,15 @@ template <typename ManagerT> class PersistMemoryTypedApi
         const pmm::NodeType nt_old      = BlockStateBase<address_traits>::get_node_type( old_blk_raw );
         if ( pmm::is_allocated( nt_old ) && pmm::can_be_deleted_from_pap( nt_old ) )
         {
-            static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<address_traits>;
-            auto                        old_alloc   = AllocatedBlock<address_traits>::cast_from_raw( old_blk_raw );
-            index_type                  total_gran  = detail::physical_block_total_granules<address_traits>(
+            auto       old_alloc  = AllocatedBlock<address_traits>::cast_from_raw( old_blk_raw );
+            index_type total_gran = detail::physical_block_total_granules<address_traits>(
                 base, hdr, detail::block_at<address_traits>( base, old_blk_idx ) );
             old_alloc.mark_as_free( total_gran );
             hdr->alloc_count--;
             hdr->free_count++;
             if ( hdr->used_size >= freed_w )
                 hdr->used_size -= freed_w;
-            allocator::coalesce( base, hdr, old_blk_idx );
-            (void)kBlkHdrGran;
+            allocator::coalesce( arena_after, old_blk_idx );
         }
         ManagerT::_last_error = PmmError::Ok;
         return new_p;

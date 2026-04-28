@@ -61,18 +61,7 @@ template <typename IndexT, size_t GranuleSz> struct AddressTraits
     using index_type                         = IndexT;
     static constexpr size_t     granule_size = GranuleSz;
     static constexpr index_type no_block     = std::numeric_limits<IndexT>::max();
-    static constexpr index_type bytes_to_granules( size_t bytes ) noexcept
-    {
-        if ( bytes == 0 )
-            return static_cast<index_type>( 0 );
-        if ( bytes > std::numeric_limits<size_t>::max() - ( granule_size - 1 ) )
-            return static_cast<index_type>( 0 );
-        size_t granules = ( bytes + granule_size - 1 ) / granule_size;
-        if ( granules > static_cast<size_t>( std::numeric_limits<IndexT>::max() ) )
-            return static_cast<index_type>( 0 );
-        return static_cast<index_type>( granules );
-    }
-    static constexpr size_t granules_to_bytes( index_type granules ) noexcept
+    static constexpr size_t     granules_to_bytes( index_type granules ) noexcept
     {
         return static_cast<size_t>( granules ) * granule_size;
     }
@@ -471,10 +460,7 @@ template <typename AT> class BlockStateBase
     BlockStateBase()     = delete;
     static Header*       header_of( void* raw_blk ) noexcept { return detail::block_header_at<AT>( raw_blk ); }
     static const Header* header_of( const void* raw_blk ) noexcept { return detail::block_header_at<AT>( raw_blk ); }
-    static bool          is_free_raw( const void* raw_blk ) noexcept
-    {
-        return pmm::is_free( header_of( raw_blk )->node_type );
-    }
+    static bool is_free_raw( const void* raw_blk ) noexcept { return pmm::is_free( header_of( raw_blk )->node_type ); }
     static bool is_allocated_raw( const void* raw_blk, index_type own_idx ) noexcept
     {
         const Header* h = header_of( raw_blk );
@@ -899,12 +885,12 @@ template <typename AT> inline bool validate_block_index( size_t total_size, type
 {
     if ( idx == AT::no_block )
         return false;
-    size_t byte_off = static_cast<size_t>( idx ) * AT::granule_size;
-    if ( idx != 0 && byte_off / AT::granule_size != static_cast<size_t>( idx ) )
+    constexpr size_t kG = AT::granule_size;
+    if ( static_cast<size_t>( idx ) > std::numeric_limits<size_t>::max() / kG )
         return false;
-    if ( byte_off + sizeof( pmm::Block<AT> ) > total_size )
-        return false;
-    return true;
+    size_t byte_off = static_cast<size_t>( idx ) * kG;
+    return byte_off <= std::numeric_limits<size_t>::max() - sizeof( pmm::Block<AT> ) &&
+           byte_off + sizeof( pmm::Block<AT> ) <= total_size;
 }
 template <typename AT>
 inline bool validate_user_ptr( const uint8_t* base, size_t total_size, const void* ptr,
@@ -954,32 +940,39 @@ inline void validate_block_header_full( const uint8_t* base, size_t total_size, 
     BlockState::verify_state( blk_raw, idx, result );
     index_type next = BlockState::get_next_offset( blk_raw );
     if ( next != AT::no_block && !validate_block_index<AT>( total_size, next ) )
-    {
         result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction, static_cast<uint64_t>( idx ),
                     static_cast<uint64_t>( AT::no_block ), static_cast<uint64_t>( next ) );
-    }
     index_type prev = BlockState::get_prev_offset( blk_raw );
     if ( prev != AT::no_block && !validate_block_index<AT>( total_size, prev ) )
-    {
         result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction, static_cast<uint64_t>( idx ),
                     static_cast<uint64_t>( AT::no_block ), static_cast<uint64_t>( prev ) );
-    }
     pmm::NodeType nt = BlockState::get_node_type( blk_raw );
     if ( !pmm::is_known_node_type( static_cast<std::uint8_t>( nt ) ) )
-    {
         result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction, static_cast<uint64_t>( idx ), 0,
                     static_cast<uint64_t>( static_cast<std::uint8_t>( nt ) ) );
-    }
     index_type w = BlockState::get_weight( blk_raw );
     if ( pmm::is_allocated( nt ) && w > 0 )
     {
-        static constexpr size_t kBlkHdrBytes = sizeof( pmm::Block<AT> );
-        size_t                  blk_byte_off = static_cast<size_t>( idx ) * AT::granule_size;
-        size_t                  data_bytes   = static_cast<size_t>( w ) * AT::granule_size;
-        if ( blk_byte_off + kBlkHdrBytes + data_bytes > total_size )
+        constexpr size_t kBlkHdrBytes = sizeof( pmm::Block<AT> );
+        constexpr size_t kSzMax       = std::numeric_limits<size_t>::max();
+        constexpr size_t kSentinel    = kSzMax;
+        size_t           idx_sz       = static_cast<size_t>( idx );
+        size_t           w_sz         = static_cast<size_t>( w );
+        if ( idx_sz > kSzMax / AT::granule_size || w_sz > kSzMax / AT::granule_size )
         {
             result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction, static_cast<uint64_t>( idx ),
-                        total_size, static_cast<uint64_t>( blk_byte_off + kBlkHdrBytes + data_bytes ) );
+                        total_size, kSentinel );
+            return;
+        }
+        size_t blk_byte_off = idx_sz * AT::granule_size;
+        size_t data_bytes   = w_sz * AT::granule_size;
+        bool   ovf1         = ( blk_byte_off > kSzMax - kBlkHdrBytes );
+        bool   ovf2         = !ovf1 && ( ( blk_byte_off + kBlkHdrBytes ) > kSzMax - data_bytes );
+        size_t end_diag     = ( ovf1 || ovf2 ) ? kSentinel : ( blk_byte_off + kBlkHdrBytes + data_bytes );
+        if ( ovf1 || ovf2 || end_diag > total_size )
+        {
+            result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction, static_cast<uint64_t>( idx ),
+                        total_size, static_cast<uint64_t>( end_diag ) );
         }
     }
 }
@@ -1159,17 +1152,6 @@ inline constexpr size_t   kMinBlockSize          = sizeof( pmm::Block<pmm::Defau
 inline constexpr size_t   kMinMemorySize         = sizeof( pmm::Block<pmm::DefaultAddressTraits> ) +
                                          sizeof( ManagerHeader<pmm::DefaultAddressTraits> ) +
                                          sizeof( pmm::Block<pmm::DefaultAddressTraits> ) + kMinBlockSize;
-template <typename AT> inline typename AT::index_type bytes_to_granules_t( size_t bytes )
-{
-    using IndexT                    = typename AT::index_type;
-    static constexpr size_t kGranSz = AT::granule_size;
-    if ( bytes > std::numeric_limits<size_t>::max() - ( kGranSz - 1 ) )
-        return static_cast<IndexT>( 0 );
-    size_t granules = ( bytes + kGranSz - 1 ) / kGranSz;
-    if ( granules > static_cast<size_t>( std::numeric_limits<IndexT>::max() ) )
-        return static_cast<IndexT>( 0 );
-    return static_cast<IndexT>( granules );
-}
 template <typename AT> inline typename AT::index_type bytes_to_idx_t( size_t bytes )
 {
     static constexpr size_t kGranSz = AT::granule_size;
@@ -1414,14 +1396,6 @@ template <typename AT> inline pmm::Block<AT>* header_from_ptr_t( uint8_t* base, 
         return nullptr;
     uint8_t* cand_addr = static_cast<uint8_t*>( ptr ) - kBlockSize;
     return reinterpret_cast<pmm::Block<AT>*>( cand_addr );
-}
-template <typename AT> inline typename AT::index_type required_block_granules_t( size_t user_bytes )
-{
-    using index_type         = typename AT::index_type;
-    index_type data_granules = bytes_to_granules_t<AT>( user_bytes );
-    if ( data_granules == 0 )
-        data_granules = 1;
-    return kBlockHeaderGranules_t<AT> + data_granules;
 }
 }
 }
@@ -2052,6 +2026,248 @@ template <typename AT = DefaultAddressTraits> struct AvlFreeTree
 static_assert( FreeBlockTreePolicyForTraitsConcept<AvlFreeTree<DefaultAddressTraits>, DefaultAddressTraits>, "" );
 }
 
+#include <atomic>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <optional>
+#include <type_traits>
+#include <utility>
+namespace pmm::detail
+{
+/*
+### pmm-detail-checkedarithmetic
+*/
+template <typename AT> struct GranuleCount
+{
+    using index_type = typename AT::index_type;
+    index_type value = 0;
+};
+constexpr std::optional<std::size_t> checked_add( std::size_t a, std::size_t b ) noexcept
+{
+    if ( a > std::numeric_limits<std::size_t>::max() - b )
+        return std::nullopt;
+    return a + b;
+}
+constexpr std::optional<std::size_t> checked_mul( std::size_t a, std::size_t b ) noexcept
+{
+    if ( a == 0 || b == 0 )
+        return std::size_t{ 0 };
+    if ( a > std::numeric_limits<std::size_t>::max() / b )
+        return std::nullopt;
+    return a * b;
+}
+constexpr bool fits_range( std::size_t off, std::size_t len, std::size_t total ) noexcept
+{
+    auto end = checked_add( off, len );
+    return end.has_value() && *end <= total;
+}
+constexpr std::optional<std::size_t> round_up_checked( std::size_t v, std::size_t a ) noexcept
+{
+    if ( a == 0 || ( a & ( a - 1 ) ) != 0 )
+        return std::nullopt;
+    auto p = checked_add( v, a - 1 );
+    return p.has_value() ? std::optional<std::size_t>{ ( *p / a ) * a } : std::nullopt;
+}
+template <typename AT>
+constexpr std::optional<std::size_t> checked_granule_offset( typename AT::index_type idx ) noexcept
+{
+    return checked_mul( static_cast<std::size_t>( idx ), AT::granule_size );
+}
+template <typename AT>
+constexpr std::optional<typename AT::index_type> byte_off_to_idx_checked( std::size_t byte_off ) noexcept
+{
+    using IndexT             = typename AT::index_type;
+    constexpr std::size_t kG = AT::granule_size;
+    if ( byte_off % kG != 0 )
+        return std::nullopt;
+    std::size_t idx = byte_off / kG;
+    if ( idx > static_cast<std::size_t>( std::numeric_limits<IndexT>::max() ) || idx == AT::no_block )
+        return std::nullopt;
+    return static_cast<IndexT>( idx );
+}
+template <typename AT> constexpr std::size_t max_arena_size() noexcept
+{
+    using IndexT             = typename AT::index_type;
+    constexpr std::size_t kG = AT::granule_size;
+    constexpr std::size_t mx = static_cast<std::size_t>( std::numeric_limits<IndexT>::max() );
+    if ( mx > std::numeric_limits<std::size_t>::max() / kG )
+        return std::numeric_limits<std::size_t>::max();
+    return mx * kG;
+}
+template <typename AT> constexpr std::optional<GranuleCount<AT>> bytes_to_granules_checked( std::size_t bytes ) noexcept
+{
+    using IndexT             = typename AT::index_type;
+    constexpr std::size_t kG = AT::granule_size;
+    if ( bytes == 0 )
+        return GranuleCount<AT>{ static_cast<IndexT>( 0 ) };
+    auto plus = checked_add( bytes, kG - 1 );
+    if ( !plus.has_value() )
+        return std::nullopt;
+    std::size_t g = *plus / kG;
+    if ( g > static_cast<std::size_t>( std::numeric_limits<IndexT>::max() ) )
+        return std::nullopt;
+    return GranuleCount<AT>{ static_cast<IndexT>( g ) };
+}
+/*
+### pmm-detail-arenaview
+*/
+template <typename AT, bool IsConst> class BasicArenaView
+{
+  public:
+    using index_type                    = typename AT::index_type;
+    using byte_ptr                      = std::conditional_t<IsConst, const std::uint8_t*, std::uint8_t*>;
+    using header_ptr                    = std::conditional_t<IsConst, const ManagerHeader<AT>*, ManagerHeader<AT>*>;
+    using block_ptr                     = std::conditional_t<IsConst, const Block<AT>*, Block<AT>*>;
+    constexpr BasicArenaView() noexcept = default;
+    constexpr BasicArenaView( byte_ptr b, header_ptr h ) noexcept : _base( b ), _hdr( h ) {}
+    constexpr byte_ptr   base() const noexcept { return _base; }
+    constexpr header_ptr header() const noexcept { return _hdr; }
+    std::size_t          total_size() const noexcept { return _hdr ? _hdr->total_size : 0; }
+    bool                 valid() const noexcept { return _base && _hdr; }
+    bool                 fits( index_type idx, std::size_t len ) const noexcept
+    {
+        auto off = checked_granule_offset<AT>( idx );
+        return off.has_value() && fits_range( *off, len, total_size() );
+    }
+    bool valid_block( index_type idx ) const noexcept
+    {
+        return _base && _hdr && idx != AT::no_block && fits( idx, sizeof( Block<AT> ) );
+    }
+    block_ptr block( index_type idx ) const noexcept
+    {
+        if ( !valid_block( idx ) )
+            return nullptr;
+        return reinterpret_cast<block_ptr>( _base + static_cast<std::size_t>( idx ) * AT::granule_size );
+    }
+
+  private:
+    byte_ptr   _base = nullptr;
+    header_ptr _hdr  = nullptr;
+};
+template <typename AT> using ArenaView      = BasicArenaView<AT, false>;
+template <typename AT> using ConstArenaView = BasicArenaView<AT, true>;
+/*
+### pmm-detail-walkcontrol
+*/
+enum class WalkControl
+{
+    Continue,
+    StopOk,
+    Fail,
+};
+/*
+### pmm-detail-blockwalker
+*/
+template <typename AT, bool IsConst, typename Fn>
+bool for_each_physical_block( BasicArenaView<AT, IsConst> arena, Fn&& fn ) noexcept
+{
+    using IndexT     = typename AT::index_type;
+    using BlockState = pmm::BlockStateBase<AT>;
+    auto base        = arena.base();
+    auto hdr         = arena.header();
+    if ( !base || !hdr )
+        return false;
+    const std::size_t total = static_cast<std::size_t>( hdr->total_size );
+    const std::size_t kBlk  = sizeof( pmm::Block<AT> );
+    const std::size_t limit = total / AT::granule_size + 1;
+    IndexT            idx   = hdr->first_block_offset;
+    std::size_t       steps = 0;
+    while ( idx != AT::no_block )
+    {
+        if ( ++steps > limit )
+            return false;
+        auto off = checked_granule_offset<AT>( idx );
+        if ( !off.has_value() || !fits_range( *off, kBlk, total ) )
+            return false;
+        auto* blk    = base + *off;
+        using Result = std::decay_t<decltype( fn( idx, blk ) )>;
+        if constexpr ( std::is_same_v<Result, WalkControl> )
+        {
+            WalkControl c = fn( idx, blk );
+            if ( c == WalkControl::StopOk )
+                return true;
+            if ( c == WalkControl::Fail )
+                return false;
+        }
+        else
+        {
+            if ( !fn( idx, blk ) )
+                return false;
+        }
+        IndexT next = BlockState::get_next_offset( blk );
+        if ( next != AT::no_block && next <= idx )
+            return false;
+        idx = next;
+    }
+    return true;
+}
+template <typename AT, typename Fn> bool for_each_physical_block_mut( ArenaView<AT> arena, Fn&& fn ) noexcept
+{
+    return for_each_physical_block<AT, false>( arena, std::forward<Fn>( fn ) );
+}
+/*
+### pmm-detail-growthpolicy
+*/
+inline std::optional<std::size_t> compute_growth( std::size_t current, std::size_t min_required, std::size_t gran,
+                                                  std::size_t num, std::size_t den, std::size_t max_gb,
+                                                  std::size_t max_arena = 0 ) noexcept
+{
+    if ( gran == 0 || ( gran & ( gran - 1 ) ) != 0 || den == 0 )
+        return std::nullopt;
+    auto tn = checked_mul( current, num );
+    if ( !tn )
+        return std::nullopt;
+    std::size_t target   = *tn / den;
+    std::size_t new_size = target > current ? target : current;
+    auto        need     = checked_add( current, min_required );
+    if ( !need )
+        return std::nullopt;
+    if ( *need > new_size )
+        new_size = *need;
+    auto rounded = round_up_checked( new_size, gran );
+    if ( !rounded || *rounded <= current )
+        return std::nullopt;
+    new_size = *rounded;
+    if ( max_gb != 0 )
+    {
+        auto cap = checked_mul( max_gb, std::size_t{ 1024 } * 1024 * 1024 );
+        if ( !cap || new_size > *cap )
+            return std::nullopt;
+    }
+    if ( max_arena != 0 && new_size > max_arena )
+        return std::nullopt;
+    return new_size;
+}
+template <typename AT>
+inline std::optional<std::size_t> compute_growth_for_traits( std::size_t current, std::size_t min_required,
+                                                             std::size_t num, std::size_t den,
+                                                             std::size_t max_gb ) noexcept
+{
+    auto target = compute_growth( current, min_required, AT::granule_size, num, den, max_gb, max_arena_size<AT>() );
+    if ( !target || !byte_off_to_idx_checked<AT>( *target ) )
+        return std::nullopt;
+    return target;
+}
+/*
+### pmm-detail-initguard
+*/
+struct InitGuard
+{
+    std::atomic<bool>& initialized;
+    bool               committed = false;
+    explicit InitGuard( std::atomic<bool>& a ) noexcept : initialized( a ) {}
+    ~InitGuard() noexcept
+    {
+        if ( !committed )
+            initialized.store( false, std::memory_order_release );
+    }
+    InitGuard( const InitGuard& )            = delete;
+    InitGuard& operator=( const InitGuard& ) = delete;
+    void       commit() noexcept { committed = true; }
+};
+}
+
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -2064,7 +2280,7 @@ template <typename Backend>
 concept StorageBackendConcept = requires( Backend& b, const Backend& cb, size_t n ) {
     { b.base_ptr() } -> std::convertible_to<uint8_t*>;
     { cb.total_size() } -> std::convertible_to<size_t>;
-    { b.expand( n ) } -> std::convertible_to<bool>;
+    { b.resize_to( n ) } -> std::convertible_to<bool>;
     { cb.owns_memory() } -> std::convertible_to<bool>;
 };
 template <typename Backend> inline constexpr bool is_storage_backend_v = StorageBackendConcept<Backend>;
@@ -2076,8 +2292,44 @@ template <typename Backend> inline constexpr bool is_storage_backend_v = Storage
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <optional>
+#if defined( _WIN32 )
+#include <malloc.h>
+#endif
 namespace pmm
 {
+namespace detail
+{
+/*
+### pmm-detail-alignedalloc
+*/
+inline void* aligned_alloc_for_arena( size_t alignment, size_t size ) noexcept
+{
+    if ( size == 0 )
+        return nullptr;
+    auto rounded = round_up_checked( size, alignment );
+    if ( !rounded.has_value() )
+        return nullptr;
+#if defined( _WIN32 )
+    return _aligned_malloc( *rounded, alignment );
+#else
+    void* p = nullptr;
+    if ( posix_memalign( &p, alignment < sizeof( void* ) ? sizeof( void* ) : alignment, *rounded ) != 0 )
+        return nullptr;
+    return p;
+#endif
+}
+inline void aligned_free_for_arena( void* p ) noexcept
+{
+    if ( p == nullptr )
+        return;
+#if defined( _WIN32 )
+    _aligned_free( p );
+#else
+    std::free( p );
+#endif
+}
+}
 /*
 ## pmm-heapstorage
 */
@@ -2090,13 +2342,16 @@ template <typename AT = DefaultAddressTraits> class HeapStorage
     {
         if ( initial_size == 0 )
             return;
-        size_t aligned = ( ( initial_size + AT::granule_size - 1 ) / AT::granule_size ) * AT::granule_size;
-        _buffer        = static_cast<uint8_t*>( std::malloc( aligned ) );
+        auto rounded = pmm::detail::round_up_checked( initial_size, AT::granule_size );
+        if ( !rounded.has_value() )
+            return;
+        _buffer = static_cast<uint8_t*>( detail::aligned_alloc_for_arena( AT::granule_size, *rounded ) );
         if ( _buffer != nullptr )
         {
-            _size        = aligned;
+            _size        = *rounded;
             _owns_memory = true;
         }
+        assert( reinterpret_cast<std::uintptr_t>( _buffer ) % AT::granule_size == 0 );
     }
     HeapStorage( const HeapStorage& )            = delete;
     HeapStorage& operator=( const HeapStorage& ) = delete;
@@ -2112,7 +2367,7 @@ template <typename AT = DefaultAddressTraits> class HeapStorage
         if ( this != &other )
         {
             if ( _owns_memory && _buffer != nullptr )
-                std::free( _buffer );
+                detail::aligned_free_for_arena( _buffer );
             _buffer            = other._buffer;
             _size              = other._size;
             _owns_memory       = other._owns_memory;
@@ -2125,12 +2380,12 @@ template <typename AT = DefaultAddressTraits> class HeapStorage
     ~HeapStorage()
     {
         if ( _owns_memory && _buffer != nullptr )
-            std::free( _buffer );
+            detail::aligned_free_for_arena( _buffer );
     }
     void attach( void* memory, size_t size ) noexcept
     {
         if ( _owns_memory && _buffer != nullptr )
-            std::free( _buffer );
+            detail::aligned_free_for_arena( _buffer );
         _buffer      = static_cast<uint8_t*>( memory );
         _size        = size;
         _owns_memory = false;
@@ -2138,26 +2393,24 @@ template <typename AT = DefaultAddressTraits> class HeapStorage
     uint8_t*       base_ptr() noexcept { return _buffer; }
     const uint8_t* base_ptr() const noexcept { return _buffer; }
     size_t         total_size() const noexcept { return _size; }
-    bool           expand( size_t additional_bytes ) noexcept
+    bool           resize_to( size_t new_total_size ) noexcept
     {
-        if ( additional_bytes == 0 )
-            return _size > 0;
-        static constexpr size_t kMinInitialSize = 4096;
-        size_t                  growth =
-            ( _size > 0 ) ? ( _size / 4 + additional_bytes ) : std::max( additional_bytes, kMinInitialSize );
-        size_t new_size = _size + growth;
-        new_size        = ( ( new_size + AT::granule_size - 1 ) / AT::granule_size ) * AT::granule_size;
-        if ( new_size <= _size )
+        if ( new_total_size == 0 )
             return false;
-        void* new_buf = std::malloc( new_size );
+        if ( new_total_size % AT::granule_size != 0 )
+            return false;
+        if ( new_total_size <= _size )
+            return false;
+        void* new_buf = detail::aligned_alloc_for_arena( AT::granule_size, new_total_size );
         if ( new_buf == nullptr )
             return false;
+        assert( reinterpret_cast<std::uintptr_t>( new_buf ) % AT::granule_size == 0 );
         if ( _buffer != nullptr )
             std::memcpy( new_buf, _buffer, _size );
         if ( _owns_memory && _buffer != nullptr )
-            std::free( _buffer );
+            detail::aligned_free_for_arena( _buffer );
         _buffer      = static_cast<uint8_t*>( new_buf );
-        _size        = new_size;
+        _size        = new_total_size;
         _owns_memory = true;
         return true;
     }
@@ -2241,7 +2494,7 @@ template <size_t Size, typename AT = DefaultAddressTraits> class StaticStorage
 /*
 ### pmm-staticstorage-expand
 */
-    bool           expand( size_t ) noexcept { return false; }
+    bool           resize_to( size_t ) noexcept { return false; }
     constexpr bool owns_memory() const noexcept { return false; }
 
   private:
@@ -2337,23 +2590,27 @@ class AllocatorPolicy
     using index_type                                     = typename AT::index_type;
     using BlockT                                         = Block<AT>;
     using BlockState                                     = BlockStateBase<AT>;
+    using Arena                                          = detail::ArenaView<AT>;
+    using ConstArena                                     = detail::ConstArenaView<AT>;
     AllocatorPolicy()                                    = delete;
     AllocatorPolicy( const AllocatorPolicy& )            = delete;
     AllocatorPolicy& operator=( const AllocatorPolicy& ) = delete;
-    static void*     allocate_from_block( uint8_t* base, detail::ManagerHeader<AT>* hdr, index_type blk_idx,
-                                          size_t user_size )
+    static void*     allocate_from_block( Arena arena, index_type blk_idx, index_type data_gran )
     {
-        FT::remove( base, hdr, blk_idx );
-        FreeBlock<AT>               fb          = FreeBlock<AT>::cast_from_raw( detail::block_at<AT>( base, blk_idx ) );
-        FreeBlockRemovedAVL<AT>     removed     = fb.remove_from_avl();
         static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AT>;
-        index_type                  blk_total_gran = BlockState::get_weight( detail::block_at<AT>( base, blk_idx ) );
-        index_type                  data_gran      = detail::bytes_to_granules_t<AT>( user_size );
+        if ( data_gran == 0 )
+            return nullptr;
         if ( data_gran > std::numeric_limits<index_type>::max() - kBlkHdrGran )
             return nullptr;
-        index_type needed_gran  = kBlkHdrGran + data_gran;
-        index_type min_rem_gran = kBlkHdrGran + 1;
-        bool       can_split    = false;
+        std::uint8_t*              base = arena.base();
+        detail::ManagerHeader<AT>* hdr  = arena.header();
+        FT::remove( base, hdr, blk_idx );
+        FreeBlock<AT>           fb             = FreeBlock<AT>::cast_from_raw( detail::block_at<AT>( base, blk_idx ) );
+        FreeBlockRemovedAVL<AT> removed        = fb.remove_from_avl();
+        index_type              blk_total_gran = BlockState::get_weight( detail::block_at<AT>( base, blk_idx ) );
+        index_type              needed_gran    = kBlkHdrGran + data_gran;
+        index_type              min_rem_gran   = kBlkHdrGran + 1;
+        bool                    can_split      = false;
         if ( needed_gran <= std::numeric_limits<index_type>::max() - min_rem_gran )
             can_split = ( blk_total_gran >= needed_gran + min_rem_gran );
         if ( can_split )
@@ -2383,9 +2640,11 @@ class AllocatorPolicy
         hdr->used_size += data_gran;
         return detail::user_ptr<AT>( detail::block_at<AT>( base, blk_idx ) );
     }
-    static void coalesce( uint8_t* base, detail::ManagerHeader<AT>* hdr, index_type blk_idx )
+    static void coalesce( Arena arena, index_type blk_idx )
     {
-        FreeBlockNotInAVL<AT> not_avl = FreeBlockNotInAVL<AT>::cast_from_raw( detail::block_at<AT>( base, blk_idx ) );
+        std::uint8_t*              base = arena.base();
+        detail::ManagerHeader<AT>* hdr  = arena.header();
+        FreeBlockNotInAVL<AT> not_avl   = FreeBlockNotInAVL<AT>::cast_from_raw( detail::block_at<AT>( base, blk_idx ) );
         CoalescingBlock<AT>   coalescing        = not_avl.begin_coalescing();
         static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AT>;
         index_type                  b_idx       = blk_idx;
@@ -2436,163 +2695,161 @@ class AllocatorPolicy
         (void)coalescing.finalize_coalesce();
         FT::insert( base, hdr, b_idx );
     }
-    static void rebuild_free_tree( uint8_t* base, detail::ManagerHeader<AT>* hdr )
+    static void rebuild_free_tree( Arena arena )
     {
-        hdr->free_tree_root    = AT::no_block;
-        hdr->last_block_offset = AT::no_block;
-        index_type idx         = hdr->first_block_offset;
-        while ( idx != AT::no_block )
+        std::uint8_t*              base = arena.base();
+        detail::ManagerHeader<AT>* hdr  = arena.header();
+        hdr->free_tree_root             = AT::no_block;
+        hdr->last_block_offset          = AT::no_block;
+        index_type last_seen            = AT::no_block;
+        auto       step                 = [&]( index_type idx, void* blk_ptr ) noexcept
         {
-            void* blk_ptr = detail::block_at<AT>( base, idx );
             BlockState::recover_state( blk_ptr, idx );
             if ( pmm::is_free( BlockState::get_node_type( blk_ptr ) ) )
             {
-                index_type total_gran = compute_total_block_granules( base, hdr, idx, blk_ptr );
+                index_type total_gran = compute_total_block_granules( hdr, idx, blk_ptr );
                 BlockState::set_weight_of( blk_ptr, total_gran );
                 BlockState::reset_avl_fields_of( blk_ptr );
                 FT::insert( base, hdr, idx );
             }
-            index_type next_idx = BlockState::get_next_offset( blk_ptr );
-            if ( next_idx == AT::no_block )
-                hdr->last_block_offset = idx;
-            idx = next_idx;
-        }
+            last_seen = idx;
+            return true;
+        };
+        (void)detail::for_each_physical_block_mut<AT>( arena, step );
+        if ( last_seen != AT::no_block )
+            hdr->last_block_offset = last_seen;
     }
-    static void repair_linked_list( uint8_t* base, detail::ManagerHeader<AT>* hdr )
+    static void repair_linked_list( Arena arena )
     {
-        index_type idx  = hdr->first_block_offset;
         index_type prev = AT::no_block;
-        while ( idx != AT::no_block )
+        auto       step = [&]( index_type idx, void* blk_ptr ) noexcept
         {
-            if ( static_cast<size_t>( idx ) * AT::granule_size + sizeof( BlockT ) > hdr->total_size )
-                break;
-            void* blk_ptr = detail::block_at<AT>( base, idx );
             BlockState::repair_prev_offset( blk_ptr, prev );
-            prev                   = idx;
-            index_type next_offset = BlockState::get_next_offset( blk_ptr );
-            idx                    = next_offset;
-        }
+            prev = idx;
+            return true;
+        };
+        (void)detail::for_each_physical_block_mut<AT>( arena, step );
     }
-    static void recompute_counters( uint8_t* base, detail::ManagerHeader<AT>* hdr )
+    struct Counters
+    {
+        index_type block_count = 0, free_count = 0, alloc_count = 0, used_gran = 0;
+        bool       walk_ok = true;
+    };
+    static Counters accumulate_counters( ConstArena arena ) noexcept
     {
         static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AT>;
-        index_type                  block_count = 0, free_count = 0, alloc_count = 0;
-        index_type                  used_gran = 0;
-        index_type                  idx       = hdr->first_block_offset;
-        while ( idx != AT::no_block )
-        {
-            if ( static_cast<size_t>( idx ) * AT::granule_size + sizeof( BlockT ) > hdr->total_size )
-                break;
-            const void* blk_ptr = detail::block_at<AT>( base, idx );
-            block_count++;
-            used_gran += kBlkHdrGran;
-            if ( pmm::is_allocated( BlockState::get_node_type( blk_ptr ) ) )
+        Counters                    c;
+        c.walk_ok = detail::for_each_physical_block<AT>(
+            arena,
+            [&]( index_type, const void* blk_ptr ) noexcept
             {
-                alloc_count++;
-                used_gran += BlockState::get_weight( blk_ptr );
-            }
-            else
-            {
-                free_count++;
-            }
-            idx = BlockState::get_next_offset( blk_ptr );
-        }
-        hdr->block_count = block_count;
-        hdr->free_count  = free_count;
-        hdr->alloc_count = alloc_count;
-        hdr->used_size   = used_gran;
+                ++c.block_count;
+                c.used_gran = static_cast<index_type>( c.used_gran + kBlkHdrGran );
+                if ( pmm::is_allocated( BlockState::get_node_type( blk_ptr ) ) )
+                {
+                    ++c.alloc_count;
+                    c.used_gran = static_cast<index_type>( c.used_gran + BlockState::get_weight( blk_ptr ) );
+                }
+                else
+                {
+                    ++c.free_count;
+                }
+                return true;
+            } );
+        return c;
     }
-    static void verify_linked_list( const uint8_t* base, const detail::ManagerHeader<AT>* hdr,
-                                    VerifyResult& result ) noexcept
+    static void recompute_counters( Arena arena )
     {
-        index_type idx  = hdr->first_block_offset;
-        index_type prev = AT::no_block;
-        while ( idx != AT::no_block )
-        {
-            if ( static_cast<size_t>( idx ) * AT::granule_size + sizeof( BlockT ) > hdr->total_size )
-                break;
-            const void* blk_ptr     = detail::block_at<AT>( base, idx );
-            index_type  stored_prev = BlockState::get_prev_offset( blk_ptr );
-            if ( stored_prev != prev )
+        Counters                   c   = accumulate_counters( ConstArena{ arena.base(), arena.header() } );
+        detail::ManagerHeader<AT>* hdr = arena.header();
+        hdr->block_count               = c.block_count;
+        hdr->free_count                = c.free_count;
+        hdr->alloc_count               = c.alloc_count;
+        hdr->used_size                 = c.used_gran;
+    }
+    static void verify_linked_list( ConstArena arena, VerifyResult& result ) noexcept
+    {
+        index_type expected_prev = AT::no_block;
+        const bool ok            = detail::for_each_physical_block<AT>(
+            arena,
+            [&]( index_type idx, const void* blk_ptr ) noexcept
             {
-                result.add( ViolationType::PrevOffsetMismatch, DiagnosticAction::NoAction, static_cast<uint64_t>( idx ),
-                            static_cast<uint64_t>( prev ), static_cast<uint64_t>( stored_prev ) );
-            }
-            prev                   = idx;
-            index_type next_offset = BlockState::get_next_offset( blk_ptr );
-            idx                    = next_offset;
+                index_type stored_prev = BlockState::get_prev_offset( blk_ptr );
+                if ( stored_prev != expected_prev )
+                {
+                    result.add( ViolationType::PrevOffsetMismatch, DiagnosticAction::NoAction,
+                                           static_cast<uint64_t>( idx ), static_cast<uint64_t>( expected_prev ),
+                                           static_cast<uint64_t>( stored_prev ) );
+                }
+                expected_prev = idx;
+                return true;
+            } );
+        if ( !ok )
+        {
+            result.add( ViolationType::HeaderCorruption, DiagnosticAction::NoAction );
         }
     }
-    static void verify_counters( const uint8_t* base, const detail::ManagerHeader<AT>* hdr,
-                                 VerifyResult& result ) noexcept
+    static void verify_counters( ConstArena arena, VerifyResult& result ) noexcept
     {
-        static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AT>;
-        index_type                  block_count = 0, free_count = 0, alloc_count = 0;
-        index_type                  used_gran = 0;
-        index_type                  idx       = hdr->first_block_offset;
-        while ( idx != AT::no_block )
+        Counters c = accumulate_counters( arena );
+        if ( !c.walk_ok )
         {
-            if ( static_cast<size_t>( idx ) * AT::granule_size + sizeof( BlockT ) > hdr->total_size )
-                break;
-            const void* blk_ptr = detail::block_at<AT>( base, idx );
-            block_count++;
-            used_gran += kBlkHdrGran;
-            if ( pmm::is_allocated( BlockState::get_node_type( blk_ptr ) ) )
-            {
-                alloc_count++;
-                used_gran += BlockState::get_weight( blk_ptr );
-            }
-            else
-            {
-                free_count++;
-            }
-            idx = BlockState::get_next_offset( blk_ptr );
+            result.add( ViolationType::HeaderCorruption, DiagnosticAction::NoAction );
+            return;
         }
-        if ( hdr->block_count != block_count || hdr->free_count != free_count || hdr->alloc_count != alloc_count ||
-             hdr->used_size != used_gran )
+        const detail::ManagerHeader<AT>* hdr = arena.header();
+        if ( hdr->block_count != c.block_count || hdr->free_count != c.free_count ||
+             hdr->alloc_count != c.alloc_count || hdr->used_size != c.used_gran )
         {
             result.add( ViolationType::CounterMismatch, DiagnosticAction::NoAction, 0,
-                        static_cast<uint64_t>( block_count ), static_cast<uint64_t>( hdr->block_count ) );
+                        static_cast<uint64_t>( c.block_count ), static_cast<uint64_t>( hdr->block_count ) );
         }
     }
-    static void verify_block_states( const uint8_t* base, const detail::ManagerHeader<AT>* hdr,
-                                     VerifyResult& result ) noexcept
+    static void verify_block_states( ConstArena arena, VerifyResult& result ) noexcept
     {
-        index_type idx = hdr->first_block_offset;
-        while ( idx != AT::no_block )
-        {
-            if ( static_cast<size_t>( idx ) * AT::granule_size + sizeof( BlockT ) > hdr->total_size )
-                break;
-            const void* blk_ptr = detail::block_at<AT>( base, idx );
-            BlockState::verify_state( blk_ptr, idx, result );
-            if ( pmm::is_free( BlockState::get_node_type( blk_ptr ) ) )
+        const std::uint8_t*              base = arena.base();
+        const detail::ManagerHeader<AT>* hdr  = arena.header();
+        const bool                       ok   = detail::for_each_physical_block<AT>(
+            arena,
+            [&]( index_type idx, const void* blk_ptr ) noexcept
             {
-                const auto* blk      = reinterpret_cast<const BlockT*>( blk_ptr );
-                index_type  cached   = BlockState::get_weight( blk_ptr );
-                index_type  physical = detail::physical_block_total_granules<AT>( base, hdr, blk );
-                if ( cached != physical )
+                BlockState::verify_state( blk_ptr, idx, result );
+                if ( pmm::is_free( BlockState::get_node_type( blk_ptr ) ) )
                 {
-                    result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction,
-                                static_cast<uint64_t>( idx ), static_cast<uint64_t>( physical ),
-                                static_cast<uint64_t>( cached ) );
+                    const auto* blk    = reinterpret_cast<const BlockT*>( blk_ptr );
+                    index_type  cached = BlockState::get_weight( blk_ptr );
+                    index_type  physical = detail::physical_block_total_granules<AT>( base, hdr, blk );
+                    if ( cached != physical )
+                    {
+                        result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction,
+                                                            static_cast<uint64_t>( idx ), static_cast<uint64_t>( physical ),
+                                                            static_cast<uint64_t>( cached ) );
+                    }
                 }
-            }
-            idx = BlockState::get_next_offset( blk_ptr );
+                return true;
+            } );
+        if ( !ok )
+        {
+            result.add( ViolationType::HeaderCorruption, DiagnosticAction::NoAction );
         }
     }
-    static void verify_free_tree( const uint8_t* base, const detail::ManagerHeader<AT>* hdr,
-                                  VerifyResult& result ) noexcept
+    static void verify_free_tree( ConstArena arena, VerifyResult& result ) noexcept
     {
-        size_t     expected_count = 0;
-        index_type idx            = hdr->first_block_offset;
-        while ( idx != AT::no_block )
+        const std::uint8_t*              base           = arena.base();
+        const detail::ManagerHeader<AT>* hdr            = arena.header();
+        std::size_t                      expected_count = 0;
+        const bool                       walk_ok =
+            detail::for_each_physical_block<AT>( arena,
+                                                 [&]( index_type, const void* blk_ptr ) noexcept
+                                                 {
+                                                     if ( pmm::is_free( BlockState::get_node_type( blk_ptr ) ) )
+                                                         ++expected_count;
+                                                     return true;
+                                                 } );
+        if ( !walk_ok )
         {
-            if ( static_cast<size_t>( idx ) * AT::granule_size + sizeof( BlockT ) > hdr->total_size )
-                break;
-            const void* blk_ptr = detail::block_at<AT>( base, idx );
-            if ( pmm::is_free( BlockState::get_node_type( blk_ptr ) ) )
-                ++expected_count;
-            idx = BlockState::get_next_offset( blk_ptr );
+            result.add( ViolationType::HeaderCorruption, DiagnosticAction::NoAction );
+            return;
         }
         const bool root_present = ( hdr->free_tree_root != AT::no_block );
         if ( expected_count == 0 )
@@ -2624,45 +2881,43 @@ class AllocatorPolicy
                         static_cast<uint64_t>( hdr->free_tree_root ), 0,
                         static_cast<uint64_t>( BlockState::get_parent_offset( root ) ) );
         }
-        size_t visited_count = 0;
+        std::size_t visited_count = 0;
         verify_free_tree_node( base, hdr, hdr->free_tree_root, AT::no_block, {}, false, {}, false, expected_count,
                                visited_count, result );
-        idx = hdr->first_block_offset;
-        while ( idx != AT::no_block )
-        {
-            if ( static_cast<size_t>( idx ) * AT::granule_size + sizeof( BlockT ) > hdr->total_size )
-                break;
-            const void* blk_ptr = detail::block_at<AT>( base, idx );
-            if ( pmm::is_free( BlockState::get_node_type( blk_ptr ) ) &&
-                 !free_tree_contains( base, hdr, hdr->free_tree_root, idx, expected_count ) )
+        (void)detail::for_each_physical_block<AT>(
+            arena,
+            [&]( index_type idx, const void* blk_ptr ) noexcept
             {
-                result.add( ViolationType::FreeTreeStale, DiagnosticAction::NoAction, static_cast<uint64_t>( idx ), 1,
-                            0 );
-            }
-            idx = BlockState::get_next_offset( blk_ptr );
-        }
+                if ( pmm::is_free( BlockState::get_node_type( blk_ptr ) ) &&
+                     !free_tree_contains( base, hdr, hdr->free_tree_root, idx, expected_count ) )
+                {
+                    result.add( ViolationType::FreeTreeStale, DiagnosticAction::NoAction, static_cast<uint64_t>( idx ),
+                                1, 0 );
+                }
+                return true;
+            } );
         if ( visited_count != expected_count )
         {
             result.add( ViolationType::FreeTreeStale, DiagnosticAction::NoAction, 0,
                         static_cast<uint64_t>( expected_count ), static_cast<uint64_t>( visited_count ) );
         }
     }
-    static index_type free_tree_block_granules( const uint8_t* base, const detail::ManagerHeader<AT>* hdr,
+    static index_type free_tree_block_granules( const std::uint8_t* base, const detail::ManagerHeader<AT>* hdr,
                                                 index_type block_idx ) noexcept
     {
         (void)hdr;
         const void* n = detail::block_at<AT>( base, block_idx );
         return BlockState::get_weight( n );
     }
-    static bool free_tree_less_key( const uint8_t* base, const detail::ManagerHeader<AT>* hdr, index_type a,
+    static bool free_tree_less_key( const std::uint8_t* base, const detail::ManagerHeader<AT>* hdr, index_type a,
                                     index_type b ) noexcept
     {
         index_type a_gran = free_tree_block_granules( base, hdr, a );
         index_type b_gran = free_tree_block_granules( base, hdr, b );
         return ( a_gran < b_gran ) || ( a_gran == b_gran && a < b );
     }
-    static bool free_tree_contains( const uint8_t* base, const detail::ManagerHeader<AT>* hdr, index_type node_idx,
-                                    index_type target, size_t step_limit ) noexcept
+    static bool free_tree_contains( const std::uint8_t* base, const detail::ManagerHeader<AT>* hdr, index_type node_idx,
+                                    index_type target, std::size_t step_limit ) noexcept
     {
         while ( node_idx != AT::no_block && step_limit-- > 0 )
         {
@@ -2678,10 +2933,10 @@ class AllocatorPolicy
         }
         return false;
     }
-    static std::int16_t verify_free_tree_node( const uint8_t* base, const detail::ManagerHeader<AT>* hdr,
+    static std::int16_t verify_free_tree_node( const std::uint8_t* base, const detail::ManagerHeader<AT>* hdr,
                                                index_type node_idx, index_type parent, index_type lower, bool has_lower,
-                                               index_type upper, bool has_upper, size_t expected_count,
-                                               size_t& visited_count, VerifyResult& result ) noexcept
+                                               index_type upper, bool has_upper, std::size_t expected_count,
+                                               std::size_t& visited_count, VerifyResult& result ) noexcept
     {
         if ( node_idx == AT::no_block )
             return 0;
@@ -2736,9 +2991,11 @@ class AllocatorPolicy
         }
         return expected_h;
     }
-    static void realloc_shrink( uint8_t* base, detail::ManagerHeader<AT>* hdr, index_type blk_idx, void* blk_raw,
-                                index_type old_data_gran, index_type new_data_gran ) noexcept
+    static void realloc_shrink( Arena arena, index_type blk_idx, void* blk_raw, index_type old_data_gran,
+                                index_type new_data_gran ) noexcept
     {
+        std::uint8_t*               base        = arena.base();
+        detail::ManagerHeader<AT>*  hdr         = arena.header();
         static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AT>;
         index_type                  remainder   = old_data_gran - new_data_gran;
         if ( remainder >= kBlkHdrGran + 1 )
@@ -2760,7 +3017,7 @@ class AllocatorPolicy
             hdr->free_count++;
             hdr->used_size += kBlkHdrGran;
             hdr->used_size -= ( old_data_gran - new_data_gran );
-            coalesce( base, hdr, new_free_idx );
+            coalesce( arena, new_free_idx );
         }
         else
         {
@@ -2768,9 +3025,11 @@ class AllocatorPolicy
             hdr->used_size -= ( old_data_gran - new_data_gran );
         }
     }
-    static bool realloc_grow( uint8_t* base, detail::ManagerHeader<AT>* hdr, index_type blk_idx, void* blk_raw,
-                              index_type old_data_gran, index_type new_data_gran ) noexcept
+    static bool realloc_grow( Arena arena, index_type blk_idx, void* blk_raw, index_type old_data_gran,
+                              index_type new_data_gran ) noexcept
     {
+        std::uint8_t*               base        = arena.base();
+        detail::ManagerHeader<AT>*  hdr         = arena.header();
         static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AT>;
         index_type                  next_idx    = BlockState::get_next_offset( blk_raw );
         if ( next_idx == AT::no_block )
@@ -2818,10 +3077,9 @@ class AllocatorPolicy
     }
 
   private:
-    static index_type compute_total_block_granules( const uint8_t* base, const detail::ManagerHeader<AT>* hdr,
-                                                    index_type idx, const void* blk ) noexcept
+    static index_type compute_total_block_granules( const detail::ManagerHeader<AT>* hdr, index_type idx,
+                                                    const void* blk ) noexcept
     {
-        (void)base;
         index_type next       = BlockState::get_next_offset( blk );
         index_type total_gran = static_cast<index_type>( hdr->total_size / AT::granule_size );
         return ( next != AT::no_block ) ? static_cast<index_type>( next - idx )
@@ -2916,6 +3174,7 @@ static_assert( std::is_nothrow_default_constructible_v<ForestDomainRegistry<Defa
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 namespace pmm::detail
 {
 template <typename ManagerAccess> struct ManagerLayoutOps
@@ -2963,43 +3222,55 @@ template <typename ManagerAccess> struct ManagerLayoutOps
         ManagerAccess::set_initialized();
         return true;
     }
-    static bool do_expand( storage_backend& backend, bool initialized, size_t user_size ) noexcept
+    static bool do_expand( storage_backend& backend, bool initialized, index_type data_gran_need ) noexcept
     {
         if ( !initialized )
             return false;
-        uint8_t*                       base           = backend.base_ptr();
-        ManagerHeader<address_traits>* hdr            = ManagerAccess::get_header( base );
-        size_t                         old_size       = hdr->total_size;
-        static constexpr size_t        kGranSz        = address_traits::granule_size;
-        index_type                     data_gran_need = bytes_to_granules_t<address_traits>( user_size );
         if ( data_gran_need == 0 )
-            data_gran_need = 1;
-        size_t min_need = static_cast<size_t>( ManagerAccess::kBlockHdrGranules + data_gran_need +
-                                               ManagerAccess::kBlockHdrGranules ) *
-                          kGranSz;
-        size_t growth   = old_size / 4;
-        if ( growth < min_need )
-            growth = min_need;
-        if ( !backend.expand( growth ) )
+            return false;
+        uint8_t*                       base     = backend.base_ptr();
+        ManagerHeader<address_traits>* hdr      = ManagerAccess::get_header( base );
+        size_t                         old_size = hdr->total_size;
+        static constexpr size_t        kGranSz  = address_traits::granule_size;
+        auto need_grans                         = checked_add( static_cast<size_t>( ManagerAccess::kBlockHdrGranules ),
+                                                               static_cast<size_t>( data_gran_need ) );
+        if ( !need_grans )
+            return false;
+        auto need_grans_total = checked_add( *need_grans, static_cast<size_t>( ManagerAccess::kBlockHdrGranules ) );
+        if ( !need_grans_total )
+            return false;
+        auto min_need = checked_mul( *need_grans_total, kGranSz );
+        if ( !min_need )
+            return false;
+        std::optional<size_t> target_size =
+            compute_growth_for_traits<address_traits>( old_size, *min_need, ManagerAccess::kGrowNumerator,
+                                                       ManagerAccess::kGrowDenominator, ManagerAccess::kMaxMemoryGB );
+        if ( !target_size.has_value() )
+            return false;
+        if ( !backend.resize_to( *target_size ) )
             return false;
         uint8_t* new_base = backend.base_ptr();
         size_t   new_size = backend.total_size();
         if ( new_base == nullptr || new_size <= old_size )
             return false;
         logging_policy::on_expand( old_size, new_size );
-        hdr                   = ManagerAccess::get_header( new_base );
-        index_type extra_idx  = byte_off_to_idx_t<address_traits>( old_size );
-        size_t     extra_size = new_size - old_size;
+        hdr                     = ManagerAccess::get_header( new_base );
+        auto extra_idx_opt      = byte_off_to_idx_checked<address_traits>( old_size );
+        auto new_total_gran_opt = byte_off_to_idx_checked<address_traits>( new_size );
+        if ( !extra_idx_opt.has_value() || !new_total_gran_opt.has_value() )
+            return false;
+        index_type extra_idx      = *extra_idx_opt;
+        index_type new_total_gran = *new_total_gran_opt;
+        size_t     extra_size     = new_size - old_size;
         void*      last_blk_raw =
             ( hdr->last_block_offset != address_traits::no_block )
-                ? static_cast<void*>( new_base + static_cast<size_t>( hdr->last_block_offset ) * kGranSz )
-                : nullptr;
+                     ? static_cast<void*>( new_base + static_cast<size_t>( hdr->last_block_offset ) * kGranSz )
+                     : nullptr;
         if ( last_blk_raw != nullptr && pmm::is_free( BlockState::get_node_type( last_blk_raw ) ) )
         {
             Block<address_traits>* last_blk = reinterpret_cast<Block<address_traits>*>( last_blk_raw );
             index_type             loff     = block_idx_t<address_traits>( new_base, last_blk );
             free_block_tree::remove( new_base, hdr, loff );
-            index_type new_total_gran = byte_off_to_idx_t<address_traits>( new_size );
             BlockState::set_weight_of( last_blk_raw, static_cast<index_type>( new_total_gran - loff ) );
             hdr->total_size = new_size;
             free_block_tree::insert( new_base, hdr, loff );
@@ -3008,9 +3279,8 @@ template <typename ManagerAccess> struct ManagerLayoutOps
         {
             if ( extra_size < sizeof( Block<address_traits> ) + kGranSz )
                 return false;
-            void*      nb_blk        = new_base + static_cast<size_t>( extra_idx ) * kGranSz;
-            index_type new_total_gran = byte_off_to_idx_t<address_traits>( new_size );
-            index_type new_blk_gran   = static_cast<index_type>( new_total_gran - extra_idx );
+            void*      nb_blk       = new_base + static_cast<size_t>( extra_idx ) * kGranSz;
+            index_type new_blk_gran = static_cast<index_type>( new_total_gran - extra_idx );
             std::memset( nb_blk, 0, sizeof( Block<address_traits> ) );
             if ( last_blk_raw != nullptr )
             {
@@ -4032,50 +4302,57 @@ template <typename ManagerT> class PersistMemoryTypedApi
             ManagerT::_last_error = PmmError::NotInitialized;
             return pmm::pptr<T, ManagerT>();
         }
+        auto checked = pmm::detail::bytes_to_granules_checked<address_traits>( new_user_size );
+        if ( !checked.has_value() )
+        {
+            ManagerT::_last_error = PmmError::Overflow;
+            return pmm::pptr<T, ManagerT>();
+        }
+        index_type new_data_gran = checked->value;
+        if ( new_data_gran == 0 )
+        {
+            ManagerT::_last_error = PmmError::InvalidSize;
+            return pmm::pptr<T, ManagerT>();
+        }
+        if ( new_data_gran > std::numeric_limits<index_type>::max() - ManagerT::kBlockHdrGranules )
+        {
+            ManagerT::_last_error = PmmError::Overflow;
+            return pmm::pptr<T, ManagerT>();
+        }
         uint8_t*                               base          = ManagerT::_backend.base_ptr();
         detail::ManagerHeader<address_traits>* hdr           = ManagerT::get_header( base );
         index_type                             blk_idx       = ManagerT::template block_idx_from_pptr<T>( p );
         void*                                  blk_raw       = detail::block_at<address_traits>( base, blk_idx );
         index_type                             old_data_gran = BlockStateBase<address_traits>::get_weight( blk_raw );
-        index_type new_data_gran = detail::bytes_to_granules_t<address_traits>( new_user_size );
-        if ( new_data_gran == 0 )
-            new_data_gran = 1;
         if ( new_data_gran == old_data_gran )
         {
             ManagerT::_last_error = PmmError::Ok;
             return p;
         }
         static constexpr bool kBlockAligned = ( sizeof( Block<address_traits> ) % address_traits::granule_size == 0 );
+        detail::ArenaView<address_traits> arena{ base, hdr };
         if constexpr ( kBlockAligned )
         {
             if ( new_data_gran < old_data_gran )
             {
-                allocator::realloc_shrink( base, hdr, blk_idx, blk_raw, old_data_gran, new_data_gran );
+                allocator::realloc_shrink( arena, blk_idx, blk_raw, old_data_gran, new_data_gran );
                 ManagerT::_last_error = PmmError::Ok;
                 return p;
             }
             if ( new_data_gran > old_data_gran )
             {
-                if ( allocator::realloc_grow( base, hdr, blk_idx, blk_raw, old_data_gran, new_data_gran ) )
+                if ( allocator::realloc_grow( arena, blk_idx, blk_raw, old_data_gran, new_data_gran ) )
                 {
                     ManagerT::_last_error = PmmError::Ok;
                     return p;
                 }
             }
         }
-        index_type new_data_gran_alloc = detail::bytes_to_granules_t<address_traits>( new_user_size );
-        if ( new_data_gran_alloc == 0 )
-            new_data_gran_alloc = 1;
-        if ( new_data_gran_alloc > std::numeric_limits<index_type>::max() - ManagerT::kBlockHdrGranules )
-        {
-            ManagerT::_last_error = PmmError::Overflow;
-            return pmm::pptr<T, ManagerT>();
-        }
-        index_type needed  = ManagerT::kBlockHdrGranules + new_data_gran_alloc;
+        index_type needed  = ManagerT::kBlockHdrGranules + new_data_gran;
         index_type new_idx = free_block_tree::find_best_fit( base, hdr, needed );
         if ( new_idx == address_traits::no_block )
         {
-            if ( !ManagerT::do_expand( new_user_size ) )
+            if ( !ManagerT::do_expand( new_data_gran ) )
             {
                 ManagerT::_last_error = PmmError::OutOfMemory;
                 logging_policy::on_allocation_failure( new_user_size, PmmError::OutOfMemory );
@@ -4091,7 +4368,8 @@ template <typename ManagerT> class PersistMemoryTypedApi
                 return pmm::pptr<T, ManagerT>();
             }
         }
-        void* new_raw = allocator::allocate_from_block( base, hdr, new_idx, new_user_size );
+        detail::ArenaView<address_traits> arena_after{ base, hdr };
+        void* new_raw = allocator::allocate_from_block( arena_after, new_idx, new_data_gran );
         if ( new_raw == nullptr )
         {
             ManagerT::_last_error = PmmError::OutOfMemory;
@@ -4114,17 +4392,15 @@ template <typename ManagerT> class PersistMemoryTypedApi
         const pmm::NodeType nt_old      = BlockStateBase<address_traits>::get_node_type( old_blk_raw );
         if ( pmm::is_allocated( nt_old ) && pmm::can_be_deleted_from_pap( nt_old ) )
         {
-            static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<address_traits>;
-            auto                        old_alloc   = AllocatedBlock<address_traits>::cast_from_raw( old_blk_raw );
-            index_type                  total_gran  = detail::physical_block_total_granules<address_traits>(
+            auto       old_alloc  = AllocatedBlock<address_traits>::cast_from_raw( old_blk_raw );
+            index_type total_gran = detail::physical_block_total_granules<address_traits>(
                 base, hdr, detail::block_at<address_traits>( base, old_blk_idx ) );
             old_alloc.mark_as_free( total_gran );
             hdr->alloc_count--;
             hdr->free_count++;
             if ( hdr->used_size >= freed_w )
                 hdr->used_size -= freed_w;
-            allocator::coalesce( base, hdr, old_blk_idx );
-            (void)kBlkHdrGran;
+            allocator::coalesce( arena_after, old_blk_idx );
         }
         ManagerT::_last_error = PmmError::Ok;
         return new_p;
@@ -4276,6 +4552,10 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     using free_block_tree = typename ConfigT::free_block_tree;
     using thread_policy   = typename ConfigT::lock_policy;
     using logging_policy  = typename detail::config_logging_policy<ConfigT>::type;
+    static_assert( ConfigT::grow_numerator >= 1, "ConfigT must define grow_numerator >= 1" );
+    static_assert( ConfigT::grow_denominator >= 1, "ConfigT must define grow_denominator >= 1" );
+    static_assert( ConfigT::grow_numerator >= ConfigT::grow_denominator,
+                   "ConfigT::grow_numerator must be >= grow_denominator" );
     using allocator       = AllocatorPolicy<free_block_tree, address_traits>;
     using index_type      = typename address_traits::index_type;
     using forest_registry = detail::ForestDomainRegistry<address_traits>;
@@ -4303,16 +4583,16 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             return false;
         }
         static constexpr size_t kGranSzCreate = address_traits::granule_size;
-        if ( initial_size > std::numeric_limits<size_t>::max() - ( kGranSzCreate - 1 ) )
+        auto                    aligned_opt   = detail::round_up_checked( initial_size, kGranSzCreate );
+        if ( !aligned_opt.has_value() )
         {
             _last_error = PmmError::Overflow;
             return false;
         }
-        size_t aligned = ( ( initial_size + kGranSzCreate - 1 ) / kGranSzCreate ) * kGranSzCreate;
+        size_t aligned = *aligned_opt;
         if ( _backend.base_ptr() == nullptr || _backend.total_size() < aligned )
         {
-            size_t additional = ( _backend.total_size() < aligned ) ? ( aligned - _backend.total_size() ) : aligned;
-            if ( !_backend.expand( additional ) )
+            if ( !_backend.resize_to( aligned ) )
             {
                 _last_error = PmmError::ExpandFailed;
                 return false;
@@ -4323,17 +4603,26 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             _last_error = PmmError::BackendError;
             return false;
         }
-        bool ok = init_layout( _backend.base_ptr(), _backend.total_size() );
-        if ( ok )
-            ok = bootstrap_forest_registry_unlocked();
-        if ( ok )
-            ok = validate_bootstrap_invariants_unlocked();
-        if ( ok )
+        detail::InitGuard guard( _initialized );
+        if ( !init_layout( _backend.base_ptr(), _backend.total_size() ) )
         {
-            _last_error = PmmError::Ok;
-            logging_policy::on_create( _backend.total_size() );
+            _last_error = PmmError::BackendError;
+            return false;
         }
-        return ok;
+        if ( !bootstrap_forest_registry_unlocked() )
+        {
+            _last_error = PmmError::BackendError;
+            return false;
+        }
+        if ( !validate_bootstrap_invariants_unlocked() )
+        {
+            _last_error = PmmError::BackendError;
+            return false;
+        }
+        _last_error = PmmError::Ok;
+        logging_policy::on_create( _backend.total_size() );
+        guard.commit();
+        return true;
     }
     static bool create() noexcept
     {
@@ -4343,17 +4632,26 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             _last_error = ( _backend.base_ptr() == nullptr ) ? PmmError::BackendError : PmmError::InvalidSize;
             return false;
         }
-        bool ok = init_layout( _backend.base_ptr(), _backend.total_size() );
-        if ( ok )
-            ok = bootstrap_forest_registry_unlocked();
-        if ( ok )
-            ok = validate_bootstrap_invariants_unlocked();
-        if ( ok )
+        detail::InitGuard guard( _initialized );
+        if ( !init_layout( _backend.base_ptr(), _backend.total_size() ) )
         {
-            _last_error = PmmError::Ok;
-            logging_policy::on_create( _backend.total_size() );
+            _last_error = PmmError::BackendError;
+            return false;
         }
-        return ok;
+        if ( !bootstrap_forest_registry_unlocked() )
+        {
+            _last_error = PmmError::BackendError;
+            return false;
+        }
+        if ( !validate_bootstrap_invariants_unlocked() )
+        {
+            _last_error = PmmError::BackendError;
+            return false;
+        }
+        _last_error = PmmError::Ok;
+        logging_policy::on_create( _backend.total_size() );
+        guard.commit();
+        return true;
     }
     static bool load( VerifyResult& result ) noexcept
     {
@@ -4405,25 +4703,27 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             for ( size_t i = from; i < r.entry_count; ++i )
                 r.entries[i].action = act;
         };
-        size_t pre = result.entry_count;
-        allocator::verify_block_states( base, hdr, result );
+        detail::ConstArenaView<address_traits> cview{ base, hdr };
+        size_t                                 pre = result.entry_count;
+        allocator::verify_block_states( cview, result );
         mark_entries( result, pre, DiagnosticAction::Repaired );
         pre = result.entry_count;
-        allocator::verify_linked_list( base, hdr, result );
+        allocator::verify_linked_list( cview, result );
         mark_entries( result, pre, DiagnosticAction::Repaired );
         pre = result.entry_count;
-        allocator::verify_counters( base, hdr, result );
+        allocator::verify_counters( cview, result );
         mark_entries( result, pre, DiagnosticAction::Rebuilt );
         pre = result.entry_count;
-        allocator::verify_free_tree( base, hdr, result );
+        allocator::verify_free_tree( cview, result );
         mark_entries( result, pre, DiagnosticAction::Rebuilt );
         if ( detail::image_version_requires_migration( hdr->image_version ) )
             hdr->image_version = detail::kCurrentImageVersion;
         hdr->owns_memory     = false;
         hdr->prev_total_size = 0;
-        allocator::repair_linked_list( base, hdr );
-        allocator::recompute_counters( base, hdr );
-        allocator::rebuild_free_tree( base, hdr );
+        detail::ArenaView<address_traits> arena_mut{ base, hdr };
+        allocator::repair_linked_list( arena_mut );
+        allocator::recompute_counters( arena_mut );
+        allocator::rebuild_free_tree( arena_mut );
         _initialized = true;
         {
             VerifyResult forest_verify;
@@ -4767,31 +5067,29 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         const uint8_t* base                                  = _backend.base_ptr();
         using BlockState                                     = BlockStateBase<address_traits>;
         const detail::ManagerHeader<address_traits>* hdr     = get_header_c( base );
-        index_type                                   idx     = hdr->first_block_offset;
         static constexpr size_t                      kGranSz = address_traits::granule_size;
-        while ( idx != address_traits::no_block )
-        {
-            if ( static_cast<size_t>( idx ) * kGranSz + sizeof( Block<address_traits> ) > hdr->total_size )
-                break;
-            const void*                  blk_raw    = base + static_cast<size_t>( idx ) * kGranSz;
-            const Block<address_traits>* blk        = reinterpret_cast<const Block<address_traits>*>( blk_raw );
-            index_type                   total_gran = detail::block_total_granules( base, hdr, blk );
-            auto                         w          = BlockState::get_weight( blk_raw );
-            bool                         is_used    = pmm::is_allocated( BlockState::get_node_type( blk_raw ) );
-            size_t                       hdr_bytes  = sizeof( Block<address_traits> );
-            size_t                       data_bytes = is_used ? static_cast<size_t>( w ) * kGranSz : 0;
-            BlockView                    view;
-            view.index       = idx;
-            view.offset      = static_cast<std::ptrdiff_t>( static_cast<size_t>( idx ) * kGranSz );
-            view.total_size  = static_cast<size_t>( total_gran ) * kGranSz;
-            view.header_size = hdr_bytes;
-            view.user_size   = data_bytes;
-            view.alignment   = kGranSz;
-            view.used        = is_used;
-            callback( view );
-            idx = BlockState::get_next_offset( blk_raw );
-        }
-        return true;
+        detail::ConstArenaView<address_traits>       cview{ base, hdr };
+        return detail::for_each_physical_block<address_traits>(
+            cview,
+            [&]( index_type idx, const void* blk_raw ) noexcept
+            {
+                const Block<address_traits>* blk        = reinterpret_cast<const Block<address_traits>*>( blk_raw );
+                index_type                   total_gran = detail::block_total_granules( base, hdr, blk );
+                auto                         w          = BlockState::get_weight( blk_raw );
+                bool                         is_used    = pmm::is_allocated( BlockState::get_node_type( blk_raw ) );
+                size_t                       hdr_bytes  = sizeof( Block<address_traits> );
+                size_t                       data_bytes = is_used ? static_cast<size_t>( w ) * kGranSz : 0;
+                BlockView                    view;
+                view.index       = idx;
+                view.offset      = static_cast<std::ptrdiff_t>( static_cast<size_t>( idx ) * kGranSz );
+                view.total_size  = static_cast<size_t>( total_gran ) * kGranSz;
+                view.header_size = hdr_bytes;
+                view.user_size   = data_bytes;
+                view.alignment   = kGranSz;
+                view.used        = is_used;
+                callback( view );
+                return true;
+            } );
     }
     template <typename Callback> static bool for_each_free_block( Callback&& callback ) noexcept
     {
@@ -4814,8 +5112,10 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     {
         if ( off == 0 || _backend.base_ptr() == nullptr || _backend.total_size() == 0 )
             return false;
-        size_t byte_off = static_cast<size_t>( off ) * address_traits::granule_size;
-        return byte_off + size_bytes <= _backend.total_size();
+        auto byte_off_opt = detail::checked_granule_offset<address_traits>( off );
+        if ( !byte_off_opt.has_value() )
+            return false;
+        return detail::fits_range( *byte_off_opt, size_bytes, _backend.total_size() );
     }
     static void* allocate_unlocked( size_t user_size ) noexcept
     {
@@ -4831,25 +5131,36 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             logging_policy::on_allocation_failure( user_size, PmmError::InvalidSize );
             return nullptr;
         }
-        uint8_t*                               base      = _backend.base_ptr();
-        detail::ManagerHeader<address_traits>* hdr       = get_header( base );
-        index_type                             data_gran = detail::bytes_to_granules_t<address_traits>( user_size );
+        auto checked = detail::bytes_to_granules_checked<address_traits>( user_size );
+        if ( !checked.has_value() )
+        {
+            _last_error = PmmError::Overflow;
+            logging_policy::on_allocation_failure( user_size, PmmError::Overflow );
+            return nullptr;
+        }
+        index_type data_gran = checked->value;
         if ( data_gran == 0 )
-            data_gran = 1;
+        {
+            _last_error = PmmError::InvalidSize;
+            logging_policy::on_allocation_failure( user_size, PmmError::InvalidSize );
+            return nullptr;
+        }
         if ( data_gran > std::numeric_limits<index_type>::max() - kBlockHdrGranules )
         {
             _last_error = PmmError::Overflow;
             logging_policy::on_allocation_failure( user_size, PmmError::Overflow );
             return nullptr;
         }
-        index_type needed = kBlockHdrGranules + data_gran;
-        index_type idx    = free_block_tree::find_best_fit( base, hdr, needed );
+        uint8_t*                               base   = _backend.base_ptr();
+        detail::ManagerHeader<address_traits>* hdr    = get_header( base );
+        index_type                             needed = kBlockHdrGranules + data_gran;
+        index_type                             idx    = free_block_tree::find_best_fit( base, hdr, needed );
         if ( idx != address_traits::no_block )
         {
             _last_error = PmmError::Ok;
-            return allocator::allocate_from_block( base, hdr, idx, user_size );
+            return allocator::allocate_from_block( detail::ArenaView<address_traits>{ base, hdr }, idx, data_gran );
         }
-        if ( !do_expand( user_size ) )
+        if ( !do_expand( data_gran ) )
         {
             _last_error = PmmError::OutOfMemory;
             logging_policy::on_allocation_failure( user_size, PmmError::OutOfMemory );
@@ -4861,7 +5172,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         if ( idx != address_traits::no_block )
         {
             _last_error = PmmError::Ok;
-            return allocator::allocate_from_block( base, hdr, idx, user_size );
+            return allocator::allocate_from_block( detail::ArenaView<address_traits>{ base, hdr }, idx, data_gran );
         }
         _last_error = PmmError::OutOfMemory;
         logging_policy::on_allocation_failure( user_size, PmmError::OutOfMemory );
@@ -4891,7 +5202,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         hdr->free_count++;
         if ( hdr->used_size >= freed )
             hdr->used_size -= freed;
-        allocator::coalesce( base, hdr, blk_idx );
+        allocator::coalesce( detail::ArenaView<address_traits>{ base, hdr }, blk_idx );
     }
     static bool lock_block_permanent_unlocked( void* ptr ) noexcept
     {
@@ -5032,7 +5343,8 @@ static bool register_domain_unlocked( const char* name, uint8_t flags, uint8_t b
         if ( existing->symbol_offset == 0 )
         {
             pptr<pstringview> symbol = intern_symbol_unlocked( name );
-            if ( !symbol.is_null() )
+            existing                 = find_domain_by_name_unlocked( name );
+            if ( existing != nullptr && !symbol.is_null() )
                 existing->symbol_offset = symbol.offset();
         }
         return true;
@@ -5049,6 +5361,11 @@ static bool register_domain_unlocked( const char* name, uint8_t flags, uint8_t b
     rec.flags                = flags;
     rec.symbol_offset        = 0;
     pptr<pstringview> symbol = intern_symbol_unlocked( name );
+    reg                      = forest_registry_root_unlocked();
+    if ( reg == nullptr )
+        return false;
+    if ( reg->domain_count >= detail::kMaxForestDomains )
+        return false;
     if ( !symbol.is_null() )
         rec.symbol_offset = symbol.offset();
     reg->domains[reg->domain_count++] = rec;
@@ -5337,10 +5654,9 @@ template <typename T> static pptr<T> make_pptr_from_raw( void* raw ) noexcept
     index_type blk_idx = static_cast<index_type>( blk_idx_raw );
     if ( !detail::validate_block_index<address_traits>( _backend.total_size(), blk_idx ) )
         return pptr<T>();
-    const void* blk = detail::block_at<address_traits>( base, blk_idx );
+    const void*         blk       = detail::block_at<address_traits>( base, blk_idx );
     const pmm::NodeType node_type = BlockStateBase<address_traits>::get_node_type( blk );
-    if ( !pmm::is_allocated( node_type ) ||
-         BlockStateBase<address_traits>::get_root_offset( blk ) != blk_idx )
+    if ( !pmm::is_allocated( node_type ) || BlockStateBase<address_traits>::get_root_offset( blk ) != blk_idx )
         return pptr<T>();
     if ( !pmm::is_known_node_type( static_cast<std::uint8_t>( node_type ) ) )
         return pptr<T>();
@@ -5443,22 +5759,19 @@ static void verify_image_unlocked( VerifyResult& result ) noexcept
                     static_cast<uint64_t>( hdr->granule_size ) );
         return;
     }
-    {
-        using BlockState = BlockStateBase<address_traits>;
-        index_type idx   = hdr->first_block_offset;
-        while ( idx != address_traits::no_block )
-        {
-            if ( !detail::validate_block_index<address_traits>( hdr->total_size, idx ) )
-                break;
-            detail::validate_block_header_full<address_traits>( base, hdr->total_size, idx, result );
-            const void* blk_ptr = base + static_cast<size_t>( idx ) * address_traits::granule_size;
-            idx                 = BlockState::get_next_offset( blk_ptr );
-        }
-    }
-    allocator::verify_block_states( base, hdr, result );
-    allocator::verify_linked_list( base, hdr, result );
-    allocator::verify_counters( base, hdr, result );
-    allocator::verify_free_tree( base, hdr, result );
+    detail::ConstArenaView<address_traits> cview{ base, hdr };
+    (void)detail::for_each_physical_block<address_traits>( cview,
+                                                           [&]( index_type idx, const void* blk_ptr ) noexcept
+                                                           {
+                                                               (void)blk_ptr;
+                                                               detail::validate_block_header_full<address_traits>(
+                                                                   base, hdr->total_size, idx, result );
+                                                               return true;
+                                                           } );
+    allocator::verify_block_states( cview, result );
+    allocator::verify_linked_list( cview, result );
+    allocator::verify_counters( cview, result );
+    allocator::verify_free_tree( cview, result );
     verify_forest_registry_unlocked( result );
 }
 static void verify_forest_registry_unlocked( VerifyResult& result ) noexcept
@@ -5517,6 +5830,9 @@ static void verify_forest_registry_unlocked( VerifyResult& result ) noexcept
         static constexpr index_type                   kBlockHdrGranules = manager_type::kBlockHdrGranules;
         static constexpr index_type                   kMgrHdrGranules   = manager_type::kMgrHdrGranules;
         static constexpr index_type                   kFreeBlkIdxLayout = manager_type::kFreeBlkIdxLayout;
+        static constexpr size_t                       kGrowNumerator    = ConfigT::grow_numerator;
+        static constexpr size_t                       kGrowDenominator  = ConfigT::grow_denominator;
+        static constexpr size_t                       kMaxMemoryGB      = ConfigT::max_memory_gb;
         static detail::ManagerHeader<address_traits>* get_header( uint8_t* base ) noexcept
         {
             return manager_type::get_header( base );
@@ -5527,9 +5843,9 @@ static void verify_forest_registry_unlocked( VerifyResult& result ) noexcept
     {
         return detail::ManagerLayoutOps<layout_access>::init_layout( _backend, base, size );
     }
-    static bool do_expand( size_t user_size ) noexcept
+    static bool do_expand( index_type data_gran ) noexcept
     {
-        return detail::ManagerLayoutOps<layout_access>::do_expand( _backend, _initialized, user_size );
+        return detail::ManagerLayoutOps<layout_access>::do_expand( _backend, _initialized, data_gran );
     }
 };
 }
@@ -5709,6 +6025,7 @@ template <typename MgrT> inline bool load_manager_from_file( const char* filenam
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #if defined( _WIN32 ) || defined( _WIN64 )
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -5762,8 +6079,10 @@ template <typename AT = DefaultAddressTraits> class MMapStorage
             return false;
         if ( path == nullptr || size_bytes == 0 )
             return false;
-        size_bytes = ( ( size_bytes + AT::granule_size - 1 ) / AT::granule_size ) * AT::granule_size;
-        return open_impl( path, size_bytes );
+        auto rounded = pmm::detail::round_up_checked( size_bytes, AT::granule_size );
+        if ( !rounded.has_value() )
+            return false;
+        return open_impl( path, *rounded );
     }
     void close() noexcept
     {
@@ -5781,16 +6100,17 @@ template <typename AT = DefaultAddressTraits> class MMapStorage
 /*
 ### pmm-mmapstorage-expand
 */
-    bool expand( size_t additional_bytes ) noexcept
+    bool resize_to( size_t new_total_size ) noexcept
     {
-        if ( !_mapped || additional_bytes == 0 )
-            return _mapped && additional_bytes == 0;
-        size_t growth   = _size / 4 + additional_bytes;
-        size_t new_size = _size + growth;
-        new_size        = ( ( new_size + AT::granule_size - 1 ) / AT::granule_size ) * AT::granule_size;
-        if ( new_size <= _size )
+        if ( !_mapped )
             return false;
-        return expand_impl( new_size );
+        if ( new_total_size == 0 )
+            return false;
+        if ( new_total_size % AT::granule_size != 0 )
+            return false;
+        if ( new_total_size <= _size )
+            return false;
+        return expand_impl( new_total_size );
     }
     bool owns_memory() const noexcept { return false; }
 
@@ -5920,7 +6240,9 @@ template <typename AT = DefaultAddressTraits> class MMapStorage
         _fd = ::open( path, O_RDWR | O_CREAT, 0600 );
         if ( _fd < 0 )
             return false;
-        struct stat st{};
+        struct stat st
+        {
+        };
         if ( ::fstat( _fd, &st ) != 0 )
         {
             ::close( _fd );
