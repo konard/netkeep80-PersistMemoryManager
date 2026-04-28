@@ -22,18 +22,7 @@ template <typename IndexT, size_t GranuleSz> struct AddressTraits
     using index_type                         = IndexT;
     static constexpr size_t     granule_size = GranuleSz;
     static constexpr index_type no_block     = std::numeric_limits<IndexT>::max();
-    static constexpr index_type bytes_to_granules( size_t bytes ) noexcept
-    {
-        if ( bytes == 0 )
-            return static_cast<index_type>( 0 );
-        if ( bytes > std::numeric_limits<size_t>::max() - ( granule_size - 1 ) )
-            return static_cast<index_type>( 0 );
-        size_t granules = ( bytes + granule_size - 1 ) / granule_size;
-        if ( granules > static_cast<size_t>( std::numeric_limits<IndexT>::max() ) )
-            return static_cast<index_type>( 0 );
-        return static_cast<index_type>( granules );
-    }
-    static constexpr size_t granules_to_bytes( index_type granules ) noexcept
+    static constexpr size_t     granules_to_bytes( index_type granules ) noexcept
     {
         return static_cast<size_t>( granules ) * granule_size;
     }

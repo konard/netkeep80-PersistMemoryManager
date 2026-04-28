@@ -125,48 +125,46 @@ TEST_CASE( "    verify_invariants: wrong own_idx", "[test_issue144_code_review]"
 }
 
 // =============================================================================
-// I144-C: bytes_to_granules overflow handling
+// I144-C: bytes_to_granules_checked overflow handling (issue #373)
 // =============================================================================
 
-/// @brief bytes_to_granules returns 0 on overflow (well-defined sentinel).
-TEST_CASE( "    overflow returns 0", "[test_issue144_code_review]" )
+/// @brief bytes_to_granules_checked returns std::nullopt on overflow.
+TEST_CASE( "    overflow returns nullopt", "[test_issue144_code_review]" )
 {
     using A = pmm::DefaultAddressTraits;
 
-    // Max size_t: would overflow in granule calculation
-    std::size_t   max_sz = std::numeric_limits<std::size_t>::max();
-    A::index_type result = A::bytes_to_granules( max_sz );
-    REQUIRE( result == 0 ); // Overflow returns 0
+    std::size_t max_sz = std::numeric_limits<std::size_t>::max();
+    auto        result = pmm::detail::bytes_to_granules_checked<A>( max_sz );
+    REQUIRE_FALSE( result.has_value() );
 
-    // Also test with a value that overflows IndexT (uint32_t)
-    // Large value that produces > 2^32 granules: (2^32 + 1) * granule_size
-    // granule_size = 16, so (UINT32_MAX + 1) * 16 = 2^36 bytes
     std::size_t overflow_for_idx = ( static_cast<std::size_t>( std::numeric_limits<std::uint32_t>::max() ) + 1 ) * 16;
-    // This might not overflow size_t but would overflow uint32_t index
-    if ( overflow_for_idx != 0 ) // Only if no size_t overflow in the multiplication
+    if ( overflow_for_idx != 0 )
     {
-        A::index_type r2 = A::bytes_to_granules( overflow_for_idx );
-        REQUIRE( r2 == 0 ); // Should return 0 on IndexT overflow
+        auto r2 = pmm::detail::bytes_to_granules_checked<A>( overflow_for_idx );
+        REQUIRE_FALSE( r2.has_value() );
     }
 }
 
-/// @brief bytes_to_granules normal conversion is correct.
+/// @brief bytes_to_granules_checked normal conversion is correct.
 TEST_CASE( "    normal conversions correct", "[test_issue144_code_review]" )
 {
     using A = pmm::DefaultAddressTraits;
 
-    // Exact multiple of granule_size
-    REQUIRE( A::bytes_to_granules( 0 ) == 0 );
-    REQUIRE( A::bytes_to_granules( 16 ) == 1 );
-    REQUIRE( A::bytes_to_granules( 32 ) == 2 );
-    REQUIRE( A::bytes_to_granules( 48 ) == 3 );
-
-    // Ceiling: non-multiple rounds up
-    REQUIRE( A::bytes_to_granules( 1 ) == 1 );
-    REQUIRE( A::bytes_to_granules( 15 ) == 1 );
-    REQUIRE( A::bytes_to_granules( 17 ) == 2 );
-    REQUIRE( A::bytes_to_granules( 31 ) == 2 );
-    REQUIRE( A::bytes_to_granules( 33 ) == 3 );
+    auto check = []( std::size_t bytes, A::index_type expected )
+    {
+        auto g = pmm::detail::bytes_to_granules_checked<A>( bytes );
+        REQUIRE( g.has_value() );
+        REQUIRE( g->value == expected );
+    };
+    check( 0, 0 );
+    check( 16, 1 );
+    check( 32, 2 );
+    check( 48, 3 );
+    check( 1, 1 );
+    check( 15, 1 );
+    check( 17, 2 );
+    check( 31, 2 );
+    check( 33, 3 );
 }
 
 // =============================================================================

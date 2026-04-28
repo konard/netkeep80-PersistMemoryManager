@@ -573,7 +573,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         const detail::ManagerHeader<address_traits>* hdr     = get_header_c( base );
         static constexpr size_t                      kGranSz = address_traits::granule_size;
         detail::ConstArenaView<address_traits>       cview{ base, hdr };
-        (void)detail::for_each_physical_block<address_traits>(
+        return detail::for_each_physical_block<address_traits>(
             cview,
             [&]( index_type idx, const void* blk_raw ) noexcept
             {
@@ -594,7 +594,6 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
                 callback( view );
                 return true;
             } );
-        return true;
     }
     template <typename Callback> static bool for_each_free_block( Callback&& callback ) noexcept
     {
@@ -617,8 +616,10 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     {
         if ( off == 0 || _backend.base_ptr() == nullptr || _backend.total_size() == 0 )
             return false;
-        size_t byte_off = static_cast<size_t>( off ) * address_traits::granule_size;
-        return byte_off + size_bytes <= _backend.total_size();
+        auto byte_off_opt = detail::checked_granule_offset<address_traits>( off );
+        if ( !byte_off_opt.has_value() )
+            return false;
+        return detail::fits_range( *byte_off_opt, size_bytes, _backend.total_size() );
     }
     static void* allocate_unlocked( size_t user_size ) noexcept
     {

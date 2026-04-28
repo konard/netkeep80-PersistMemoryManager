@@ -1,31 +1,9 @@
-// Suppress deprecation warnings — this test deliberately exercises deprecated functions.
-#if defined( __GNUC__ ) || defined( __clang__ )
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#elif defined( _MSC_VER )
-#pragma warning( push )
-#pragma warning( disable : 4996 )
-#endif
-
 /**
  * @file test_issue160_deduplication.cpp
- * @brief Тесты дедупликации функциональности ПАП.
- *
- * Проверяет:
- *   - BasicConfig<> — базовый шаблон конфигурации для heap-менеджеров
- *   - Совместимость псевдонимов конфигурации с оригинальными именами
- *   - Корректность рефакторинга функций конвертации байты↔гранулы:
- *       - detail::bytes_to_granules() делегирует в bytes_to_granules_t<DefaultAddressTraits>()
- *       - detail::granules_to_bytes() делегирует в DefaultAddressTraits::granules_to_bytes()
- *       - detail::idx_to_byte_off() делегирует в DefaultAddressTraits::idx_to_byte_off()
- *       - detail::byte_off_to_idx() делегирует в byte_off_to_idx_t<DefaultAddressTraits>()
- *   - Унификация block_total_granules: единственная шаблонная реализация
- *
- * @see include/pmm/manager_configs.h
- * @see include/pmm/types.h
- * @version 0.1
+ * @brief BasicConfig deduplication tests + checked granule conversion sanity (issue #373).
  */
 
+#include "pmm/arena_internals.h"
 #include "pmm/manager_configs.h"
 #include "pmm/types.h"
 
@@ -123,77 +101,64 @@ TEST_CASE( "I160-B5: LargeDBConfig is BasicConfig alias", "[test_issue160_dedupl
 }
 
 // =============================================================================
-// Byte/granule conversion deduplication
+// Byte/granule conversion deduplication (issue #373: checked-only API)
 // =============================================================================
 
-/// @brief detail::bytes_to_granules() == bytes_to_granules_t<DefaultAddressTraits>().
-TEST_CASE( "I160-C1: detail::bytes_to_granules() delegates to _t", "[test_issue160_deduplication]" )
+TEST_CASE( "I160-C1: bytes_to_granules_checked round-trip for DefaultAddressTraits", "[test_issue160_deduplication]" )
 {
     using AT = pmm::DefaultAddressTraits;
-
-    // Non-templated must produce same results as _t version for DefaultAddressTraits
-    REQUIRE( pmm::detail::bytes_to_granules_t<pmm::DefaultAddressTraits>( 0 ) ==
-             pmm::detail::bytes_to_granules_t<AT>( 0 ) );
-    REQUIRE( pmm::detail::bytes_to_granules_t<pmm::DefaultAddressTraits>( 1 ) ==
-             pmm::detail::bytes_to_granules_t<AT>( 1 ) );
-    REQUIRE( pmm::detail::bytes_to_granules_t<pmm::DefaultAddressTraits>( 16 ) ==
-             pmm::detail::bytes_to_granules_t<AT>( 16 ) );
-    REQUIRE( pmm::detail::bytes_to_granules_t<pmm::DefaultAddressTraits>( 17 ) ==
-             pmm::detail::bytes_to_granules_t<AT>( 17 ) );
-    REQUIRE( pmm::detail::bytes_to_granules_t<pmm::DefaultAddressTraits>( 128 ) ==
-             pmm::detail::bytes_to_granules_t<AT>( 128 ) );
-    REQUIRE( pmm::detail::bytes_to_granules_t<pmm::DefaultAddressTraits>( 1000 ) ==
-             pmm::detail::bytes_to_granules_t<AT>( 1000 ) );
-}
-
-/// @brief detail::granules_to_bytes() == DefaultAddressTraits::granules_to_bytes().
-TEST_CASE( "I160-C2: detail::granules_to_bytes() delegates to AddressTraits", "[test_issue160_deduplication]" )
-{
-    using AT = pmm::DefaultAddressTraits;
-
-    REQUIRE( pmm::DefaultAddressTraits::granules_to_bytes( 0 ) == AT::granules_to_bytes( 0 ) );
-    REQUIRE( pmm::DefaultAddressTraits::granules_to_bytes( 1 ) == AT::granules_to_bytes( 1 ) );
-    REQUIRE( pmm::DefaultAddressTraits::granules_to_bytes( 100 ) == AT::granules_to_bytes( 100 ) );
-    REQUIRE( pmm::DefaultAddressTraits::granules_to_bytes( 1000 ) == AT::granules_to_bytes( 1000 ) );
-}
-
-/// @brief detail::idx_to_byte_off() == DefaultAddressTraits::idx_to_byte_off().
-TEST_CASE( "I160-C3: detail::idx_to_byte_off() delegates to AddressTraits", "[test_issue160_deduplication]" )
-{
-    using AT = pmm::DefaultAddressTraits;
-
-    REQUIRE( pmm::detail::idx_to_byte_off_t<pmm::DefaultAddressTraits>( 0 ) == AT::idx_to_byte_off( 0 ) );
-    REQUIRE( pmm::detail::idx_to_byte_off_t<pmm::DefaultAddressTraits>( 1 ) == AT::idx_to_byte_off( 1 ) );
-    REQUIRE( pmm::detail::idx_to_byte_off_t<pmm::DefaultAddressTraits>( 10 ) == AT::idx_to_byte_off( 10 ) );
-    REQUIRE( pmm::detail::idx_to_byte_off_t<pmm::DefaultAddressTraits>( 100 ) == AT::idx_to_byte_off( 100 ) );
-    REQUIRE( pmm::detail::idx_to_byte_off_t<pmm::DefaultAddressTraits>( 1000 ) == AT::idx_to_byte_off( 1000 ) );
-}
-
-/// @brief detail::byte_off_to_idx() == byte_off_to_idx_t<DefaultAddressTraits>().
-TEST_CASE( "I160-C4: detail::byte_off_to_idx() delegates to _t", "[test_issue160_deduplication]" )
-{
-    using AT = pmm::DefaultAddressTraits;
-
-    for ( std::uint32_t idx : { 0u, 1u, 10u, 100u, 1000u } )
+    for ( std::size_t bytes : { std::size_t( 0 ), std::size_t( 1 ), std::size_t( 16 ), std::size_t( 17 ),
+                                std::size_t( 128 ), std::size_t( 1000 ) } )
     {
-        std::size_t byte_off = AT::idx_to_byte_off( idx );
-        REQUIRE( pmm::detail::byte_off_to_idx_t<pmm::DefaultAddressTraits>( byte_off ) ==
-                 pmm::detail::byte_off_to_idx_t<AT>( byte_off ) );
+        auto g = pmm::detail::bytes_to_granules_checked<AT>( bytes );
+        REQUIRE( g.has_value() );
+        std::size_t expected = ( bytes == 0 ) ? 0 : ( bytes + AT::granule_size - 1 ) / AT::granule_size;
+        REQUIRE( g->value == expected );
     }
 }
 
-/// @brief Функции конвертации совместимы: roundtrip idx→bytes→idx.
+TEST_CASE( "I160-C2: granules_to_bytes is well-defined for DefaultAddressTraits", "[test_issue160_deduplication]" )
+{
+    using AT = pmm::DefaultAddressTraits;
+    REQUIRE( AT::granules_to_bytes( 0 ) == 0 );
+    REQUIRE( AT::granules_to_bytes( 1 ) == 16 );
+    REQUIRE( AT::granules_to_bytes( 100 ) == 1600 );
+}
+
+TEST_CASE( "I160-C3: idx_to_byte_off is well-defined for DefaultAddressTraits", "[test_issue160_deduplication]" )
+{
+    using AT = pmm::DefaultAddressTraits;
+    REQUIRE( AT::idx_to_byte_off( 0 ) == 0 );
+    REQUIRE( AT::idx_to_byte_off( 1 ) == 16 );
+    REQUIRE( AT::idx_to_byte_off( 100 ) == 1600 );
+}
+
+TEST_CASE( "I160-C4: byte_off_to_idx_checked round-trips for DefaultAddressTraits", "[test_issue160_deduplication]" )
+{
+    using AT = pmm::DefaultAddressTraits;
+    for ( std::uint32_t idx : { 0u, 1u, 10u, 100u, 1000u } )
+    {
+        std::size_t byte_off = AT::idx_to_byte_off( idx );
+        auto        checked  = pmm::detail::byte_off_to_idx_checked<AT>( byte_off );
+        REQUIRE( checked.has_value() );
+        REQUIRE( *checked == idx );
+    }
+}
+
 TEST_CASE( "I160-C5: Conversion roundtrip idx->bytes->idx", "[test_issue160_deduplication]" )
 {
+    using AT = pmm::DefaultAddressTraits;
     for ( std::uint32_t idx : { 1u, 2u, 5u, 10u, 100u, 500u } )
     {
-        std::size_t   bytes = pmm::DefaultAddressTraits::granules_to_bytes( idx );
-        std::uint32_t back  = pmm::detail::bytes_to_granules_t<pmm::DefaultAddressTraits>( bytes );
-        REQUIRE( back == idx );
+        std::size_t bytes = AT::granules_to_bytes( idx );
+        auto        back  = pmm::detail::bytes_to_granules_checked<AT>( bytes );
+        REQUIRE( back.has_value() );
+        REQUIRE( back->value == idx );
 
-        std::size_t   byte_off = pmm::detail::idx_to_byte_off_t<pmm::DefaultAddressTraits>( idx );
-        std::uint32_t idx_back = pmm::detail::byte_off_to_idx_t<pmm::DefaultAddressTraits>( byte_off );
-        REQUIRE( idx_back == idx );
+        std::size_t byte_off = AT::idx_to_byte_off( idx );
+        auto        idx_back = pmm::detail::byte_off_to_idx_checked<AT>( byte_off );
+        REQUIRE( idx_back.has_value() );
+        REQUIRE( *idx_back == idx );
     }
 }
 
@@ -227,10 +192,3 @@ TEST_CASE( "I160-D1: block_total_granules<AT> compiles for multiple traits", "[t
 // =============================================================================
 // main
 // =============================================================================
-
-// Restore deprecation warnings
-#if defined( __GNUC__ ) || defined( __clang__ )
-#pragma GCC diagnostic pop
-#elif defined( _MSC_VER )
-#pragma warning( pop )
-#endif

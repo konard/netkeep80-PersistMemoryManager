@@ -75,8 +75,8 @@ template <typename ManagerAccess> struct ManagerLayoutOps
         if ( !min_need )
             return false;
         std::optional<size_t> target_size =
-            compute_growth( old_size, *min_need, kGranSz, ManagerAccess::kGrowNumerator,
-                            ManagerAccess::kGrowDenominator, ManagerAccess::kMaxMemoryGB );
+            compute_growth_for_traits<address_traits>( old_size, *min_need, ManagerAccess::kGrowNumerator,
+                                                       ManagerAccess::kGrowDenominator, ManagerAccess::kMaxMemoryGB );
         if ( !target_size.has_value() )
             return false;
         if ( !backend.resize_to( *target_size ) )
@@ -86,9 +86,14 @@ template <typename ManagerAccess> struct ManagerLayoutOps
         if ( new_base == nullptr || new_size <= old_size )
             return false;
         logging_policy::on_expand( old_size, new_size );
-        hdr                   = ManagerAccess::get_header( new_base );
-        index_type extra_idx  = byte_off_to_idx_t<address_traits>( old_size );
-        size_t     extra_size = new_size - old_size;
+        hdr                     = ManagerAccess::get_header( new_base );
+        auto extra_idx_opt      = byte_off_to_idx_checked<address_traits>( old_size );
+        auto new_total_gran_opt = byte_off_to_idx_checked<address_traits>( new_size );
+        if ( !extra_idx_opt.has_value() || !new_total_gran_opt.has_value() )
+            return false;
+        index_type extra_idx      = *extra_idx_opt;
+        index_type new_total_gran = *new_total_gran_opt;
+        size_t     extra_size     = new_size - old_size;
         void*      last_blk_raw =
             ( hdr->last_block_offset != address_traits::no_block )
                      ? static_cast<void*>( new_base + static_cast<size_t>( hdr->last_block_offset ) * kGranSz )
@@ -98,7 +103,6 @@ template <typename ManagerAccess> struct ManagerLayoutOps
             Block<address_traits>* last_blk = reinterpret_cast<Block<address_traits>*>( last_blk_raw );
             index_type             loff     = block_idx_t<address_traits>( new_base, last_blk );
             free_block_tree::remove( new_base, hdr, loff );
-            index_type new_total_gran = byte_off_to_idx_t<address_traits>( new_size );
             BlockState::set_weight_of( last_blk_raw, static_cast<index_type>( new_total_gran - loff ) );
             hdr->total_size = new_size;
             free_block_tree::insert( new_base, hdr, loff );
@@ -107,9 +111,8 @@ template <typename ManagerAccess> struct ManagerLayoutOps
         {
             if ( extra_size < sizeof( Block<address_traits> ) + kGranSz )
                 return false;
-            void*      nb_blk         = new_base + static_cast<size_t>( extra_idx ) * kGranSz;
-            index_type new_total_gran = byte_off_to_idx_t<address_traits>( new_size );
-            index_type new_blk_gran   = static_cast<index_type>( new_total_gran - extra_idx );
+            void*      nb_blk       = new_base + static_cast<size_t>( extra_idx ) * kGranSz;
+            index_type new_blk_gran = static_cast<index_type>( new_total_gran - extra_idx );
             std::memset( nb_blk, 0, sizeof( Block<address_traits> ) );
             if ( last_blk_raw != nullptr )
             {

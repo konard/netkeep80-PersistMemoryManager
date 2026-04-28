@@ -14,12 +14,12 @@ template <typename AT> inline bool validate_block_index( size_t total_size, type
 {
     if ( idx == AT::no_block )
         return false;
-    size_t byte_off = static_cast<size_t>( idx ) * AT::granule_size;
-    if ( idx != 0 && byte_off / AT::granule_size != static_cast<size_t>( idx ) )
+    constexpr size_t kG = AT::granule_size;
+    if ( static_cast<size_t>( idx ) > std::numeric_limits<size_t>::max() / kG )
         return false;
-    if ( byte_off + sizeof( pmm::Block<AT> ) > total_size )
-        return false;
-    return true;
+    size_t byte_off = static_cast<size_t>( idx ) * kG;
+    return byte_off <= std::numeric_limits<size_t>::max() - sizeof( pmm::Block<AT> ) &&
+           byte_off + sizeof( pmm::Block<AT> ) <= total_size;
 }
 template <typename AT>
 inline bool validate_user_ptr( const uint8_t* base, size_t total_size, const void* ptr,
@@ -69,29 +69,33 @@ inline void validate_block_header_full( const uint8_t* base, size_t total_size, 
     BlockState::verify_state( blk_raw, idx, result );
     index_type next = BlockState::get_next_offset( blk_raw );
     if ( next != AT::no_block && !validate_block_index<AT>( total_size, next ) )
-    {
         result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction, static_cast<uint64_t>( idx ),
                     static_cast<uint64_t>( AT::no_block ), static_cast<uint64_t>( next ) );
-    }
     index_type prev = BlockState::get_prev_offset( blk_raw );
     if ( prev != AT::no_block && !validate_block_index<AT>( total_size, prev ) )
-    {
         result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction, static_cast<uint64_t>( idx ),
                     static_cast<uint64_t>( AT::no_block ), static_cast<uint64_t>( prev ) );
-    }
     pmm::NodeType nt = BlockState::get_node_type( blk_raw );
     if ( !pmm::is_known_node_type( static_cast<std::uint8_t>( nt ) ) )
-    {
         result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction, static_cast<uint64_t>( idx ), 0,
                     static_cast<uint64_t>( static_cast<std::uint8_t>( nt ) ) );
-    }
     index_type w = BlockState::get_weight( blk_raw );
     if ( pmm::is_allocated( nt ) && w > 0 )
     {
-        static constexpr size_t kBlkHdrBytes = sizeof( pmm::Block<AT> );
-        size_t                  blk_byte_off = static_cast<size_t>( idx ) * AT::granule_size;
-        size_t                  data_bytes   = static_cast<size_t>( w ) * AT::granule_size;
-        if ( blk_byte_off + kBlkHdrBytes + data_bytes > total_size )
+        constexpr size_t kBlkHdrBytes = sizeof( pmm::Block<AT> );
+        constexpr size_t kSzMax       = std::numeric_limits<size_t>::max();
+        size_t           idx_sz       = static_cast<size_t>( idx );
+        size_t           w_sz         = static_cast<size_t>( w );
+        if ( idx_sz > kSzMax / AT::granule_size || w_sz > kSzMax / AT::granule_size )
+        {
+            result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction, static_cast<uint64_t>( idx ),
+                        total_size, 0 );
+            return;
+        }
+        size_t blk_byte_off = idx_sz * AT::granule_size;
+        size_t data_bytes   = w_sz * AT::granule_size;
+        if ( blk_byte_off > kSzMax - kBlkHdrBytes || ( blk_byte_off + kBlkHdrBytes ) > kSzMax - data_bytes ||
+             blk_byte_off + kBlkHdrBytes + data_bytes > total_size )
         {
             result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction, static_cast<uint64_t>( idx ),
                         total_size, static_cast<uint64_t>( blk_byte_off + kBlkHdrBytes + data_bytes ) );

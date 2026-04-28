@@ -10,6 +10,7 @@
  * @version 0.1
  */
 
+#include "pmm/arena_internals.h"
 #include "pmm/pmm_presets.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -35,21 +36,18 @@ using LargeM = pmm::PersistMemoryManager<pmm::LargeDBConfig, 21304>;
 // bytes_to_granules overflow
 // =============================================================================
 
-TEST_CASE( "bytes_to_granules_t returns 0 on size_t overflow", "[test_issue213_overflow]" )
+TEST_CASE( "bytes_to_granules_checked returns nullopt on size_t overflow", "[test_issue213_overflow]" )
 {
-    // Passing a value close to size_t max should overflow the (bytes + granule_size - 1) computation.
     std::size_t huge = std::numeric_limits<std::size_t>::max();
-    auto        g    = pmm::detail::bytes_to_granules_t<pmm::DefaultAddressTraits>( huge );
-    REQUIRE( g == 0 );
+    auto        g    = pmm::detail::bytes_to_granules_checked<pmm::DefaultAddressTraits>( huge );
+    REQUIRE_FALSE( g.has_value() );
 }
 
-TEST_CASE( "bytes_to_granules_t returns 0 when result exceeds index_type max", "[test_issue213_overflow]" )
+TEST_CASE( "bytes_to_granules_checked returns nullopt when result exceeds index_type max", "[test_issue213_overflow]" )
 {
-    // For 16-bit index: max index = 65535. If we need more granules than that, return 0.
-    // 65536 granules × 16 bytes/granule = 1,048,576 bytes = 1 MB
     std::size_t needs_more_than_16bit = static_cast<std::size_t>( 65536 ) * 16 + 1;
-    auto        g = pmm::detail::bytes_to_granules_t<pmm::SmallAddressTraits>( needs_more_than_16bit );
-    REQUIRE( g == 0 );
+    auto        g = pmm::detail::bytes_to_granules_checked<pmm::SmallAddressTraits>( needs_more_than_16bit );
+    REQUIRE_FALSE( g.has_value() );
 }
 
 TEST_CASE( "bytes_to_idx_t returns no_block on overflow", "[test_issue213_overflow]" )
@@ -74,12 +72,11 @@ TEST_CASE( "allocate returns nullptr for size_t max on static storage", "[test_i
     StaticM::destroy();
     REQUIRE( StaticM::create() );
 
-    // bytes_to_granules_t returns 0 for size_t max (overflow), clamped to 1 granule.
-    // On static storage this succeeds as 1 granule (minimum alloc).
-    // The key test is that the manager doesn't crash or corrupt state.
+    // After issue #373 the legacy clamp-overflow-to-1-granule fallback is removed:
+    // allocate(huge) must report PmmError::Overflow, not silently allocate 1 granule.
     void* p = StaticM::allocate( std::numeric_limits<std::size_t>::max() );
-    if ( p != nullptr )
-        StaticM::deallocate( p ); // cleanup — the allocator silently treated overflow as 1 granule
+    REQUIRE( p == nullptr );
+    REQUIRE( StaticM::last_error() == pmm::PmmError::Overflow );
 
     REQUIRE( StaticM::is_initialized() );
     StaticM::destroy();
