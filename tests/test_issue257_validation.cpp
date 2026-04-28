@@ -389,23 +389,23 @@ TEST_CASE( "validation: header_from_ptr uses validate_user_ptr for cheap rejecti
 
 TEST_CASE( "validation: ArenaAddress::block returns nullptr for no_block", "[test_issue257]" )
 {
-    std::uint8_t                   dummy[256] = {};
+    std::uint8_t                  dummy[256] = {};
     pmm::detail::ArenaAddress<AT> addr{ dummy, std::size_t{ 256 } };
     REQUIRE( addr.block( AT::no_block ) == nullptr );
 }
 
 TEST_CASE( "validation: ArenaAddress::block returns nullptr for out-of-range index", "[test_issue257]" )
 {
-    std::uint8_t                   dummy[256] = {};
+    std::uint8_t                  dummy[256] = {};
     pmm::detail::ArenaAddress<AT> addr{ dummy, std::size_t{ 256 } };
     REQUIRE( addr.block( 20 ) == nullptr );
 }
 
 TEST_CASE( "validation: ArenaAddress::block returns valid pointer for in-range index", "[test_issue257]" )
 {
-    std::uint8_t                   dummy[256] = {};
+    std::uint8_t                  dummy[256] = {};
     pmm::detail::ArenaAddress<AT> addr{ dummy, std::size_t{ 256 } };
-    auto*                          blk = addr.block( 2 );
+    auto*                         blk = addr.block( 2 );
     REQUIRE( blk != nullptr );
     REQUIRE( reinterpret_cast<std::uint8_t*>( blk ) == dummy + 2 * 16 );
 }
@@ -414,21 +414,21 @@ TEST_CASE( "validation: ArenaAddress::block returns valid pointer for in-range i
 
 TEST_CASE( "validation: ArenaAddress::try_user_ptr returns nullptr for zero idx", "[test_issue257]" )
 {
-    std::uint8_t                   dummy[256] = {};
+    std::uint8_t                  dummy[256] = {};
     pmm::detail::ArenaAddress<AT> addr{ dummy, std::size_t{ 256 } };
     REQUIRE( addr.try_user_ptr( 0 ) == nullptr );
 }
 
 TEST_CASE( "validation: ArenaAddress::try_user_ptr returns nullptr for out-of-bounds idx", "[test_issue257]" )
 {
-    std::uint8_t                   dummy[256] = {};
+    std::uint8_t                  dummy[256] = {};
     pmm::detail::ArenaAddress<AT> addr{ dummy, std::size_t{ 256 } };
     REQUIRE( addr.try_user_ptr( 20 ) == nullptr );
 }
 
 TEST_CASE( "validation: ArenaAddress::try_user_ptr returns valid ptr for in-range idx", "[test_issue257]" )
 {
-    std::uint8_t                   dummy[256] = {};
+    std::uint8_t                  dummy[256] = {};
     pmm::detail::ArenaAddress<AT> addr{ dummy, std::size_t{ 256 } };
     REQUIRE( addr.try_user_ptr( 3 ) == dummy + 48 );
 }
@@ -437,14 +437,14 @@ TEST_CASE( "validation: ArenaAddress::try_user_ptr returns valid ptr for in-rang
 
 TEST_CASE( "validation: ArenaAddress::try_user_idx_from_raw nullopt for null", "[test_issue257]" )
 {
-    std::uint8_t                   dummy[256] = {};
+    std::uint8_t                  dummy[256] = {};
     pmm::detail::ArenaAddress<AT> addr{ dummy, std::size_t{ 256 } };
     REQUIRE_FALSE( addr.try_user_idx_from_raw( nullptr ).has_value() );
 }
 
 TEST_CASE( "validation: ArenaAddress::try_user_idx_from_raw nullopt for out-of-bounds", "[test_issue257]" )
 {
-    std::uint8_t                   dummy[256] = {};
+    std::uint8_t                  dummy[256] = {};
     pmm::detail::ArenaAddress<AT> addr{ dummy, std::size_t{ 256 } };
     const void* oob_ptr = reinterpret_cast<const void*>( reinterpret_cast<std::uintptr_t>( dummy ) + 300 );
     REQUIRE_FALSE( addr.try_user_idx_from_raw( oob_ptr ).has_value() );
@@ -452,16 +452,16 @@ TEST_CASE( "validation: ArenaAddress::try_user_idx_from_raw nullopt for out-of-b
 
 TEST_CASE( "validation: ArenaAddress::try_user_idx_from_raw nullopt for misaligned", "[test_issue257]" )
 {
-    std::uint8_t                   dummy[256] = {};
+    std::uint8_t                  dummy[256] = {};
     pmm::detail::ArenaAddress<AT> addr{ dummy, std::size_t{ 256 } };
     REQUIRE_FALSE( addr.try_user_idx_from_raw( dummy + 7 ).has_value() );
 }
 
 TEST_CASE( "validation: ArenaAddress::try_user_idx_from_raw returns correct index", "[test_issue257]" )
 {
-    std::uint8_t                   dummy[256] = {};
+    std::uint8_t                  dummy[256] = {};
     pmm::detail::ArenaAddress<AT> addr{ dummy, std::size_t{ 256 } };
-    auto                           idx = addr.try_user_idx_from_raw( dummy + 48 );
+    auto                          idx = addr.try_user_idx_from_raw( dummy + 48 );
     REQUIRE( idx.has_value() );
     REQUIRE( *idx == 3 );
 }
