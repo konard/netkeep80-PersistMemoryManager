@@ -244,8 +244,7 @@ TEST_CASE( "detect_block_state and recover_block_state behave consistently", "[i
 
 // ─── Checked cast_from_raw boundaries ────────────────────────────────────────
 
-TEST_CASE( "FreeBlock::can_cast_from_raw / try_cast_from_raw reject invalid input",
-           "[issue367][block_header][safety]" )
+TEST_CASE( "FreeBlock::can_cast_from_raw / try_cast_from_raw reject invalid input", "[issue367][block_header][safety]" )
 {
     using A          = pmm::DefaultAddressTraits;
     using H          = pmm::BlockHeader<A>;
@@ -258,7 +257,7 @@ TEST_CASE( "FreeBlock::can_cast_from_raw / try_cast_from_raw reject invalid inpu
 
     // Misaligned raw pointer is rejected.
     alignas( H ) std::uint8_t big_buffer[sizeof( H ) + alignof( H )]{};
-    void* misaligned = big_buffer + 1;
+    void*                     misaligned = big_buffer + 1;
     REQUIRE_FALSE( pmm::FreeBlock<A>::can_cast_from_raw( misaligned ) );
     REQUIRE_FALSE( pmm::FreeBlock<A>::try_cast_from_raw( misaligned ).has_value() );
 
@@ -289,7 +288,7 @@ TEST_CASE( "AllocatedBlock::can_cast_from_raw / try_cast_from_raw reject invalid
 
     // Misaligned raw pointer is rejected.
     alignas( H ) std::uint8_t big_buffer[sizeof( H ) + alignof( H )]{};
-    void* misaligned = big_buffer + 1;
+    void*                     misaligned = big_buffer + 1;
     REQUIRE_FALSE( pmm::AllocatedBlock<A>::can_cast_from_raw( misaligned ) );
     REQUIRE_FALSE( pmm::AllocatedBlock<A>::try_cast_from_raw( misaligned ).has_value() );
 
