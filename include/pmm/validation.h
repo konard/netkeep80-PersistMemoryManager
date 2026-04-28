@@ -84,21 +84,24 @@ inline void validate_block_header_full( const uint8_t* base, size_t total_size, 
     {
         constexpr size_t kBlkHdrBytes = sizeof( pmm::Block<AT> );
         constexpr size_t kSzMax       = std::numeric_limits<size_t>::max();
+        constexpr size_t kSentinel    = kSzMax;
         size_t           idx_sz       = static_cast<size_t>( idx );
         size_t           w_sz         = static_cast<size_t>( w );
         if ( idx_sz > kSzMax / AT::granule_size || w_sz > kSzMax / AT::granule_size )
         {
             result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction, static_cast<uint64_t>( idx ),
-                        total_size, 0 );
+                        total_size, kSentinel );
             return;
         }
         size_t blk_byte_off = idx_sz * AT::granule_size;
         size_t data_bytes   = w_sz * AT::granule_size;
-        if ( blk_byte_off > kSzMax - kBlkHdrBytes || ( blk_byte_off + kBlkHdrBytes ) > kSzMax - data_bytes ||
-             blk_byte_off + kBlkHdrBytes + data_bytes > total_size )
+        bool   ovf1         = ( blk_byte_off > kSzMax - kBlkHdrBytes );
+        bool   ovf2         = !ovf1 && ( ( blk_byte_off + kBlkHdrBytes ) > kSzMax - data_bytes );
+        size_t end_diag     = ( ovf1 || ovf2 ) ? kSentinel : ( blk_byte_off + kBlkHdrBytes + data_bytes );
+        if ( ovf1 || ovf2 || end_diag > total_size )
         {
             result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction, static_cast<uint64_t>( idx ),
-                        total_size, static_cast<uint64_t>( blk_byte_off + kBlkHdrBytes + data_bytes ) );
+                        total_size, static_cast<uint64_t>( end_diag ) );
         }
     }
 }

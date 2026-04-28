@@ -166,33 +166,42 @@ class AllocatorPolicy
         };
         (void)detail::for_each_physical_block_mut<AT>( arena, step );
     }
-    static void recompute_counters( Arena arena )
+    struct Counters
+    {
+        index_type block_count = 0, free_count = 0, alloc_count = 0, used_gran = 0;
+        bool       walk_ok = true;
+    };
+    static Counters accumulate_counters( ConstArena arena ) noexcept
     {
         static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AT>;
-        index_type                  block_count = 0, free_count = 0, alloc_count = 0;
-        index_type                  used_gran = 0;
-        ConstArena                  cview{ arena.base(), arena.header() };
-        auto                        step = [&]( index_type, const void* blk_ptr ) noexcept
-        {
-            ++block_count;
-            used_gran = static_cast<index_type>( used_gran + kBlkHdrGran );
-            if ( pmm::is_allocated( BlockState::get_node_type( blk_ptr ) ) )
+        Counters                    c;
+        c.walk_ok = detail::for_each_physical_block<AT>(
+            arena,
+            [&]( index_type, const void* blk_ptr ) noexcept
             {
-                ++alloc_count;
-                used_gran = static_cast<index_type>( used_gran + BlockState::get_weight( blk_ptr ) );
-            }
-            else
-            {
-                ++free_count;
-            }
-            return true;
-        };
-        (void)detail::for_each_physical_block<AT>( cview, step );
+                ++c.block_count;
+                c.used_gran = static_cast<index_type>( c.used_gran + kBlkHdrGran );
+                if ( pmm::is_allocated( BlockState::get_node_type( blk_ptr ) ) )
+                {
+                    ++c.alloc_count;
+                    c.used_gran = static_cast<index_type>( c.used_gran + BlockState::get_weight( blk_ptr ) );
+                }
+                else
+                {
+                    ++c.free_count;
+                }
+                return true;
+            } );
+        return c;
+    }
+    static void recompute_counters( Arena arena )
+    {
+        Counters                   c   = accumulate_counters( ConstArena{ arena.base(), arena.header() } );
         detail::ManagerHeader<AT>* hdr = arena.header();
-        hdr->block_count               = block_count;
-        hdr->free_count                = free_count;
-        hdr->alloc_count               = alloc_count;
-        hdr->used_size                 = used_gran;
+        hdr->block_count               = c.block_count;
+        hdr->free_count                = c.free_count;
+        hdr->alloc_count               = c.alloc_count;
+        hdr->used_size                 = c.used_gran;
     }
     static void verify_linked_list( ConstArena arena, VerifyResult& result ) noexcept
     {
@@ -218,37 +227,18 @@ class AllocatorPolicy
     }
     static void verify_counters( ConstArena arena, VerifyResult& result ) noexcept
     {
-        static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AT>;
-        index_type                  block_count = 0, free_count = 0, alloc_count = 0;
-        index_type                  used_gran = 0;
-        const bool                  ok        = detail::for_each_physical_block<AT>(
-            arena,
-            [&]( index_type, const void* blk_ptr ) noexcept
-            {
-                ++block_count;
-                used_gran = static_cast<index_type>( used_gran + kBlkHdrGran );
-                if ( pmm::is_allocated( BlockState::get_node_type( blk_ptr ) ) )
-                {
-                    ++alloc_count;
-                    used_gran = static_cast<index_type>( used_gran + BlockState::get_weight( blk_ptr ) );
-                }
-                else
-                {
-                    ++free_count;
-                }
-                return true;
-            } );
-        if ( !ok )
+        Counters c = accumulate_counters( arena );
+        if ( !c.walk_ok )
         {
             result.add( ViolationType::HeaderCorruption, DiagnosticAction::NoAction );
             return;
         }
         const detail::ManagerHeader<AT>* hdr = arena.header();
-        if ( hdr->block_count != block_count || hdr->free_count != free_count || hdr->alloc_count != alloc_count ||
-             hdr->used_size != used_gran )
+        if ( hdr->block_count != c.block_count || hdr->free_count != c.free_count ||
+             hdr->alloc_count != c.alloc_count || hdr->used_size != c.used_gran )
         {
             result.add( ViolationType::CounterMismatch, DiagnosticAction::NoAction, 0,
-                        static_cast<uint64_t>( block_count ), static_cast<uint64_t>( hdr->block_count ) );
+                        static_cast<uint64_t>( c.block_count ), static_cast<uint64_t>( hdr->block_count ) );
         }
     }
     static void verify_block_states( ConstArena arena, VerifyResult& result ) noexcept

@@ -246,6 +246,19 @@ TEST_CASE( "I373-Growth: compute_growth_for_traits caps target by max_arena_size
 }
 
 /*
+### test-issue373-growth-traits-no-block
+*/
+TEST_CASE( "I373-Growth: compute_growth_for_traits rejects no_block-sized arena target",
+           "[issue373][growth][traits]" )
+{
+    using AT32 = pmm::DefaultAddressTraits;
+    constexpr std::size_t sentinel_sized_arena =
+        static_cast<std::size_t>( AT32::no_block ) * AT32::granule_size;
+    auto r = pmm::detail::compute_growth_for_traits<AT32>( sentinel_sized_arena - 4096, 4096, 1, 1, 0 );
+    REQUIRE_FALSE( r.has_value() );
+}
+
+/*
 ### test-issue373-byte-off-checked
 */
 TEST_CASE( "I373-Conv: byte_off_to_idx_checked rejects misalignment and overflow", "[issue373][conv]" )

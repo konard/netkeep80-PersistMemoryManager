@@ -955,21 +955,24 @@ inline void validate_block_header_full( const uint8_t* base, size_t total_size, 
     {
         constexpr size_t kBlkHdrBytes = sizeof( pmm::Block<AT> );
         constexpr size_t kSzMax       = std::numeric_limits<size_t>::max();
+        constexpr size_t kSentinel    = kSzMax;
         size_t           idx_sz       = static_cast<size_t>( idx );
         size_t           w_sz         = static_cast<size_t>( w );
         if ( idx_sz > kSzMax / AT::granule_size || w_sz > kSzMax / AT::granule_size )
         {
             result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction, static_cast<uint64_t>( idx ),
-                        total_size, 0 );
+                        total_size, kSentinel );
             return;
         }
         size_t blk_byte_off = idx_sz * AT::granule_size;
         size_t data_bytes   = w_sz * AT::granule_size;
-        if ( blk_byte_off > kSzMax - kBlkHdrBytes || ( blk_byte_off + kBlkHdrBytes ) > kSzMax - data_bytes ||
-             blk_byte_off + kBlkHdrBytes + data_bytes > total_size )
+        bool   ovf1         = ( blk_byte_off > kSzMax - kBlkHdrBytes );
+        bool   ovf2         = !ovf1 && ( ( blk_byte_off + kBlkHdrBytes ) > kSzMax - data_bytes );
+        size_t end_diag     = ( ovf1 || ovf2 ) ? kSentinel : ( blk_byte_off + kBlkHdrBytes + data_bytes );
+        if ( ovf1 || ovf2 || end_diag > total_size )
         {
             result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction, static_cast<uint64_t>( idx ),
-                        total_size, static_cast<uint64_t>( blk_byte_off + kBlkHdrBytes + data_bytes ) );
+                        total_size, static_cast<uint64_t>( end_diag ) );
         }
     }
 }
@@ -2109,62 +2112,41 @@ template <typename AT> constexpr std::optional<GranuleCount<AT>> bytes_to_granul
 /*
 ### pmm-detail-arenaview
 */
-template <typename AT, typename BytePtr, typename HdrPtr> class ArenaViewBase
+template <typename AT, bool IsConst> class BasicArenaView
 {
   public:
-    using index_type                   = typename AT::index_type;
-    constexpr ArenaViewBase() noexcept = default;
-    constexpr ArenaViewBase( BytePtr b, HdrPtr h ) noexcept : _base( b ), _hdr( h ) {}
-    constexpr BytePtr base() const noexcept { return _base; }
-    constexpr HdrPtr  header() const noexcept { return _hdr; }
-    std::size_t       total_size() const noexcept { return _hdr ? _hdr->total_size : 0; }
-    bool              valid() const noexcept { return _base && _hdr; }
-    bool              valid_block( index_type idx ) const noexcept
-    {
-        if ( !_base || !_hdr || idx == AT::no_block )
-            return false;
-        return fits( idx, sizeof( Block<AT> ) );
-    }
-    bool fits( index_type idx, std::size_t len ) const noexcept
+    using index_type                    = typename AT::index_type;
+    using byte_ptr                      = std::conditional_t<IsConst, const std::uint8_t*, std::uint8_t*>;
+    using header_ptr                    = std::conditional_t<IsConst, const ManagerHeader<AT>*, ManagerHeader<AT>*>;
+    using block_ptr                     = std::conditional_t<IsConst, const Block<AT>*, Block<AT>*>;
+    constexpr BasicArenaView() noexcept = default;
+    constexpr BasicArenaView( byte_ptr b, header_ptr h ) noexcept : _base( b ), _hdr( h ) {}
+    constexpr byte_ptr   base() const noexcept { return _base; }
+    constexpr header_ptr header() const noexcept { return _hdr; }
+    std::size_t          total_size() const noexcept { return _hdr ? _hdr->total_size : 0; }
+    bool                 valid() const noexcept { return _base && _hdr; }
+    bool                 fits( index_type idx, std::size_t len ) const noexcept
     {
         auto off = checked_granule_offset<AT>( idx );
         return off.has_value() && fits_range( *off, len, total_size() );
     }
-
-  protected:
-    BytePtr _base = nullptr;
-    HdrPtr  _hdr  = nullptr;
-};
-template <typename AT> class ArenaView : public ArenaViewBase<AT, std::uint8_t*, ManagerHeader<AT>*>
-{
-    using Base = ArenaViewBase<AT, std::uint8_t*, ManagerHeader<AT>*>;
-
-  public:
-    using index_type = typename AT::index_type;
-    using Base::Base;
-    Block<AT>* block( index_type idx ) const noexcept
+    bool valid_block( index_type idx ) const noexcept
     {
-        if ( !this->valid_block( idx ) )
-            return nullptr;
-        auto off = checked_granule_offset<AT>( idx );
-        return off.has_value() ? reinterpret_cast<Block<AT>*>( this->_base + *off ) : nullptr;
+        return _base && _hdr && idx != AT::no_block && fits( idx, sizeof( Block<AT> ) );
     }
-};
-template <typename AT> class ConstArenaView : public ArenaViewBase<AT, const std::uint8_t*, const ManagerHeader<AT>*>
-{
-    using Base = ArenaViewBase<AT, const std::uint8_t*, const ManagerHeader<AT>*>;
-
-  public:
-    using index_type = typename AT::index_type;
-    using Base::Base;
-    const Block<AT>* block( index_type idx ) const noexcept
+    block_ptr block( index_type idx ) const noexcept
     {
-        if ( !this->valid_block( idx ) )
+        if ( !valid_block( idx ) )
             return nullptr;
-        auto off = checked_granule_offset<AT>( idx );
-        return off.has_value() ? reinterpret_cast<const Block<AT>*>( this->_base + *off ) : nullptr;
+        return reinterpret_cast<block_ptr>( _base + static_cast<std::size_t>( idx ) * AT::granule_size );
     }
+
+  private:
+    byte_ptr   _base = nullptr;
+    header_ptr _hdr  = nullptr;
 };
+template <typename AT> using ArenaView      = BasicArenaView<AT, false>;
+template <typename AT> using ConstArenaView = BasicArenaView<AT, true>;
 /*
 ### pmm-detail-walkcontrol
 */
@@ -2174,13 +2156,16 @@ enum class WalkControl
     StopOk,
     Fail,
 };
-namespace walker_internal
+/*
+### pmm-detail-blockwalker
+*/
+template <typename AT, bool IsConst, typename Fn>
+bool for_each_physical_block( BasicArenaView<AT, IsConst> arena, Fn&& fn ) noexcept
 {
-template <typename AT, typename BytePtr, typename HdrPtr, typename Fn>
-bool walk_chain( BytePtr base, HdrPtr hdr, Fn&& fn ) noexcept
-{
-    using BlockState = pmm::BlockStateBase<AT>;
     using IndexT     = typename AT::index_type;
+    using BlockState = pmm::BlockStateBase<AT>;
+    auto base        = arena.base();
+    auto hdr         = arena.header();
     if ( !base || !hdr )
         return false;
     const std::size_t total = static_cast<std::size_t>( hdr->total_size );
@@ -2217,21 +2202,9 @@ bool walk_chain( BytePtr base, HdrPtr hdr, Fn&& fn ) noexcept
     }
     return true;
 }
-}
-/*
-### pmm-detail-blockwalker
-*/
-template <typename AT, typename Fn> bool for_each_physical_block( ConstArenaView<AT> arena, Fn&& fn ) noexcept
-{
-    return walker_internal::walk_chain<AT>( arena.base(), arena.header(), std::forward<Fn>( fn ) );
-}
-template <typename AT, typename Fn> bool for_each_physical_block( ArenaView<AT> arena, Fn&& fn ) noexcept
-{
-    return for_each_physical_block<AT>( ConstArenaView<AT>{ arena.base(), arena.header() }, std::forward<Fn>( fn ) );
-}
 template <typename AT, typename Fn> bool for_each_physical_block_mut( ArenaView<AT> arena, Fn&& fn ) noexcept
 {
-    return walker_internal::walk_chain<AT>( arena.base(), arena.header(), std::forward<Fn>( fn ) );
+    return for_each_physical_block<AT, false>( arena, std::forward<Fn>( fn ) );
 }
 /*
 ### pmm-detail-growthpolicy
@@ -2271,7 +2244,10 @@ inline std::optional<std::size_t> compute_growth_for_traits( std::size_t current
                                                              std::size_t num, std::size_t den,
                                                              std::size_t max_gb ) noexcept
 {
-    return compute_growth( current, min_required, AT::granule_size, num, den, max_gb, max_arena_size<AT>() );
+    auto target = compute_growth( current, min_required, AT::granule_size, num, den, max_gb, max_arena_size<AT>() );
+    if ( !target || !byte_off_to_idx_checked<AT>( *target ) )
+        return std::nullopt;
+    return target;
 }
 /*
 ### pmm-detail-initguard
@@ -2754,33 +2730,42 @@ class AllocatorPolicy
         };
         (void)detail::for_each_physical_block_mut<AT>( arena, step );
     }
-    static void recompute_counters( Arena arena )
+    struct Counters
+    {
+        index_type block_count = 0, free_count = 0, alloc_count = 0, used_gran = 0;
+        bool       walk_ok = true;
+    };
+    static Counters accumulate_counters( ConstArena arena ) noexcept
     {
         static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AT>;
-        index_type                  block_count = 0, free_count = 0, alloc_count = 0;
-        index_type                  used_gran = 0;
-        ConstArena                  cview{ arena.base(), arena.header() };
-        auto                        step = [&]( index_type, const void* blk_ptr ) noexcept
-        {
-            ++block_count;
-            used_gran = static_cast<index_type>( used_gran + kBlkHdrGran );
-            if ( pmm::is_allocated( BlockState::get_node_type( blk_ptr ) ) )
+        Counters                    c;
+        c.walk_ok = detail::for_each_physical_block<AT>(
+            arena,
+            [&]( index_type, const void* blk_ptr ) noexcept
             {
-                ++alloc_count;
-                used_gran = static_cast<index_type>( used_gran + BlockState::get_weight( blk_ptr ) );
-            }
-            else
-            {
-                ++free_count;
-            }
-            return true;
-        };
-        (void)detail::for_each_physical_block<AT>( cview, step );
+                ++c.block_count;
+                c.used_gran = static_cast<index_type>( c.used_gran + kBlkHdrGran );
+                if ( pmm::is_allocated( BlockState::get_node_type( blk_ptr ) ) )
+                {
+                    ++c.alloc_count;
+                    c.used_gran = static_cast<index_type>( c.used_gran + BlockState::get_weight( blk_ptr ) );
+                }
+                else
+                {
+                    ++c.free_count;
+                }
+                return true;
+            } );
+        return c;
+    }
+    static void recompute_counters( Arena arena )
+    {
+        Counters                   c   = accumulate_counters( ConstArena{ arena.base(), arena.header() } );
         detail::ManagerHeader<AT>* hdr = arena.header();
-        hdr->block_count               = block_count;
-        hdr->free_count                = free_count;
-        hdr->alloc_count               = alloc_count;
-        hdr->used_size                 = used_gran;
+        hdr->block_count               = c.block_count;
+        hdr->free_count                = c.free_count;
+        hdr->alloc_count               = c.alloc_count;
+        hdr->used_size                 = c.used_gran;
     }
     static void verify_linked_list( ConstArena arena, VerifyResult& result ) noexcept
     {
@@ -2806,37 +2791,18 @@ class AllocatorPolicy
     }
     static void verify_counters( ConstArena arena, VerifyResult& result ) noexcept
     {
-        static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AT>;
-        index_type                  block_count = 0, free_count = 0, alloc_count = 0;
-        index_type                  used_gran = 0;
-        const bool                  ok        = detail::for_each_physical_block<AT>(
-            arena,
-            [&]( index_type, const void* blk_ptr ) noexcept
-            {
-                ++block_count;
-                used_gran = static_cast<index_type>( used_gran + kBlkHdrGran );
-                if ( pmm::is_allocated( BlockState::get_node_type( blk_ptr ) ) )
-                {
-                    ++alloc_count;
-                    used_gran = static_cast<index_type>( used_gran + BlockState::get_weight( blk_ptr ) );
-                }
-                else
-                {
-                    ++free_count;
-                }
-                return true;
-            } );
-        if ( !ok )
+        Counters c = accumulate_counters( arena );
+        if ( !c.walk_ok )
         {
             result.add( ViolationType::HeaderCorruption, DiagnosticAction::NoAction );
             return;
         }
         const detail::ManagerHeader<AT>* hdr = arena.header();
-        if ( hdr->block_count != block_count || hdr->free_count != free_count || hdr->alloc_count != alloc_count ||
-             hdr->used_size != used_gran )
+        if ( hdr->block_count != c.block_count || hdr->free_count != c.free_count ||
+             hdr->alloc_count != c.alloc_count || hdr->used_size != c.used_gran )
         {
             result.add( ViolationType::CounterMismatch, DiagnosticAction::NoAction, 0,
-                        static_cast<uint64_t>( block_count ), static_cast<uint64_t>( hdr->block_count ) );
+                        static_cast<uint64_t>( c.block_count ), static_cast<uint64_t>( hdr->block_count ) );
         }
     }
     static void verify_block_states( ConstArena arena, VerifyResult& result ) noexcept
