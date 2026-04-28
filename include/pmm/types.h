@@ -259,10 +259,12 @@ inline typename AT::index_type block_total_granules( const uint8_t* base, const 
     static constexpr size_t kGranSz    = AT::granule_size;
     using IndexT                       = typename AT::index_type;
     static constexpr IndexT kNoBlk     = AT::no_block;
-    size_t                  byte_off   = reinterpret_cast<const uint8_t*>( blk ) - base;
-    IndexT                  this_idx   = static_cast<IndexT>( byte_off / kGranSz );
-    IndexT                  next_off   = BlockState::get_next_offset( blk );
-    IndexT                  total_gran = static_cast<IndexT>( hdr->total_size / kGranSz );
+    if ( pmm::is_free( BlockState::get_node_type( blk ) ) )
+        return BlockState::get_weight( blk );
+    size_t byte_off   = reinterpret_cast<const uint8_t*>( blk ) - base;
+    IndexT this_idx   = static_cast<IndexT>( byte_off / kGranSz );
+    IndexT next_off   = BlockState::get_next_offset( blk );
+    IndexT total_gran = static_cast<IndexT>( hdr->total_size / kGranSz );
     if ( next_off != kNoBlk )
         return static_cast<IndexT>( next_off - this_idx );
     return static_cast<IndexT>( total_gran - this_idx );
@@ -373,11 +375,11 @@ inline bool is_canonical_allocated_block_header( const uint8_t* base, size_t tot
     const IndexT cand_idx = static_cast<IndexT>( cand_off / AT::granule_size );
     if ( !validate_block_index<AT>( total_size, cand_idx ) )
         return false;
-    const IndexT weight = BlockState::get_weight( cand_addr );
-    if ( weight == 0 || BlockState::get_root_offset( cand_addr ) != cand_idx )
+    const IndexT       weight    = BlockState::get_weight( cand_addr );
+    const pmm::NodeType node_type = BlockState::get_node_type( cand_addr );
+    if ( !pmm::is_allocated( node_type ) || BlockState::get_root_offset( cand_addr ) != cand_idx )
         return false;
-    const uint16_t node_type = BlockState::get_node_type( cand_addr );
-    if ( node_type != pmm::kNodeReadWrite && node_type != pmm::kNodeReadOnly )
+    if ( weight == 0 )
         return false;
     if ( total_size < manager_header_offset_bytes_v<AT> + sizeof( ManagerHeader<AT> ) )
         return false;

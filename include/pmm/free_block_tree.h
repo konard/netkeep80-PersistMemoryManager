@@ -41,17 +41,14 @@ template <typename AT = DefaultAddressTraits> struct AvlFreeTree
             hdr->free_tree_root = blk_idx;
             return;
         }
-        index_type total_gran = detail::byte_off_to_idx_t<AT>( hdr->total_size );
-        index_type blk_next   = BlockState::get_next_offset( blk );
-        index_type blk_gran   = ( blk_next != AT::no_block ) ? ( blk_next - blk_idx ) : ( total_gran - blk_idx );
+        index_type blk_gran = BlockState::get_weight( blk );
         index_type cur = hdr->free_tree_root, parent = AT::no_block;
         bool       go_left = false;
         while ( cur != AT::no_block )
         {
             parent              = cur;
             const void* n       = detail::block_at<AT>( base, cur );
-            index_type  n_next  = BlockState::get_next_offset( n );
-            index_type  n_gran  = ( n_next != AT::no_block ) ? ( n_next - cur ) : ( total_gran - cur );
+            index_type  n_gran  = BlockState::get_weight( n );
             bool        smaller = ( blk_gran < n_gran ) || ( blk_gran == n_gran && blk_idx < cur );
             go_left             = smaller;
             cur                 = smaller ? BlockState::get_left_offset( n ) : BlockState::get_right_offset( n );
@@ -119,13 +116,12 @@ template <typename AT = DefaultAddressTraits> struct AvlFreeTree
 */
     static index_type find_best_fit( uint8_t* base, detail::ManagerHeader<AT>* hdr, index_type needed_granules )
     {
-        index_type total_gran = detail::byte_off_to_idx_t<AT>( hdr->total_size );
+        (void)hdr;
         index_type cur = hdr->free_tree_root, result = AT::no_block;
         while ( cur != AT::no_block )
         {
-            const void* node      = detail::block_at<AT>( base, cur );
-            index_type  node_next = BlockState::get_next_offset( node );
-            index_type  cur_gran  = ( node_next != AT::no_block ) ? ( node_next - cur ) : ( total_gran - cur );
+            const void* node     = detail::block_at<AT>( base, cur );
+            index_type  cur_gran = BlockState::get_weight( node );
             if ( cur_gran >= needed_granules )
             {
                 result = cur;

@@ -150,15 +150,20 @@ template <typename ManagerT> class PersistMemoryTypedApi
         index_type old_blk_idx = ManagerT::template block_idx_from_pptr<T>( p );
         void*      old_blk_raw = detail::block_at<address_traits>( base, old_blk_idx );
         index_type freed_w     = BlockStateBase<address_traits>::get_weight( old_blk_raw );
-        if ( BlockStateBase<address_traits>::get_node_type( old_blk_raw ) != pmm::kNodeReadOnly )
+        const pmm::NodeType nt_old = BlockStateBase<address_traits>::get_node_type( old_blk_raw );
+        if ( pmm::can_be_deleted_from_pap( nt_old ) )
         {
-            auto old_alloc = AllocatedBlock<address_traits>::cast_from_raw( old_blk_raw );
-            old_alloc.mark_as_free();
+            static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<address_traits>;
+            auto       old_alloc                    = AllocatedBlock<address_traits>::cast_from_raw( old_blk_raw );
+            index_type total_gran =
+                detail::block_total_granules<address_traits>( base, hdr, detail::block_at<address_traits>( base, old_blk_idx ) );
+            old_alloc.mark_as_free( total_gran );
             hdr->alloc_count--;
             hdr->free_count++;
             if ( hdr->used_size >= freed_w )
                 hdr->used_size -= freed_w;
             allocator::coalesce( base, hdr, old_blk_idx );
+            (void)kBlkHdrGran;
         }
         ManagerT::_last_error = PmmError::Ok;
         return new_p;
@@ -221,14 +226,14 @@ template <typename ManagerT> class PersistMemoryTypedApi
             return nullptr;
         }
         index_type blk_idx = ManagerT::template block_idx_from_pptr<T>( p );
-        if ( BlockStateBase<address_traits>::get_weight( blk_raw ) == 0 ||
+        const pmm::NodeType node_type = BlockStateBase<address_traits>::get_node_type( blk_raw );
+        if ( !pmm::is_allocated( node_type ) ||
              BlockStateBase<address_traits>::get_root_offset( blk_raw ) != blk_idx )
         {
             ManagerT::_last_error = PmmError::InvalidPointer;
             return nullptr;
         }
-        const uint16_t node_type = BlockStateBase<address_traits>::get_node_type( blk_raw );
-        if ( node_type != pmm::kNodeReadWrite && node_type != pmm::kNodeReadOnly )
+        if ( !pmm::is_known_node_type( static_cast<std::uint8_t>( node_type ) ) )
         {
             ManagerT::_last_error = PmmError::InvalidPointer;
             return nullptr;

@@ -6,34 +6,103 @@
 #include <type_traits>
 namespace pmm
 {
-enum : uint16_t
+/*
+## pmm-nodetype
+*/
+enum class NodeType : std::uint8_t
 {
-    kNodeReadWrite = 0,
-    kNodeReadOnly  = 1,
+    Free           = 0,
+    ManagerHeader  = 1,
+    Generic        = 2,
+    ReadOnlyLocked = 3,
+    PStringView    = 4,
+    PString        = 5,
+    PArray         = 6,
+    PMap           = 7,
+    PPtr           = 8,
 };
+/*
+### pmm-nodetype-helpers
+*/
+constexpr bool is_free( NodeType t ) noexcept { return t == NodeType::Free; }
+constexpr bool is_allocated( NodeType t ) noexcept { return t != NodeType::Free; }
+constexpr bool is_mutable( NodeType t ) noexcept
+{
+    switch ( t )
+    {
+        case NodeType::Free:
+        case NodeType::ManagerHeader:
+        case NodeType::Generic:
+        case NodeType::PString:
+        case NodeType::PArray:
+        case NodeType::PMap:
+        case NodeType::PPtr:
+            return true;
+        case NodeType::ReadOnlyLocked:
+        case NodeType::PStringView:
+            return false;
+    }
+    return false;
+}
+constexpr bool can_be_deleted_from_pap( NodeType t ) noexcept
+{
+    switch ( t )
+    {
+        case NodeType::Free:
+        case NodeType::Generic:
+        case NodeType::PStringView:
+        case NodeType::PString:
+        case NodeType::PArray:
+        case NodeType::PMap:
+        case NodeType::PPtr:
+            return true;
+        case NodeType::ManagerHeader:
+        case NodeType::ReadOnlyLocked:
+            return false;
+    }
+    return false;
+}
+constexpr bool participates_in_free_tree( NodeType t ) noexcept { return t == NodeType::Free; }
+constexpr bool is_known_node_type( std::uint8_t v ) noexcept
+{
+    switch ( static_cast<NodeType>( v ) )
+    {
+        case NodeType::Free:
+        case NodeType::ManagerHeader:
+        case NodeType::Generic:
+        case NodeType::ReadOnlyLocked:
+        case NodeType::PStringView:
+        case NodeType::PString:
+        case NodeType::PArray:
+        case NodeType::PMap:
+        case NodeType::PPtr:
+            return true;
+    }
+    return false;
+}
 namespace detail
 {
-template <typename AT, bool NeedsPadding> struct BlockHeaderStorage;
-template <typename AT> struct BlockHeaderStorage<AT, false>
+template <typename AT> struct BlockHeaderCoreFields
 {
     using index_type = typename AT::index_type;
-    index_type   weight;
-    index_type   left_offset;
-    index_type   right_offset;
-    index_type   parent_offset;
-    index_type   root_offset;
-    std::int16_t avl_height;
-    uint16_t     node_type;
-    index_type   prev_offset;
-    index_type   next_offset;
+    index_type weight;
+    index_type left_offset;
+    index_type right_offset;
+    index_type parent_offset;
+    index_type root_offset;
+    index_type prev_offset;
+    index_type next_offset;
 };
-template <typename AT> constexpr std::size_t block_header_natural_size_v = sizeof( BlockHeaderStorage<AT, false> );
+template <typename AT> constexpr std::size_t block_header_core_size_v = sizeof( BlockHeaderCoreFields<AT> );
+template <typename AT>
+constexpr std::size_t block_header_min_size_v = block_header_core_size_v<AT> + 2;
 template <typename AT>
 constexpr std::size_t block_header_target_size_v =
-    ( ( block_header_natural_size_v<AT> + AT::granule_size - 1 ) / AT::granule_size ) * AT::granule_size;
+    ( ( block_header_min_size_v<AT> + AT::granule_size - 1 ) / AT::granule_size ) * AT::granule_size;
 template <typename AT>
-constexpr bool block_header_needs_padding_v = block_header_natural_size_v<AT> != block_header_target_size_v<AT>;
-template <typename AT> struct BlockHeaderStorage<AT, true>
+constexpr std::size_t block_header_trailer_pad_v =
+    block_header_target_size_v<AT> - block_header_core_size_v<AT> - 2;
+template <typename AT, std::size_t Pad> struct BlockHeaderStorageImpl
 {
     using index_type = typename AT::index_type;
     index_type   weight;
@@ -41,17 +110,31 @@ template <typename AT> struct BlockHeaderStorage<AT, true>
     index_type   right_offset;
     index_type   parent_offset;
     index_type   root_offset;
-    std::int16_t avl_height;
-    uint16_t     node_type;
     index_type   prev_offset;
     index_type   next_offset;
-    std::uint8_t _granule_padding[block_header_target_size_v<AT> - block_header_natural_size_v<AT>];
+    std::uint8_t _trailer_padding[Pad];
+    std::uint8_t avl_height;
+    NodeType     node_type;
 };
+template <typename AT> struct BlockHeaderStorageImpl<AT, 0>
+{
+    using index_type = typename AT::index_type;
+    index_type   weight;
+    index_type   left_offset;
+    index_type   right_offset;
+    index_type   parent_offset;
+    index_type   root_offset;
+    index_type   prev_offset;
+    index_type   next_offset;
+    std::uint8_t avl_height;
+    NodeType     node_type;
+};
+template <typename AT> using BlockHeaderStorage = BlockHeaderStorageImpl<AT, block_header_trailer_pad_v<AT>>;
 }
 /*
 ## pmm-blockheader
 */
-template <typename AT> struct BlockHeader : detail::BlockHeaderStorage<AT, detail::block_header_needs_padding_v<AT>>
+template <typename AT> struct BlockHeader : detail::BlockHeaderStorage<AT>
 {
     using address_traits = AT;
     using index_type     = typename AT::index_type;
@@ -80,10 +163,12 @@ static_assert( offsetof( BlockHeader<DefaultAddressTraits>, left_offset ) == 4 )
 static_assert( offsetof( BlockHeader<DefaultAddressTraits>, right_offset ) == 8 );
 static_assert( offsetof( BlockHeader<DefaultAddressTraits>, parent_offset ) == 12 );
 static_assert( offsetof( BlockHeader<DefaultAddressTraits>, root_offset ) == 16 );
-static_assert( offsetof( BlockHeader<DefaultAddressTraits>, avl_height ) == 20 );
-static_assert( offsetof( BlockHeader<DefaultAddressTraits>, node_type ) == 22 );
-static_assert( offsetof( BlockHeader<DefaultAddressTraits>, prev_offset ) == 24 );
-static_assert( offsetof( BlockHeader<DefaultAddressTraits>, next_offset ) == 28 );
+static_assert( offsetof( BlockHeader<DefaultAddressTraits>, prev_offset ) == 20 );
+static_assert( offsetof( BlockHeader<DefaultAddressTraits>, next_offset ) == 24 );
+static_assert( offsetof( BlockHeader<DefaultAddressTraits>, avl_height ) ==
+               sizeof( BlockHeader<DefaultAddressTraits> ) - 2 );
+static_assert( offsetof( BlockHeader<DefaultAddressTraits>, node_type ) ==
+               sizeof( BlockHeader<DefaultAddressTraits> ) - 1 );
 static_assert( ( sizeof( BlockHeader<SmallAddressTraits> ) % SmallAddressTraits::granule_size ) == 0 );
 static_assert( ( sizeof( BlockHeader<DefaultAddressTraits> ) % DefaultAddressTraits::granule_size ) == 0 );
 static_assert( ( sizeof( BlockHeader<LargeAddressTraits> ) % LargeAddressTraits::granule_size ) == 0 );

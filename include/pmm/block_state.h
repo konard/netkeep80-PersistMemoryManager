@@ -30,13 +30,12 @@ template <typename AT> class BlockStateBase
     static const Header* header_of( const void* raw_blk ) noexcept { return detail::block_header_at<AT>( raw_blk ); }
     static bool          is_free_raw( const void* raw_blk ) noexcept
     {
-        const Header* h = header_of( raw_blk );
-        return h->weight == 0 && h->root_offset == 0;
+        return pmm::is_free( header_of( raw_blk )->node_type );
     }
     static bool is_allocated_raw( const void* raw_blk, index_type own_idx ) noexcept
     {
         const Header* h = header_of( raw_blk );
-        return h->weight > 0 && h->root_offset == own_idx;
+        return pmm::is_allocated( h->node_type ) && h->root_offset == own_idx;
     }
 /*
 ### pmm-blockstatebase-recover_state
@@ -44,9 +43,9 @@ template <typename AT> class BlockStateBase
     static void recover_state( void* raw_blk, index_type own_idx ) noexcept
     {
         Header* h = header_of( raw_blk );
-        if ( h->weight > 0 && h->root_offset != own_idx )
+        if ( pmm::is_allocated( h->node_type ) && h->root_offset != own_idx )
             h->root_offset = own_idx;
-        if ( h->weight == 0 && h->root_offset != 0 )
+        if ( pmm::is_free( h->node_type ) && h->root_offset != 0 )
             h->root_offset = 0;
     }
 /*
@@ -55,13 +54,13 @@ template <typename AT> class BlockStateBase
     static void verify_state( const void* raw_blk, index_type own_idx, VerifyResult& result ) noexcept
     {
         const Header* h = header_of( raw_blk );
-        if ( h->weight > 0 && h->root_offset != own_idx )
+        if ( pmm::is_allocated( h->node_type ) && h->root_offset != own_idx )
         {
             result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction,
                         static_cast<uint64_t>( own_idx ), static_cast<uint64_t>( own_idx ),
                         static_cast<uint64_t>( h->root_offset ) );
         }
-        if ( h->weight == 0 && h->root_offset != 0 )
+        if ( pmm::is_free( h->node_type ) && h->root_offset != 0 )
         {
             result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction,
                         static_cast<uint64_t>( own_idx ), 0, static_cast<uint64_t>( h->root_offset ) );
@@ -86,10 +85,10 @@ template <typename AT> class BlockStateBase
     static index_type   get_right_offset( const void* b ) noexcept { return header_of( b )->right_offset; }
     static index_type   get_parent_offset( const void* b ) noexcept { return header_of( b )->parent_offset; }
     static index_type   get_root_offset( const void* b ) noexcept { return header_of( b )->root_offset; }
-    static std::int16_t get_avl_height( const void* raw_blk ) noexcept { return header_of( raw_blk )->avl_height; }
-    static uint16_t     get_node_type( const void* raw_blk ) noexcept { return header_of( raw_blk )->node_type; }
-    static void init_fields( void* raw_blk, index_type prev_idx, index_type next_idx, std::int16_t avl_height_val,
-                             index_type weight_val, index_type root_offset_val ) noexcept
+    static std::uint8_t get_avl_height( const void* raw_blk ) noexcept { return header_of( raw_blk )->avl_height; }
+    static NodeType     get_node_type( const void* raw_blk ) noexcept { return header_of( raw_blk )->node_type; }
+    static void init_fields( void* raw_blk, index_type prev_idx, index_type next_idx, std::uint8_t avl_height_val,
+                             index_type weight_val, index_type root_offset_val, NodeType node_type_val ) noexcept
     {
         Header* h        = header_of( raw_blk );
         h->prev_offset   = prev_idx;
@@ -100,6 +99,7 @@ template <typename AT> class BlockStateBase
         h->avl_height    = avl_height_val;
         h->weight        = weight_val;
         h->root_offset   = root_offset_val;
+        h->node_type     = node_type_val;
     }
     static void set_next_offset_of( void* b, index_type v ) noexcept { header_of( b )->next_offset = v; }
     static void set_prev_offset_of( void* b, index_type v ) noexcept { header_of( b )->prev_offset = v; }
@@ -108,8 +108,8 @@ template <typename AT> class BlockStateBase
     static void set_parent_offset_of( void* b, index_type v ) noexcept { header_of( b )->parent_offset = v; }
     static void set_weight_of( void* b, index_type v ) noexcept { header_of( b )->weight = v; }
     static void set_root_offset_of( void* b, index_type v ) noexcept { header_of( b )->root_offset = v; }
-    static void set_avl_height_of( void* b, std::int16_t v ) noexcept { header_of( b )->avl_height = v; }
-    static void set_node_type_of( void* b, uint16_t v ) noexcept { header_of( b )->node_type = v; }
+    static void set_avl_height_of( void* b, std::uint8_t v ) noexcept { header_of( b )->avl_height = v; }
+    static void set_node_type_of( void* b, NodeType v ) noexcept { header_of( b )->node_type = v; }
 };
 /*
 ## pmm-freeblock
@@ -131,9 +131,9 @@ template <typename AT> class FreeBlock
     index_type    right_offset() const noexcept { return h_->right_offset; }
     index_type    parent_offset() const noexcept { return h_->parent_offset; }
     index_type    root_offset() const noexcept { return h_->root_offset; }
-    std::int16_t  avl_height() const noexcept { return h_->avl_height; }
-    uint16_t      node_type() const noexcept { return h_->node_type; }
-    bool          is_free() const noexcept { return h_->weight == 0 && h_->root_offset == 0; }
+    std::uint8_t  avl_height() const noexcept { return h_->avl_height; }
+    NodeType      node_type() const noexcept { return h_->node_type; }
+    bool          is_free() const noexcept { return pmm::is_free( h_->node_type ); }
 /*
 ### pmm-freeblock-cast_from_raw
 */
@@ -141,8 +141,7 @@ template <typename AT> class FreeBlock
     {
         assert( raw != nullptr );
         Header* h = detail::block_header_at<AT>( raw );
-        assert( ( h->weight == 0 && h->root_offset == 0 ) &&
-                "cast_from_raw<FreeBlock>: block is not in FreeBlock state" );
+        assert( pmm::is_free( h->node_type ) && "cast_from_raw<FreeBlock>: block is not in FreeBlock state" );
         return FreeBlock( *h );
     }
 /*
@@ -155,7 +154,7 @@ template <typename AT> class FreeBlock
         if ( reinterpret_cast<std::uintptr_t>( raw ) % alignof( Header ) != 0 )
             return false;
         const Header* h = reinterpret_cast<const Header*>( raw );
-        return h->weight == 0 && h->root_offset == 0;
+        return pmm::is_free( h->node_type );
     }
 /*
 ### pmm-freeblock-try_cast_from_raw
@@ -219,7 +218,8 @@ template <typename AT> class SplittingBlock
     {
         return SplittingBlock( *detail::block_header_at<AT>( raw ) );
     }
-    void initialize_new_block( void* new_blk_ptr, [[maybe_unused]] index_type new_idx, index_type own_idx ) noexcept
+    void initialize_new_block( void* new_blk_ptr, [[maybe_unused]] index_type new_idx, index_type own_idx,
+                               index_type new_block_total_granules ) noexcept
     {
         std::memset( new_blk_ptr, 0, sizeof( BlockHeader<AT> ) );
         Header* nh        = detail::block_header_at<AT>( new_blk_ptr );
@@ -229,8 +229,9 @@ template <typename AT> class SplittingBlock
         nh->right_offset  = AT::no_block;
         nh->parent_offset = AT::no_block;
         nh->avl_height    = 1;
-        nh->weight        = 0;
+        nh->weight        = new_block_total_granules;
         nh->root_offset   = 0;
+        nh->node_type     = NodeType::Free;
     }
     void link_new_block( void* old_next_blk, index_type new_idx ) noexcept
     {
@@ -257,6 +258,7 @@ template <typename AT> class AllocatedBlock
     const Header& header() const noexcept { return *h_; }
     index_type    weight() const noexcept { return h_->weight; }
     index_type    root_offset() const noexcept { return h_->root_offset; }
+    NodeType      node_type() const noexcept { return h_->node_type; }
 /*
 ### pmm-allocatedblock-cast_from_raw
 */
@@ -264,7 +266,7 @@ template <typename AT> class AllocatedBlock
     {
         assert( raw != nullptr );
         Header* h = detail::block_header_at<AT>( raw );
-        assert( h->weight != 0 && "cast_from_raw<AllocatedBlock>: block is not allocated (weight==0)" );
+        assert( pmm::is_allocated( h->node_type ) && "cast_from_raw<AllocatedBlock>: block is not allocated" );
         return AllocatedBlock( *h );
     }
 /*
@@ -277,7 +279,7 @@ template <typename AT> class AllocatedBlock
         if ( reinterpret_cast<std::uintptr_t>( raw ) % alignof( Header ) != 0 )
             return false;
         const Header* h = reinterpret_cast<const Header*>( raw );
-        return h->weight != 0;
+        return pmm::is_allocated( h->node_type );
     }
 /*
 ### pmm-allocatedblock-try_cast_from_raw
@@ -291,10 +293,13 @@ template <typename AT> class AllocatedBlock
 /*
 ### pmm-allocatedblock-verify_invariants
 */
-    bool verify_invariants( index_type own_idx ) const noexcept { return h_->weight > 0 && h_->root_offset == own_idx; }
+    bool verify_invariants( index_type own_idx ) const noexcept
+    {
+        return pmm::is_allocated( h_->node_type ) && h_->root_offset == own_idx;
+    }
     void*       user_ptr() noexcept { return reinterpret_cast<uint8_t*>( h_ ) + sizeof( Header ); }
     const void* user_ptr() const noexcept { return reinterpret_cast<const uint8_t*>( h_ ) + sizeof( Header ); }
-    FreeBlockNotInAVL<AT> mark_as_free() noexcept;
+    FreeBlockNotInAVL<AT> mark_as_free( index_type total_granules ) noexcept;
 
   private:
     Header* h_;
@@ -341,30 +346,36 @@ template <typename AT> class CoalescingBlock
     const Header&          header() const noexcept { return *h_; }
     index_type             next_offset() const noexcept { return h_->next_offset; }
     index_type             prev_offset() const noexcept { return h_->prev_offset; }
+    index_type             weight() const noexcept { return h_->weight; }
     static CoalescingBlock cast_from_raw( void* raw ) noexcept
     {
         return CoalescingBlock( *detail::block_header_at<AT>( raw ) );
     }
-    void coalesce_with_next( void* next_blk, void* next_next_blk, index_type own_idx ) noexcept
+    void coalesce_with_next( void* next_blk, void* next_next_blk, index_type own_idx,
+                             index_type next_block_granules ) noexcept
     {
         Header* nx      = detail::block_header_at<AT>( next_blk );
         h_->next_offset = nx->next_offset;
         if ( next_next_blk != nullptr )
             detail::block_header_at<AT>( next_next_blk )->prev_offset = own_idx;
         std::memset( next_blk, 0, sizeof( Header ) );
+        h_->weight = static_cast<index_type>( h_->weight + next_block_granules );
     }
-    CoalescingBlock coalesce_with_prev( void* prev_blk, void* next_blk, index_type prev_idx ) noexcept
+    CoalescingBlock coalesce_with_prev( void* prev_blk, void* next_blk, index_type prev_idx,
+                                        index_type self_block_granules ) noexcept
     {
         Header* prev      = detail::block_header_at<AT>( prev_blk );
         prev->next_offset = h_->next_offset;
         if ( next_blk != nullptr )
             detail::block_header_at<AT>( next_blk )->prev_offset = prev_idx;
         std::memset( h_, 0, sizeof( Header ) );
+        prev->weight = static_cast<index_type>( prev->weight + self_block_granules );
         return CoalescingBlock( *prev );
     }
     FreeBlock<AT> finalize_coalesce() noexcept
     {
         h_->avl_height = 1;
+        h_->node_type  = NodeType::Free;
         return FreeBlock<AT>( *h_ );
     }
 
@@ -384,6 +395,7 @@ AllocatedBlock<AT> FreeBlockRemovedAVL<AT>::mark_as_allocated( index_type data_g
     h_->right_offset  = AT::no_block;
     h_->parent_offset = AT::no_block;
     h_->avl_height    = 0;
+    h_->node_type     = NodeType::Generic;
     return AllocatedBlock<AT>( *h_ );
 }
 template <typename AT> SplittingBlock<AT> FreeBlockRemovedAVL<AT>::begin_splitting() noexcept
@@ -399,12 +411,14 @@ AllocatedBlock<AT> SplittingBlock<AT>::finalize_split( index_type data_granules,
     h_->right_offset  = AT::no_block;
     h_->parent_offset = AT::no_block;
     h_->avl_height    = 0;
+    h_->node_type     = NodeType::Generic;
     return AllocatedBlock<AT>( *h_ );
 }
-template <typename AT> FreeBlockNotInAVL<AT> AllocatedBlock<AT>::mark_as_free() noexcept
+template <typename AT> FreeBlockNotInAVL<AT> AllocatedBlock<AT>::mark_as_free( index_type total_granules ) noexcept
 {
-    h_->weight      = 0;
+    h_->weight      = total_granules;
     h_->root_offset = 0;
+    h_->node_type   = NodeType::Free;
     return FreeBlockNotInAVL<AT>( *h_ );
 }
 template <typename AT> CoalescingBlock<AT> FreeBlockNotInAVL<AT>::begin_coalescing() noexcept

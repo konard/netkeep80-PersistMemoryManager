@@ -186,18 +186,19 @@ TEST_CASE( "validation: resolve rejects out-of-bounds pptr", "[test_issue257]" )
 
 // ─── C. Header integrity tests ────────────────────────────────────────────────
 
-TEST_CASE( "validation: corrupted weight detected by verify", "[test_issue257]" )
+TEST_CASE( "validation: corrupted root_offset on allocated block detected by verify", "[test_issue257]" )
 {
     setup_clean_image();
 
     auto p = Mgr::allocate_typed<std::uint64_t>( 4 );
     REQUIRE( !p.is_null() );
 
-    // Corrupt: set weight to 0 but keep root_offset as own_idx (inconsistent state).
+    // Post-#369: state is determined by NodeType, not by weight==0. The
+    // canonical inconsistency for an allocated block is root_offset != own_idx.
     std::uint8_t* base    = Mgr::backend().base_ptr();
     std::size_t   usr_off = static_cast<std::size_t>( p.offset() ) * AT::granule_size;
     void*         blk_raw = base + usr_off - sizeof( pmm::Block<AT> );
-    pmm::BlockStateBase<AT>::set_weight_of( blk_raw, 0 );
+    pmm::BlockStateBase<AT>::set_root_offset_of( blk_raw, 0xDEAD );
 
     // verify() should detect inconsistency.
     pmm::VerifyResult result = Mgr::verify();
@@ -284,7 +285,7 @@ TEST_CASE( "validation: corrupted node_type detected by full verify", "[test_iss
     std::uint8_t* base    = Mgr::backend().base_ptr();
     std::size_t   usr_off = static_cast<std::size_t>( p.offset() ) * AT::granule_size;
     void*         blk_raw = base + usr_off - sizeof( pmm::Block<AT> );
-    pmm::BlockStateBase<AT>::set_node_type_of( blk_raw, 0xBEEF );
+    pmm::BlockStateBase<AT>::set_node_type_of( blk_raw, static_cast<pmm::NodeType>( 0xEF ) );
 
     pmm::VerifyResult result = Mgr::verify();
     REQUIRE_FALSE( result.ok );

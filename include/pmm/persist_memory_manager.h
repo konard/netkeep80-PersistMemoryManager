@@ -281,7 +281,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         const pmm::Block<address_traits>* blk = find_block_from_user_ptr( ptr );
         if ( blk == nullptr )
             return false;
-        return BlockStateBase<address_traits>::get_node_type( blk ) == pmm::kNodeReadOnly;
+        return BlockStateBase<address_traits>::get_node_type( blk ) == pmm::NodeType::ReadOnlyLocked;
     }
     template <typename T> static void set_root( pptr<T> p ) noexcept
     {
@@ -459,11 +459,11 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     {
         set_tree_field( p, &BlockStateBase<address_traits>::set_weight_of, w );
     }
-    template <typename T> static std::int16_t get_tree_height( pptr<T> p ) noexcept
+    template <typename T> static std::uint8_t get_tree_height( pptr<T> p ) noexcept
     {
         return get_tree_field( p, &BlockStateBase<address_traits>::get_avl_height );
     }
-    template <typename T> static void set_tree_height( pptr<T> p, std::int16_t h ) noexcept
+    template <typename T> static void set_tree_height( pptr<T> p, std::uint8_t h ) noexcept
     {
         set_tree_field( p, &BlockStateBase<address_traits>::set_avl_height_of, h );
     }
@@ -556,7 +556,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             const Block<address_traits>* blk        = reinterpret_cast<const Block<address_traits>*>( blk_raw );
             index_type                   total_gran = detail::block_total_granules( base, hdr, blk );
             auto                         w          = BlockState::get_weight( blk_raw );
-            bool                         is_used    = ( w > 0 );
+            bool                         is_used    = pmm::is_allocated( BlockState::get_node_type( blk_raw ) );
             size_t                       hdr_bytes  = sizeof( Block<address_traits> );
             size_t                       data_bytes = is_used ? static_cast<size_t>( w ) * kGranSz : 0;
             BlockView                    view;
@@ -653,16 +653,19 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         pmm::Block<address_traits>* blk = find_block_from_user_ptr( ptr );
         if ( blk == nullptr )
             return;
+        const pmm::NodeType nt = BlockStateBase<address_traits>::get_node_type( blk );
+        if ( !pmm::can_be_deleted_from_pap( nt ) )
+            return;
         index_type freed = BlockStateBase<address_traits>::get_weight( blk );
         if ( freed == 0 )
-            return;
-        if ( BlockStateBase<address_traits>::get_node_type( blk ) == pmm::kNodeReadOnly )
             return;
         uint8_t*                               base    = _backend.base_ptr();
         detail::ManagerHeader<address_traits>* hdr     = get_header( base );
         index_type                             blk_idx = detail::block_idx_t<address_traits>( base, blk );
-        AllocatedBlock<address_traits>         alloc   = AllocatedBlock<address_traits>::cast_from_raw( blk );
-        alloc.mark_as_free();
+        index_type total_gran =
+            detail::block_total_granules<address_traits>( base, hdr, detail::block_at<address_traits>( base, blk_idx ) );
+        AllocatedBlock<address_traits> alloc = AllocatedBlock<address_traits>::cast_from_raw( blk );
+        alloc.mark_as_free( total_gran );
         hdr->alloc_count--;
         hdr->free_count++;
         if ( hdr->used_size >= freed )
@@ -676,10 +679,10 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         pmm::Block<address_traits>* blk = find_block_from_user_ptr( ptr );
         if ( blk == nullptr )
             return false;
-        index_type w = BlockStateBase<address_traits>::get_weight( blk );
-        if ( w == 0 )
+        const pmm::NodeType nt = BlockStateBase<address_traits>::get_node_type( blk );
+        if ( !pmm::is_allocated( nt ) )
             return false;
-        BlockStateBase<address_traits>::set_node_type_of( blk, pmm::kNodeReadOnly );
+        BlockStateBase<address_traits>::set_node_type_of( blk, pmm::NodeType::ReadOnlyLocked );
         return true;
     }
     template <typename T, typename... Args> static pptr<T> create_typed_unlocked( Args&&... args ) noexcept

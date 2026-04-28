@@ -31,7 +31,7 @@ void write_fake_allocated_header( void* raw )
     BlockState::set_weight_of( raw, 1 );
     BlockState::set_prev_offset_of( raw, AT::no_block );
     BlockState::set_next_offset_of( raw, AT::no_block );
-    BlockState::set_node_type_of( raw, pmm::kNodeReadWrite );
+    BlockState::set_node_type_of( raw, pmm::NodeType::Generic );
 }
 
 void write_self_consistent_fake_allocated_header( std::uint8_t* base, void* raw )

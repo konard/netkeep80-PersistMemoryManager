@@ -26,7 +26,7 @@ template <typename ManagerAccess> struct ManagerLayoutOps
         void* hdr_blk = base;
         std::memset( hdr_blk, 0, ManagerAccess::kBlockHdrByteSize );
         BlockState::init_fields( hdr_blk, address_traits::no_block, kFreeBlkIdx, 0, ManagerAccess::kMgrHdrGranules,
-                                 kHdrBlkIdx );
+                                 kHdrBlkIdx, NodeType::ManagerHeader );
         ManagerHeader<address_traits>* hdr = ManagerAccess::get_header( base );
         std::memset( hdr, 0, sizeof( ManagerHeader<address_traits> ) );
         hdr->magic              = ManagerAccess::kMagic;
@@ -37,9 +37,11 @@ template <typename ManagerAccess> struct ManagerLayoutOps
         hdr->image_version      = kCurrentImageVersion;
         hdr->granule_size       = static_cast<uint16_t>( kGranSz );
         hdr->root_offset        = address_traits::no_block;
-        void* blk               = base + static_cast<size_t>( kFreeBlkIdx ) * kGranSz;
+        void*      blk          = base + static_cast<size_t>( kFreeBlkIdx ) * kGranSz;
+        index_type total_gran   = static_cast<index_type>( size / kGranSz );
+        index_type free_gran    = static_cast<index_type>( total_gran - kFreeBlkIdx );
         std::memset( blk, 0, sizeof( Block<address_traits> ) );
-        BlockState::init_fields( blk, kHdrBlkIdx, address_traits::no_block, 1, 0, 0 );
+        BlockState::init_fields( blk, kHdrBlkIdx, address_traits::no_block, 1, free_gran, 0, NodeType::Free );
         hdr->last_block_offset = kFreeBlkIdx;
         hdr->free_tree_root    = kFreeBlkIdx;
         hdr->block_count       = 2;
@@ -81,11 +83,13 @@ template <typename ManagerAccess> struct ManagerLayoutOps
             ( hdr->last_block_offset != address_traits::no_block )
                 ? static_cast<void*>( new_base + static_cast<size_t>( hdr->last_block_offset ) * kGranSz )
                 : nullptr;
-        if ( last_blk_raw != nullptr && BlockState::get_weight( last_blk_raw ) == 0 )
+        if ( last_blk_raw != nullptr && pmm::is_free( BlockState::get_node_type( last_blk_raw ) ) )
         {
             Block<address_traits>* last_blk = reinterpret_cast<Block<address_traits>*>( last_blk_raw );
             index_type             loff     = block_idx_t<address_traits>( new_base, last_blk );
             free_block_tree::remove( new_base, hdr, loff );
+            index_type new_total_gran = byte_off_to_idx_t<address_traits>( new_size );
+            BlockState::set_weight_of( last_blk_raw, static_cast<index_type>( new_total_gran - loff ) );
             hdr->total_size = new_size;
             free_block_tree::insert( new_base, hdr, loff );
         }
@@ -93,18 +97,21 @@ template <typename ManagerAccess> struct ManagerLayoutOps
         {
             if ( extra_size < sizeof( Block<address_traits> ) + kGranSz )
                 return false;
-            void* nb_blk = new_base + static_cast<size_t>( extra_idx ) * kGranSz;
+            void*      nb_blk        = new_base + static_cast<size_t>( extra_idx ) * kGranSz;
+            index_type new_total_gran = byte_off_to_idx_t<address_traits>( new_size );
+            index_type new_blk_gran   = static_cast<index_type>( new_total_gran - extra_idx );
             std::memset( nb_blk, 0, sizeof( Block<address_traits> ) );
             if ( last_blk_raw != nullptr )
             {
                 Block<address_traits>* last_blk = reinterpret_cast<Block<address_traits>*>( last_blk_raw );
                 index_type             loff     = block_idx_t<address_traits>( new_base, last_blk );
-                BlockState::init_fields( nb_blk, loff, address_traits::no_block, 1, 0, 0 );
+                BlockState::init_fields( nb_blk, loff, address_traits::no_block, 1, new_blk_gran, 0, NodeType::Free );
                 BlockState::set_next_offset_of( last_blk_raw, static_cast<index_type>( extra_idx ) );
             }
             else
             {
-                BlockState::init_fields( nb_blk, address_traits::no_block, address_traits::no_block, 1, 0, 0 );
+                BlockState::init_fields( nb_blk, address_traits::no_block, address_traits::no_block, 1, new_blk_gran, 0,
+                                         NodeType::Free );
                 hdr->first_block_offset = extra_idx;
             }
             hdr->last_block_offset = extra_idx;
