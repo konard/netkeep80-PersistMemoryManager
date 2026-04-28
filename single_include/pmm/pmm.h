@@ -3587,8 +3587,7 @@ template <typename T, typename ManagerT> struct parray
     {
         if ( _data_idx != detail::kNullIdx_v<typename ManagerT::address_traits> )
         {
-            ManagerT::deallocate( detail::resolve_granule_ptr<typename ManagerT::address_traits>(
-                ManagerT::backend().base_ptr(), _data_idx ) );
+            ManagerT::template deallocate_typed<T>( pmm::pptr<T, ManagerT>( _data_idx ) );
             _data_idx = detail::kNullIdx_v<typename ManagerT::address_traits>;
         }
         _size     = 0;
@@ -3611,11 +3610,7 @@ template <typename T, typename ManagerT> struct parray
     bool operator!=( const parray& other ) const noexcept { return !( *this == other ); }
 
   private:
-    T* resolve_data() const noexcept
-    {
-        return reinterpret_cast<T*>( detail::resolve_granule_ptr<typename ManagerT::address_traits>(
-            ManagerT::backend().base_ptr(), _data_idx ) );
-    }
+    T*   resolve_data() const noexcept { return pmm::pptr<T, ManagerT>( _data_idx ).resolve_unchecked(); }
     bool ensure_capacity( uint32_t required ) noexcept
     {
         if ( required <= _capacity )
@@ -3625,12 +3620,11 @@ template <typename T, typename ManagerT> struct parray
             new_cap = required;
         if ( new_cap < 4 )
             new_cap = 4;
-        if ( sizeof( T ) > 0 &&
-             static_cast<size_t>( new_cap ) > ( std::numeric_limits<size_t>::max )() / sizeof( T ) )
+        if ( sizeof( T ) > 0 && static_cast<size_t>( new_cap ) > ( std::numeric_limits<size_t>::max )() / sizeof( T ) )
             return false;
         pmm::pptr<T, ManagerT> old_p( _data_idx );
-        pmm::pptr<T, ManagerT> new_p = ManagerT::template reallocate_typed<T>(
-            old_p, static_cast<size_t>( _size ), static_cast<size_t>( new_cap ) );
+        pmm::pptr<T, ManagerT> new_p = ManagerT::template reallocate_typed<T>( old_p, static_cast<size_t>( _size ),
+                                                                               static_cast<size_t>( new_cap ) );
         if ( new_p.is_null() )
             return false;
         _data_idx = new_p.offset();
@@ -3983,8 +3977,7 @@ template <typename ManagerT> struct pstring
     {
         if ( _data_idx != detail::kNullIdx_v<typename ManagerT::address_traits> )
         {
-            ManagerT::deallocate( detail::resolve_granule_ptr<typename ManagerT::address_traits>(
-                ManagerT::backend().base_ptr(), _data_idx ) );
+            ManagerT::template deallocate_typed<char>( pmm::pptr<char, ManagerT>( _data_idx ) );
             _data_idx = detail::kNullIdx_v<typename ManagerT::address_traits>;
         }
         _length   = 0;
@@ -4011,12 +4004,8 @@ template <typename ManagerT> struct pstring
     bool operator<( const pstring& other ) const noexcept { return std::strcmp( c_str(), other.c_str() ) < 0; }
 
   private:
-    char* resolve_data() const noexcept
-    {
-        return reinterpret_cast<char*>( detail::resolve_granule_ptr<typename ManagerT::address_traits>(
-            ManagerT::backend().base_ptr(), _data_idx ) );
-    }
-    bool ensure_capacity( uint32_t required ) noexcept
+    char* resolve_data() const noexcept { return pmm::pptr<char, ManagerT>( _data_idx ).resolve_unchecked(); }
+    bool  ensure_capacity( uint32_t required ) noexcept
     {
         if ( required <= _capacity )
             return true;
@@ -4025,16 +4014,15 @@ template <typename ManagerT> struct pstring
             new_cap = required;
         if ( new_cap < 16 )
             new_cap = 16;
-        const bool         had_data = _data_idx != detail::kNullIdx_v<typename ManagerT::address_traits>;
-        const std::size_t  old_count = had_data ? static_cast<std::size_t>( _length ) + 1 : 0;
-        const std::size_t  new_count = static_cast<std::size_t>( new_cap ) + 1;
+        const bool                had_data  = _data_idx != detail::kNullIdx_v<typename ManagerT::address_traits>;
+        const std::size_t         old_count = had_data ? static_cast<std::size_t>( _length ) + 1 : 0;
+        const std::size_t         new_count = static_cast<std::size_t>( new_cap ) + 1;
         pmm::pptr<char, ManagerT> old_p( _data_idx );
-        pmm::pptr<char, ManagerT> new_p =
-            ManagerT::template reallocate_typed<char>( old_p, old_count, new_count );
+        pmm::pptr<char, ManagerT> new_p = ManagerT::template reallocate_typed<char>( old_p, old_count, new_count );
         if ( new_p.is_null() )
             return false;
-        _data_idx = new_p.offset();
-        _capacity = new_cap;
+        _data_idx  = new_p.offset();
+        _capacity  = new_cap;
         char* data = resolve_data();
         if ( data == nullptr )
             return false;
@@ -4338,10 +4326,12 @@ template <typename ManagerT> class PersistMemoryTypedApi
             ManagerT::_last_error = PmmError::Overflow;
             return pmm::pptr<T, ManagerT>();
         }
+        void* blk_raw = ManagerT::template try_checked_block_from_pptr<T>( p );
+        if ( blk_raw == nullptr )
+            return pmm::pptr<T, ManagerT>();
         uint8_t*                               base          = ManagerT::_backend.base_ptr();
         detail::ManagerHeader<address_traits>* hdr           = ManagerT::get_header( base );
         index_type                             blk_idx       = ManagerT::template block_idx_from_pptr<T>( p );
-        void*                                  blk_raw       = detail::block_at<address_traits>( base, blk_idx );
         index_type                             old_data_gran = BlockStateBase<address_traits>::get_weight( blk_raw );
         if ( new_data_gran == old_data_gran )
         {
@@ -4405,21 +4395,20 @@ template <typename ManagerT> class PersistMemoryTypedApi
         void*  old_src = resolve_unchecked<T>( p );
         size_t copy_sz = ( new_count < old_count ? new_count : old_count ) * sizeof( T );
         std::memmove( new_dst, old_src, copy_sz );
-        index_type          old_blk_idx = ManagerT::template block_idx_from_pptr<T>( p );
-        void*               old_blk_raw = detail::block_at<address_traits>( base, old_blk_idx );
+        void*               old_blk_raw = detail::block_at<address_traits>( base, blk_idx );
         index_type          freed_w     = BlockStateBase<address_traits>::get_weight( old_blk_raw );
         const pmm::NodeType nt_old      = BlockStateBase<address_traits>::get_node_type( old_blk_raw );
         if ( pmm::is_allocated( nt_old ) && pmm::can_be_deleted_from_pap( nt_old ) )
         {
             auto       old_alloc  = AllocatedBlock<address_traits>::cast_from_raw( old_blk_raw );
             index_type total_gran = detail::physical_block_total_granules<address_traits>(
-                base, hdr, detail::block_at<address_traits>( base, old_blk_idx ) );
+                base, hdr, detail::block_at<address_traits>( base, blk_idx ) );
             old_alloc.mark_as_free( total_gran );
             hdr->alloc_count--;
             hdr->free_count++;
             if ( hdr->used_size >= freed_w )
                 hdr->used_size -= freed_w;
-            allocator::coalesce( arena_after, old_blk_idx );
+            allocator::coalesce( arena_after, blk_idx );
         }
         ManagerT::_last_error = PmmError::Ok;
         return new_p;
@@ -4928,7 +4917,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     }
 
   private:
-    template <typename T> static void* try_checked_block_header_from_pptr( pptr<T> p ) noexcept
+    template <typename T> static void* try_checked_block_from_pptr( pptr<T> p ) noexcept
     {
         if ( p.is_null() || !_initialized )
             return nullptr;
@@ -4951,7 +4940,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     template <typename T, typename ValueT>
     static ValueT get_tree_field( pptr<T> p, ValueT ( *getter )( const void* ) ) noexcept
     {
-        const void* blk = try_checked_block_header_from_pptr( p );
+        const void* blk = try_checked_block_from_pptr( p );
         if ( blk == nullptr )
             return ValueT{};
         return getter( blk );
@@ -4959,7 +4948,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     template <typename T, typename ValueT>
     static void set_tree_field( pptr<T> p, void ( *setter )( void*, ValueT ), ValueT value ) noexcept
     {
-        void* blk = try_checked_block_header_from_pptr( p );
+        void* blk = try_checked_block_from_pptr( p );
         if ( blk == nullptr )
             return;
         setter( blk, value );
@@ -5019,7 +5008,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     }
     template <typename T> static BlockHeader<address_traits>* try_tree_node( pptr<T> p ) noexcept
     {
-        void* blk = try_checked_block_header_from_pptr( p );
+        void* blk = try_checked_block_from_pptr( p );
         if ( blk == nullptr )
             return nullptr;
         return detail::block_header_at<address_traits>( blk );

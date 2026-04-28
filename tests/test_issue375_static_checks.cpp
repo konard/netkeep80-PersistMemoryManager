@@ -79,6 +79,17 @@ TEST_CASE( "I375-X: parray/pstring no longer call ManagerT::allocate directly", 
     }
 }
 
+TEST_CASE( "I375-X: parray/pstring use canonical pptr resolve, not resolve_granule_ptr", "[issue375][static]" )
+{
+    const std::filesystem::path root = std::filesystem::path( PMM_SOURCE_DIR ) / "include" / "pmm";
+    for ( const auto& name : { "parray.h", "pstring.h" } )
+    {
+        const std::string contents = slurp( root / name );
+        INFO( name );
+        REQUIRE( contents.find( "resolve_granule_ptr" ) == std::string::npos );
+    }
+}
+
 TEST_CASE( "I375-X: legacy pptr::tree_node() ref API is gone (only try_tree_node/tree_node_unchecked)",
            "[issue375][static]" )
 {

@@ -134,8 +134,7 @@ template <typename T, typename ManagerT> struct parray
     {
         if ( _data_idx != detail::kNullIdx_v<typename ManagerT::address_traits> )
         {
-            ManagerT::deallocate( detail::resolve_granule_ptr<typename ManagerT::address_traits>(
-                ManagerT::backend().base_ptr(), _data_idx ) );
+            ManagerT::template deallocate_typed<T>( pmm::pptr<T, ManagerT>( _data_idx ) );
             _data_idx = detail::kNullIdx_v<typename ManagerT::address_traits>;
         }
         _size     = 0;
@@ -158,11 +157,7 @@ template <typename T, typename ManagerT> struct parray
     bool operator!=( const parray& other ) const noexcept { return !( *this == other ); }
 
   private:
-    T* resolve_data() const noexcept
-    {
-        return reinterpret_cast<T*>( detail::resolve_granule_ptr<typename ManagerT::address_traits>(
-            ManagerT::backend().base_ptr(), _data_idx ) );
-    }
+    T*   resolve_data() const noexcept { return pmm::pptr<T, ManagerT>( _data_idx ).resolve_unchecked(); }
     bool ensure_capacity( uint32_t required ) noexcept
     {
         if ( required <= _capacity )
@@ -172,12 +167,11 @@ template <typename T, typename ManagerT> struct parray
             new_cap = required;
         if ( new_cap < 4 )
             new_cap = 4;
-        if ( sizeof( T ) > 0 &&
-             static_cast<size_t>( new_cap ) > ( std::numeric_limits<size_t>::max )() / sizeof( T ) )
+        if ( sizeof( T ) > 0 && static_cast<size_t>( new_cap ) > ( std::numeric_limits<size_t>::max )() / sizeof( T ) )
             return false;
         pmm::pptr<T, ManagerT> old_p( _data_idx );
-        pmm::pptr<T, ManagerT> new_p = ManagerT::template reallocate_typed<T>(
-            old_p, static_cast<size_t>( _size ), static_cast<size_t>( new_cap ) );
+        pmm::pptr<T, ManagerT> new_p = ManagerT::template reallocate_typed<T>( old_p, static_cast<size_t>( _size ),
+                                                                               static_cast<size_t>( new_cap ) );
         if ( new_p.is_null() )
             return false;
         _data_idx = new_p.offset();

@@ -73,7 +73,7 @@ check_ensure_capacity_body() {
     local f="$1"
     local body
     body=$(awk '
-        /bool ensure_capacity\(/ { in_fn = 1; depth = 0 }
+        /bool[[:space:]]+ensure_capacity\(/ { in_fn = 1; depth = 0 }
         in_fn {
             print
             for ( i = 1; i <= length( $0 ); i++ ) {

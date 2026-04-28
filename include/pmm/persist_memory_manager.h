@@ -413,7 +413,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     }
 
   private:
-    template <typename T> static void* try_checked_block_header_from_pptr( pptr<T> p ) noexcept
+    template <typename T> static void* try_checked_block_from_pptr( pptr<T> p ) noexcept
     {
         if ( p.is_null() || !_initialized )
             return nullptr;
@@ -436,7 +436,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     template <typename T, typename ValueT>
     static ValueT get_tree_field( pptr<T> p, ValueT ( *getter )( const void* ) ) noexcept
     {
-        const void* blk = try_checked_block_header_from_pptr( p );
+        const void* blk = try_checked_block_from_pptr( p );
         if ( blk == nullptr )
             return ValueT{};
         return getter( blk );
@@ -444,7 +444,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     template <typename T, typename ValueT>
     static void set_tree_field( pptr<T> p, void ( *setter )( void*, ValueT ), ValueT value ) noexcept
     {
-        void* blk = try_checked_block_header_from_pptr( p );
+        void* blk = try_checked_block_from_pptr( p );
         if ( blk == nullptr )
             return;
         setter( blk, value );
@@ -504,7 +504,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     }
     template <typename T> static BlockHeader<address_traits>* try_tree_node( pptr<T> p ) noexcept
     {
-        void* blk = try_checked_block_header_from_pptr( p );
+        void* blk = try_checked_block_from_pptr( p );
         if ( blk == nullptr )
             return nullptr;
         return detail::block_header_at<address_traits>( blk );

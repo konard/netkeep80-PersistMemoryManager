@@ -344,7 +344,9 @@ manager. The successful path calls `guard.commit()` after every invariant is est
   fallback allocation).
 - `reallocate_typed` runs `bytes_to_granules_checked` exactly once and reports the same
   errors; in-place grow / shrink and out-of-place fallback all share that one checked
-  granule count.
+  granule count. The source `pptr` is validated through `try_checked_block_from_pptr`
+  before any block access, so below-header offsets and stale pptrs (after
+  `deallocate_typed`) return a null `pptr<T>` with `PmmError::InvalidPointer`.
 - `verify()` and `load(VerifyResult&)` always terminate, even on a corrupted physical
   chain: the bounded walker rejects cycles and backward links instead of looping.
 

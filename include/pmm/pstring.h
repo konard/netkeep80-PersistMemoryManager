@@ -83,8 +83,7 @@ template <typename ManagerT> struct pstring
     {
         if ( _data_idx != detail::kNullIdx_v<typename ManagerT::address_traits> )
         {
-            ManagerT::deallocate( detail::resolve_granule_ptr<typename ManagerT::address_traits>(
-                ManagerT::backend().base_ptr(), _data_idx ) );
+            ManagerT::template deallocate_typed<char>( pmm::pptr<char, ManagerT>( _data_idx ) );
             _data_idx = detail::kNullIdx_v<typename ManagerT::address_traits>;
         }
         _length   = 0;
@@ -111,12 +110,8 @@ template <typename ManagerT> struct pstring
     bool operator<( const pstring& other ) const noexcept { return std::strcmp( c_str(), other.c_str() ) < 0; }
 
   private:
-    char* resolve_data() const noexcept
-    {
-        return reinterpret_cast<char*>( detail::resolve_granule_ptr<typename ManagerT::address_traits>(
-            ManagerT::backend().base_ptr(), _data_idx ) );
-    }
-    bool ensure_capacity( uint32_t required ) noexcept
+    char* resolve_data() const noexcept { return pmm::pptr<char, ManagerT>( _data_idx ).resolve_unchecked(); }
+    bool  ensure_capacity( uint32_t required ) noexcept
     {
         if ( required <= _capacity )
             return true;
@@ -125,16 +120,15 @@ template <typename ManagerT> struct pstring
             new_cap = required;
         if ( new_cap < 16 )
             new_cap = 16;
-        const bool         had_data = _data_idx != detail::kNullIdx_v<typename ManagerT::address_traits>;
-        const std::size_t  old_count = had_data ? static_cast<std::size_t>( _length ) + 1 : 0;
-        const std::size_t  new_count = static_cast<std::size_t>( new_cap ) + 1;
+        const bool                had_data  = _data_idx != detail::kNullIdx_v<typename ManagerT::address_traits>;
+        const std::size_t         old_count = had_data ? static_cast<std::size_t>( _length ) + 1 : 0;
+        const std::size_t         new_count = static_cast<std::size_t>( new_cap ) + 1;
         pmm::pptr<char, ManagerT> old_p( _data_idx );
-        pmm::pptr<char, ManagerT> new_p =
-            ManagerT::template reallocate_typed<char>( old_p, old_count, new_count );
+        pmm::pptr<char, ManagerT> new_p = ManagerT::template reallocate_typed<char>( old_p, old_count, new_count );
         if ( new_p.is_null() )
             return false;
-        _data_idx = new_p.offset();
-        _capacity = new_cap;
+        _data_idx  = new_p.offset();
+        _capacity  = new_cap;
         char* data = resolve_data();
         if ( data == nullptr )
             return false;
