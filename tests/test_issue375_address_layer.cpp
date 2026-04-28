@@ -156,3 +156,45 @@ TEST_CASE( "I375-A: Default ArenaAddress (no header) can still answer total_size
     REQUIRE( addr.valid() );
     REQUIRE( addr.header() == nullptr );
 }
+
+TEMPLATE_TEST_CASE( "I375-A: try_user_ptr rejects one-past arena even for zero required bytes", "[issue375][address]",
+                    SmallAT, DefaultAT, LargeAT )
+{
+    std::uint8_t   dummy[1024] = {};
+    Addr<TestType> addr{ dummy, std::size_t{ 1024 } };
+
+    using IndexT                       = typename TestType::index_type;
+    const IndexT one_past_idx          = static_cast<IndexT>( 1024 / TestType::granule_size );
+    const IndexT one_past_end_in_bytes = one_past_idx;
+
+    REQUIRE( addr.try_user_ptr( one_past_end_in_bytes ) == nullptr );
+    REQUIRE( addr.try_user_ptr( one_past_end_in_bytes, std::size_t{ 0 } ) == nullptr );
+}
+
+TEMPLATE_TEST_CASE( "I375-A: try_user_ptr accepts last in-range granule for zero required bytes", "[issue375][address]",
+                    SmallAT, DefaultAT, LargeAT )
+{
+    std::uint8_t   dummy[1024] = {};
+    Addr<TestType> addr{ dummy, std::size_t{ 1024 } };
+
+    using IndexT       = typename TestType::index_type;
+    const IndexT idx_n = static_cast<IndexT>( 1024 / TestType::granule_size - 1 );
+
+    REQUIRE( addr.try_user_ptr( idx_n ) != nullptr );
+}
+
+TEMPLATE_TEST_CASE( "I375-A: try_user_idx_from_raw rejects unrelated heap pointer via integer math",
+                    "[issue375][address]", SmallAT, DefaultAT, LargeAT )
+{
+    std::uint8_t   dummy[1024] = {};
+    Addr<TestType> addr{ dummy, std::size_t{ 1024 } };
+
+    // Construct a far-away pointer via integer arithmetic; must be rejected
+    // without invoking pointer relational comparison on unrelated objects.
+    const auto far_addr = reinterpret_cast<std::uintptr_t>( dummy ) + ( std::uintptr_t{ 1 } << 30 );
+    REQUIRE_FALSE( addr.try_user_idx_from_raw( reinterpret_cast<const void*>( far_addr ) ).has_value() );
+
+    // Pointer numerically below base is also rejected.
+    const auto below = reinterpret_cast<std::uintptr_t>( dummy ) - std::uintptr_t{ 1024 };
+    REQUIRE_FALSE( addr.try_user_idx_from_raw( reinterpret_cast<const void*>( below ) ).has_value() );
+}

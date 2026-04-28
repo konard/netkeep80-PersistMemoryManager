@@ -66,12 +66,44 @@ fi
 rm -f /tmp/_pmm_legacy_tree_node
 
 # Manual ensure_capacity allocate/memcpy/deallocate paths are forbidden in
-# parray/pstring; reallocate_typed is the canonical path.
-for f in include/pmm/parray.h include/pmm/pstring.h; do
-    if grep -nE 'ManagerT::allocate\(' "$f" >/dev/null 2>&1; then
-        echo "FAIL: $f still calls ManagerT::allocate — should use reallocate_typed"
+# parray/pstring; reallocate_typed is the canonical path. Extract the body of
+# `bool ensure_capacity(...) noexcept { ... }` and require reallocate_typed,
+# while forbidding allocate/deallocate/memcpy/memmove inside it.
+check_ensure_capacity_body() {
+    local f="$1"
+    local body
+    body=$(awk '
+        /bool ensure_capacity\(/ { in_fn = 1; depth = 0 }
+        in_fn {
+            print
+            for ( i = 1; i <= length( $0 ); i++ ) {
+                c = substr( $0, i, 1 )
+                if ( c == "{" ) depth++
+                else if ( c == "}" ) {
+                    depth--
+                    if ( depth == 0 ) { in_fn = 0; exit }
+                }
+            }
+        }
+    ' "$f")
+    if [[ -z "$body" ]]; then
+        echo "FAIL: $f has no ensure_capacity body to scan"
+        FAILED=1
+        return
+    fi
+    if ! grep -qE 'reallocate_typed' <<<"$body"; then
+        echo "FAIL: $f::ensure_capacity must use ManagerT::reallocate_typed"
         FAILED=1
     fi
-done
+    local forbidden
+    if forbidden=$(grep -nE 'ManagerT::(allocate|deallocate)\(|\bstd::(memcpy|memmove)\(|\bmemcpy\(|\bmemmove\(' \
+        <<<"$body"); then
+        echo "FAIL: $f::ensure_capacity reintroduces forbidden manual relocation:"
+        echo "$forbidden"
+        FAILED=1
+    fi
+}
+check_ensure_capacity_body include/pmm/parray.h
+check_ensure_capacity_body include/pmm/pstring.h
 
 exit $FAILED
