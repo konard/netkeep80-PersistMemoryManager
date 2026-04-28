@@ -107,7 +107,8 @@ static bool register_domain_unlocked( const char* name, uint8_t flags, uint8_t b
         if ( existing->symbol_offset == 0 )
         {
             pptr<pstringview> symbol = intern_symbol_unlocked( name );
-            if ( !symbol.is_null() )
+            existing                 = find_domain_by_name_unlocked( name );
+            if ( existing != nullptr && !symbol.is_null() )
                 existing->symbol_offset = symbol.offset();
         }
         return true;
@@ -124,6 +125,11 @@ static bool register_domain_unlocked( const char* name, uint8_t flags, uint8_t b
     rec.flags                = flags;
     rec.symbol_offset        = 0;
     pptr<pstringview> symbol = intern_symbol_unlocked( name );
+    reg                      = forest_registry_root_unlocked();
+    if ( reg == nullptr )
+        return false;
+    if ( reg->domain_count >= detail::kMaxForestDomains )
+        return false;
     if ( !symbol.is_null() )
         rec.symbol_offset = symbol.offset();
     reg->domains[reg->domain_count++] = rec;

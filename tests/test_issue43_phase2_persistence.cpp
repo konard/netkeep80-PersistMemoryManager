@@ -314,8 +314,8 @@ TEST_CASE( "mmap_expand_basic", "[test_issue43_phase2_persistence]" )
     // Write a pattern to the existing region
     std::memset( storage.base_ptr(), 0xAA, old_size );
 
-    // Expand
-    REQUIRE( storage.expand( 4096 ) );
+    // Expand via resize_to(new_total_size)
+    REQUIRE( storage.resize_to( old_size + 4096 ) );
     REQUIRE( storage.total_size() > old_size );
     REQUIRE( storage.base_ptr() != nullptr );
 
@@ -328,7 +328,7 @@ TEST_CASE( "mmap_expand_basic", "[test_issue43_phase2_persistence]" )
     std::remove( MMAP_FILE );
 }
 
-/// @brief MMapStorage::expand(0) should return true without changes.
+/// @brief MMapStorage::resize_to(0) returns false (zero is not a valid size).
 TEST_CASE( "mmap_expand_zero", "[test_issue43_phase2_persistence]" )
 {
     static const char* MMAP_FILE = "test_phase2_mmap_zero.dat";
@@ -337,21 +337,21 @@ TEST_CASE( "mmap_expand_zero", "[test_issue43_phase2_persistence]" )
     pmm::MMapStorage<pmm::DefaultAddressTraits> storage;
     REQUIRE( storage.open( MMAP_FILE, 4096 ) );
     std::size_t old_size = storage.total_size();
-    REQUIRE( storage.expand( 0 ) );
+    REQUIRE_FALSE( storage.resize_to( 0 ) );
     REQUIRE( storage.total_size() == old_size );
 
     storage.close();
     std::remove( MMAP_FILE );
 }
 
-/// @brief MMapStorage::expand() on an unmapped storage returns false.
+/// @brief MMapStorage::resize_to() on an unmapped storage returns false.
 TEST_CASE( "mmap_expand_not_open", "[test_issue43_phase2_persistence]" )
 {
     pmm::MMapStorage<pmm::DefaultAddressTraits> storage;
-    REQUIRE( !storage.expand( 1024 ) );
+    REQUIRE_FALSE( storage.resize_to( 1024 ) );
 }
 
-/// @brief MMapStorage expand integrates with PersistMemoryManager via auto-grow.
+/// @brief MMapStorage resize_to integrates with PersistMemoryManager via auto-grow.
 TEST_CASE( "mmap_expand_with_manager", "[test_issue43_phase2_persistence]" )
 {
     // Use a config that uses MMapStorage.
@@ -366,12 +366,12 @@ TEST_CASE( "mmap_expand_with_manager", "[test_issue43_phase2_persistence]" )
     REQUIRE( storage.is_open() );
     REQUIRE( storage.total_size() >= initial_size );
 
-    // Verify expand works multiple times
+    // Verify resize_to works multiple times
     std::size_t size1 = storage.total_size();
-    REQUIRE( storage.expand( 2048 ) );
+    REQUIRE( storage.resize_to( size1 + 2048 ) );
     std::size_t size2 = storage.total_size();
     REQUIRE( size2 > size1 );
-    REQUIRE( storage.expand( 2048 ) );
+    REQUIRE( storage.resize_to( size2 + 2048 ) );
     std::size_t size3 = storage.total_size();
     REQUIRE( size3 > size2 );
 

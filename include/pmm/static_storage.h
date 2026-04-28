@@ -26,7 +26,7 @@ template <size_t Size, typename AT = DefaultAddressTraits> class StaticStorage
 /*
 ### pmm-staticstorage-expand
 */
-    bool           expand( size_t ) noexcept { return false; }
+    bool           resize_to( size_t ) noexcept { return false; }
     constexpr bool owns_memory() const noexcept { return false; }
 
   private:

@@ -54,28 +54,32 @@ template <typename ManagerAccess> struct ManagerLayoutOps
         ManagerAccess::set_initialized();
         return true;
     }
-    static bool do_expand( storage_backend& backend, bool initialized, size_t user_size ) noexcept
+    static bool do_expand( storage_backend& backend, bool initialized, index_type data_gran_need ) noexcept
     {
         if ( !initialized )
             return false;
-        uint8_t*                       base           = backend.base_ptr();
-        ManagerHeader<address_traits>* hdr            = ManagerAccess::get_header( base );
-        size_t                         old_size       = hdr->total_size;
-        static constexpr size_t        kGranSz        = address_traits::granule_size;
-        auto checked = bytes_to_granules_checked<address_traits>( user_size );
-        index_type data_gran_need = checked.has_value() ? checked->value : index_type{ 0 };
         if ( data_gran_need == 0 )
-            data_gran_need = 1;
-        size_t min_need = static_cast<size_t>( ManagerAccess::kBlockHdrGranules + data_gran_need +
-                                               ManagerAccess::kBlockHdrGranules ) *
-                          kGranSz;
-        std::optional<size_t> target_size = compute_growth( old_size, min_need, kGranSz, ManagerAccess::kGrowNumerator,
+            return false;
+        uint8_t*                       base    = backend.base_ptr();
+        ManagerHeader<address_traits>* hdr     = ManagerAccess::get_header( base );
+        size_t                         old_size = hdr->total_size;
+        static constexpr size_t        kGranSz = address_traits::granule_size;
+        auto need_grans = checked_add( static_cast<size_t>( ManagerAccess::kBlockHdrGranules ),
+                                       static_cast<size_t>( data_gran_need ) );
+        if ( !need_grans )
+            return false;
+        auto need_grans_total = checked_add( *need_grans, static_cast<size_t>( ManagerAccess::kBlockHdrGranules ) );
+        if ( !need_grans_total )
+            return false;
+        auto min_need = checked_mul( *need_grans_total, kGranSz );
+        if ( !min_need )
+            return false;
+        std::optional<size_t> target_size = compute_growth( old_size, *min_need, kGranSz, ManagerAccess::kGrowNumerator,
                                                             ManagerAccess::kGrowDenominator,
                                                             ManagerAccess::kMaxMemoryGB );
         if ( !target_size.has_value() )
             return false;
-        size_t growth = *target_size - old_size;
-        if ( !backend.expand( growth ) )
+        if ( !backend.resize_to( *target_size ) )
             return false;
         uint8_t* new_base = backend.base_ptr();
         size_t   new_size = backend.total_size();

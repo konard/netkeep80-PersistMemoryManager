@@ -28,22 +28,18 @@ static void verify_image_unlocked( VerifyResult& result ) noexcept
                     static_cast<uint64_t>( hdr->granule_size ) );
         return;
     }
-    {
-        using BlockState = BlockStateBase<address_traits>;
-        index_type idx   = hdr->first_block_offset;
-        while ( idx != address_traits::no_block )
+    detail::ConstArenaView<address_traits> cview{ base, hdr };
+    (void)detail::for_each_physical_block<address_traits>(
+        cview, [&]( index_type idx, const void* blk_ptr ) noexcept
         {
-            if ( !detail::validate_block_index<address_traits>( hdr->total_size, idx ) )
-                break;
+            (void)blk_ptr;
             detail::validate_block_header_full<address_traits>( base, hdr->total_size, idx, result );
-            const void* blk_ptr = base + static_cast<size_t>( idx ) * address_traits::granule_size;
-            idx                 = BlockState::get_next_offset( blk_ptr );
-        }
-    }
-    allocator::verify_block_states( base, hdr, result );
-    allocator::verify_linked_list( base, hdr, result );
-    allocator::verify_counters( base, hdr, result );
-    allocator::verify_free_tree( base, hdr, result );
+            return true;
+        } );
+    allocator::verify_block_states( cview, result );
+    allocator::verify_linked_list( cview, result );
+    allocator::verify_counters( cview, result );
+    allocator::verify_free_tree( cview, result );
     verify_forest_registry_unlocked( result );
 }
 static void verify_forest_registry_unlocked( VerifyResult& result ) noexcept

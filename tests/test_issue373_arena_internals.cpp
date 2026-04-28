@@ -186,16 +186,72 @@ TEST_CASE( "I373-I: for_each_physical_block walks all blocks of a healthy arena"
 {
     using Mgr = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 3733>;
     REQUIRE( Mgr::create( 4096 ) );
-    auto*       base   = Mgr::backend().base_ptr();
-    const auto* hdr    = pmm::detail::manager_header_at<DefaultAT>( base );
-    std::size_t visits = 0;
-    bool        clean  = pmm::detail::for_each_physical_block<DefaultAT>( base, hdr,
-                                                                          [&]( DefaultAT::index_type, const void* ) noexcept
-                                                                          {
+    auto*                                  base   = Mgr::backend().base_ptr();
+    const auto*                            hdr    = pmm::detail::manager_header_at<DefaultAT>( base );
+    pmm::detail::ConstArenaView<DefaultAT> view{ base, hdr };
+    std::size_t                            visits = 0;
+    bool clean = pmm::detail::for_each_physical_block<DefaultAT>( view, [&]( DefaultAT::index_type, const void* ) noexcept
+                                                                  {
                                                                       ++visits;
                                                                       return true;
                                                                   } );
     REQUIRE( clean );
     REQUIRE( visits == hdr->block_count );
     Mgr::destroy();
+}
+
+// I373-I: walker callback returning false propagates as failure
+TEST_CASE( "I373-I: for_each_physical_block returns false when callback fails", "[issue373][walker]" )
+{
+    using Mgr = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 3734>;
+    REQUIRE( Mgr::create( 4096 ) );
+    auto*                                  base = Mgr::backend().base_ptr();
+    const auto*                            hdr  = pmm::detail::manager_header_at<DefaultAT>( base );
+    pmm::detail::ConstArenaView<DefaultAT> view{ base, hdr };
+    bool ok = pmm::detail::for_each_physical_block<DefaultAT>( view, []( DefaultAT::index_type, const void* ) noexcept
+                                                               { return false; } );
+    REQUIRE_FALSE( ok );
+    Mgr::destroy();
+}
+
+// I373-I: WalkControl differentiates StopOk from Fail
+TEST_CASE( "I373-I: for_each_physical_block honors WalkControl::StopOk and Fail", "[issue373][walker]" )
+{
+    using Mgr = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 3735>;
+    REQUIRE( Mgr::create( 4096 ) );
+    auto*                                  base = Mgr::backend().base_ptr();
+    const auto*                            hdr  = pmm::detail::manager_header_at<DefaultAT>( base );
+    pmm::detail::ConstArenaView<DefaultAT> view{ base, hdr };
+    bool stop_ok = pmm::detail::for_each_physical_block<DefaultAT>( view, []( DefaultAT::index_type, const void* ) noexcept
+                                                                    { return pmm::detail::WalkControl::StopOk; } );
+    REQUIRE( stop_ok );
+    bool fail = pmm::detail::for_each_physical_block<DefaultAT>( view, []( DefaultAT::index_type, const void* ) noexcept
+                                                                 { return pmm::detail::WalkControl::Fail; } );
+    REQUIRE_FALSE( fail );
+    Mgr::destroy();
+}
+
+// I373-J: round_up_checked: normal, edge and overflow
+TEST_CASE( "I373-J: round_up_checked rounds up safely and detects overflow", "[issue373][arithmetic]" )
+{
+    REQUIRE( pmm::detail::round_up_checked( 0, 16 ).value() == 0 );
+    REQUIRE( pmm::detail::round_up_checked( 1, 16 ).value() == 16 );
+    REQUIRE( pmm::detail::round_up_checked( 16, 16 ).value() == 16 );
+    REQUIRE( pmm::detail::round_up_checked( 17, 16 ).value() == 32 );
+    REQUIRE_FALSE( pmm::detail::round_up_checked( std::numeric_limits<std::size_t>::max(), 16 ).has_value() );
+    REQUIRE_FALSE( pmm::detail::round_up_checked( 100, 0 ).has_value() );
+    REQUIRE_FALSE( pmm::detail::round_up_checked( 100, 3 ).has_value() );
+}
+
+// I373-K: checked_granule_offset detects overflow on huge index
+TEST_CASE( "I373-K: checked_granule_offset rejects huge index", "[issue373][arithmetic]" )
+{
+    using IndexT     = LargeAT::index_type;
+    constexpr auto m = std::numeric_limits<IndexT>::max();
+    auto           r = pmm::detail::checked_granule_offset<LargeAT>( m );
+    if ( r.has_value() )
+        REQUIRE( *r == static_cast<std::size_t>( m ) * LargeAT::granule_size );
+    auto small = pmm::detail::checked_granule_offset<DefaultAT>( static_cast<DefaultAT::index_type>( 10 ) );
+    REQUIRE( small.has_value() );
+    REQUIRE( *small == 10u * DefaultAT::granule_size );
 }

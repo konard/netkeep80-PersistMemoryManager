@@ -36,10 +36,13 @@
 // Аналог старого StaticPMM в AbstractPersistMemoryManager.
 struct StaticStorageConfig
 {
-    using address_traits  = pmm::DefaultAddressTraits;
-    using storage_backend = pmm::StaticStorage<4096, pmm::DefaultAddressTraits>;
-    using free_block_tree = pmm::AvlFreeTree<pmm::DefaultAddressTraits>;
-    using lock_policy     = pmm::config::NoLock;
+    using address_traits                     = pmm::DefaultAddressTraits;
+    using storage_backend                    = pmm::StaticStorage<4096, pmm::DefaultAddressTraits>;
+    using free_block_tree                    = pmm::AvlFreeTree<pmm::DefaultAddressTraits>;
+    using lock_policy                        = pmm::config::NoLock;
+    static constexpr std::size_t grow_numerator   = pmm::config::kDefaultGrowNumerator;
+    static constexpr std::size_t grow_denominator = pmm::config::kDefaultGrowDenominator;
+    static constexpr std::size_t max_memory_gb    = 0;
 };
 
 // =============================================================================

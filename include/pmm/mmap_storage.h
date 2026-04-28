@@ -1,9 +1,11 @@
 #pragma once
 #include "pmm/address_traits.h"
+#include "pmm/arena_internals.h"
 #include "pmm/storage_backend.h"
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #if defined( _WIN32 ) || defined( _WIN64 )
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -57,8 +59,10 @@ template <typename AT = DefaultAddressTraits> class MMapStorage
             return false;
         if ( path == nullptr || size_bytes == 0 )
             return false;
-        size_bytes = ( ( size_bytes + AT::granule_size - 1 ) / AT::granule_size ) * AT::granule_size;
-        return open_impl( path, size_bytes );
+        auto rounded = pmm::detail::round_up_checked( size_bytes, AT::granule_size );
+        if ( !rounded.has_value() )
+            return false;
+        return open_impl( path, *rounded );
     }
     void close() noexcept
     {
@@ -76,16 +80,17 @@ template <typename AT = DefaultAddressTraits> class MMapStorage
 /*
 ### pmm-mmapstorage-expand
 */
-    bool expand( size_t additional_bytes ) noexcept
+    bool resize_to( size_t new_total_size ) noexcept
     {
-        if ( !_mapped || additional_bytes == 0 )
-            return _mapped && additional_bytes == 0;
-        size_t growth   = _size / 4 + additional_bytes;
-        size_t new_size = _size + growth;
-        new_size        = ( ( new_size + AT::granule_size - 1 ) / AT::granule_size ) * AT::granule_size;
-        if ( new_size <= _size )
+        if ( !_mapped )
             return false;
-        return expand_impl( new_size );
+        if ( new_total_size == 0 )
+            return false;
+        if ( new_total_size % AT::granule_size != 0 )
+            return false;
+        if ( new_total_size <= _size )
+            return false;
+        return expand_impl( new_total_size );
     }
     bool owns_memory() const noexcept { return false; }
 

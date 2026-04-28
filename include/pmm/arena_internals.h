@@ -36,6 +36,20 @@ constexpr bool fits_range( std::size_t off, std::size_t len, std::size_t total )
     auto end = checked_add( off, len );
     return end.has_value() && *end <= total;
 }
+constexpr std::optional<std::size_t> round_up_checked( std::size_t value, std::size_t alignment ) noexcept
+{
+    if ( alignment == 0 || ( alignment & ( alignment - 1 ) ) != 0 )
+        return std::nullopt;
+    auto plus = checked_add( value, alignment - 1 );
+    if ( !plus.has_value() )
+        return std::nullopt;
+    return ( *plus / alignment ) * alignment;
+}
+template <typename AT>
+constexpr std::optional<std::size_t> checked_granule_offset( typename AT::index_type idx ) noexcept
+{
+    return checked_mul( static_cast<std::size_t>( idx ), AT::granule_size );
+}
 template <typename AT>
 constexpr std::optional<GranuleCount<AT>> bytes_to_granules_checked( std::size_t bytes ) noexcept
 {
@@ -67,7 +81,10 @@ template <typename AT> class ArenaView
     {
         if ( !valid_block( idx ) )
             return nullptr;
-        return reinterpret_cast<Block<AT>*>( _base + static_cast<std::size_t>( idx ) * AT::granule_size );
+        auto off = checked_granule_offset<AT>( idx );
+        if ( !off.has_value() )
+            return nullptr;
+        return reinterpret_cast<Block<AT>*>( _base + *off );
     }
     bool valid_block( index_type idx ) const noexcept
     {
@@ -77,7 +94,10 @@ template <typename AT> class ArenaView
     }
     bool fits( index_type idx, std::size_t len ) const noexcept
     {
-        return fits_range( static_cast<std::size_t>( idx ) * AT::granule_size, len, total_size() );
+        auto off = checked_granule_offset<AT>( idx );
+        if ( !off.has_value() )
+            return false;
+        return fits_range( *off, len, total_size() );
     }
     bool valid() const noexcept { return _base && _hdr; }
 
@@ -85,41 +105,104 @@ template <typename AT> class ArenaView
     std::uint8_t*      _base = nullptr;
     ManagerHeader<AT>* _hdr  = nullptr;
 };
+template <typename AT> class ConstArenaView
+{
+  public:
+    using index_type                            = typename AT::index_type;
+    constexpr ConstArenaView() noexcept         = default;
+    constexpr ConstArenaView( const std::uint8_t* b, const ManagerHeader<AT>* h ) noexcept : _base( b ), _hdr( h ) {}
+    constexpr const std::uint8_t*      base() const noexcept { return _base; }
+    constexpr const ManagerHeader<AT>* header() const noexcept { return _hdr; }
+    std::size_t                        total_size() const noexcept { return _hdr ? _hdr->total_size : 0; }
+    const Block<AT>*                   block( index_type idx ) const noexcept
+    {
+        if ( !valid_block( idx ) )
+            return nullptr;
+        auto off = checked_granule_offset<AT>( idx );
+        if ( !off.has_value() )
+            return nullptr;
+        return reinterpret_cast<const Block<AT>*>( _base + *off );
+    }
+    bool valid_block( index_type idx ) const noexcept
+    {
+        if ( !_base || !_hdr || idx == AT::no_block )
+            return false;
+        return fits( idx, sizeof( Block<AT> ) );
+    }
+    bool fits( index_type idx, std::size_t len ) const noexcept
+    {
+        auto off = checked_granule_offset<AT>( idx );
+        if ( !off.has_value() )
+            return false;
+        return fits_range( *off, len, total_size() );
+    }
+    bool valid() const noexcept { return _base && _hdr; }
+
+  private:
+    const std::uint8_t*      _base = nullptr;
+    const ManagerHeader<AT>* _hdr  = nullptr;
+};
+/*
+### pmm-detail-walkcontrol
+*/
+enum class WalkControl
+{
+    Continue,
+    StopOk,
+    Fail,
+};
 /*
 ### pmm-detail-blockwalker
 */
 template <typename AT, typename Fn>
-bool for_each_physical_block( const std::uint8_t* base, const ManagerHeader<AT>* hdr, Fn&& fn ) noexcept
+bool for_each_physical_block( ConstArenaView<AT> arena, Fn&& fn ) noexcept
 {
     using BlockState = pmm::BlockStateBase<AT>;
     using IndexT     = typename AT::index_type;
-    if ( !base || !hdr )
+    if ( !arena.valid() )
         return false;
-    const std::size_t total = static_cast<std::size_t>( hdr->total_size );
-    const std::size_t kBlk  = sizeof( pmm::Block<AT> );
-    const std::size_t limit = total / AT::granule_size + 1;
-    IndexT            idx   = hdr->first_block_offset;
-    IndexT            prev  = AT::no_block;
-    std::size_t       steps = 0;
+    const std::uint8_t*      base  = arena.base();
+    const ManagerHeader<AT>* hdr   = arena.header();
+    const std::size_t        total = static_cast<std::size_t>( hdr->total_size );
+    const std::size_t        kBlk  = sizeof( pmm::Block<AT> );
+    const std::size_t        limit = total / AT::granule_size + 1;
+    IndexT                   idx   = hdr->first_block_offset;
+    std::size_t              steps = 0;
     while ( idx != AT::no_block )
     {
         if ( ++steps > limit )
             return false;
-        std::size_t off = static_cast<std::size_t>( idx ) * AT::granule_size;
-        if ( !fits_range( off, kBlk, total ) )
+        auto off = checked_granule_offset<AT>( idx );
+        if ( !off.has_value() )
             return false;
-        const void* blk = base + off;
-        if ( BlockState::get_prev_offset( blk ) != prev )
+        if ( !fits_range( *off, kBlk, total ) )
             return false;
-        if ( !fn( idx, blk ) )
-            return true;
+        const void* blk = base + *off;
+        using Result    = std::decay_t<decltype( fn( idx, blk ) )>;
+        if constexpr ( std::is_same_v<Result, WalkControl> )
+        {
+            WalkControl c = fn( idx, blk );
+            if ( c == WalkControl::StopOk )
+                return true;
+            if ( c == WalkControl::Fail )
+                return false;
+        }
+        else
+        {
+            if ( !fn( idx, blk ) )
+                return false;
+        }
         IndexT next = BlockState::get_next_offset( blk );
         if ( next != AT::no_block && next <= idx )
             return false;
-        prev = idx;
-        idx  = next;
+        idx = next;
     }
     return true;
+}
+template <typename AT, typename Fn>
+bool for_each_physical_block( ArenaView<AT> arena, Fn&& fn ) noexcept
+{
+    return for_each_physical_block<AT>( ConstArenaView<AT>{ arena.base(), arena.header() }, std::forward<Fn>( fn ) );
 }
 /*
 ### pmm-detail-growthpolicy
@@ -139,10 +222,10 @@ inline std::optional<std::size_t> compute_growth( std::size_t current, std::size
         return std::nullopt;
     if ( *need > new_size )
         new_size = *need;
-    auto plus = checked_add( new_size, gran - 1 );
-    if ( !plus )
+    auto rounded = round_up_checked( new_size, gran );
+    if ( !rounded )
         return std::nullopt;
-    new_size = ( *plus / gran ) * gran;
+    new_size = *rounded;
     if ( new_size <= current )
         return std::nullopt;
     if ( max_gb != 0 )
