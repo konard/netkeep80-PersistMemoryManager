@@ -32,6 +32,16 @@ repos:
         files: '\.(cpp|h)$'
         exclude: ^(third_party/|include/pmm_.*\.h$)
 
+  # ─── Production LOC budget guard (issue #375) ────────────────────────────────
+  - repo: local
+    hooks:
+      - id: pmm-source-loc-budget
+        name: PMM production LOC budget (issue #375)
+        entry: bash scripts/check-source-loc-budget.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+
   # ─── File size limit (1500 lines max) ────────────────────────────────────────
   - repo: local
     hooks:

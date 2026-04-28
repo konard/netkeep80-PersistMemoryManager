@@ -95,20 +95,35 @@ template <typename AT, bool IsConst> class BasicArenaView
     using byte_ptr                      = std::conditional_t<IsConst, const std::uint8_t*, std::uint8_t*>;
     using header_ptr                    = std::conditional_t<IsConst, const ManagerHeader<AT>*, ManagerHeader<AT>*>;
     using block_ptr                     = std::conditional_t<IsConst, const Block<AT>*, Block<AT>*>;
+    using void_ptr                      = std::conditional_t<IsConst, const void*, void*>;
     constexpr BasicArenaView() noexcept = default;
     constexpr BasicArenaView( byte_ptr b, header_ptr h ) noexcept : _base( b ), _hdr( h ) {}
+    constexpr BasicArenaView( byte_ptr b, std::size_t total_sz ) noexcept
+        : _base( b ), _hdr( nullptr ), _total_size_override( total_sz )
+    {
+    }
     constexpr byte_ptr   base() const noexcept { return _base; }
     constexpr header_ptr header() const noexcept { return _hdr; }
-    std::size_t          total_size() const noexcept { return _hdr ? _hdr->total_size : 0; }
-    bool                 valid() const noexcept { return _base && _hdr; }
-    bool                 fits( index_type idx, std::size_t len ) const noexcept
+    std::size_t          total_size() const noexcept
+    {
+        return _hdr ? static_cast<std::size_t>( _hdr->total_size ) : _total_size_override;
+    }
+    bool valid() const noexcept { return _base != nullptr; }
+    bool fits( index_type idx, std::size_t len ) const noexcept
     {
         auto off = checked_granule_offset<AT>( idx );
         return off.has_value() && fits_range( *off, len, total_size() );
     }
+    std::optional<std::size_t> granule_offset( index_type idx ) const noexcept
+    {
+        auto off = checked_granule_offset<AT>( idx );
+        if ( !off.has_value() || *off > total_size() )
+            return std::nullopt;
+        return off;
+    }
     bool valid_block( index_type idx ) const noexcept
     {
-        return _base && _hdr && idx != AT::no_block && fits( idx, sizeof( Block<AT> ) );
+        return _base && idx != AT::no_block && fits( idx, sizeof( Block<AT> ) );
     }
     block_ptr block( index_type idx ) const noexcept
     {
@@ -116,13 +131,69 @@ template <typename AT, bool IsConst> class BasicArenaView
             return nullptr;
         return reinterpret_cast<block_ptr>( _base + static_cast<std::size_t>( idx ) * AT::granule_size );
     }
+    block_ptr block_unchecked( index_type idx ) const noexcept
+    {
+        return reinterpret_cast<block_ptr>( _base + static_cast<std::size_t>( idx ) * AT::granule_size );
+    }
+    void_ptr try_user_ptr( index_type user_idx, std::size_t required_bytes = 0 ) const noexcept
+    {
+        if ( !_base || user_idx == static_cast<index_type>( 0 ) || user_idx == AT::no_block )
+            return nullptr;
+        auto              off   = checked_granule_offset<AT>( user_idx );
+        const std::size_t total = total_size();
+        if ( !off.has_value() || *off >= total )
+            return nullptr;
+        if ( required_bytes != 0 && !fits_range( *off, required_bytes, total ) )
+            return nullptr;
+        return _base + *off;
+    }
+    std::optional<index_type> try_user_idx_from_raw( const void* raw ) const noexcept
+    {
+        if ( !_base || raw == nullptr )
+            return std::nullopt;
+        const auto raw_addr  = reinterpret_cast<std::uintptr_t>( raw );
+        const auto base_addr = reinterpret_cast<std::uintptr_t>( _base );
+        if ( raw_addr < base_addr )
+            return std::nullopt;
+        const std::uintptr_t delta = raw_addr - base_addr;
+        if ( delta > static_cast<std::uintptr_t>( ( std::numeric_limits<std::size_t>::max )() ) )
+            return std::nullopt;
+        const std::size_t byte_off = static_cast<std::size_t>( delta );
+        if ( byte_off >= total_size() )
+            return std::nullopt;
+        return byte_off_to_idx_checked<AT>( byte_off );
+    }
+    std::optional<index_type> try_block_idx_from_user_idx( index_type user_idx ) const noexcept
+    {
+        constexpr index_type kHdrG =
+            static_cast<index_type>( ( sizeof( Block<AT> ) + AT::granule_size - 1 ) / AT::granule_size );
+        if ( user_idx == static_cast<index_type>( 0 ) || user_idx < kHdrG )
+            return std::nullopt;
+        index_type blk_idx = static_cast<index_type>( user_idx - kHdrG );
+        if ( !fits( blk_idx, sizeof( Block<AT> ) ) )
+            return std::nullopt;
+        return blk_idx;
+    }
+    std::optional<index_type> try_user_idx_from_block_idx( index_type blk_idx ) const noexcept
+    {
+        constexpr index_type kHdrG =
+            static_cast<index_type>( ( sizeof( Block<AT> ) + AT::granule_size - 1 ) / AT::granule_size );
+        if ( !valid_block( blk_idx ) )
+            return std::nullopt;
+        if ( blk_idx > std::numeric_limits<index_type>::max() - kHdrG )
+            return std::nullopt;
+        return static_cast<index_type>( blk_idx + kHdrG );
+    }
 
   private:
-    byte_ptr   _base = nullptr;
-    header_ptr _hdr  = nullptr;
+    byte_ptr    _base                = nullptr;
+    header_ptr  _hdr                 = nullptr;
+    std::size_t _total_size_override = 0;
 };
-template <typename AT> using ArenaView      = BasicArenaView<AT, false>;
-template <typename AT> using ConstArenaView = BasicArenaView<AT, true>;
+template <typename AT> using ArenaView         = BasicArenaView<AT, false>;
+template <typename AT> using ConstArenaView    = BasicArenaView<AT, true>;
+template <typename AT> using ArenaAddress      = BasicArenaView<AT, false>;
+template <typename AT> using ConstArenaAddress = BasicArenaView<AT, true>;
 /*
 ### pmm-detail-walkcontrol
 */

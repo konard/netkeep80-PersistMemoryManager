@@ -216,21 +216,6 @@ inline const pmm::Block<AT>* block_at( const uint8_t* base, typename AT::index_t
     assert( idx != kNoBlock_v<AT> );
     return reinterpret_cast<const pmm::Block<AT>*>( base + static_cast<size_t>( idx ) * AT::granule_size );
 }
-template <typename AT = pmm::DefaultAddressTraits>
-inline pmm::Block<AT>* block_at_checked( uint8_t* base, size_t total_size, typename AT::index_type idx ) noexcept
-{
-    if ( !validate_block_index<AT>( total_size, idx ) )
-        return nullptr;
-    return reinterpret_cast<pmm::Block<AT>*>( base + static_cast<size_t>( idx ) * AT::granule_size );
-}
-template <typename AT = pmm::DefaultAddressTraits>
-inline const pmm::Block<AT>* block_at_checked( const uint8_t* base, size_t total_size,
-                                               typename AT::index_type idx ) noexcept
-{
-    if ( !validate_block_index<AT>( total_size, idx ) )
-        return nullptr;
-    return reinterpret_cast<const pmm::Block<AT>*>( base + static_cast<size_t>( idx ) * AT::granule_size );
-}
 template <typename AT> inline typename AT::index_type block_idx_t( const uint8_t* base, const pmm::Block<AT>* block )
 {
     size_t byte_off = reinterpret_cast<const uint8_t*>( block ) - base;
@@ -276,37 +261,9 @@ template <typename AT> inline void* resolve_granule_ptr( uint8_t* base, typename
                                                                 : base + static_cast<size_t>( idx ) * AT::granule_size;
 }
 template <typename AT>
-inline void* resolve_granule_ptr_checked( uint8_t* base, size_t total_size, typename AT::index_type idx ) noexcept
-{
-    if ( idx == static_cast<typename AT::index_type>( 0 ) )
-        return nullptr;
-    size_t byte_off = static_cast<size_t>( idx ) * AT::granule_size;
-    if ( byte_off >= total_size )
-        return nullptr;
-    return base + byte_off;
-}
-template <typename AT>
 inline typename AT::index_type ptr_to_granule_idx( const uint8_t* base, const void* ptr ) noexcept
 {
     return static_cast<typename AT::index_type>( ( static_cast<const uint8_t*>( ptr ) - base ) / AT::granule_size );
-}
-template <typename AT>
-inline typename AT::index_type ptr_to_granule_idx_checked( const uint8_t* base, size_t total_size,
-                                                           const void* ptr ) noexcept
-{
-    using IndexT = typename AT::index_type;
-    if ( ptr == nullptr || base == nullptr )
-        return AT::no_block;
-    const auto* raw = static_cast<const uint8_t*>( ptr );
-    if ( raw < base || raw >= base + total_size )
-        return AT::no_block;
-    size_t byte_off = static_cast<size_t>( raw - base );
-    if ( byte_off % AT::granule_size != 0 )
-        return AT::no_block;
-    size_t idx = byte_off / AT::granule_size;
-    if ( idx > static_cast<size_t>( std::numeric_limits<IndexT>::max() ) )
-        return AT::no_block;
-    return static_cast<IndexT>( idx );
 }
 template <typename AT = pmm::DefaultAddressTraits> inline void* user_ptr( pmm::Block<AT>* block )
 {

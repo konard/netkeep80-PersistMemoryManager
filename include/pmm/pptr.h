@@ -69,10 +69,11 @@ class pptr
             return false;
         return **this < *other;
     }
-    T&    operator*() const noexcept { return *ManagerT::template resolve_checked<T>( *this ); }
-    T*    operator->() const noexcept { return ManagerT::template resolve_checked<T>( *this ); }
-    T*    resolve() const noexcept { return ManagerT::template resolve_checked<T>( *this ); }
-    T*    resolve_unchecked() const noexcept { return ManagerT::template resolve_unchecked<T>( *this ); }
-    auto& tree_node() const noexcept { return ManagerT::tree_node( *this ); }
+    T&   operator*() const noexcept { return *ManagerT::template resolve_checked<T>( *this ); }
+    T*   operator->() const noexcept { return ManagerT::template resolve_checked<T>( *this ); }
+    T*   resolve() const noexcept { return ManagerT::template resolve_checked<T>( *this ); }
+    T*   resolve_unchecked() const noexcept { return ManagerT::template resolve_unchecked<T>( *this ); }
+    auto try_tree_node() const noexcept { return ManagerT::try_tree_node( *this ); }
+    auto& tree_node_unchecked() const noexcept { return ManagerT::tree_node_unchecked( *this ); }
 };
 }

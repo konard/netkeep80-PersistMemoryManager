@@ -119,10 +119,12 @@ template <typename ManagerT> class PersistMemoryTypedApi
             ManagerT::_last_error = PmmError::Overflow;
             return pmm::pptr<T, ManagerT>();
         }
+        void* blk_raw = ManagerT::template try_checked_block_from_pptr<T>( p );
+        if ( blk_raw == nullptr )
+            return pmm::pptr<T, ManagerT>();
         uint8_t*                               base          = ManagerT::_backend.base_ptr();
         detail::ManagerHeader<address_traits>* hdr           = ManagerT::get_header( base );
         index_type                             blk_idx       = ManagerT::template block_idx_from_pptr<T>( p );
-        void*                                  blk_raw       = detail::block_at<address_traits>( base, blk_idx );
         index_type                             old_data_gran = BlockStateBase<address_traits>::get_weight( blk_raw );
         if ( new_data_gran == old_data_gran )
         {
@@ -186,21 +188,20 @@ template <typename ManagerT> class PersistMemoryTypedApi
         void*  old_src = resolve_unchecked<T>( p );
         size_t copy_sz = ( new_count < old_count ? new_count : old_count ) * sizeof( T );
         std::memmove( new_dst, old_src, copy_sz );
-        index_type          old_blk_idx = ManagerT::template block_idx_from_pptr<T>( p );
-        void*               old_blk_raw = detail::block_at<address_traits>( base, old_blk_idx );
+        void*               old_blk_raw = detail::block_at<address_traits>( base, blk_idx );
         index_type          freed_w     = BlockStateBase<address_traits>::get_weight( old_blk_raw );
         const pmm::NodeType nt_old      = BlockStateBase<address_traits>::get_node_type( old_blk_raw );
         if ( pmm::is_allocated( nt_old ) && pmm::can_be_deleted_from_pap( nt_old ) )
         {
             auto       old_alloc  = AllocatedBlock<address_traits>::cast_from_raw( old_blk_raw );
             index_type total_gran = detail::physical_block_total_granules<address_traits>(
-                base, hdr, detail::block_at<address_traits>( base, old_blk_idx ) );
+                base, hdr, detail::block_at<address_traits>( base, blk_idx ) );
             old_alloc.mark_as_free( total_gran );
             hdr->alloc_count--;
             hdr->free_count++;
             if ( hdr->used_size >= freed_w )
                 hdr->used_size -= freed_w;
-            allocator::coalesce( arena_after, old_blk_idx );
+            allocator::coalesce( arena_after, blk_idx );
         }
         ManagerT::_last_error = PmmError::Ok;
         return new_p;

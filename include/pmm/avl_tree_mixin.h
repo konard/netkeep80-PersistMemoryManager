@@ -21,39 +21,39 @@ template <typename PPtr> static PPtr pptr_make( PPtr, typename PPtr::index_type 
 }
 template <typename PPtr> static PPtr pptr_get_left( PPtr p ) noexcept
 {
-    auto idx = p.tree_node().left_offset;
+    auto idx = p.tree_node_unchecked().left_offset;
     return ( idx == pptr_no_block<PPtr>() ) ? PPtr() : pptr_make( p, idx );
 }
 template <typename PPtr> static PPtr pptr_get_right( PPtr p ) noexcept
 {
-    auto idx = p.tree_node().right_offset;
+    auto idx = p.tree_node_unchecked().right_offset;
     return ( idx == pptr_no_block<PPtr>() ) ? PPtr() : pptr_make( p, idx );
 }
 template <typename PPtr> static PPtr pptr_get_parent( PPtr p ) noexcept
 {
-    auto idx = p.tree_node().parent_offset;
+    auto idx = p.tree_node_unchecked().parent_offset;
     return ( idx == pptr_no_block<PPtr>() ) ? PPtr() : pptr_make( p, idx );
 }
 template <typename PPtr> static void pptr_set_left( PPtr p, PPtr child ) noexcept
 {
     auto idx                  = child.is_null() ? pptr_no_block<PPtr>() : child.offset();
-    p.tree_node().left_offset = idx;
+    p.tree_node_unchecked().left_offset = idx;
 }
 template <typename PPtr> static void pptr_set_right( PPtr p, PPtr child ) noexcept
 {
     auto idx                   = child.is_null() ? pptr_no_block<PPtr>() : child.offset();
-    p.tree_node().right_offset = idx;
+    p.tree_node_unchecked().right_offset = idx;
 }
 template <typename PPtr> static void pptr_set_parent( PPtr p, PPtr parent ) noexcept
 {
     auto idx                    = parent.is_null() ? pptr_no_block<PPtr>() : parent.offset();
-    p.tree_node().parent_offset = idx;
+    p.tree_node_unchecked().parent_offset = idx;
 }
 template <typename PPtr> static std::int16_t avl_height( PPtr p ) noexcept
 {
     if ( p.is_null() )
         return 0;
-    return p.tree_node().avl_height;
+    return p.tree_node_unchecked().avl_height;
 }
 template <typename PPtr> static void avl_update_height( PPtr p ) noexcept
 {
@@ -64,7 +64,7 @@ template <typename PPtr> static void avl_update_height( PPtr p ) noexcept
     std::int16_t h  = static_cast<std::int16_t>( 1 + ( lh > rh ? lh : rh ) );
     assert( h >= 0 );
     assert( h <= static_cast<std::int16_t>( ( std::numeric_limits<std::uint8_t>::max )() ) );
-    p.tree_node().avl_height = static_cast<std::uint8_t>( h );
+    p.tree_node_unchecked().avl_height = static_cast<std::uint8_t>( h );
 }
 template <typename PPtr> static std::int16_t avl_balance_factor( PPtr p ) noexcept
 {
@@ -208,7 +208,7 @@ static void avl_remove( PPtr target, IndexType& root_idx, NodeUpdateFn update_no
     else
     {
         PPtr successor    = avl_min_node( right_p );
-        auto succ_par_idx = successor.tree_node().parent_offset;
+        auto succ_par_idx = successor.tree_node_unchecked().parent_offset;
         PPtr succ_rgt     = pptr_get_right( successor );
         if ( succ_par_idx == target.offset() )
         {
@@ -278,7 +278,7 @@ template <typename PPtr> static PPtr avl_inorder_successor( PPtr cur ) noexcept
 }
 template <typename PPtr> static void avl_init_node( PPtr p ) noexcept
 {
-    auto& tn         = p.tree_node();
+    auto& tn         = p.tree_node_unchecked();
     tn.left_offset   = pptr_no_block<PPtr>();
     tn.right_offset  = pptr_no_block<PPtr>();
     tn.parent_offset = pptr_no_block<PPtr>();
@@ -314,7 +314,7 @@ static void avl_insert( PPtr new_node, IndexType& root_idx, GoLeftFn&& go_left, 
         pptr_set_left( new_node, PPtr() );
         pptr_set_right( new_node, PPtr() );
         pptr_set_parent( new_node, PPtr() );
-        new_node.tree_node().avl_height = static_cast<std::int16_t>( 1 );
+        new_node.tree_node_unchecked().avl_height = static_cast<std::int16_t>( 1 );
         root_idx                        = new_node.offset();
         return;
     }
@@ -439,7 +439,10 @@ template <typename AT> struct BlockPPtr
     index_type       offset() const noexcept { return _idx; }
     bool             operator==( const BlockPPtr& other ) const noexcept { return _idx == other._idx; }
     bool             operator!=( const BlockPPtr& other ) const noexcept { return _idx != other._idx; }
-    BlockHeader<AT>& tree_node() const noexcept { return *block_header_at<AT>( block_at<AT>( _base, _idx ) ); }
+    BlockHeader<AT>& tree_node_unchecked() const noexcept
+    {
+        return *block_header_at<AT>( block_at<AT>( _base, _idx ) );
+    }
 };
 template <typename AT> static BlockPPtr<AT> pptr_make( BlockPPtr<AT> source, typename AT::index_type idx ) noexcept
 {
