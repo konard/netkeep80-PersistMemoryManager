@@ -27,8 +27,7 @@
 
 // ─── Compile-time layout contract ─────────────────────────────────────────────
 
-TEST_CASE( "BlockHeader<DefaultAddressTraits> is standard-layout and trivially-copyable",
-           "[issue367][block_header]" )
+TEST_CASE( "BlockHeader<DefaultAddressTraits> is standard-layout and trivially-copyable", "[issue367][block_header]" )
 {
     using H = pmm::BlockHeader<pmm::DefaultAddressTraits>;
     static_assert( std::is_standard_layout_v<H> );
@@ -36,8 +35,7 @@ TEST_CASE( "BlockHeader<DefaultAddressTraits> is standard-layout and trivially-c
     static_assert( sizeof( H ) == 32 );
 }
 
-TEST_CASE( "BlockHeader<DefaultAddressTraits> field offsets match the binary contract",
-           "[issue367][block_header]" )
+TEST_CASE( "BlockHeader<DefaultAddressTraits> field offsets match the binary contract", "[issue367][block_header]" )
 {
     using H = pmm::BlockHeader<pmm::DefaultAddressTraits>;
     static_assert( offsetof( H, weight ) == 0 );
@@ -51,8 +49,7 @@ TEST_CASE( "BlockHeader<DefaultAddressTraits> field offsets match the binary con
     static_assert( offsetof( H, next_offset ) == 28 );
 }
 
-TEST_CASE( "BlockLayoutContract compiles for Small/Default/Large address traits",
-           "[issue367][block_header]" )
+TEST_CASE( "BlockLayoutContract compiles for Small/Default/Large address traits", "[issue367][block_header]" )
 {
     using SC = pmm::BlockLayoutContract<pmm::SmallAddressTraits>;
     using DC = pmm::BlockLayoutContract<pmm::DefaultAddressTraits>;
@@ -65,8 +62,7 @@ TEST_CASE( "BlockLayoutContract compiles for Small/Default/Large address traits"
 
 // ─── Direct access via block_header_at<AT> ────────────────────────────────────
 
-TEST_CASE( "block_header_at<AT> returns aligned pointer to BlockHeader",
-           "[issue367][block_header]" )
+TEST_CASE( "block_header_at<AT> returns aligned pointer to BlockHeader", "[issue367][block_header]" )
 {
     using A = pmm::DefaultAddressTraits;
     using H = pmm::BlockHeader<A>;
@@ -86,8 +82,7 @@ TEST_CASE( "block_header_at<AT> returns aligned pointer to BlockHeader",
     REQUIRE( ch->right_offset == 13 );
 }
 
-TEST_CASE( "BlockStateBase reads observe direct field writes",
-           "[issue367][block_header]" )
+TEST_CASE( "BlockStateBase reads observe direct field writes", "[issue367][block_header]" )
 {
     using A          = pmm::DefaultAddressTraits;
     using H          = pmm::BlockHeader<A>;
@@ -118,8 +113,7 @@ TEST_CASE( "BlockStateBase reads observe direct field writes",
 
 // ─── BlockTreeAccess adapter ──────────────────────────────────────────────────
 
-TEST_CASE( "BlockTreeAccess<AT> reads and writes tree fields directly",
-           "[issue367][block_header]" )
+TEST_CASE( "BlockTreeAccess<AT> reads and writes tree fields directly", "[issue367][block_header]" )
 {
     using A          = pmm::DefaultAddressTraits;
     using H          = pmm::BlockHeader<A>;
@@ -137,8 +131,7 @@ TEST_CASE( "BlockTreeAccess<AT> reads and writes tree fields directly",
 
 // ─── State transitions over BlockHeader views ─────────────────────────────────
 
-TEST_CASE( "FreeBlock -> FreeBlockRemovedAVL -> AllocatedBlock transitions",
-           "[issue367][block_header]" )
+TEST_CASE( "FreeBlock -> FreeBlockRemovedAVL -> AllocatedBlock transitions", "[issue367][block_header]" )
 {
     using A = pmm::DefaultAddressTraits;
     using H = pmm::BlockHeader<A>;
@@ -153,8 +146,7 @@ TEST_CASE( "FreeBlock -> FreeBlockRemovedAVL -> AllocatedBlock transitions",
     REQUIRE_FALSE( alloc.verify_invariants( 7 ) );
 }
 
-TEST_CASE( "AllocatedBlock -> FreeBlockNotInAVL -> FreeBlock transitions",
-           "[issue367][block_header]" )
+TEST_CASE( "AllocatedBlock -> FreeBlockNotInAVL -> FreeBlock transitions", "[issue367][block_header]" )
 {
     using A          = pmm::DefaultAddressTraits;
     using H          = pmm::BlockHeader<A>;
@@ -173,8 +165,7 @@ TEST_CASE( "AllocatedBlock -> FreeBlockNotInAVL -> FreeBlock transitions",
     REQUIRE( fb.is_free() );
 }
 
-TEST_CASE( "SplittingBlock initializes new block and links it into the chain",
-           "[issue367][block_header]" )
+TEST_CASE( "SplittingBlock initializes new block and links it into the chain", "[issue367][block_header]" )
 {
     using A          = pmm::DefaultAddressTraits;
     using H          = pmm::BlockHeader<A>;
@@ -202,8 +193,7 @@ TEST_CASE( "SplittingBlock initializes new block and links it into the chain",
     REQUIRE( alloc.root_offset() == 6u );
 }
 
-TEST_CASE( "CoalescingBlock merges with a free next neighbour",
-           "[issue367][block_header]" )
+TEST_CASE( "CoalescingBlock merges with a free next neighbour", "[issue367][block_header]" )
 {
     using A          = pmm::DefaultAddressTraits;
     using H          = pmm::BlockHeader<A>;
@@ -226,8 +216,7 @@ TEST_CASE( "CoalescingBlock merges with a free next neighbour",
         REQUIRE( buffer_next[i] == 0 );
 }
 
-TEST_CASE( "detect_block_state and recover_block_state behave consistently",
-           "[issue367][block_header]" )
+TEST_CASE( "detect_block_state and recover_block_state behave consistently", "[issue367][block_header]" )
 {
     using A          = pmm::DefaultAddressTraits;
     using H          = pmm::BlockHeader<A>;
@@ -256,8 +245,7 @@ TEST_CASE( "detect_block_state and recover_block_state behave consistently",
 
 // ─── Image version contract ───────────────────────────────────────────────────
 
-TEST_CASE( "Current image version rejects legacy unversioned images",
-           "[issue367][block_header]" )
+TEST_CASE( "Current image version rejects legacy unversioned images", "[issue367][block_header]" )
 {
     using namespace pmm::detail;
     static_assert( kCurrentImageVersion >= 2 );

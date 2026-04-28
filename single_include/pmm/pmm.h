@@ -453,13 +453,14 @@ template <typename AT> class FreeBlock
     {
         assert( raw != nullptr );
         Header* h = detail::block_header_at<AT>( raw );
-        assert( ( h->weight == 0 && h->root_offset == 0 ) && "cast_from_raw<FreeBlock>: block is not in FreeBlock state" );
+        assert( ( h->weight == 0 && h->root_offset == 0 ) &&
+                "cast_from_raw<FreeBlock>: block is not in FreeBlock state" );
         return FreeBlock( *h );
     }
 /*
 ### pmm-freeblock-verify_invariants
 */
-    bool                   verify_invariants() const noexcept { return is_free(); }
+    bool                    verify_invariants() const noexcept { return is_free(); }
     FreeBlockRemovedAVL<AT> remove_from_avl() noexcept;
 
   private:
@@ -475,12 +476,12 @@ template <typename AT> class FreeBlockRemovedAVL
     using index_type     = typename AT::index_type;
     using Header         = BlockHeader<AT>;
     explicit FreeBlockRemovedAVL( Header& h ) noexcept : h_( &h ) {}
-    Header&       header() noexcept { return *h_; }
-    const Header& header() const noexcept { return *h_; }
-    index_type    weight() const noexcept { return h_->weight; }
-    index_type    prev_offset() const noexcept { return h_->prev_offset; }
-    index_type    next_offset() const noexcept { return h_->next_offset; }
-    index_type    root_offset() const noexcept { return h_->root_offset; }
+    Header&                    header() noexcept { return *h_; }
+    const Header&              header() const noexcept { return *h_; }
+    index_type                 weight() const noexcept { return h_->weight; }
+    index_type                 prev_offset() const noexcept { return h_->prev_offset; }
+    index_type                 next_offset() const noexcept { return h_->next_offset; }
+    index_type                 root_offset() const noexcept { return h_->root_offset; }
     static FreeBlockRemovedAVL cast_from_raw( void* raw ) noexcept
     {
         return FreeBlockRemovedAVL( *detail::block_header_at<AT>( raw ) );
@@ -502,9 +503,9 @@ template <typename AT> class SplittingBlock
     using index_type     = typename AT::index_type;
     using Header         = BlockHeader<AT>;
     explicit SplittingBlock( Header& h ) noexcept : h_( &h ) {}
-    Header&       header() noexcept { return *h_; }
-    const Header& header() const noexcept { return *h_; }
-    index_type    next_offset() const noexcept { return h_->next_offset; }
+    Header&               header() noexcept { return *h_; }
+    const Header&         header() const noexcept { return *h_; }
+    index_type            next_offset() const noexcept { return h_->next_offset; }
     static SplittingBlock cast_from_raw( void* raw ) noexcept
     {
         return SplittingBlock( *detail::block_header_at<AT>( raw ) );
@@ -560,8 +561,8 @@ template <typename AT> class AllocatedBlock
 /*
 ### pmm-allocatedblock-verify_invariants
 */
-    bool  verify_invariants( index_type own_idx ) const noexcept { return h_->weight > 0 && h_->root_offset == own_idx; }
-    void* user_ptr() noexcept { return reinterpret_cast<uint8_t*>( h_ ) + sizeof( Header ); }
+    bool verify_invariants( index_type own_idx ) const noexcept { return h_->weight > 0 && h_->root_offset == own_idx; }
+    void*       user_ptr() noexcept { return reinterpret_cast<uint8_t*>( h_ ) + sizeof( Header ); }
     const void* user_ptr() const noexcept { return reinterpret_cast<const uint8_t*>( h_ ) + sizeof( Header ); }
     FreeBlockNotInAVL<AT> mark_as_free() noexcept;
 
@@ -578,10 +579,10 @@ template <typename AT> class FreeBlockNotInAVL
     using index_type     = typename AT::index_type;
     using Header         = BlockHeader<AT>;
     explicit FreeBlockNotInAVL( Header& h ) noexcept : h_( &h ) {}
-    Header&       header() noexcept { return *h_; }
-    const Header& header() const noexcept { return *h_; }
-    index_type    weight() const noexcept { return h_->weight; }
-    index_type    root_offset() const noexcept { return h_->root_offset; }
+    Header&                  header() noexcept { return *h_; }
+    const Header&            header() const noexcept { return *h_; }
+    index_type               weight() const noexcept { return h_->weight; }
+    index_type               root_offset() const noexcept { return h_->root_offset; }
     static FreeBlockNotInAVL cast_from_raw( void* raw ) noexcept
     {
         return FreeBlockNotInAVL( *detail::block_header_at<AT>( raw ) );
@@ -606,10 +607,10 @@ template <typename AT> class CoalescingBlock
     using index_type     = typename AT::index_type;
     using Header         = BlockHeader<AT>;
     explicit CoalescingBlock( Header& h ) noexcept : h_( &h ) {}
-    Header&       header() noexcept { return *h_; }
-    const Header& header() const noexcept { return *h_; }
-    index_type    next_offset() const noexcept { return h_->next_offset; }
-    index_type    prev_offset() const noexcept { return h_->prev_offset; }
+    Header&                header() noexcept { return *h_; }
+    const Header&          header() const noexcept { return *h_; }
+    index_type             next_offset() const noexcept { return h_->next_offset; }
+    index_type             prev_offset() const noexcept { return h_->prev_offset; }
     static CoalescingBlock cast_from_raw( void* raw ) noexcept
     {
         return CoalescingBlock( *detail::block_header_at<AT>( raw ) );
@@ -624,8 +625,8 @@ template <typename AT> class CoalescingBlock
     }
     CoalescingBlock coalesce_with_prev( void* prev_blk, void* next_blk, index_type prev_idx ) noexcept
     {
-        Header* prev               = detail::block_header_at<AT>( prev_blk );
-        prev->next_offset          = h_->next_offset;
+        Header* prev      = detail::block_header_at<AT>( prev_blk );
+        prev->next_offset = h_->next_offset;
         if ( next_blk != nullptr )
             detail::block_header_at<AT>( next_blk )->prev_offset = prev_idx;
         std::memset( h_, 0, sizeof( Header ) );
@@ -889,7 +890,7 @@ inline constexpr bool    is_supported_image_version( uint8_t image_version ) noe
 {
     return image_version == kCurrentImageVersion;
 }
-inline constexpr bool image_version_requires_migration( uint8_t /*image_version*/ ) noexcept
+inline constexpr bool image_version_requires_migration( [[maybe_unused]] uint8_t image_version ) noexcept
 {
     return false;
 }
@@ -969,8 +970,8 @@ template <typename AT> inline uint32_t compute_image_crc32( const uint8_t* data,
 inline constexpr uint32_t kManagerHeaderGranules = sizeof( ManagerHeader<DefaultAddressTraits> ) / kGranuleSize;
 inline constexpr size_t   kMinBlockSize          = sizeof( pmm::Block<pmm::DefaultAddressTraits> ) + kGranuleSize;
 inline constexpr size_t   kMinMemorySize         = sizeof( pmm::Block<pmm::DefaultAddressTraits> ) +
-                                                   sizeof( ManagerHeader<pmm::DefaultAddressTraits> ) +
-                                                   sizeof( pmm::Block<pmm::DefaultAddressTraits> ) + kMinBlockSize;
+                                         sizeof( ManagerHeader<pmm::DefaultAddressTraits> ) +
+                                         sizeof( pmm::Block<pmm::DefaultAddressTraits> ) + kMinBlockSize;
 template <typename AT> inline typename AT::index_type bytes_to_granules_t( size_t bytes )
 {
     using IndexT                    = typename AT::index_type;
@@ -1279,9 +1280,9 @@ template <typename PPtr> static void avl_update_height( PPtr p ) noexcept
 {
     if ( p.is_null() )
         return;
-    std::int16_t lh         = avl_height( pptr_get_left( p ) );
-    std::int16_t rh         = avl_height( pptr_get_right( p ) );
-    std::int16_t h          = static_cast<std::int16_t>( 1 + ( lh > rh ? lh : rh ) );
+    std::int16_t lh          = avl_height( pptr_get_left( p ) );
+    std::int16_t rh          = avl_height( pptr_get_right( p ) );
+    std::int16_t h           = static_cast<std::int16_t>( 1 + ( lh > rh ? lh : rh ) );
     p.tree_node().avl_height = h;
 }
 template <typename PPtr> static std::int16_t avl_balance_factor( PPtr p ) noexcept
@@ -1533,7 +1534,7 @@ static void avl_insert( PPtr new_node, IndexType& root_idx, GoLeftFn&& go_left, 
         pptr_set_right( new_node, PPtr() );
         pptr_set_parent( new_node, PPtr() );
         new_node.tree_node().avl_height = static_cast<std::int16_t>( 1 );
-        root_idx = new_node.offset();
+        root_idx                        = new_node.offset();
         return;
     }
     PPtr cur( root_idx );
@@ -2182,8 +2183,8 @@ class AllocatorPolicy
     }
     static void coalesce( uint8_t* base, detail::ManagerHeader<AT>* hdr, index_type blk_idx )
     {
-        FreeBlockNotInAVL<AT> not_avl     = FreeBlockNotInAVL<AT>::cast_from_raw( detail::block_at<AT>( base, blk_idx ) );
-        CoalescingBlock<AT>   coalescing  = not_avl.begin_coalescing();
+        FreeBlockNotInAVL<AT> not_avl = FreeBlockNotInAVL<AT>::cast_from_raw( detail::block_at<AT>( base, blk_idx ) );
+        CoalescingBlock<AT>   coalescing        = not_avl.begin_coalescing();
         static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AT>;
         index_type                  b_idx       = blk_idx;
         index_type                  curr_next   = coalescing.next_offset();

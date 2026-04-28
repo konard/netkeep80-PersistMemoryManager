@@ -57,9 +57,9 @@ template <typename PPtr> static void avl_update_height( PPtr p ) noexcept
 {
     if ( p.is_null() )
         return;
-    std::int16_t lh         = avl_height( pptr_get_left( p ) );
-    std::int16_t rh         = avl_height( pptr_get_right( p ) );
-    std::int16_t h          = static_cast<std::int16_t>( 1 + ( lh > rh ? lh : rh ) );
+    std::int16_t lh          = avl_height( pptr_get_left( p ) );
+    std::int16_t rh          = avl_height( pptr_get_right( p ) );
+    std::int16_t h           = static_cast<std::int16_t>( 1 + ( lh > rh ? lh : rh ) );
     p.tree_node().avl_height = h;
 }
 template <typename PPtr> static std::int16_t avl_balance_factor( PPtr p ) noexcept
@@ -311,7 +311,7 @@ static void avl_insert( PPtr new_node, IndexType& root_idx, GoLeftFn&& go_left, 
         pptr_set_right( new_node, PPtr() );
         pptr_set_parent( new_node, PPtr() );
         new_node.tree_node().avl_height = static_cast<std::int16_t>( 1 );
-        root_idx = new_node.offset();
+        root_idx                        = new_node.offset();
         return;
     }
     PPtr cur( root_idx );

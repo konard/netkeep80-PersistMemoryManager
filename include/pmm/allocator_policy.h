@@ -72,8 +72,8 @@ class AllocatorPolicy
     }
     static void coalesce( uint8_t* base, detail::ManagerHeader<AT>* hdr, index_type blk_idx )
     {
-        FreeBlockNotInAVL<AT> not_avl     = FreeBlockNotInAVL<AT>::cast_from_raw( detail::block_at<AT>( base, blk_idx ) );
-        CoalescingBlock<AT>   coalescing  = not_avl.begin_coalescing();
+        FreeBlockNotInAVL<AT> not_avl = FreeBlockNotInAVL<AT>::cast_from_raw( detail::block_at<AT>( base, blk_idx ) );
+        CoalescingBlock<AT>   coalescing        = not_avl.begin_coalescing();
         static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AT>;
         index_type                  b_idx       = blk_idx;
         index_type                  curr_next   = coalescing.next_offset();

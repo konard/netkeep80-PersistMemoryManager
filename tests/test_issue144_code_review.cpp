@@ -192,21 +192,21 @@ TEST_CASE( "    block state: is_free / is_allocated consistency", "[test_issue14
     std::memset( buffer, 0, sizeof( buffer ) );
     (void)buffer;
     REQUIRE( BlockState::is_free_raw( buffer ) == true );
-    REQUIRE( BlockState::is_allocated_raw( buffer, 0  ) == false );
+    REQUIRE( BlockState::is_allocated_raw( buffer, 0 ) == false );
     REQUIRE( BlockState::get_weight( buffer ) == 0 );
 
     // Transitional: weight=0, root_offset!=0 — neither free nor allocated
     BlockState::set_root_offset_of( buffer, 5u );
     REQUIRE( BlockState::is_free_raw( buffer ) == false );
-    REQUIRE( BlockState::is_allocated_raw( buffer, 0  ) == false );
-    REQUIRE( BlockState::is_allocated_raw( buffer, 5  ) == false ); // weight==0, so not allocated
+    REQUIRE( BlockState::is_allocated_raw( buffer, 0 ) == false );
+    REQUIRE( BlockState::is_allocated_raw( buffer, 5 ) == false ); // weight==0, so not allocated
 
     // Allocated: weight>0, root_offset==own_idx
     BlockState::set_weight_of( buffer, 3u );
     BlockState::set_root_offset_of( buffer, 7u );
     REQUIRE( BlockState::is_free_raw( buffer ) == false );
-    REQUIRE( BlockState::is_allocated_raw( buffer, 7  ) == true );
-    REQUIRE( BlockState::is_allocated_raw( buffer, 8  ) == false );
+    REQUIRE( BlockState::is_allocated_raw( buffer, 7 ) == true );
+    REQUIRE( BlockState::is_allocated_raw( buffer, 8 ) == false );
 }
 
 // =============================================================================
@@ -232,7 +232,7 @@ TEST_CASE( "    recover allocated with wrong root_offset", "[test_issue144_code_
     REQUIRE( BlockState::get_root_offset( buffer ) == 10 ); // Corrected to own_idx
 
     (void)buffer;
-    REQUIRE( BlockState::is_allocated_raw( buffer, 10  ) == true );
+    REQUIRE( BlockState::is_allocated_raw( buffer, 10 ) == true );
 }
 
 /// @brief recover_block_state fixes weight==0 with non-zero root_offset.
@@ -276,7 +276,7 @@ TEST_CASE( "    valid allocated block unchanged", "[test_issue144_code_review]" 
     REQUIRE( BlockState::get_root_offset( buffer ) == 5 ); // Unchanged
 
     (void)buffer;
-    REQUIRE( BlockState::is_allocated_raw( buffer, 5  ) == true );
+    REQUIRE( BlockState::is_allocated_raw( buffer, 5 ) == true );
 }
 
 /// @brief recover_block_state leaves valid free block unchanged.

@@ -335,10 +335,10 @@ TEST_CASE( "pptr_tree_node_links", "[test_pptr]" )
     REQUIRE( node2.tree_node().parent_offset == no_block );
 
     // Построить дерево: node1 — корень, node2 — левый, node3 — правый
-    node1.tree_node().left_offset = node2.offset( );
-    node1.tree_node().right_offset = node3.offset( );
-    node2.tree_node().parent_offset = node1.offset( );
-    node3.tree_node().parent_offset = node1.offset( );
+    node1.tree_node().left_offset   = node2.offset();
+    node1.tree_node().right_offset  = node3.offset();
+    node2.tree_node().parent_offset = node1.offset();
+    node3.tree_node().parent_offset = node1.offset();
 
     // Проверить связи
     REQUIRE( node1.tree_node().left_offset == node2.offset() );
@@ -379,8 +379,8 @@ TEST_CASE( "pptr_tree_node_height", "[test_pptr]" )
     REQUIRE( node2.tree_node().avl_height == 0 );
 
     // Установить высоту
-    node1.tree_node().avl_height = 2 ;
-    node2.tree_node().avl_height = 1 ;
+    node1.tree_node().avl_height = 2;
+    node2.tree_node().avl_height = 1;
 
     REQUIRE( node1.tree_node().avl_height == 2 );
     REQUIRE( node2.tree_node().avl_height == 1 );
@@ -452,30 +452,30 @@ TEST_CASE( "pptr_user_avl_tree", "[test_pptr]" )
     //   L    R
     // n4(10) n5(25)
 
-    n1.tree_node().left_offset = n2.offset( );
-    n1.tree_node().right_offset = n3.offset( );
-    n1.tree_node().parent_offset = no_block ;
-    n1.tree_node().avl_height = 3 ;
+    n1.tree_node().left_offset   = n2.offset();
+    n1.tree_node().right_offset  = n3.offset();
+    n1.tree_node().parent_offset = no_block;
+    n1.tree_node().avl_height    = 3;
 
-    n2.tree_node().left_offset = n4.offset( );
-    n2.tree_node().right_offset = n5.offset( );
-    n2.tree_node().parent_offset = n1.offset( );
-    n2.tree_node().avl_height = 2 ;
+    n2.tree_node().left_offset   = n4.offset();
+    n2.tree_node().right_offset  = n5.offset();
+    n2.tree_node().parent_offset = n1.offset();
+    n2.tree_node().avl_height    = 2;
 
-    n3.tree_node().left_offset = no_block ;
-    n3.tree_node().right_offset = no_block ;
-    n3.tree_node().parent_offset = n1.offset( );
-    n3.tree_node().avl_height = 1 ;
+    n3.tree_node().left_offset   = no_block;
+    n3.tree_node().right_offset  = no_block;
+    n3.tree_node().parent_offset = n1.offset();
+    n3.tree_node().avl_height    = 1;
 
-    n4.tree_node().left_offset = no_block ;
-    n4.tree_node().right_offset = no_block ;
-    n4.tree_node().parent_offset = n2.offset( );
-    n4.tree_node().avl_height = 1 ;
+    n4.tree_node().left_offset   = no_block;
+    n4.tree_node().right_offset  = no_block;
+    n4.tree_node().parent_offset = n2.offset();
+    n4.tree_node().avl_height    = 1;
 
-    n5.tree_node().left_offset = no_block ;
-    n5.tree_node().right_offset = no_block ;
-    n5.tree_node().parent_offset = n2.offset( );
-    n5.tree_node().avl_height = 1 ;
+    n5.tree_node().left_offset   = no_block;
+    n5.tree_node().right_offset  = no_block;
+    n5.tree_node().parent_offset = n2.offset();
+    n5.tree_node().avl_height    = 1;
 
     // Проверить структуру дерева
     REQUIRE( n1.tree_node().left_offset == n2.offset() );
@@ -544,13 +544,13 @@ TEST_CASE( "pptr_tree_node_ref", "[test_pptr]" )
     REQUIRE( tn2.right_offset == no_block );
 
     // Построить дерево через tree_node(): n1 — корень, n2 — левый, n3 — правый
-    tn1.left_offset = n2.offset( );
-    tn1.right_offset = n3.offset( );
-    tn2.parent_offset = n1.offset( );
-    tn3.parent_offset = n1.offset( );
-    tn1.avl_height = 2 ;
-    tn2.avl_height = 1 ;
-    tn3.avl_height = 1 ;
+    tn1.left_offset   = n2.offset();
+    tn1.right_offset  = n3.offset();
+    tn2.parent_offset = n1.offset();
+    tn3.parent_offset = n1.offset();
+    tn1.avl_height    = 2;
+    tn2.avl_height    = 1;
+    tn3.avl_height    = 1;
 
     // Проверить через tree_node()
     REQUIRE( tn1.left_offset == n2.offset() );

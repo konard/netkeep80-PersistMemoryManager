@@ -174,8 +174,8 @@ template <typename AT> inline uint32_t compute_image_crc32( const uint8_t* data,
 inline constexpr uint32_t kManagerHeaderGranules = sizeof( ManagerHeader<DefaultAddressTraits> ) / kGranuleSize;
 inline constexpr size_t   kMinBlockSize          = sizeof( pmm::Block<pmm::DefaultAddressTraits> ) + kGranuleSize;
 inline constexpr size_t   kMinMemorySize         = sizeof( pmm::Block<pmm::DefaultAddressTraits> ) +
-                                                   sizeof( ManagerHeader<pmm::DefaultAddressTraits> ) +
-                                                   sizeof( pmm::Block<pmm::DefaultAddressTraits> ) + kMinBlockSize;
+                                         sizeof( ManagerHeader<pmm::DefaultAddressTraits> ) +
+                                         sizeof( pmm::Block<pmm::DefaultAddressTraits> ) + kMinBlockSize;
 template <typename AT> inline typename AT::index_type bytes_to_granules_t( size_t bytes )
 {
     using IndexT                    = typename AT::index_type;
