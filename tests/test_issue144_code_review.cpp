@@ -66,8 +66,7 @@ TEST_CASE( "    is_free_raw: allocated node_type is not free", "[test_issue144_c
 }
 
 /// @brief Inconsistent free block (root_offset != 0) is still detected as free by node_type.
-TEST_CASE( "    is_free_raw: free node_type stays free even with non-zero root_offset",
-           "[test_issue144_code_review]" )
+TEST_CASE( "    is_free_raw: free node_type stays free even with non-zero root_offset", "[test_issue144_code_review]" )
 {
     using A          = pmm::DefaultAddressTraits;
     using BlockState = pmm::BlockStateBase<A>;

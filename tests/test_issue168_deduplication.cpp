@@ -149,8 +149,7 @@ TEST_CASE( "I168-B4: BlockStateBase::get_weight() directly", "[test_issue168_ded
     auto*                      blk        = reinterpret_cast<pmm::Block<A>*>( buffer );
 
     BlockState::init_fields( blk, A::no_block, A::no_block, static_cast<std::uint8_t>( 0 ),
-                             static_cast<A::index_type>( 0 ), static_cast<A::index_type>( 0 ),
-                             pmm::NodeType::Free );
+                             static_cast<A::index_type>( 0 ), static_cast<A::index_type>( 0 ), pmm::NodeType::Free );
     REQUIRE( BlockState::get_weight( blk ) == 0 );
 
     BlockState::set_weight_of( blk, static_cast<A::index_type>( 5 ) );
