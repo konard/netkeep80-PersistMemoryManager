@@ -191,4 +191,8 @@ template <typename T, typename ManagerT> struct parray
         return true;
     }
 };
+template <typename T, typename ManagerT> struct node_type_for<parray<T, ManagerT>>
+{
+    static constexpr NodeType value = NodeType::PArray;
+};
 }

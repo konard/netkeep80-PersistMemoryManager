@@ -24,23 +24,43 @@ enum class NodeType : std::uint8_t
 /*
 ### pmm-nodetype-helpers
 */
-constexpr bool is_free( NodeType t ) noexcept { return t == NodeType::Free; }
-constexpr bool is_allocated( NodeType t ) noexcept { return t != NodeType::Free; }
+constexpr bool is_free( NodeType t ) noexcept
+{
+    return t == NodeType::Free;
+}
+constexpr bool is_allocated( NodeType t ) noexcept
+{
+    switch ( t )
+    {
+    case NodeType::ManagerHeader:
+    case NodeType::Generic:
+    case NodeType::ReadOnlyLocked:
+    case NodeType::PStringView:
+    case NodeType::PString:
+    case NodeType::PArray:
+    case NodeType::PMap:
+    case NodeType::PPtr:
+        return true;
+    case NodeType::Free:
+        return false;
+    }
+    return false;
+}
 constexpr bool is_mutable( NodeType t ) noexcept
 {
     switch ( t )
     {
-        case NodeType::Free:
-        case NodeType::ManagerHeader:
-        case NodeType::Generic:
-        case NodeType::PString:
-        case NodeType::PArray:
-        case NodeType::PMap:
-        case NodeType::PPtr:
-            return true;
-        case NodeType::ReadOnlyLocked:
-        case NodeType::PStringView:
-            return false;
+    case NodeType::Free:
+    case NodeType::ManagerHeader:
+    case NodeType::Generic:
+    case NodeType::PString:
+    case NodeType::PArray:
+    case NodeType::PMap:
+    case NodeType::PPtr:
+        return true;
+    case NodeType::ReadOnlyLocked:
+    case NodeType::PStringView:
+        return false;
     }
     return false;
 }
@@ -48,35 +68,46 @@ constexpr bool can_be_deleted_from_pap( NodeType t ) noexcept
 {
     switch ( t )
     {
-        case NodeType::Free:
-        case NodeType::Generic:
-        case NodeType::PStringView:
-        case NodeType::PString:
-        case NodeType::PArray:
-        case NodeType::PMap:
-        case NodeType::PPtr:
-            return true;
-        case NodeType::ManagerHeader:
-        case NodeType::ReadOnlyLocked:
-            return false;
+    case NodeType::Generic:
+    case NodeType::PStringView:
+    case NodeType::PString:
+    case NodeType::PArray:
+    case NodeType::PMap:
+    case NodeType::PPtr:
+        return true;
+    case NodeType::Free:
+    case NodeType::ManagerHeader:
+    case NodeType::ReadOnlyLocked:
+        return false;
     }
     return false;
 }
-constexpr bool participates_in_free_tree( NodeType t ) noexcept { return t == NodeType::Free; }
-constexpr bool is_known_node_type( std::uint8_t v ) noexcept
+constexpr bool participates_in_free_tree( NodeType t ) noexcept
+{
+    return t == NodeType::Free;
+}
+/*
+### pmm-nodetype-for
+*/
+template <typename T> struct node_type_for
+{
+    static constexpr NodeType value = NodeType::Generic;
+};
+template <typename T> inline constexpr NodeType node_type_for_v = node_type_for<T>::value;
+constexpr bool                                  is_known_node_type( std::uint8_t v ) noexcept
 {
     switch ( static_cast<NodeType>( v ) )
     {
-        case NodeType::Free:
-        case NodeType::ManagerHeader:
-        case NodeType::Generic:
-        case NodeType::ReadOnlyLocked:
-        case NodeType::PStringView:
-        case NodeType::PString:
-        case NodeType::PArray:
-        case NodeType::PMap:
-        case NodeType::PPtr:
-            return true;
+    case NodeType::Free:
+    case NodeType::ManagerHeader:
+    case NodeType::Generic:
+    case NodeType::ReadOnlyLocked:
+    case NodeType::PStringView:
+    case NodeType::PString:
+    case NodeType::PArray:
+    case NodeType::PMap:
+    case NodeType::PPtr:
+        return true;
     }
     return false;
 }
@@ -94,14 +125,12 @@ template <typename AT> struct BlockHeaderCoreFields
     index_type next_offset;
 };
 template <typename AT> constexpr std::size_t block_header_core_size_v = sizeof( BlockHeaderCoreFields<AT> );
-template <typename AT>
-constexpr std::size_t block_header_min_size_v = block_header_core_size_v<AT> + 2;
+template <typename AT> constexpr std::size_t block_header_min_size_v  = block_header_core_size_v<AT> + 2;
 template <typename AT>
 constexpr std::size_t block_header_target_size_v =
     ( ( block_header_min_size_v<AT> + AT::granule_size - 1 ) / AT::granule_size ) * AT::granule_size;
 template <typename AT>
-constexpr std::size_t block_header_trailer_pad_v =
-    block_header_target_size_v<AT> - block_header_core_size_v<AT> - 2;
+constexpr std::size_t block_header_trailer_pad_v = block_header_target_size_v<AT> - block_header_core_size_v<AT> - 2;
 template <typename AT, std::size_t Pad> struct BlockHeaderStorageImpl
 {
     using index_type = typename AT::index_type;

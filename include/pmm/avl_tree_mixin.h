@@ -2,9 +2,11 @@
 #include "pmm/block.h"
 #include "pmm/block_state.h"
 #include "pmm/types.h"
+#include <cassert>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 namespace pmm
 {
 namespace detail
@@ -57,10 +59,12 @@ template <typename PPtr> static void avl_update_height( PPtr p ) noexcept
 {
     if ( p.is_null() )
         return;
-    std::int16_t lh          = avl_height( pptr_get_left( p ) );
-    std::int16_t rh          = avl_height( pptr_get_right( p ) );
-    std::int16_t h           = static_cast<std::int16_t>( 1 + ( lh > rh ? lh : rh ) );
-    p.tree_node().avl_height = h;
+    std::int16_t lh = avl_height( pptr_get_left( p ) );
+    std::int16_t rh = avl_height( pptr_get_right( p ) );
+    std::int16_t h  = static_cast<std::int16_t>( 1 + ( lh > rh ? lh : rh ) );
+    assert( h >= 0 );
+    assert( h <= static_cast<std::int16_t>( ( std::numeric_limits<std::uint8_t>::max )() ) );
+    p.tree_node().avl_height = static_cast<std::uint8_t>( h );
 }
 template <typename PPtr> static std::int16_t avl_balance_factor( PPtr p ) noexcept
 {

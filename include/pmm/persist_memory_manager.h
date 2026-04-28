@@ -654,16 +654,16 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         if ( blk == nullptr )
             return;
         const pmm::NodeType nt = BlockStateBase<address_traits>::get_node_type( blk );
-        if ( !pmm::can_be_deleted_from_pap( nt ) )
+        if ( !pmm::is_allocated( nt ) || !pmm::can_be_deleted_from_pap( nt ) )
             return;
         index_type freed = BlockStateBase<address_traits>::get_weight( blk );
         if ( freed == 0 )
             return;
-        uint8_t*                               base    = _backend.base_ptr();
-        detail::ManagerHeader<address_traits>* hdr     = get_header( base );
-        index_type                             blk_idx = detail::block_idx_t<address_traits>( base, blk );
-        index_type total_gran =
-            detail::block_total_granules<address_traits>( base, hdr, detail::block_at<address_traits>( base, blk_idx ) );
+        uint8_t*                               base       = _backend.base_ptr();
+        detail::ManagerHeader<address_traits>* hdr        = get_header( base );
+        index_type                             blk_idx    = detail::block_idx_t<address_traits>( base, blk );
+        index_type                             total_gran = detail::physical_block_total_granules<address_traits>(
+            base, hdr, detail::block_at<address_traits>( base, blk_idx ) );
         AllocatedBlock<address_traits> alloc = AllocatedBlock<address_traits>::cast_from_raw( blk );
         alloc.mark_as_free( total_gran );
         hdr->alloc_count--;
@@ -691,6 +691,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         void* raw = allocate_unlocked( sizeof( T ) );
         if ( raw == nullptr )
             return pptr<T>();
+        manager_type::template assign_node_type_for<T>( raw );
         pptr<T> p   = make_pptr_from_raw<T>( raw );
         T*      obj = manager_type::template resolve_unchecked<T>( p );
         if ( obj == nullptr )

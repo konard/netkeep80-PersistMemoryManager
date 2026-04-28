@@ -311,6 +311,9 @@ target_compile_definitions(test_issue354_include_anchors PRIVATE PMM_SOURCE_DIR=
 pmm_add_test(test_issue358_release_workflow test_issue358_release_workflow.cpp)
 target_compile_definitions(test_issue358_release_workflow PRIVATE PMM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
+# ─── Issue 369: review follow-up — NodeType / weight semantics tightening ──
+pmm_add_test(test_issue369_review_fixes test_issue369_review_fixes.cpp)
+
 # ─── Issue 314: build graph compaction contract ─────────────────
 add_test(
     NAME test_issue314_build_graph_contract

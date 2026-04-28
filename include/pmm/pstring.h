@@ -147,4 +147,8 @@ template <typename ManagerT> struct pstring
         return true;
     }
 };
+template <typename ManagerT> struct node_type_for<pstring<ManagerT>>
+{
+    static constexpr NodeType value = NodeType::PString;
+};
 }

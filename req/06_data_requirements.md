@@ -15,6 +15,9 @@
 | DR-015 | `NodeType` — `enum class : std::uint8_t`, перечисляющий все физические/логические типы узлов: `Free`, `ManagerHeader`, `Generic`, `ReadOnlyLocked`, `PStringView`, `PString`, `PArray`, `PMap`, `PPtr`. Перечисление расширяемо: добавление нового persistent object type требует только регистрации его свойств в `is_*`-хелперах. | Must | Recovered | `include/pmm/block_header.h` |
 | DR-016 | Свойства узла (свободный/выделенный, изменяемый, удаляемый из ПАП, участвующий в AVL free-tree) выводятся централизованно из `NodeType` через `is_free`, `is_allocated`, `is_mutable`, `can_be_deleted_from_pap`, `participates_in_free_tree`. Allocator и free-tree обязаны использовать только эти хелперы. | Must | Recovered | `include/pmm/block_header.h` |
 | DR-017 | AVL free-tree обязан использовать `weight` как ключ размера блока в нормальном пути (insert/remove/find_best_fit/ordering invariant). Вычисление размера через `next_offset - own_idx` в нормальном пути недопустимо. | Must | Recovered | `include/pmm/free_block_tree.h` |
+| DR-018 | `is_allocated(NodeType)` должен быть closed-world `switch`-ем по всем известным значениям enum-а. Неизвестное значение `node_type` (повреждённый байт) не должно трактоваться как allocated. `NodeType::Free` не является user/PAP-deletable; путь `deallocate()` обязан проверять `is_allocated(nt) && can_be_deleted_from_pap(nt)`. | Must | Recovered | `include/pmm/block_header.h`, `include/pmm/persist_memory_manager.h` |
+| DR-019 | Typed allocation paths (`allocate_typed<T>`, `create_typed<T>`, `reallocate_typed<T>`) обязаны проставлять блоку logical `NodeType` через `node_type_for<T>::value`. Регистрация нового persistent object type выполняется только специализацией `node_type_for<T>` без изменения базовой логики allocator-а. | Must | Recovered | `include/pmm/typed_manager_api.h`, `include/pmm/block_header.h` |
+| DR-020 | Verify-режим обязан проверять, что для свободного блока кэшированный `weight` совпадает с физическим span-ом блока, вычисленным по соседям (`next_offset - own_idx` или `total_granules - own_idx`). Расхождение должно классифицироваться как `BlockStateInconsistent`. Для использования в validation/repair предусмотрены отдельные хелперы `physical_block_total_granules` и `cached_block_total_granules`. | Must | Recovered | `include/pmm/allocator_policy.h`, `include/pmm/types.h` |
 | DR-007 | `pptr<T>` должен хранить granule index размером 1/2/4/8 байт в зависимости от address traits. | Must | Recovered | README, `docs/architecture.md` |
 | DR-008 | Image version должен поддерживать legacy migration `0 → 1`; неподдерживаемая версия должна приводить к ошибке unsupported format. | Must | Recovered | `docs/architecture.md` |
 | DR-009 | Persistent container nodes должны храниться в PAP-блоках и использовать встроенные `TreeNode` fields как AVL links. | Should | Recovered | `docs/architecture.md` |
@@ -26,7 +29,7 @@
 
 | NodeType        | Free | Allocated | Mutable | Deletable from PAP | In AVL free-tree |
 |-----------------|:----:|:---------:|:-------:|:------------------:|:----------------:|
-| Free            |  Y   |     N     |    Y    |         Y          |        Y         |
+| Free            |  Y   |     N     |    Y    |         N          |        Y         |
 | ManagerHeader   |  N   |     Y     |    Y    |         N          |        N         |
 | Generic         |  N   |     Y     |    Y    |         Y          |        N         |
 | ReadOnlyLocked  |  N   |     Y     |    N    |         N          |        N         |

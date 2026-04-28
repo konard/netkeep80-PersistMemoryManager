@@ -9,16 +9,40 @@
 #include <limits>
 #include <new>
 #include <type_traits>
+namespace pmm
+{
+template <class T, class ManagerT> struct node_type_for<pptr<T, ManagerT>>
+{
+    static constexpr NodeType value = NodeType::PPtr;
+};
+}
 namespace pmm::detail
 {
 template <typename ManagerT> class PersistMemoryTypedApi
 {
   public:
+    template <typename T> static void assign_node_type_for( void* user_raw ) noexcept
+    {
+        if ( user_raw == nullptr )
+            return;
+        using address_traits = typename ManagerT::address_traits;
+        constexpr size_t kHdrBytes =
+            static_cast<size_t>( detail::kBlockHeaderGranules_t<address_traits> ) * address_traits::granule_size;
+        auto* base = ManagerT::backend().base_ptr();
+        if ( base == nullptr )
+            return;
+        const size_t user_off = static_cast<size_t>( static_cast<uint8_t*>( user_raw ) - base );
+        if ( user_off < kHdrBytes )
+            return;
+        void* blk_raw = base + user_off - kHdrBytes;
+        BlockStateBase<address_traits>::set_node_type_of( blk_raw, pmm::node_type_for_v<T> );
+    }
     template <typename T> static pmm::pptr<T, ManagerT> allocate_typed() noexcept
     {
         void* raw = ManagerT::allocate( sizeof( T ) );
         if ( raw == nullptr )
             return pmm::pptr<T, ManagerT>();
+        assign_node_type_for<T>( raw );
         return ManagerT::template make_pptr_from_raw<T>( raw );
     }
     template <typename T> static pmm::pptr<T, ManagerT> allocate_typed( size_t count ) noexcept
@@ -30,6 +54,7 @@ template <typename ManagerT> class PersistMemoryTypedApi
         void* raw = ManagerT::allocate( sizeof( T ) * count );
         if ( raw == nullptr )
             return pmm::pptr<T, ManagerT>();
+        assign_node_type_for<T>( raw );
         return ManagerT::template make_pptr_from_raw<T>( raw );
     }
     template <typename T> static void deallocate_typed( pmm::pptr<T, ManagerT> p ) noexcept
@@ -137,6 +162,7 @@ template <typename ManagerT> class PersistMemoryTypedApi
             ManagerT::_last_error = PmmError::OutOfMemory;
             return pmm::pptr<T, ManagerT>();
         }
+        assign_node_type_for<T>( new_raw );
         pmm::pptr<T, ManagerT> new_p = ManagerT::template make_pptr_from_raw<T>( new_raw );
         if ( new_p.is_null() )
         {
@@ -147,16 +173,16 @@ template <typename ManagerT> class PersistMemoryTypedApi
         void*  old_src = resolve_unchecked<T>( p );
         size_t copy_sz = ( new_count < old_count ? new_count : old_count ) * sizeof( T );
         std::memmove( new_dst, old_src, copy_sz );
-        index_type old_blk_idx = ManagerT::template block_idx_from_pptr<T>( p );
-        void*      old_blk_raw = detail::block_at<address_traits>( base, old_blk_idx );
-        index_type freed_w     = BlockStateBase<address_traits>::get_weight( old_blk_raw );
-        const pmm::NodeType nt_old = BlockStateBase<address_traits>::get_node_type( old_blk_raw );
-        if ( pmm::can_be_deleted_from_pap( nt_old ) )
+        index_type          old_blk_idx = ManagerT::template block_idx_from_pptr<T>( p );
+        void*               old_blk_raw = detail::block_at<address_traits>( base, old_blk_idx );
+        index_type          freed_w     = BlockStateBase<address_traits>::get_weight( old_blk_raw );
+        const pmm::NodeType nt_old      = BlockStateBase<address_traits>::get_node_type( old_blk_raw );
+        if ( pmm::is_allocated( nt_old ) && pmm::can_be_deleted_from_pap( nt_old ) )
         {
             static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<address_traits>;
-            auto       old_alloc                    = AllocatedBlock<address_traits>::cast_from_raw( old_blk_raw );
-            index_type total_gran =
-                detail::block_total_granules<address_traits>( base, hdr, detail::block_at<address_traits>( base, old_blk_idx ) );
+            auto                        old_alloc   = AllocatedBlock<address_traits>::cast_from_raw( old_blk_raw );
+            index_type                  total_gran  = detail::physical_block_total_granules<address_traits>(
+                base, hdr, detail::block_at<address_traits>( base, old_blk_idx ) );
             old_alloc.mark_as_free( total_gran );
             hdr->alloc_count--;
             hdr->free_count++;
@@ -174,6 +200,7 @@ template <typename ManagerT> class PersistMemoryTypedApi
         void* raw = ManagerT::allocate( sizeof( T ) );
         if ( raw == nullptr )
             return pmm::pptr<T, ManagerT>();
+        assign_node_type_for<T>( raw );
         pmm::pptr<T, ManagerT> p   = ManagerT::template make_pptr_from_raw<T>( raw );
         T*                     obj = resolve_unchecked<T>( p );
         if ( obj == nullptr )
@@ -225,10 +252,9 @@ template <typename ManagerT> class PersistMemoryTypedApi
             ManagerT::_last_error = PmmError::InvalidPointer;
             return nullptr;
         }
-        index_type blk_idx = ManagerT::template block_idx_from_pptr<T>( p );
+        index_type          blk_idx   = ManagerT::template block_idx_from_pptr<T>( p );
         const pmm::NodeType node_type = BlockStateBase<address_traits>::get_node_type( blk_raw );
-        if ( !pmm::is_allocated( node_type ) ||
-             BlockStateBase<address_traits>::get_root_offset( blk_raw ) != blk_idx )
+        if ( !pmm::is_allocated( node_type ) || BlockStateBase<address_traits>::get_root_offset( blk_raw ) != blk_idx )
         {
             ManagerT::_last_error = PmmError::InvalidPointer;
             return nullptr;
