@@ -344,9 +344,10 @@ See [free_tree_forest_policy.md](free_tree_forest_policy.md) for the full orderi
 
 Текущий layout архитектурно ценен:
 
-- `BlockHeader<DefaultAddressTraits>` (AVL slot) = 24 байта;
-- `Block<DefaultAddressTraits>` = 32 байта;
-- `Block<DefaultAddressTraits>` = 2 гранулы по 16 байт.
+- AVL slot prefix of `BlockHeader<DefaultAddressTraits>` = 24 байта (`offsetof(BlockHeader, prev_offset)`);
+- `BlockHeader<DefaultAddressTraits>` целиком = 32 байта;
+- `Block<DefaultAddressTraits>` — type alias для `BlockHeader<DefaultAddressTraits>`, тоже 32 байта;
+- `BlockHeader<DefaultAddressTraits>` = 2 гранулы по 16 байт.
 
 Поэтому отсутствие новых полей считается **сознательно сохраняемым ограничением дизайна**.
 

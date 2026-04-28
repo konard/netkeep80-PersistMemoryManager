@@ -93,33 +93,49 @@ buffer start. Contains:
 | `crc32` | `uint32_t` | CRC32 checksum used by file save/load helpers |
 | `root_offset` | `uint32_t` | Forest registry root granule index |
 
-Version policy:
+Version policy (`detail::kCurrentImageVersion == 2`, no migration by design):
 
-- `image_version == 0`: legacy unversioned image; `load()` accepts it and migrates the header to version `1`.
-- `image_version == 1`: current layout; `load()` accepts it directly.
-- Any other value: unsupported format; `load()` returns `false` with `PmmError::UnsupportedImageVersion` and records `HeaderCorruption` / `Aborted`.
+- `image_version == 2`: current layout; `load()` / `verify()` accept it directly.
+- `image_version == 0` or `image_version == 1`: unsupported legacy image; `load()` /
+  `verify()` reject it with `PmmError::UnsupportedImageVersion` and record
+  `HeaderCorruption` / `Aborted`.
+- Any other value: unsupported format; same rejection behaviour.
+
+This is a deliberate, breaking change introduced by the issue #367 refactor. There is
+no migration path from previous image formats — old images must be recreated.
 
 ---
 
-## Block layout: `Block<AddressTraitsT>`
+## Block layout: `BlockHeader<AddressTraitsT>`
 
-Every block (header + data) is aligned to the granule size. The header `Block<A>` is
-32 bytes = 2 granules (for `DefaultAddressTraits`) and is placed immediately before the
-user data.
+`BlockHeader<AT>` is the **single physical block-header layout**. `Block<AT>` is a type
+alias for `BlockHeader<AT>`. Every block (header + data) is aligned to the granule size.
+The header is 32 bytes = 2 granules (for `DefaultAddressTraits`) and is placed immediately
+before the user data.
 
-`Block<A>` = `LinkedListNode<A>` + `BlockHeader<A>` (AVL slot):
+`BlockHeader<AT>` is one physical record with two semantic groups:
+
+1. **AVL/state slot prefix** — `weight`, `left_offset`, `right_offset`, `parent_offset`,
+   `root_offset`, `avl_height`, `node_type`. Used by the free-tree and by other forest
+   domains that index allocated blocks (`pstringview`, `pmap`).
+2. **Linear PAP links** — `prev_offset`, `next_offset`. Define the block's physical
+   neighbours in the linear address space; used by split / coalesce / repair.
+
+Binary layout for `BlockHeader<DefaultAddressTraits>` (asserted via `BlockLayoutContract`
+and `static_assert` in `include/pmm/block_header.h`, verified in
+`tests/test_block_header.cpp`):
 
 | Field | Bytes | Type | Description |
 |-------|-------|------|-------------|
-| `prev_offset` | 0–3 | `uint32_t` | Previous block granule index (`kNoBlock` = none) |
-| `next_offset` | 4–7 | `uint32_t` | Next block granule index (`kNoBlock` = last) |
-| `weight` | 8–11 | `uint32_t` | User data size in granules (0 = free block) |
-| `left_offset` | 12–15 | `uint32_t` | Left child AVL node (granule index) |
-| `right_offset` | 16–19 | `uint32_t` | Right child AVL node (granule index) |
-| `parent_offset` | 20–23 | `uint32_t` | Parent AVL node (granule index) |
-| `root_offset` | 24–27 | `uint32_t` | 0 = free block; own index = allocated block |
-| `avl_height` | 28–29 | `int16_t` | AVL subtree height (0 = not in tree) |
-| `node_type` | 30–31 | `uint16_t` | 0=`kNodeReadWrite`, 1=`kNodeReadOnly` (permanently locked) |
+| `weight` | 0–3 | `uint32_t` | User data size in granules (0 = free block) |
+| `left_offset` | 4–7 | `uint32_t` | Left child AVL node (granule index) |
+| `right_offset` | 8–11 | `uint32_t` | Right child AVL node (granule index) |
+| `parent_offset` | 12–15 | `uint32_t` | Parent AVL node (granule index) |
+| `root_offset` | 16–19 | `uint32_t` | 0 = free block; own index = allocated block |
+| `avl_height` | 20–21 | `int16_t` | AVL subtree height (0 = not in tree) |
+| `node_type` | 22–23 | `uint16_t` | 0=`kNodeReadWrite`, 1=`kNodeReadOnly` (permanently locked) |
+| `prev_offset` | 24–27 | `uint32_t` | Previous block granule index (`kNoBlock` = none) |
+| `next_offset` | 28–31 | `uint32_t` | Next block granule index (`kNoBlock` = last) |
 
 Field sizes above are for `DefaultAddressTraits` (`uint32_t` index, 16-byte granule).
 For `SmallAddressTraits` (`uint16_t`) and `LargeAddressTraits` (`uint64_t`), the field

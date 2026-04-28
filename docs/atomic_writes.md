@@ -24,32 +24,45 @@ process restarts.
 
 ### ManagerHeader (64 bytes, 4 granules for DefaultAddressTraits)
 
+Source of truth: `struct ManagerHeader<AT>` in `include/pmm/types.h`.
+
 ```
-Bytes 0–7:   magic           — manager magic number ("PMM_V083")
-Bytes 8–15:  total_size      — total managed region size in bytes
-Bytes 16–19: used_size       — used size in granules
-Bytes 20–23: block_count     — total block count
-Bytes 24–27: free_count      — free block count
-Bytes 28–31: alloc_count     — allocated block count
+Bytes 0–7:   magic              — manager magic number
+Bytes 8–15:  total_size         — total managed region size in bytes
+Bytes 16–19: used_size          — used size in granules
+Bytes 20–23: block_count        — total block count
+Bytes 24–27: free_count         — free block count
+Bytes 28–31: alloc_count        — allocated block count
 Bytes 32–35: first_block_offset — first block (granule index)
 Bytes 36–39: last_block_offset  — last block (granule index)
-Bytes 40–43: free_tree_root  — AVL free block tree root (granule index)
-Bytes 44:    owns_memory     — runtime-only (not persistent)
-Bytes 45:    _pad            — reserved
-Bytes 46–47: granule_size    — granule size at creation time; validated on load()
-Bytes 48–55: prev_total_size — runtime-only (not persistent)
-Bytes 56–63: _reserved[8]   — reserved
+Bytes 40–43: free_tree_root     — AVL free block tree root (granule index)
+Bytes 44:    owns_memory        — runtime-only (not persistent)
+Bytes 45:    image_version      — persistent image layout version (current = 2; legacy 0/1 are rejected)
+Bytes 46–47: granule_size       — granule size at creation time; validated on load()
+Bytes 48–55: prev_total_size    — runtime-only (not persistent)
+Bytes 56–59: crc32              — CRC32 used by file save/load helpers
+Bytes 60–63: root_offset        — forest registry root (granule index)
 ```
 
 The `granule_size` field is checked on `load()`: if it does not match the compile-time
 `address_traits::granule_size`, `load()` returns `false` (incompatible image).
+The `image_version` field must equal `detail::kCurrentImageVersion` (currently `2`);
+legacy values (`0`, `1`) are rejected with `PmmError::UnsupportedImageVersion` —
+there is no migration path by design (issue #367).
 
-### Block\<A\> (32 bytes = 2 granules for DefaultAddressTraits)
+### BlockHeader\<AT\> (32 bytes = 2 granules for DefaultAddressTraits)
 
-`Block<A>` = `LinkedListNode<A>` + `BlockHeader<A>` (AVL slot):
+`BlockHeader<AT>` is the **single physical block-header layout**. `Block<AT>` is a type
+alias for `BlockHeader<AT>`. The header is one physical record with two semantic groups:
+
+1. AVL/state slot prefix — `weight`, `left_offset`, `right_offset`, `parent_offset`,
+   `root_offset`, `avl_height`, `node_type`.
+2. Linear PAP links — `prev_offset`, `next_offset`.
+
+Binary layout for `BlockHeader<DefaultAddressTraits>` (asserted in
+`include/pmm/block_header.h`):
 
 ```
-[BlockHeader<A>]
   Bytes 0–3:   weight        — user data size in granules (0 = free block)
   Bytes 4–7:   left_offset   — left AVL child (granule index)
   Bytes 8–11:  right_offset  — right AVL child (granule index)
@@ -57,7 +70,6 @@ The `granule_size` field is checked on `load()`: if it does not match the compil
   Bytes 16–19: root_offset   — 0 = free block; own_idx = allocated block
   Bytes 20–21: avl_height    — AVL subtree height (0 = not in tree)
   Bytes 22–23: node_type     — 0 = kNodeReadWrite, 1 = kNodeReadOnly (permanently locked)
-[LinkedListNode<A>]
   Bytes 24–27: prev_offset   — previous block (granule index)
   Bytes 28–31: next_offset   — next block (granule index)
 ```
