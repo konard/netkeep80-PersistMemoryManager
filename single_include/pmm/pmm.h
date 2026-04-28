@@ -3970,7 +3970,9 @@ template <typename ManagerT> class PersistMemoryTypedApi
     }
     template <typename T> static pmm::pptr<T, ManagerT> allocate_typed() noexcept
     {
-        void* raw = ManagerT::allocate( sizeof( T ) );
+        using thread_policy = typename ManagerT::thread_policy;
+        typename thread_policy::unique_lock_type lock( ManagerT::_mutex );
+        void*                                    raw = ManagerT::allocate_unlocked( sizeof( T ) );
         if ( raw == nullptr )
             return pmm::pptr<T, ManagerT>();
         assign_node_type_for<T>( raw );
@@ -3982,7 +3984,9 @@ template <typename ManagerT> class PersistMemoryTypedApi
             return pmm::pptr<T, ManagerT>();
         if ( sizeof( T ) > 0 && count > ( std::numeric_limits<size_t>::max )() / sizeof( T ) )
             return pmm::pptr<T, ManagerT>();
-        void* raw = ManagerT::allocate( sizeof( T ) * count );
+        using thread_policy = typename ManagerT::thread_policy;
+        typename thread_policy::unique_lock_type lock( ManagerT::_mutex );
+        void*                                    raw = ManagerT::allocate_unlocked( sizeof( T ) * count );
         if ( raw == nullptr )
             return pmm::pptr<T, ManagerT>();
         assign_node_type_for<T>( raw );
@@ -4128,12 +4132,18 @@ template <typename ManagerT> class PersistMemoryTypedApi
     template <typename T, typename... Args> static pmm::pptr<T, ManagerT> create_typed( Args&&... args ) noexcept
     {
         static_assert( std::is_nothrow_constructible_v<T, Args...>, "" );
-        void* raw = ManagerT::allocate( sizeof( T ) );
-        if ( raw == nullptr )
-            return pmm::pptr<T, ManagerT>();
-        assign_node_type_for<T>( raw );
-        pmm::pptr<T, ManagerT> p   = ManagerT::template make_pptr_from_raw<T>( raw );
-        T*                     obj = resolve_unchecked<T>( p );
+        pmm::pptr<T, ManagerT> p;
+        void*                  raw = nullptr;
+        {
+            using thread_policy = typename ManagerT::thread_policy;
+            typename thread_policy::unique_lock_type lock( ManagerT::_mutex );
+            raw = ManagerT::allocate_unlocked( sizeof( T ) );
+            if ( raw == nullptr )
+                return pmm::pptr<T, ManagerT>();
+            assign_node_type_for<T>( raw );
+            p = ManagerT::template make_pptr_from_raw<T>( raw );
+        }
+        T* obj = resolve_unchecked<T>( p );
         if ( obj == nullptr )
         {
             ManagerT::deallocate( raw );
