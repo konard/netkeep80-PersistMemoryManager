@@ -5,6 +5,28 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# ─── Локальный лимит параллелизма сборки (issue #371) ────────────────────────
+# Локально (без переменной окружения CI) ограничиваем многопоточность сборки
+# и компиляции MSVC значением PMM_LOCAL_BUILD_JOBS, чтобы один разработчик не
+# съедал все ядра общей машины. В GitHub Actions переменная CI выставляется
+# автоматически — там используем неограниченный /MP.
+set(PMM_LOCAL_BUILD_JOBS "3" CACHE STRING
+    "Default parallel job count for local builds (MSVC /MP and CMake/CTest -j hints). 0 = unbounded.")
+
+if(DEFINED ENV{CI})
+    set(_pmm_in_ci TRUE)
+else()
+    set(_pmm_in_ci FALSE)
+endif()
+
+if(_pmm_in_ci OR PMM_LOCAL_BUILD_JOBS STREQUAL "0")
+    set(_pmm_msvc_mp_flag "/MP")
+else()
+    set(_pmm_msvc_mp_flag "/MP${PMM_LOCAL_BUILD_JOBS}")
+    message(STATUS "PMM: local build parallelism capped at ${PMM_LOCAL_BUILD_JOBS} jobs "
+                   "(set PMM_LOCAL_BUILD_JOBS=0 or CI=1 in env to remove the cap)")
+endif()
+
 # ─── Основная библиотека (header-only) ────────────────────────────────────────
 add_library(pmm INTERFACE)
 target_include_directories(pmm INTERFACE
@@ -15,7 +37,7 @@ target_include_directories(pmm INTERFACE
 
 # Параметры компилятора
 if(MSVC)
-    target_compile_options(pmm INTERFACE /W4 /utf-8 /MP)
+    target_compile_options(pmm INTERFACE /W4 /utf-8 ${_pmm_msvc_mp_flag})
 else()
     target_compile_options(pmm INTERFACE -Wall -Wextra -Wpedantic)
 endif()
@@ -38,7 +60,7 @@ if(BUILD_TESTING)
     if(MSVC)
         foreach(pmm_catch2_target Catch2 Catch2WithMain)
             if(TARGET ${pmm_catch2_target})
-                target_compile_options(${pmm_catch2_target} PRIVATE /MP)
+                target_compile_options(${pmm_catch2_target} PRIVATE ${_pmm_msvc_mp_flag})
             endif()
         endforeach()
     endif()

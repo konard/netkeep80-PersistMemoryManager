@@ -80,8 +80,11 @@ issue314_configure(compact_tests ON -DPMM_BUILD_EXAMPLES=OFF)
 issue314_assert_target("${compact_tests_build_dir}" test_allocate TRUE)
 issue314_assert_target("${compact_tests_build_dir}" basic_usage FALSE)
 if(MSVC)
-    issue314_assert_target_property("${compact_tests_build_dir}" Catch2 compileCommandFragments "/MP")
-    issue314_assert_target_property("${compact_tests_build_dir}" Catch2WithMain compileCommandFragments "/MP")
+    # Issue #371: the local default caps MSVC parallelism at /MP3, while CI
+    # uses unbounded /MP. Accept either form to keep the contract stable
+    # across both environments.
+    issue314_assert_target_property("${compact_tests_build_dir}" Catch2 compileCommandFragments "/MP[0-9]*")
+    issue314_assert_target_property("${compact_tests_build_dir}" Catch2WithMain compileCommandFragments "/MP[0-9]*")
 endif()
 
 issue314_configure(default_graph ON -DPMM_BUILD_EXAMPLES=ON)

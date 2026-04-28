@@ -33,13 +33,42 @@ Pre-commit hooks enforce:
 ### Building and Testing
 
 ```bash
-# Configure and build
+# Configure and build (defaults to 3 parallel jobs locally — see "Build
+# parallelism" below)
 cmake -B build -DCMAKE_BUILD_TYPE=Debug
-cmake --build build
+cmake --build build -j 3
 
-# Run all tests
-ctest --test-dir build --output-on-failure
+# Run all tests with the same 3-job cap
+ctest --test-dir build --output-on-failure -j 3
 ```
+
+### Build parallelism (issue #371)
+
+Local builds default to **3 parallel jobs** so that a single contributor does
+not saturate every core on a shared workstation. The defaults are applied in
+two places:
+
+- `CMakeLists.txt` caps the MSVC `/MP` flag to `/MP${PMM_LOCAL_BUILD_JOBS}`
+  (default `3`) when the `CI` environment variable is **not** set.
+- The Windows convenience scripts (`scripts/test.bat`, `scripts/demo.bat`)
+  pass `-j 3` to `cmake --build` and `ctest` unless `PMM_JOBS` is overridden.
+
+**Override locally** when you really do want full parallelism:
+
+```bash
+# CMake-side cap (raises MSVC /MP and is recorded in the CMake cache)
+cmake -B build -DPMM_LOCAL_BUILD_JOBS=0   # 0 = unbounded /MP
+
+# Per-invocation override at the cmake/ctest layer
+cmake --build build -j 8
+ctest --test-dir build -j 8
+```
+
+**GitHub Actions** sets `CI=true` automatically, so MSVC falls back to
+unbounded `/MP`. The workflow already pins
+`CMAKE_BUILD_PARALLEL_LEVEL` and `CTEST_PARALLEL_LEVEL` for cmake/ctest; CI
+runners therefore continue to use full parallelism without any further
+changes.
 
 ## Code Style
 
@@ -171,9 +200,9 @@ touches release-owned paths, so docs-only work never inherits a forced bump.
    find . \( -name '*.cpp' -o -name '*.h' \) ! -path './third_party/*' \
      -print0 | xargs -0 wc -l | awk '$1 > 1500 {print "FAIL:", $0; exit 1}'
 
-   # Build and test
-   cmake -B build && cmake --build build
-   ctest --test-dir build --output-on-failure
+   # Build and test (3-job cap matches the local default; see "Build parallelism")
+   cmake -B build && cmake --build build -j 3
+   ctest --test-dir build --output-on-failure -j 3
    ```
 5. Open a pull request targeting `main`
 
