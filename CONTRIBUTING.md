@@ -32,9 +32,21 @@ Pre-commit hooks enforce:
 
 ### Building and Testing
 
+The simplest path is the helper script, which already applies the local
+3-job cap from issue #371:
+
 ```bash
-# Configure and build (defaults to 3 parallel jobs locally — see "Build
-# parallelism" below)
+# Linux / macOS
+./scripts/test.sh
+
+# Windows
+scripts\test.bat
+```
+
+Or invoke CMake directly (defaults to 3 parallel jobs locally — see "Build
+parallelism" below):
+
+```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build -j 3
 
@@ -46,29 +58,45 @@ ctest --test-dir build --output-on-failure -j 3
 
 Local builds default to **3 parallel jobs** so that a single contributor does
 not saturate every core on a shared workstation. The defaults are applied in
-two places:
+three places, each covering a different layer of the build:
 
-- `CMakeLists.txt` caps the MSVC `/MP` flag to `/MP${PMM_LOCAL_BUILD_JOBS}`
-  (default `3`) when the `CI` environment variable is **not** set.
-- The Windows convenience scripts (`scripts/test.bat`, `scripts/demo.bat`)
-  pass `-j 3` to `cmake --build` and `ctest` unless `PMM_JOBS` is overridden.
+| Layer                        | Mechanism                                          | Generator scope |
+|------------------------------|----------------------------------------------------|-----------------|
+| MSVC compile-time `/MP`      | `target_compile_options(... /MP${PMM_LOCAL_BUILD_JOBS})` | MSVC            |
+| Generated build graph        | `CMAKE_JOB_POOLS` + `JOB_POOL_COMPILE`/`JOB_POOL_LINK` | Ninja           |
+| `cmake --build` / `ctest -j` | helper scripts in `scripts/`                       | All             |
+
+The CMake-side mechanisms (rows 1 and 2) only kick in when the `CI`
+environment variable is **not** set. The helper scripts (`scripts/test.sh`,
+`scripts/test.bat`, `scripts/demo.sh`, `scripts/demo.bat`) always pass `-j 3`
+to `cmake --build` and `ctest`, overridable via `PMM_JOBS`.
+
+> **Note for Make/Ninja-Makefiles users:** the Makefile generator does not
+> honour `CMAKE_JOB_POOLS`. If you bypass the helper scripts and run
+> `cmake --build build` directly without `-j`, GNU Make may still spawn one
+> job per core. Either pass `-j 3` explicitly, set
+> `CMAKE_BUILD_PARALLEL_LEVEL=3` in your shell, or use the helper scripts.
 
 **Override locally** when you really do want full parallelism:
 
 ```bash
-# CMake-side cap (raises MSVC /MP and is recorded in the CMake cache)
-cmake -B build -DPMM_LOCAL_BUILD_JOBS=0   # 0 = unbounded /MP
+# CMake-side cap (raises MSVC /MP and the Ninja job pools, recorded in cache)
+cmake -B build -DPMM_LOCAL_BUILD_JOBS=0   # 0 = unbounded
 
 # Per-invocation override at the cmake/ctest layer
 cmake --build build -j 8
 ctest --test-dir build -j 8
+
+# Helper scripts (Linux/macOS / Windows)
+PMM_JOBS=8 ./scripts/test.sh
+set PMM_JOBS=8 && scripts\test.bat
 ```
 
 **GitHub Actions** sets `CI=true` automatically, so MSVC falls back to
-unbounded `/MP`. The workflow already pins
-`CMAKE_BUILD_PARALLEL_LEVEL` and `CTEST_PARALLEL_LEVEL` for cmake/ctest; CI
-runners therefore continue to use full parallelism without any further
-changes.
+unbounded `/MP` and the Ninja job pools are not configured. The workflow
+already pins `CMAKE_BUILD_PARALLEL_LEVEL` and `CTEST_PARALLEL_LEVEL` for
+cmake/ctest; CI runners therefore continue to use full parallelism without
+any further changes.
 
 ## Code Style
 

@@ -11,7 +11,13 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # съедал все ядра общей машины. В GitHub Actions переменная CI выставляется
 # автоматически — там используем неограниченный /MP.
 set(PMM_LOCAL_BUILD_JOBS "3" CACHE STRING
-    "Default parallel job count for local builds (MSVC /MP and CMake/CTest -j hints). 0 = unbounded.")
+    "Default parallel job count for local builds (MSVC /MP and Ninja job pools). 0 = unbounded.")
+
+if(NOT PMM_LOCAL_BUILD_JOBS MATCHES "^[0-9]+$")
+    message(FATAL_ERROR
+        "PMM_LOCAL_BUILD_JOBS must be a non-negative integer; "
+        "got '${PMM_LOCAL_BUILD_JOBS}'. Use 0 for unbounded.")
+endif()
 
 if(DEFINED ENV{CI})
     set(_pmm_in_ci TRUE)
@@ -23,8 +29,20 @@ if(_pmm_in_ci OR PMM_LOCAL_BUILD_JOBS STREQUAL "0")
     set(_pmm_msvc_mp_flag "/MP")
 else()
     set(_pmm_msvc_mp_flag "/MP${PMM_LOCAL_BUILD_JOBS}")
+    # CMAKE_JOB_POOLS is honoured by the Ninja generator; it caps compile and
+    # link parallelism inside the generated build graph so an unparameterized
+    # `cmake --build build` (no -j flag) does not saturate every core. Make
+    # generators do not honour job pools — for Make/Ninja-Makefiles the cap
+    # has to come from `cmake --build -j ${PMM_LOCAL_BUILD_JOBS}` (see the
+    # CONTRIBUTING.md "Build parallelism" section and the helper scripts in
+    # scripts/).
+    set(CMAKE_JOB_POOLS
+        "pmm_compile=${PMM_LOCAL_BUILD_JOBS};pmm_link=${PMM_LOCAL_BUILD_JOBS}"
+        CACHE STRING "PMM local build parallelism job pools (Ninja generator)" FORCE)
+    set(CMAKE_JOB_POOL_COMPILE "pmm_compile" CACHE STRING "" FORCE)
+    set(CMAKE_JOB_POOL_LINK    "pmm_link"    CACHE STRING "" FORCE)
     message(STATUS "PMM: local build parallelism capped at ${PMM_LOCAL_BUILD_JOBS} jobs "
-                   "(set PMM_LOCAL_BUILD_JOBS=0 or CI=1 in env to remove the cap)")
+                   "(re-run cmake with -DPMM_LOCAL_BUILD_JOBS=0 or set CI=1 in env to remove the cap)")
 endif()
 
 # ─── Основная библиотека (header-only) ────────────────────────────────────────

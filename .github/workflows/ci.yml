@@ -10,7 +10,11 @@ on:
     paths-ignore:
       - "**/*.md"
       - ".gitkeep"
+  # Issue #371: in pull requests, only re-run on actual commits (and the
+  # initial open) so that adding a comment, reopening, or marking ready for
+  # review does not retrigger CI/CD.
   pull_request:
+    types: [opened, synchronize]
     branches: ["**"]
     paths-ignore:
       - "**/*.md"
