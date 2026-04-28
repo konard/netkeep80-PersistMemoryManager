@@ -94,9 +94,12 @@ TEST_CASE( "corruption: wrong prev_offset detected", "[issue258][corruption]" )
     Mgr::destroy();
 }
 
-// ─── D3: Block weight mismatch (free block with weight > 0) ─────────────────
+// ─── D3: Free block with non-zero root_offset detected ──────────────────────
+// Post-#369: `weight` on a free block is the cached total size (not a
+// state flag). State is determined exclusively by `node_type`. The
+// inconsistency a corrupt free block must show is `root_offset != 0`.
 
-TEST_CASE( "corruption: free block with non-zero weight detected", "[issue258][corruption]" )
+TEST_CASE( "corruption: free block with non-zero root_offset detected", "[issue258][corruption]" )
 {
     setup_clean();
 
@@ -104,22 +107,20 @@ TEST_CASE( "corruption: free block with non-zero weight detected", "[issue258][c
     REQUIRE( !p.is_null() );
     Mgr::deallocate_typed( p );
 
-    // Find a free block and corrupt its weight
+    // Find a free block and corrupt its root_offset
     std::uint8_t* base    = Mgr::backend().base_ptr();
     std::size_t   usr_off = static_cast<std::size_t>( p.offset() ) * AT::granule_size;
     void*         blk_raw = base + usr_off - sizeof( pmm::Block<AT> );
 
-    auto orig_weight = pmm::BlockStateBase<AT>::get_weight( blk_raw );
-    auto orig_root   = pmm::BlockStateBase<AT>::get_root_offset( blk_raw );
+    auto orig_root = pmm::BlockStateBase<AT>::get_root_offset( blk_raw );
 
-    // Set weight > 0 on a free block (root_offset == 0) => inconsistent
-    pmm::BlockStateBase<AT>::set_weight_of( blk_raw, 42 );
+    // Set root_offset != 0 on a free block (NodeType::Free) => inconsistent
+    pmm::BlockStateBase<AT>::set_root_offset_of( blk_raw, 42 );
 
     pmm::VerifyResult v = Mgr::verify();
     REQUIRE_FALSE( v.ok );
     REQUIRE( has_violation( v, pmm::ViolationType::BlockStateInconsistent ) );
 
-    pmm::BlockStateBase<AT>::set_weight_of( blk_raw, orig_weight );
     pmm::BlockStateBase<AT>::set_root_offset_of( blk_raw, orig_root );
     Mgr::destroy();
 }

@@ -49,11 +49,10 @@ TEST_CASE( "I168-A2: kBlockHeaderGranules_t<SmallAddressTraits> is correct", "[t
 {
     using AT = pmm::SmallAddressTraits;
 
-    // SmallAddressTraits: granule_size=16, Block<Small> has the AVL slot in BlockHeader<Small> + 2 uint16_t
-    // AVL slot inside BlockHeader<Small>: 5*uint16_t + 4 bytes = 14 bytes; Block<Small> = 14 + 4 = 18 bytes
-    // ceil(18/16) = 2
-    static_assert( pmm::detail::kBlockHeaderGranules_t<AT> == 2,
-                   "kBlockHeaderGranules_t<SmallAddressTraits> must be 2 " );
+    // SmallAddressTraits: granule_size=16, BlockHeader<Small> has 7*uint16_t (=14 bytes) of core
+    // fields + 2 trailing uint8_t fields (avl_height, node_type) = 16 bytes total = 1 granule.
+    static_assert( pmm::detail::kBlockHeaderGranules_t<AT> == 1,
+                   "kBlockHeaderGranules_t<SmallAddressTraits> must be 1" );
 }
 
 /// @brief kBlockHeaderGranules_t<LargeAddressTraits> is correct.
@@ -128,9 +127,10 @@ TEST_CASE( "I168-B3: BlockStateBase::get_next_offset() directly", "[test_issue16
     BlockState::init_fields( blk,
                              /*prev*/ A::no_block,
                              /*next*/ static_cast<A::index_type>( 42 ),
-                             /*avl_height*/ 0,
-                             /*weight*/ 0,
-                             /*root_offset*/ 0 );
+                             /*avl_height*/ static_cast<std::uint8_t>( 0 ),
+                             /*weight*/ static_cast<A::index_type>( 0 ),
+                             /*root_offset*/ static_cast<A::index_type>( 0 ),
+                             /*node_type*/ pmm::NodeType::Free );
 
     // get_next_offset is now called directly in AllocatorPolicy
     REQUIRE( BlockState::get_next_offset( blk ) == static_cast<A::index_type>( 42 ) );
@@ -148,7 +148,8 @@ TEST_CASE( "I168-B4: BlockStateBase::get_weight() directly", "[test_issue168_ded
     alignas( 16 ) std::uint8_t buffer[32] = {};
     auto*                      blk        = reinterpret_cast<pmm::Block<A>*>( buffer );
 
-    BlockState::init_fields( blk, A::no_block, A::no_block, 0, 0, 0 );
+    BlockState::init_fields( blk, A::no_block, A::no_block, static_cast<std::uint8_t>( 0 ),
+                             static_cast<A::index_type>( 0 ), static_cast<A::index_type>( 0 ), pmm::NodeType::Free );
     REQUIRE( BlockState::get_weight( blk ) == 0 );
 
     BlockState::set_weight_of( blk, static_cast<A::index_type>( 5 ) );
@@ -287,9 +288,10 @@ TEST_CASE( "I168-D2: BlockStateBase<SmallAddressTraits>::get_weight/next_offset 
     BlockState::init_fields( blk,
                              /*prev*/ A::no_block,
                              /*next*/ static_cast<A::index_type>( 99 ),
-                             /*avl_height*/ 1,
+                             /*avl_height*/ static_cast<std::uint8_t>( 1 ),
                              /*weight*/ static_cast<A::index_type>( 3 ),
-                             /*root_offset*/ static_cast<A::index_type>( 10 ) );
+                             /*root_offset*/ static_cast<A::index_type>( 10 ),
+                             /*node_type*/ pmm::NodeType::Free );
 
     // get_weight and get_next_offset are now called directly in AllocatorPolicy
     REQUIRE( BlockState::get_weight( blk ) == static_cast<A::index_type>( 3 ) );

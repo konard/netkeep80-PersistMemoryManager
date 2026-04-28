@@ -48,8 +48,9 @@ TEST_CASE( "    cast_from_raw valid free block", "[test_issue144_code_review]" )
     REQUIRE( fb.root_offset() == 0 );
 }
 
-/// @brief FreeBlock::verify_invariants detects invalid state (weight > 0).
-TEST_CASE( "    verify_invariants: invalid weight", "[test_issue144_code_review]" )
+/// @brief Setting node_type to an allocated value flips is_free_raw.
+/// Post-#369: state is determined by `node_type`, not by `weight`.
+TEST_CASE( "    is_free_raw: allocated node_type is not free", "[test_issue144_code_review]" )
 {
     using A          = pmm::DefaultAddressTraits;
     using BlockState = pmm::BlockStateBase<A>;
@@ -57,17 +58,15 @@ TEST_CASE( "    verify_invariants: invalid weight", "[test_issue144_code_review]
     alignas( 16 ) std::uint8_t buffer[32];
     std::memset( buffer, 0, sizeof( buffer ) );
 
-    // weight > 0 violates FreeBlock invariant.
-    // Avoid cast_from_raw, which asserts is_free() in debug builds — the assert
-    // would fire and abort the process when we intentionally set up an invalid
-    // state. is_free_raw is the reliable API-level check in all builds.
-    BlockState::set_weight_of( buffer, 3u );
+    // Setting an allocated node_type makes the block no longer free,
+    // regardless of `weight`.
+    BlockState::set_node_type_of( buffer, pmm::NodeType::Generic );
 
     REQUIRE( BlockState::is_free_raw( buffer ) == false );
 }
 
-/// @brief FreeBlock::verify_invariants detects invalid state (root_offset != 0).
-TEST_CASE( "    verify_invariants: invalid root_offset", "[test_issue144_code_review]" )
+/// @brief Inconsistent free block (root_offset != 0) is still detected as free by node_type.
+TEST_CASE( "    is_free_raw: free node_type stays free even with non-zero root_offset", "[test_issue144_code_review]" )
 {
     using A          = pmm::DefaultAddressTraits;
     using BlockState = pmm::BlockStateBase<A>;
@@ -75,12 +74,12 @@ TEST_CASE( "    verify_invariants: invalid root_offset", "[test_issue144_code_re
     alignas( 16 ) std::uint8_t buffer[32];
     std::memset( buffer, 0, sizeof( buffer ) );
 
-    // root_offset != 0 violates FreeBlock invariant.
-    // Avoid cast_from_raw for the same reason as above: it asserts is_free() in
-    // debug builds.
+    // Post-#369: state is determined exclusively by `node_type`. A free block
+    // with corrupt `root_offset` is still detected as free; the corruption
+    // surfaces in verify_state, not in is_free_raw.
     BlockState::set_root_offset_of( buffer, 5u );
 
-    REQUIRE( BlockState::is_free_raw( buffer ) == false );
+    REQUIRE( BlockState::is_free_raw( buffer ) == true );
 }
 
 // =============================================================================
@@ -98,6 +97,7 @@ TEST_CASE( "    cast_from_raw valid allocated block", "[test_issue144_code_revie
 
     BlockState::set_weight_of( buffer, 4u );
     BlockState::set_root_offset_of( buffer, 6u );
+    BlockState::set_node_type_of( buffer, pmm::NodeType::Generic );
 
     auto alloc = pmm::AllocatedBlock<A>::cast_from_raw( buffer );
     (void)alloc;
@@ -116,6 +116,7 @@ TEST_CASE( "    verify_invariants: wrong own_idx", "[test_issue144_code_review]"
 
     BlockState::set_weight_of( buffer, 4u );
     BlockState::set_root_offset_of( buffer, 6u ); // own_idx should be 6
+    BlockState::set_node_type_of( buffer, pmm::NodeType::Generic );
 
     auto alloc = pmm::AllocatedBlock<A>::cast_from_raw( buffer );
     REQUIRE( alloc.verify_invariants( 6 ) == true );  // Correct idx
@@ -180,7 +181,9 @@ TEST_CASE( "    kNoBlock constant", "[test_issue144_code_review]" )
     REQUIRE( kNoBlock == 0xFFFFFFFFU );
 }
 
-/// @brief Block state machine: is_free() and is_allocated() agree with weight.
+/// @brief Block state machine: is_free() and is_allocated() agree with node_type.
+/// Post-#369: state is determined exclusively by `node_type`. `weight` is the
+/// cached size and is never used as a state flag.
 TEST_CASE( "    block state: is_free / is_allocated consistency", "[test_issue144_code_review]" )
 {
     using A          = pmm::DefaultAddressTraits;
@@ -188,32 +191,32 @@ TEST_CASE( "    block state: is_free / is_allocated consistency", "[test_issue14
 
     alignas( 16 ) std::uint8_t buffer[32];
 
-    // Free: weight=0, root_offset=0
+    // Free: NodeType::Free (default for zero-initialized buffer)
     std::memset( buffer, 0, sizeof( buffer ) );
     (void)buffer;
     REQUIRE( BlockState::is_free_raw( buffer ) == true );
     REQUIRE( BlockState::is_allocated_raw( buffer, 0 ) == false );
-    REQUIRE( BlockState::get_weight( buffer ) == 0 );
 
-    // Transitional: weight=0, root_offset!=0 — neither free nor allocated
-    BlockState::set_root_offset_of( buffer, 5u );
-    REQUIRE( BlockState::is_free_raw( buffer ) == false );
-    REQUIRE( BlockState::is_allocated_raw( buffer, 0 ) == false );
-    REQUIRE( BlockState::is_allocated_raw( buffer, 5 ) == false ); // weight==0, so not allocated
-
-    // Allocated: weight>0, root_offset==own_idx
+    // Allocated node_type with root_offset==own_idx: allocated
+    BlockState::set_node_type_of( buffer, pmm::NodeType::Generic );
     BlockState::set_weight_of( buffer, 3u );
     BlockState::set_root_offset_of( buffer, 7u );
     REQUIRE( BlockState::is_free_raw( buffer ) == false );
     REQUIRE( BlockState::is_allocated_raw( buffer, 7 ) == true );
     REQUIRE( BlockState::is_allocated_raw( buffer, 8 ) == false );
+
+    // Allocated node_type with wrong root_offset: not free, not allocated_raw
+    // (allocated_raw cross-checks root_offset == own_idx).
+    BlockState::set_root_offset_of( buffer, 99u );
+    REQUIRE( BlockState::is_free_raw( buffer ) == false );
+    REQUIRE( BlockState::is_allocated_raw( buffer, 7 ) == false );
 }
 
 // =============================================================================
 // I144-E: recover_block_state handles all transitional states
 // =============================================================================
 
-/// @brief recover_block_state fixes weight>0 with wrong root_offset.
+/// @brief recover_block_state fixes allocated node_type with wrong root_offset.
 TEST_CASE( "    recover allocated with wrong root_offset", "[test_issue144_code_review]" )
 {
     using A          = pmm::DefaultAddressTraits;
@@ -222,8 +225,9 @@ TEST_CASE( "    recover allocated with wrong root_offset", "[test_issue144_code_
     alignas( 16 ) std::uint8_t buffer[32];
     std::memset( buffer, 0, sizeof( buffer ) );
 
-    // Simulate crash: weight>0 but root_offset points to wrong index
+    // Simulate crash: allocated node_type but root_offset points to wrong index.
     BlockState::set_weight_of( buffer, 5u );
+    BlockState::set_node_type_of( buffer, pmm::NodeType::Generic );
     BlockState::set_root_offset_of( buffer, 99u ); // Wrong index
 
     pmm::recover_block_state<A>( buffer, 10 ); // Own index is 10
@@ -235,7 +239,7 @@ TEST_CASE( "    recover allocated with wrong root_offset", "[test_issue144_code_
     REQUIRE( BlockState::is_allocated_raw( buffer, 10 ) == true );
 }
 
-/// @brief recover_block_state fixes weight==0 with non-zero root_offset.
+/// @brief recover_block_state fixes free node_type with non-zero root_offset.
 TEST_CASE( "    recover free with non-zero root_offset", "[test_issue144_code_review]" )
 {
     using A          = pmm::DefaultAddressTraits;
@@ -244,13 +248,12 @@ TEST_CASE( "    recover free with non-zero root_offset", "[test_issue144_code_re
     alignas( 16 ) std::uint8_t buffer[32];
     std::memset( buffer, 0, sizeof( buffer ) );
 
-    // Simulate crash: weight==0 but root_offset is non-zero (transitional state)
-    BlockState::set_weight_of( buffer, 0u );
+    // Simulate crash: free node_type but root_offset is non-zero (transitional state)
+    BlockState::set_node_type_of( buffer, pmm::NodeType::Free );
     BlockState::set_root_offset_of( buffer, 42u );
 
     pmm::recover_block_state<A>( buffer, 10 ); // Own index is 10
 
-    REQUIRE( BlockState::get_weight( buffer ) == 0 );      // Unchanged
     REQUIRE( BlockState::get_root_offset( buffer ) == 0 ); // Cleared
 
     (void)buffer;
@@ -269,6 +272,7 @@ TEST_CASE( "    valid allocated block unchanged", "[test_issue144_code_review]" 
     // Correct allocated state
     BlockState::set_weight_of( buffer, 7u );
     BlockState::set_root_offset_of( buffer, 5u );
+    BlockState::set_node_type_of( buffer, pmm::NodeType::Generic );
 
     pmm::recover_block_state<A>( buffer, 5 );
 

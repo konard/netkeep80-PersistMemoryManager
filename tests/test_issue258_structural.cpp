@@ -55,7 +55,7 @@ static std::vector<BlockInfo> walk_blocks( std::uint8_t* base, std::size_t total
         bi.next        = BlockState::get_next_offset( blk_raw );
         bi.weight      = BlockState::get_weight( blk_raw );
         bi.root_offset = BlockState::get_root_offset( blk_raw );
-        bi.is_free     = ( bi.weight == 0 && bi.root_offset == 0 );
+        bi.is_free     = pmm::is_free( BlockState::get_node_type( blk_raw ) );
 
         AT::index_type total_gran = static_cast<AT::index_type>( total_size / kGranSz );
         if ( bi.next != AT::no_block )
@@ -228,7 +228,10 @@ TEST_CASE( "structural: root_offset consistency for all blocks", "[issue258][str
     {
         if ( b.is_free )
         {
-            REQUIRE( b.weight == 0 );
+            // Under the post-#369 model `weight` is the cached total block size
+            // (in granules) for a free block, so it must be > 0 and equal to
+            // the physical block span.
+            REQUIRE( b.weight == b.total_granules );
             REQUIRE( b.root_offset == 0 );
         }
         else
@@ -286,7 +289,7 @@ TEST_CASE( "structural: weight/state consistent after alloc/dealloc mix", "[issu
 
     for ( const auto& b : blocks )
     {
-        if ( b.weight == 0 )
+        if ( b.is_free )
         {
             REQUIRE( b.root_offset == 0 );
         }

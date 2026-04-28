@@ -1,10 +1,13 @@
 /**
  * @file test_block_header.cpp
- * @brief Issue #367: Tests for the unified BlockHeader<AT> layout and direct typed access.
+ * @brief Issue #369: Tests for the refactored BlockHeader<AT> layout, NodeType enum
+ *        and weight-as-cached-size accounting.
  *
  * Verifies:
  *  - BlockHeader<AT> standard-layout, trivially-copyable invariants.
- *  - Required size and field offsets for DefaultAddressTraits.
+ *  - Required size and field offsets for DefaultAddressTraits — `avl_height`
+ *    and `node_type` live at the very end of the header as compact `uint8_t`/
+ *    `NodeType` fields.
  *  - BlockLayoutContract<AT> compiles for Small/Default/Large traits.
  *  - block_header_at<AT>() returns correctly aligned pointer.
  *  - Direct field reads/writes work and are observable via BlockStateBase API.
@@ -27,7 +30,7 @@
 
 // ─── Compile-time layout contract ─────────────────────────────────────────────
 
-TEST_CASE( "BlockHeader<DefaultAddressTraits> is standard-layout and trivially-copyable", "[issue367][block_header]" )
+TEST_CASE( "BlockHeader<DefaultAddressTraits> is standard-layout and trivially-copyable", "[issue369][block_header]" )
 {
     using H = pmm::BlockHeader<pmm::DefaultAddressTraits>;
     static_assert( std::is_standard_layout_v<H> );
@@ -35,7 +38,7 @@ TEST_CASE( "BlockHeader<DefaultAddressTraits> is standard-layout and trivially-c
     static_assert( sizeof( H ) == 32 );
 }
 
-TEST_CASE( "BlockHeader<DefaultAddressTraits> field offsets match the binary contract", "[issue367][block_header]" )
+TEST_CASE( "BlockHeader<DefaultAddressTraits> field offsets match the binary contract", "[issue369][block_header]" )
 {
     using H = pmm::BlockHeader<pmm::DefaultAddressTraits>;
     static_assert( offsetof( H, weight ) == 0 );
@@ -43,34 +46,43 @@ TEST_CASE( "BlockHeader<DefaultAddressTraits> field offsets match the binary con
     static_assert( offsetof( H, right_offset ) == 8 );
     static_assert( offsetof( H, parent_offset ) == 12 );
     static_assert( offsetof( H, root_offset ) == 16 );
-    static_assert( offsetof( H, avl_height ) == 20 );
-    static_assert( offsetof( H, node_type ) == 22 );
-    static_assert( offsetof( H, prev_offset ) == 24 );
-    static_assert( offsetof( H, next_offset ) == 28 );
+    static_assert( offsetof( H, prev_offset ) == 20 );
+    static_assert( offsetof( H, next_offset ) == 24 );
+    static_assert( offsetof( H, avl_height ) == sizeof( H ) - 2 );
+    static_assert( offsetof( H, node_type ) == sizeof( H ) - 1 );
 }
 
-TEST_CASE( "BlockLayoutContract compiles for Small/Default/Large address traits", "[issue367][block_header]" )
+TEST_CASE( "BlockHeader<DefaultAddressTraits> avl_height/node_type are compact and at the very end",
+           "[issue369][block_header]" )
+{
+    using H = pmm::BlockHeader<pmm::DefaultAddressTraits>;
+    static_assert( std::is_same_v<decltype( std::declval<H>().avl_height ), std::uint8_t> );
+    static_assert( std::is_same_v<decltype( std::declval<H>().node_type ), pmm::NodeType> );
+    static_assert( sizeof( std::declval<H>().avl_height ) == 1 );
+    static_assert( sizeof( std::declval<H>().node_type ) == 1 );
+    static_assert( offsetof( H, node_type ) == sizeof( H ) - 1 );
+    static_assert( offsetof( H, avl_height ) == sizeof( H ) - 2 );
+}
+
+TEST_CASE( "BlockLayoutContract compiles for Small/Default/Large address traits", "[issue369][block_header]" )
 {
     using SC = pmm::BlockLayoutContract<pmm::SmallAddressTraits>;
     using DC = pmm::BlockLayoutContract<pmm::DefaultAddressTraits>;
     using LC = pmm::BlockLayoutContract<pmm::LargeAddressTraits>;
     static_assert( DC::layout_size == 32 );
-    static_assert( DC::tree_slot_size == 24 );
+    static_assert( DC::tree_slot_size == 20 );
     static_assert( SC::layout_size > 0 );
     static_assert( LC::layout_size > 0 );
 }
 
 TEST_CASE( "BlockHeader<AT> size is a whole number of granules for every public AddressTraits",
-           "[issue367][block_header][granule_contract]" )
+           "[issue369][block_header][granule_contract]" )
 {
     static_assert( sizeof( pmm::BlockHeader<pmm::SmallAddressTraits> ) % pmm::SmallAddressTraits::granule_size == 0 );
     static_assert( sizeof( pmm::BlockHeader<pmm::DefaultAddressTraits> ) % pmm::DefaultAddressTraits::granule_size ==
                    0 );
     static_assert( sizeof( pmm::BlockHeader<pmm::LargeAddressTraits> ) % pmm::LargeAddressTraits::granule_size == 0 );
-
-    static_assert( sizeof( pmm::BlockHeader<pmm::SmallAddressTraits> ) == 32 );
     static_assert( sizeof( pmm::BlockHeader<pmm::DefaultAddressTraits> ) == 32 );
-    static_assert( sizeof( pmm::BlockHeader<pmm::LargeAddressTraits> ) == 64 );
 }
 
 // ─── Direct access via block_header_at<AT> ────────────────────────────────────
@@ -109,7 +121,7 @@ TEST_CASE( "BlockStateBase reads observe direct field writes", "[issue367][block
     h->parent_offset = 17;
     h->root_offset   = 19;
     h->avl_height    = 3;
-    h->node_type     = pmm::kNodeReadOnly;
+    h->node_type     = pmm::NodeType::ReadOnlyLocked;
     h->prev_offset   = 23;
     h->next_offset   = 29;
 
@@ -119,7 +131,7 @@ TEST_CASE( "BlockStateBase reads observe direct field writes", "[issue367][block
     REQUIRE( BlockState::get_parent_offset( buffer ) == 17u );
     REQUIRE( BlockState::get_root_offset( buffer ) == 19u );
     REQUIRE( BlockState::get_avl_height( buffer ) == 3 );
-    REQUIRE( BlockState::get_node_type( buffer ) == pmm::kNodeReadOnly );
+    REQUIRE( BlockState::get_node_type( buffer ) == pmm::NodeType::ReadOnlyLocked );
     REQUIRE( BlockState::get_prev_offset( buffer ) == 23u );
     REQUIRE( BlockState::get_next_offset( buffer ) == 29u );
 }
@@ -158,7 +170,7 @@ TEST_CASE( "FreeBlock -> FreeBlockRemovedAVL -> AllocatedBlock transitions", "[i
     REQUIRE_FALSE( alloc.verify_invariants( 7 ) );
 }
 
-TEST_CASE( "AllocatedBlock -> FreeBlockNotInAVL -> FreeBlock transitions", "[issue367][block_header]" )
+TEST_CASE( "AllocatedBlock -> FreeBlockNotInAVL -> FreeBlock transitions", "[issue369][block_header]" )
 {
     using A          = pmm::DefaultAddressTraits;
     using H          = pmm::BlockHeader<A>;
@@ -166,18 +178,20 @@ TEST_CASE( "AllocatedBlock -> FreeBlockNotInAVL -> FreeBlock transitions", "[iss
     alignas( H ) std::uint8_t buffer[sizeof( H )]{};
     BlockState::set_weight_of( buffer, 5u );
     BlockState::set_root_offset_of( buffer, 6u );
+    BlockState::set_node_type_of( buffer, pmm::NodeType::Generic );
 
     auto alloc   = pmm::AllocatedBlock<A>::cast_from_raw( buffer );
-    auto not_avl = alloc.mark_as_free();
-    REQUIRE( not_avl.weight() == 0u );
+    auto not_avl = alloc.mark_as_free( /*total_granules=*/8u );
+    REQUIRE( not_avl.weight() == 8u );
     REQUIRE( not_avl.root_offset() == 0u );
+    REQUIRE( BlockState::get_node_type( buffer ) == pmm::NodeType::Free );
 
     auto fb = not_avl.insert_to_avl();
     REQUIRE( fb.avl_height() == 1 );
     REQUIRE( fb.is_free() );
 }
 
-TEST_CASE( "SplittingBlock initializes new block and links it into the chain", "[issue367][block_header]" )
+TEST_CASE( "SplittingBlock initializes new block and links it into the chain", "[issue369][block_header]" )
 {
     using A          = pmm::DefaultAddressTraits;
     using H          = pmm::BlockHeader<A>;
@@ -191,10 +205,12 @@ TEST_CASE( "SplittingBlock initializes new block and links it into the chain", "
     BlockState::set_prev_offset_of( buffer_old_next, 6u );
 
     auto splitting = pmm::SplittingBlock<A>::cast_from_raw( buffer_curr );
-    splitting.initialize_new_block( buffer_new, /*new_idx=*/8, /*own_idx=*/6 );
+    splitting.initialize_new_block( buffer_new, /*new_idx=*/8, /*own_idx=*/6, /*new_block_total_granules=*/4u );
     REQUIRE( BlockState::get_prev_offset( buffer_new ) == 6u );
     REQUIRE( BlockState::get_next_offset( buffer_new ) == 100u );
     REQUIRE( BlockState::get_avl_height( buffer_new ) == 1 );
+    REQUIRE( BlockState::get_weight( buffer_new ) == 4u );
+    REQUIRE( BlockState::get_node_type( buffer_new ) == pmm::NodeType::Free );
 
     splitting.link_new_block( buffer_old_next, 8 );
     REQUIRE( splitting.next_offset() == 8u );
@@ -203,9 +219,10 @@ TEST_CASE( "SplittingBlock initializes new block and links it into the chain", "
     auto alloc = splitting.finalize_split( /*data_granules=*/5, /*own_idx=*/6 );
     REQUIRE( alloc.weight() == 5u );
     REQUIRE( alloc.root_offset() == 6u );
+    REQUIRE( BlockState::get_node_type( buffer_curr ) == pmm::NodeType::Generic );
 }
 
-TEST_CASE( "CoalescingBlock merges with a free next neighbour", "[issue367][block_header]" )
+TEST_CASE( "CoalescingBlock merges with a free next neighbour", "[issue369][block_header]" )
 {
     using A          = pmm::DefaultAddressTraits;
     using H          = pmm::BlockHeader<A>;
@@ -215,20 +232,26 @@ TEST_CASE( "CoalescingBlock merges with a free next neighbour", "[issue367][bloc
     alignas( H ) std::uint8_t buffer_next[sizeof( H )]{};
     alignas( H ) std::uint8_t buffer_nxt_nxt[sizeof( H )]{};
 
+    // Both blocks start free with cached sizes 4 and 6.
     BlockState::set_next_offset_of( buffer_curr, 10u );
+    BlockState::set_weight_of( buffer_curr, 4u );
+    BlockState::set_node_type_of( buffer_curr, pmm::NodeType::Free );
     BlockState::set_prev_offset_of( buffer_next, 6u );
     BlockState::set_next_offset_of( buffer_next, 20u );
+    BlockState::set_weight_of( buffer_next, 6u );
+    BlockState::set_node_type_of( buffer_next, pmm::NodeType::Free );
     BlockState::set_prev_offset_of( buffer_nxt_nxt, 10u );
 
     auto coalescing = pmm::CoalescingBlock<A>::cast_from_raw( buffer_curr );
-    coalescing.coalesce_with_next( buffer_next, buffer_nxt_nxt, /*own_idx=*/6 );
+    coalescing.coalesce_with_next( buffer_next, buffer_nxt_nxt, /*own_idx=*/6, /*next_block_granules=*/6u );
     REQUIRE( coalescing.next_offset() == 20u );
     REQUIRE( BlockState::get_prev_offset( buffer_nxt_nxt ) == 6u );
+    REQUIRE( BlockState::get_weight( buffer_curr ) == 10u );
     for ( size_t i = 0; i < sizeof( buffer_next ); ++i )
         REQUIRE( buffer_next[i] == 0 );
 }
 
-TEST_CASE( "detect_block_state and recover_block_state behave consistently", "[issue367][block_header]" )
+TEST_CASE( "detect_block_state and recover_block_state behave consistently", "[issue369][block_header]" )
 {
     using A          = pmm::DefaultAddressTraits;
     using H          = pmm::BlockHeader<A>;
@@ -239,25 +262,28 @@ TEST_CASE( "detect_block_state and recover_block_state behave consistently", "[i
 
     BlockState::set_weight_of( buffer, 5u );
     BlockState::set_root_offset_of( buffer, 6u );
+    BlockState::set_node_type_of( buffer, pmm::NodeType::Generic );
     REQUIRE( pmm::detect_block_state<A>( buffer, 6 ) == 1 );
     REQUIRE( pmm::detect_block_state<A>( buffer, 7 ) == -1 );
 
-    // Inconsistent: weight==0 but root_offset!=0 — recover_block_state must repair.
+    // Inconsistent: free node_type but root_offset!=0 — recover_block_state must repair.
     BlockState::set_weight_of( buffer, 0u );
     BlockState::set_root_offset_of( buffer, 6u );
+    BlockState::set_node_type_of( buffer, pmm::NodeType::Free );
     pmm::recover_block_state<A>( buffer, 6 );
     REQUIRE( BlockState::get_root_offset( buffer ) == 0u );
 
-    // Inconsistent: weight>0 but root_offset!=own_idx — recover_block_state must repair.
+    // Inconsistent: allocated node_type but root_offset!=own_idx — recover_block_state must repair.
     BlockState::set_weight_of( buffer, 5u );
     BlockState::set_root_offset_of( buffer, 10u );
+    BlockState::set_node_type_of( buffer, pmm::NodeType::Generic );
     pmm::recover_block_state<A>( buffer, 6 );
     REQUIRE( BlockState::get_root_offset( buffer ) == 6u );
 }
 
 // ─── Checked cast_from_raw boundaries ────────────────────────────────────────
 
-TEST_CASE( "FreeBlock::can_cast_from_raw / try_cast_from_raw reject invalid input", "[issue367][block_header][safety]" )
+TEST_CASE( "FreeBlock::can_cast_from_raw / try_cast_from_raw reject invalid input", "[issue369][block_header][safety]" )
 {
     using A          = pmm::DefaultAddressTraits;
     using H          = pmm::BlockHeader<A>;
@@ -274,7 +300,7 @@ TEST_CASE( "FreeBlock::can_cast_from_raw / try_cast_from_raw reject invalid inpu
     REQUIRE_FALSE( pmm::FreeBlock<A>::can_cast_from_raw( misaligned ) );
     REQUIRE_FALSE( pmm::FreeBlock<A>::try_cast_from_raw( misaligned ).has_value() );
 
-    // Zero-initialized buffer is a free block.
+    // Zero-initialized buffer is a free block (NodeType::Free == 0).
     REQUIRE( pmm::FreeBlock<A>::can_cast_from_raw( buffer ) );
     auto opt = pmm::FreeBlock<A>::try_cast_from_raw( buffer );
     REQUIRE( opt.has_value() );
@@ -283,12 +309,13 @@ TEST_CASE( "FreeBlock::can_cast_from_raw / try_cast_from_raw reject invalid inpu
     // After becoming allocated, FreeBlock cast must be rejected.
     BlockState::set_weight_of( buffer, 5u );
     BlockState::set_root_offset_of( buffer, 6u );
+    BlockState::set_node_type_of( buffer, pmm::NodeType::Generic );
     REQUIRE_FALSE( pmm::FreeBlock<A>::can_cast_from_raw( buffer ) );
     REQUIRE_FALSE( pmm::FreeBlock<A>::try_cast_from_raw( buffer ).has_value() );
 }
 
 TEST_CASE( "AllocatedBlock::can_cast_from_raw / try_cast_from_raw reject invalid input",
-           "[issue367][block_header][safety]" )
+           "[issue369][block_header][safety]" )
 {
     using A          = pmm::DefaultAddressTraits;
     using H          = pmm::BlockHeader<A>;
@@ -312,6 +339,7 @@ TEST_CASE( "AllocatedBlock::can_cast_from_raw / try_cast_from_raw reject invalid
     // After being marked allocated, AllocatedBlock cast must succeed.
     BlockState::set_weight_of( buffer, 5u );
     BlockState::set_root_offset_of( buffer, 6u );
+    BlockState::set_node_type_of( buffer, pmm::NodeType::Generic );
     REQUIRE( pmm::AllocatedBlock<A>::can_cast_from_raw( buffer ) );
     auto opt = pmm::AllocatedBlock<A>::try_cast_from_raw( buffer );
     REQUIRE( opt.has_value() );

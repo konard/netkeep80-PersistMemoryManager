@@ -79,14 +79,14 @@ inline void validate_block_header_full( const uint8_t* base, size_t total_size, 
         result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction, static_cast<uint64_t>( idx ),
                     static_cast<uint64_t>( AT::no_block ), static_cast<uint64_t>( prev ) );
     }
-    uint16_t nt = BlockState::get_node_type( blk_raw );
-    if ( nt != pmm::kNodeReadWrite && nt != pmm::kNodeReadOnly )
+    pmm::NodeType nt = BlockState::get_node_type( blk_raw );
+    if ( !pmm::is_known_node_type( static_cast<std::uint8_t>( nt ) ) )
     {
         result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction, static_cast<uint64_t>( idx ), 0,
-                    static_cast<uint64_t>( nt ) );
+                    static_cast<uint64_t>( static_cast<std::uint8_t>( nt ) ) );
     }
     index_type w = BlockState::get_weight( blk_raw );
-    if ( w > 0 )
+    if ( pmm::is_allocated( nt ) && w > 0 )
     {
         static constexpr size_t kBlkHdrBytes = sizeof( pmm::Block<AT> );
         size_t                  blk_byte_off = static_cast<size_t>( idx ) * AT::granule_size;

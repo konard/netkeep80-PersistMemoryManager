@@ -252,4 +252,8 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
     }
     iterator end() const noexcept { return iterator( static_cast<index_type>( 0 ) ); }
 };
+template <typename _K, typename _V, typename ManagerT> struct node_type_for<pmap<_K, _V, ManagerT>>
+{
+    static constexpr NodeType value = NodeType::PMap;
+};
 }

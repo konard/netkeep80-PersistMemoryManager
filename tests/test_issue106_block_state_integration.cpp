@@ -76,8 +76,10 @@ TEST_CASE( "    Allocated block uses weight > 0", "[test_issue106_block_state_in
     pmm.destroy();
 }
 
-/// @brief After deallocation, the block has weight == 0 and root_offset == 0 (FreeBlock invariant).
-TEST_CASE( "    Freed block has weight == 0", "[test_issue106_block_state_integration]" )
+/// @brief After deallocation, the block has NodeType::Free and root_offset == 0 (FreeBlock invariant).
+/// Post-#369: state is determined by `node_type`, not by `weight == 0`. `weight` on a free block is
+/// the cached total block size in granules.
+TEST_CASE( "    Freed block has NodeType::Free", "[test_issue106_block_state_integration]" )
 {
     using BlockState = pmm::BlockStateBase<A>;
 
@@ -91,12 +93,11 @@ TEST_CASE( "    Freed block has weight == 0", "[test_issue106_block_state_integr
 
     pmm.deallocate( raw );
 
-    // I106-A4: weight == 0 (free block after deallocate) (via BlockStateBase API)
-    REQUIRE( BlockState::get_weight( blk ) == 0 );
+    // I106-A4: node_type == Free after deallocate (via BlockStateBase API)
+    REQUIRE( pmm::is_free( BlockState::get_node_type( blk ) ) );
 
     // I106-A5: root_offset == 0 (free block invariant)
     // Note: after coalesce_with_prev, this block may be zeroed (absorbed into prev).
-    // We can only check that weight == 0 since block memory may be reused.
     (void)blk; // blk may have been zeroed by coalescing
 
     pmm.destroy();
@@ -156,8 +157,10 @@ TEST_CASE( "    Block freed via mark_as_free()", "[test_issue106_block_state_int
     // Deallocate blk1 — this calls AllocatedBlock::mark_as_free()
     pmm.deallocate( raw1 );
 
-    // After deallocation: blk1 should be free (weight == 0, root_offset == 0)
-    REQUIRE( BlockState::get_weight( blk1 ) == 0 );
+    // After deallocation: blk1 should be free (NodeType::Free, root_offset == 0).
+    // Post-#369: `weight` on a free block holds the cached total block size,
+    // so we no longer require `weight == 0`.
+    REQUIRE( pmm::is_free( BlockState::get_node_type( blk1 ) ) );
     REQUIRE( BlockState::get_root_offset( blk1 ) == 0 );
 
     pmm.deallocate( raw2 );
@@ -234,9 +237,10 @@ TEST_CASE( "    recover_block_state repairs inconsistencies", "[test_issue106_bl
     alignas( 16 ) std::uint8_t buffer[32];
     std::memset( buffer, 0, sizeof( buffer ) );
 
-    // Create block with inconsistent state: weight>0 but wrong root_offset
-    // (via BlockStateBase static API)
+    // Create block with inconsistent state: allocated node_type but wrong root_offset.
+    // Post-#369: state is determined by `node_type`, not by `weight`.
     BlockState::set_weight_of( buffer, 5u );
+    BlockState::set_node_type_of( buffer, pmm::NodeType::Generic );
     BlockState::set_root_offset_of( buffer, 99u ); // Should be own_idx (e.g. 6), but corrupted
 
     // recover_block_state should fix it
@@ -244,9 +248,9 @@ TEST_CASE( "    recover_block_state repairs inconsistencies", "[test_issue106_bl
     pmm::recover_block_state<A>( buffer, own_idx );
     REQUIRE( BlockState::get_root_offset( buffer ) == own_idx ); // Fixed
 
-    // Scenario 2: weight==0 but root_offset!=0 (inconsistent free block)
-    BlockState::set_weight_of( buffer, 0u );
-    BlockState::set_root_offset_of( buffer, 6u ); // Should be 0
+    // Scenario 2: free node_type but root_offset!=0 (inconsistent free block)
+    BlockState::set_node_type_of( buffer, pmm::NodeType::Free );
+    BlockState::set_root_offset_of( buffer, 6u ); // Should be 0 for free
 
     pmm::recover_block_state<A>( buffer, own_idx );
     REQUIRE( BlockState::get_root_offset( buffer ) == 0 ); // Fixed
@@ -262,25 +266,28 @@ TEST_CASE( "    detect_block_state accuracy", "[test_issue106_block_state_integr
     alignas( 16 ) std::uint8_t buffer[32];
     std::memset( buffer, 0, sizeof( buffer ) );
 
-    // FreeBlock: weight=0, root_offset=0 (via BlockStateBase API)
-    BlockState::set_weight_of( buffer, 0u );
+    // FreeBlock: NodeType::Free, root_offset=0. Post-#369: `weight` on a free
+    // block holds the cached total block size, not the state flag.
+    BlockState::set_node_type_of( buffer, pmm::NodeType::Free );
     BlockState::set_root_offset_of( buffer, 0u );
     REQUIRE( pmm::detect_block_state<A>( buffer, 6 ) == 0 );
 
-    // AllocatedBlock: weight>0, root_offset==own_idx
+    // AllocatedBlock: NodeType::Generic, weight>0, root_offset==own_idx
+    BlockState::set_node_type_of( buffer, pmm::NodeType::Generic );
     BlockState::set_weight_of( buffer, 5u );
     BlockState::set_root_offset_of( buffer, 6u );
     REQUIRE( pmm::detect_block_state<A>( buffer, 6 ) == 1 );
 
-    // Invalid: weight>0 but root_offset != own_idx
-    BlockState::set_weight_of( buffer, 5u );
+    // Invalid: allocated node_type but root_offset != own_idx
+    BlockState::set_node_type_of( buffer, pmm::NodeType::Generic );
     BlockState::set_root_offset_of( buffer, 99u ); // Wrong
     REQUIRE( pmm::detect_block_state<A>( buffer, 6 ) == -1 );
 
-    // Invalid: weight==0 but root_offset != 0
-    BlockState::set_weight_of( buffer, 0u );
-    BlockState::set_root_offset_of( buffer, 6u ); // Should be 0 for free
-    REQUIRE( pmm::detect_block_state<A>( buffer, 6 ) == -1 );
+    // Free node_type with non-zero root_offset is still detected as free by node_type
+    // alone; the root_offset corruption surfaces in verify_state, not in detect_block_state.
+    BlockState::set_node_type_of( buffer, pmm::NodeType::Free );
+    BlockState::set_root_offset_of( buffer, 6u );
+    REQUIRE( pmm::detect_block_state<A>( buffer, 6 ) == 0 );
 }
 
 // ─── I106-G: Full allocate/deallocate cycle with state verification ────────────
@@ -348,14 +355,15 @@ TEST_CASE( "    Split creates valid FreeBlock remainder", "[test_issue106_block_
     REQUIRE( BlockState::get_weight( blk ) > 0 );
     REQUIRE( BlockState::get_root_offset( blk ) == idx );
 
-    // The next block (remainder) should be a valid FreeBlock
+    // The next block (remainder) should be a valid FreeBlock.
+    // Post-#369: `weight` on a free block is the cached total block size.
     if ( BlockState::get_next_offset( blk ) != pmm::detail::kNoBlock )
     {
         std::uint8_t*  base = pmm.backend().base_ptr();
         pmm::Block<A>* rem  = reinterpret_cast<pmm::Block<A>*>(
             base + pmm::detail::idx_to_byte_off_t<A>( BlockState::get_next_offset( blk ) ) );
-        REQUIRE( BlockState::get_weight( rem ) == 0 );      // FreeBlock: weight == 0
-        REQUIRE( BlockState::get_root_offset( rem ) == 0 ); // FreeBlock: root_offset == 0
+        REQUIRE( pmm::is_free( BlockState::get_node_type( rem ) ) ); // FreeBlock state
+        REQUIRE( BlockState::get_root_offset( rem ) == 0 );          // FreeBlock: root_offset == 0
     }
 
     pmm.deallocate( raw );
@@ -393,8 +401,9 @@ TEST_CASE( "    Issue #106 acceptance criteria met", "[test_issue106_block_state
 
     pmm.deallocate( raw );
 
-    // After deallocate: weight==0, root_offset==0 (FreeBlock or merged) (via BlockStateBase API)
-    REQUIRE( BlockState::get_weight( blk ) == 0 );
+    // After deallocate: NodeType::Free, root_offset==0 (FreeBlock or merged).
+    // Post-#369: `weight` on a free block holds the cached total block size.
+    REQUIRE( pmm::is_free( BlockState::get_node_type( blk ) ) );
     REQUIRE( BlockState::get_root_offset( blk ) == 0 );
 
     pmm.destroy();

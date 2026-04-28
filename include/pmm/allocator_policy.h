@@ -35,8 +35,8 @@ class AllocatorPolicy
         FreeBlock<AT>               fb          = FreeBlock<AT>::cast_from_raw( detail::block_at<AT>( base, blk_idx ) );
         FreeBlockRemovedAVL<AT>     removed     = fb.remove_from_avl();
         static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AT>;
-        index_type blk_total_gran = detail::block_total_granules( base, hdr, detail::block_at<AT>( base, blk_idx ) );
-        index_type data_gran      = detail::bytes_to_granules_t<AT>( user_size );
+        index_type                  blk_total_gran = BlockState::get_weight( detail::block_at<AT>( base, blk_idx ) );
+        index_type                  data_gran      = detail::bytes_to_granules_t<AT>( user_size );
         if ( data_gran > std::numeric_limits<index_type>::max() - kBlkHdrGran )
             return nullptr;
         index_type needed_gran  = kBlkHdrGran + data_gran;
@@ -50,8 +50,9 @@ class AllocatorPolicy
             index_type         new_idx     = blk_idx + needed_gran;
             void*              new_blk_ptr = detail::block_at<AT>( base, new_idx );
             index_type         curr_next   = splitting.next_offset();
-            BlockT* old_next = ( curr_next != AT::no_block ) ? detail::block_at<AT>( base, curr_next ) : nullptr;
-            splitting.initialize_new_block( new_blk_ptr, new_idx, blk_idx );
+            BlockT*    old_next = ( curr_next != AT::no_block ) ? detail::block_at<AT>( base, curr_next ) : nullptr;
+            index_type new_blk_total_gran = static_cast<index_type>( blk_total_gran - needed_gran );
+            splitting.initialize_new_block( new_blk_ptr, new_idx, blk_idx, new_blk_total_gran );
             splitting.link_new_block( old_next, new_idx );
             if ( old_next == nullptr )
                 hdr->last_block_offset = new_idx;
@@ -80,13 +81,14 @@ class AllocatorPolicy
         if ( curr_next != AT::no_block )
         {
             void* nxt_raw = detail::block_at<AT>( base, curr_next );
-            if ( BlockState::get_weight( nxt_raw ) == 0 )
+            if ( pmm::is_free( BlockState::get_node_type( nxt_raw ) ) )
             {
                 index_type nxt_idx  = curr_next;
+                index_type nxt_gran = BlockState::get_weight( nxt_raw );
                 index_type nxt_next = BlockState::get_next_offset( nxt_raw );
                 BlockT* nxt_nxt_blk = ( nxt_next != AT::no_block ) ? detail::block_at<AT>( base, nxt_next ) : nullptr;
                 FT::remove( base, hdr, nxt_idx );
-                coalescing.coalesce_with_next( detail::block_at<AT>( base, nxt_idx ), nxt_nxt_blk, b_idx );
+                coalescing.coalesce_with_next( detail::block_at<AT>( base, nxt_idx ), nxt_nxt_blk, b_idx, nxt_gran );
                 if ( nxt_nxt_blk == nullptr )
                     hdr->last_block_offset = b_idx;
                 hdr->block_count--;
@@ -99,13 +101,15 @@ class AllocatorPolicy
         if ( curr_prev != AT::no_block )
         {
             void* prv_raw = detail::block_at<AT>( base, curr_prev );
-            if ( BlockState::get_weight( prv_raw ) == 0 )
+            if ( pmm::is_free( BlockState::get_node_type( prv_raw ) ) )
             {
-                index_type prv_idx  = curr_prev;
-                index_type blk_next = coalescing.next_offset();
-                BlockT*    next_blk = ( blk_next != AT::no_block ) ? detail::block_at<AT>( base, blk_next ) : nullptr;
+                index_type prv_idx   = curr_prev;
+                index_type self_gran = coalescing.weight();
+                index_type blk_next  = coalescing.next_offset();
+                BlockT*    next_blk  = ( blk_next != AT::no_block ) ? detail::block_at<AT>( base, blk_next ) : nullptr;
                 FT::remove( base, hdr, prv_idx );
-                CoalescingBlock<AT> result_coalescing = coalescing.coalesce_with_prev( prv_raw, next_blk, prv_idx );
+                CoalescingBlock<AT> result_coalescing =
+                    coalescing.coalesce_with_prev( prv_raw, next_blk, prv_idx, self_gran );
                 if ( next_blk == nullptr )
                     hdr->last_block_offset = prv_idx;
                 hdr->block_count--;
@@ -129,8 +133,10 @@ class AllocatorPolicy
         {
             void* blk_ptr = detail::block_at<AT>( base, idx );
             BlockState::recover_state( blk_ptr, idx );
-            if ( BlockState::get_weight( blk_ptr ) == 0 )
+            if ( pmm::is_free( BlockState::get_node_type( blk_ptr ) ) )
             {
+                index_type total_gran = compute_total_block_granules( base, hdr, idx, blk_ptr );
+                BlockState::set_weight_of( blk_ptr, total_gran );
                 BlockState::reset_avl_fields_of( blk_ptr );
                 FT::insert( base, hdr, idx );
             }
@@ -168,11 +174,10 @@ class AllocatorPolicy
             const void* blk_ptr = detail::block_at<AT>( base, idx );
             block_count++;
             used_gran += kBlkHdrGran;
-            index_type w = BlockState::get_weight( blk_ptr );
-            if ( w > 0 )
+            if ( pmm::is_allocated( BlockState::get_node_type( blk_ptr ) ) )
             {
                 alloc_count++;
-                used_gran += w;
+                used_gran += BlockState::get_weight( blk_ptr );
             }
             else
             {
@@ -220,11 +225,10 @@ class AllocatorPolicy
             const void* blk_ptr = detail::block_at<AT>( base, idx );
             block_count++;
             used_gran += kBlkHdrGran;
-            index_type w = BlockState::get_weight( blk_ptr );
-            if ( w > 0 )
+            if ( pmm::is_allocated( BlockState::get_node_type( blk_ptr ) ) )
             {
                 alloc_count++;
-                used_gran += w;
+                used_gran += BlockState::get_weight( blk_ptr );
             }
             else
             {
@@ -249,6 +253,18 @@ class AllocatorPolicy
                 break;
             const void* blk_ptr = detail::block_at<AT>( base, idx );
             BlockState::verify_state( blk_ptr, idx, result );
+            if ( pmm::is_free( BlockState::get_node_type( blk_ptr ) ) )
+            {
+                const auto* blk      = reinterpret_cast<const BlockT*>( blk_ptr );
+                index_type  cached   = BlockState::get_weight( blk_ptr );
+                index_type  physical = detail::physical_block_total_granules<AT>( base, hdr, blk );
+                if ( cached != physical )
+                {
+                    result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction,
+                                static_cast<uint64_t>( idx ), static_cast<uint64_t>( physical ),
+                                static_cast<uint64_t>( cached ) );
+                }
+            }
             idx = BlockState::get_next_offset( blk_ptr );
         }
     }
@@ -262,7 +278,7 @@ class AllocatorPolicy
             if ( static_cast<size_t>( idx ) * AT::granule_size + sizeof( BlockT ) > hdr->total_size )
                 break;
             const void* blk_ptr = detail::block_at<AT>( base, idx );
-            if ( BlockState::get_weight( blk_ptr ) == 0 )
+            if ( pmm::is_free( BlockState::get_node_type( blk_ptr ) ) )
                 ++expected_count;
             idx = BlockState::get_next_offset( blk_ptr );
         }
@@ -289,7 +305,8 @@ class AllocatorPolicy
             return;
         }
         const void* root = detail::block_at<AT>( base, hdr->free_tree_root );
-        if ( BlockState::get_weight( root ) != 0 || BlockState::get_parent_offset( root ) != AT::no_block )
+        if ( !pmm::is_free( BlockState::get_node_type( root ) ) ||
+             BlockState::get_parent_offset( root ) != AT::no_block )
         {
             result.add( ViolationType::FreeTreeStale, DiagnosticAction::NoAction,
                         static_cast<uint64_t>( hdr->free_tree_root ), 0,
@@ -304,7 +321,7 @@ class AllocatorPolicy
             if ( static_cast<size_t>( idx ) * AT::granule_size + sizeof( BlockT ) > hdr->total_size )
                 break;
             const void* blk_ptr = detail::block_at<AT>( base, idx );
-            if ( BlockState::get_weight( blk_ptr ) == 0 &&
+            if ( pmm::is_free( BlockState::get_node_type( blk_ptr ) ) &&
                  !free_tree_contains( base, hdr, hdr->free_tree_root, idx, expected_count ) )
             {
                 result.add( ViolationType::FreeTreeStale, DiagnosticAction::NoAction, static_cast<uint64_t>( idx ), 1,
@@ -321,11 +338,9 @@ class AllocatorPolicy
     static index_type free_tree_block_granules( const uint8_t* base, const detail::ManagerHeader<AT>* hdr,
                                                 index_type block_idx ) noexcept
     {
-        const void* n      = detail::block_at<AT>( base, block_idx );
-        index_type  n_next = BlockState::get_next_offset( n );
-        index_type  total  = detail::byte_off_to_idx_t<AT>( hdr->total_size );
-        return ( n_next != AT::no_block ) ? static_cast<index_type>( n_next - block_idx )
-                                          : static_cast<index_type>( total - block_idx );
+        (void)hdr;
+        const void* n = detail::block_at<AT>( base, block_idx );
+        return BlockState::get_weight( n );
     }
     static bool free_tree_less_key( const uint8_t* base, const detail::ManagerHeader<AT>* hdr, index_type a,
                                     index_type b ) noexcept
@@ -342,7 +357,7 @@ class AllocatorPolicy
             if ( !detail::validate_block_index<AT>( hdr->total_size, node_idx ) )
                 return false;
             const void* node = detail::block_at<AT>( base, node_idx );
-            if ( BlockState::get_weight( node ) != 0 )
+            if ( !pmm::is_free( BlockState::get_node_type( node ) ) )
                 return false;
             if ( node_idx == target )
                 return true;
@@ -372,7 +387,7 @@ class AllocatorPolicy
             return 0;
         }
         const void* node = detail::block_at<AT>( base, node_idx );
-        if ( BlockState::get_weight( node ) != 0 )
+        if ( !pmm::is_free( BlockState::get_node_type( node ) ) )
         {
             result.add( ViolationType::FreeTreeStale, DiagnosticAction::NoAction, static_cast<uint64_t>( node_idx ), 0,
                         static_cast<uint64_t>( BlockState::get_weight( node ) ) );
@@ -401,7 +416,7 @@ class AllocatorPolicy
         std::int16_t right_h    = verify_free_tree_node( base, hdr, right, node_idx, node_idx, true, upper, has_upper,
                                                          expected_count, visited_count, result );
         std::int16_t expected_h = static_cast<std::int16_t>( 1 + ( left_h > right_h ? left_h : right_h ) );
-        std::int16_t stored_h   = BlockState::get_avl_height( node );
+        std::int16_t stored_h   = static_cast<std::int16_t>( BlockState::get_avl_height( node ) );
         if ( stored_h != expected_h || left_h - right_h > 1 || right_h - left_h > 1 )
         {
             result.add( ViolationType::FreeTreeStale, DiagnosticAction::NoAction, static_cast<uint64_t>( node_idx ),
@@ -416,12 +431,13 @@ class AllocatorPolicy
         index_type                  remainder   = old_data_gran - new_data_gran;
         if ( remainder >= kBlkHdrGran + 1 )
         {
-            index_type new_free_idx = blk_idx + kBlkHdrGran + new_data_gran;
-            void*      new_free_blk = detail::block_at<AT>( base, new_free_idx );
-            index_type old_next     = BlockState::get_next_offset( blk_raw );
-            auto*      old_next_blk = ( old_next != AT::no_block ) ? detail::block_at<AT>( base, old_next ) : nullptr;
+            index_type new_free_idx  = blk_idx + kBlkHdrGran + new_data_gran;
+            void*      new_free_blk  = detail::block_at<AT>( base, new_free_idx );
+            index_type new_free_gran = remainder;
+            index_type old_next      = BlockState::get_next_offset( blk_raw );
+            auto*      old_next_blk  = ( old_next != AT::no_block ) ? detail::block_at<AT>( base, old_next ) : nullptr;
             std::memset( new_free_blk, 0, sizeof( BlockT ) );
-            BlockState::init_fields( new_free_blk, blk_idx, old_next, 1, 0, 0 );
+            BlockState::init_fields( new_free_blk, blk_idx, old_next, 1, new_free_gran, 0, NodeType::Free );
             BlockState::set_next_offset_of( blk_raw, new_free_idx );
             if ( old_next_blk != nullptr )
                 BlockState::set_prev_offset_of( old_next_blk, new_free_idx );
@@ -448,9 +464,9 @@ class AllocatorPolicy
         if ( next_idx == AT::no_block )
             return false;
         void* next_blk = detail::block_at<AT>( base, next_idx );
-        if ( BlockState::get_weight( next_blk ) != 0 )
+        if ( !pmm::is_free( BlockState::get_node_type( next_blk ) ) )
             return false;
-        index_type next_total = detail::block_total_granules( base, hdr, detail::block_at<AT>( base, next_idx ) );
+        index_type next_total = BlockState::get_weight( next_blk );
         index_type available  = old_data_gran + next_total;
         if ( available < new_data_gran )
             return false;
@@ -473,7 +489,7 @@ class AllocatorPolicy
             void*      rem_blk      = detail::block_at<AT>( base, rem_idx );
             index_type blk_new_next = BlockState::get_next_offset( blk_raw );
             std::memset( rem_blk, 0, sizeof( BlockT ) );
-            BlockState::init_fields( rem_blk, blk_idx, blk_new_next, 1, 0, 0 );
+            BlockState::init_fields( rem_blk, blk_idx, blk_new_next, 1, rem, 0, NodeType::Free );
             BlockState::set_next_offset_of( blk_raw, rem_idx );
             if ( blk_new_next != AT::no_block )
                 BlockState::set_prev_offset_of( detail::block_at<AT>( base, blk_new_next ), rem_idx );
@@ -487,6 +503,17 @@ class AllocatorPolicy
         BlockState::set_weight_of( blk_raw, new_data_gran );
         hdr->used_size += ( new_data_gran - old_data_gran );
         return true;
+    }
+
+  private:
+    static index_type compute_total_block_granules( const uint8_t* base, const detail::ManagerHeader<AT>* hdr,
+                                                    index_type idx, const void* blk ) noexcept
+    {
+        (void)base;
+        index_type next       = BlockState::get_next_offset( blk );
+        index_type total_gran = static_cast<index_type>( hdr->total_size / AT::granule_size );
+        return ( next != AT::no_block ) ? static_cast<index_type>( next - idx )
+                                        : static_cast<index_type>( total_gran - idx );
     }
 };
 using DefaultAllocatorPolicy = AllocatorPolicy<AvlFreeTree<DefaultAddressTraits>, DefaultAddressTraits>;

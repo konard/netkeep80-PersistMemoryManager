@@ -141,34 +141,132 @@ inline constexpr size_t kDefaultGrowDenominator = 4;
 #include <type_traits>
 namespace pmm
 {
-enum : uint16_t
+/*
+## pmm-nodetype
+*/
+enum class NodeType : std::uint8_t
 {
-    kNodeReadWrite = 0,
-    kNodeReadOnly  = 1,
+    Free           = 0,
+    ManagerHeader  = 1,
+    Generic        = 2,
+    ReadOnlyLocked = 3,
+    PStringView    = 4,
+    PString        = 5,
+    PArray         = 6,
+    PMap           = 7,
+    PPtr           = 8,
 };
+/*
+### pmm-nodetype-helpers
+*/
+constexpr bool is_free( NodeType t ) noexcept
+{
+    return t == NodeType::Free;
+}
+constexpr bool is_allocated( NodeType t ) noexcept
+{
+    switch ( t )
+    {
+    case NodeType::ManagerHeader:
+    case NodeType::Generic:
+    case NodeType::ReadOnlyLocked:
+    case NodeType::PStringView:
+    case NodeType::PString:
+    case NodeType::PArray:
+    case NodeType::PMap:
+    case NodeType::PPtr:
+        return true;
+    case NodeType::Free:
+        return false;
+    }
+    return false;
+}
+constexpr bool is_mutable( NodeType t ) noexcept
+{
+    switch ( t )
+    {
+    case NodeType::Free:
+    case NodeType::ManagerHeader:
+    case NodeType::Generic:
+    case NodeType::PString:
+    case NodeType::PArray:
+    case NodeType::PMap:
+    case NodeType::PPtr:
+        return true;
+    case NodeType::ReadOnlyLocked:
+    case NodeType::PStringView:
+        return false;
+    }
+    return false;
+}
+constexpr bool can_be_deleted_from_pap( NodeType t ) noexcept
+{
+    switch ( t )
+    {
+    case NodeType::Generic:
+    case NodeType::PStringView:
+    case NodeType::PString:
+    case NodeType::PArray:
+    case NodeType::PMap:
+    case NodeType::PPtr:
+        return true;
+    case NodeType::Free:
+    case NodeType::ManagerHeader:
+    case NodeType::ReadOnlyLocked:
+        return false;
+    }
+    return false;
+}
+constexpr bool participates_in_free_tree( NodeType t ) noexcept
+{
+    return t == NodeType::Free;
+}
+/*
+### pmm-nodetype-for
+*/
+template <typename T> struct node_type_for
+{
+    static constexpr NodeType value = NodeType::Generic;
+};
+template <typename T> inline constexpr NodeType node_type_for_v = node_type_for<T>::value;
+constexpr bool                                  is_known_node_type( std::uint8_t v ) noexcept
+{
+    switch ( static_cast<NodeType>( v ) )
+    {
+    case NodeType::Free:
+    case NodeType::ManagerHeader:
+    case NodeType::Generic:
+    case NodeType::ReadOnlyLocked:
+    case NodeType::PStringView:
+    case NodeType::PString:
+    case NodeType::PArray:
+    case NodeType::PMap:
+    case NodeType::PPtr:
+        return true;
+    }
+    return false;
+}
 namespace detail
 {
-template <typename AT, bool NeedsPadding> struct BlockHeaderStorage;
-template <typename AT> struct BlockHeaderStorage<AT, false>
+template <typename AT> struct BlockHeaderCoreFields
 {
     using index_type = typename AT::index_type;
-    index_type   weight;
-    index_type   left_offset;
-    index_type   right_offset;
-    index_type   parent_offset;
-    index_type   root_offset;
-    std::int16_t avl_height;
-    uint16_t     node_type;
-    index_type   prev_offset;
-    index_type   next_offset;
+    index_type weight;
+    index_type left_offset;
+    index_type right_offset;
+    index_type parent_offset;
+    index_type root_offset;
+    index_type prev_offset;
+    index_type next_offset;
 };
-template <typename AT> constexpr std::size_t block_header_natural_size_v = sizeof( BlockHeaderStorage<AT, false> );
+template <typename AT> constexpr std::size_t block_header_core_size_v = sizeof( BlockHeaderCoreFields<AT> );
+template <typename AT> constexpr std::size_t block_header_min_size_v  = block_header_core_size_v<AT> + 2;
 template <typename AT>
 constexpr std::size_t block_header_target_size_v =
-    ( ( block_header_natural_size_v<AT> + AT::granule_size - 1 ) / AT::granule_size ) * AT::granule_size;
+    ( ( block_header_min_size_v<AT> + AT::granule_size - 1 ) / AT::granule_size ) * AT::granule_size;
 template <typename AT>
-constexpr bool block_header_needs_padding_v = block_header_natural_size_v<AT> != block_header_target_size_v<AT>;
-template <typename AT> struct BlockHeaderStorage<AT, true>
+constexpr std::size_t block_header_trailer_pad_v = block_header_target_size_v<AT> - block_header_core_size_v<AT> - 2;
+template <typename AT, std::size_t Pad> struct BlockHeaderStorageImpl
 {
     using index_type = typename AT::index_type;
     index_type   weight;
@@ -176,17 +274,31 @@ template <typename AT> struct BlockHeaderStorage<AT, true>
     index_type   right_offset;
     index_type   parent_offset;
     index_type   root_offset;
-    std::int16_t avl_height;
-    uint16_t     node_type;
     index_type   prev_offset;
     index_type   next_offset;
-    std::uint8_t _granule_padding[block_header_target_size_v<AT> - block_header_natural_size_v<AT>];
+    std::uint8_t _trailer_padding[Pad];
+    std::uint8_t avl_height;
+    NodeType     node_type;
 };
+template <typename AT> struct BlockHeaderStorageImpl<AT, 0>
+{
+    using index_type = typename AT::index_type;
+    index_type   weight;
+    index_type   left_offset;
+    index_type   right_offset;
+    index_type   parent_offset;
+    index_type   root_offset;
+    index_type   prev_offset;
+    index_type   next_offset;
+    std::uint8_t avl_height;
+    NodeType     node_type;
+};
+template <typename AT> using BlockHeaderStorage = BlockHeaderStorageImpl<AT, block_header_trailer_pad_v<AT>>;
 }
 /*
 ## pmm-blockheader
 */
-template <typename AT> struct BlockHeader : detail::BlockHeaderStorage<AT, detail::block_header_needs_padding_v<AT>>
+template <typename AT> struct BlockHeader : detail::BlockHeaderStorage<AT>
 {
     using address_traits = AT;
     using index_type     = typename AT::index_type;
@@ -215,10 +327,12 @@ static_assert( offsetof( BlockHeader<DefaultAddressTraits>, left_offset ) == 4 )
 static_assert( offsetof( BlockHeader<DefaultAddressTraits>, right_offset ) == 8 );
 static_assert( offsetof( BlockHeader<DefaultAddressTraits>, parent_offset ) == 12 );
 static_assert( offsetof( BlockHeader<DefaultAddressTraits>, root_offset ) == 16 );
-static_assert( offsetof( BlockHeader<DefaultAddressTraits>, avl_height ) == 20 );
-static_assert( offsetof( BlockHeader<DefaultAddressTraits>, node_type ) == 22 );
-static_assert( offsetof( BlockHeader<DefaultAddressTraits>, prev_offset ) == 24 );
-static_assert( offsetof( BlockHeader<DefaultAddressTraits>, next_offset ) == 28 );
+static_assert( offsetof( BlockHeader<DefaultAddressTraits>, prev_offset ) == 20 );
+static_assert( offsetof( BlockHeader<DefaultAddressTraits>, next_offset ) == 24 );
+static_assert( offsetof( BlockHeader<DefaultAddressTraits>, avl_height ) ==
+               sizeof( BlockHeader<DefaultAddressTraits> ) - 2 );
+static_assert( offsetof( BlockHeader<DefaultAddressTraits>, node_type ) ==
+               sizeof( BlockHeader<DefaultAddressTraits> ) - 1 );
 static_assert( ( sizeof( BlockHeader<SmallAddressTraits> ) % SmallAddressTraits::granule_size ) == 0 );
 static_assert( ( sizeof( BlockHeader<DefaultAddressTraits> ) % DefaultAddressTraits::granule_size ) == 0 );
 static_assert( ( sizeof( BlockHeader<LargeAddressTraits> ) % LargeAddressTraits::granule_size ) == 0 );
@@ -359,13 +473,12 @@ template <typename AT> class BlockStateBase
     static const Header* header_of( const void* raw_blk ) noexcept { return detail::block_header_at<AT>( raw_blk ); }
     static bool          is_free_raw( const void* raw_blk ) noexcept
     {
-        const Header* h = header_of( raw_blk );
-        return h->weight == 0 && h->root_offset == 0;
+        return pmm::is_free( header_of( raw_blk )->node_type );
     }
     static bool is_allocated_raw( const void* raw_blk, index_type own_idx ) noexcept
     {
         const Header* h = header_of( raw_blk );
-        return h->weight > 0 && h->root_offset == own_idx;
+        return pmm::is_allocated( h->node_type ) && h->root_offset == own_idx;
     }
 /*
 ### pmm-blockstatebase-recover_state
@@ -373,9 +486,9 @@ template <typename AT> class BlockStateBase
     static void recover_state( void* raw_blk, index_type own_idx ) noexcept
     {
         Header* h = header_of( raw_blk );
-        if ( h->weight > 0 && h->root_offset != own_idx )
+        if ( pmm::is_allocated( h->node_type ) && h->root_offset != own_idx )
             h->root_offset = own_idx;
-        if ( h->weight == 0 && h->root_offset != 0 )
+        if ( pmm::is_free( h->node_type ) && h->root_offset != 0 )
             h->root_offset = 0;
     }
 /*
@@ -384,13 +497,13 @@ template <typename AT> class BlockStateBase
     static void verify_state( const void* raw_blk, index_type own_idx, VerifyResult& result ) noexcept
     {
         const Header* h = header_of( raw_blk );
-        if ( h->weight > 0 && h->root_offset != own_idx )
+        if ( pmm::is_allocated( h->node_type ) && h->root_offset != own_idx )
         {
             result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction,
                         static_cast<uint64_t>( own_idx ), static_cast<uint64_t>( own_idx ),
                         static_cast<uint64_t>( h->root_offset ) );
         }
-        if ( h->weight == 0 && h->root_offset != 0 )
+        if ( pmm::is_free( h->node_type ) && h->root_offset != 0 )
         {
             result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction,
                         static_cast<uint64_t>( own_idx ), 0, static_cast<uint64_t>( h->root_offset ) );
@@ -415,10 +528,10 @@ template <typename AT> class BlockStateBase
     static index_type   get_right_offset( const void* b ) noexcept { return header_of( b )->right_offset; }
     static index_type   get_parent_offset( const void* b ) noexcept { return header_of( b )->parent_offset; }
     static index_type   get_root_offset( const void* b ) noexcept { return header_of( b )->root_offset; }
-    static std::int16_t get_avl_height( const void* raw_blk ) noexcept { return header_of( raw_blk )->avl_height; }
-    static uint16_t     get_node_type( const void* raw_blk ) noexcept { return header_of( raw_blk )->node_type; }
-    static void init_fields( void* raw_blk, index_type prev_idx, index_type next_idx, std::int16_t avl_height_val,
-                             index_type weight_val, index_type root_offset_val ) noexcept
+    static std::uint8_t get_avl_height( const void* raw_blk ) noexcept { return header_of( raw_blk )->avl_height; }
+    static NodeType     get_node_type( const void* raw_blk ) noexcept { return header_of( raw_blk )->node_type; }
+    static void init_fields( void* raw_blk, index_type prev_idx, index_type next_idx, std::uint8_t avl_height_val,
+                             index_type weight_val, index_type root_offset_val, NodeType node_type_val ) noexcept
     {
         Header* h        = header_of( raw_blk );
         h->prev_offset   = prev_idx;
@@ -429,6 +542,7 @@ template <typename AT> class BlockStateBase
         h->avl_height    = avl_height_val;
         h->weight        = weight_val;
         h->root_offset   = root_offset_val;
+        h->node_type     = node_type_val;
     }
     static void set_next_offset_of( void* b, index_type v ) noexcept { header_of( b )->next_offset = v; }
     static void set_prev_offset_of( void* b, index_type v ) noexcept { header_of( b )->prev_offset = v; }
@@ -437,8 +551,8 @@ template <typename AT> class BlockStateBase
     static void set_parent_offset_of( void* b, index_type v ) noexcept { header_of( b )->parent_offset = v; }
     static void set_weight_of( void* b, index_type v ) noexcept { header_of( b )->weight = v; }
     static void set_root_offset_of( void* b, index_type v ) noexcept { header_of( b )->root_offset = v; }
-    static void set_avl_height_of( void* b, std::int16_t v ) noexcept { header_of( b )->avl_height = v; }
-    static void set_node_type_of( void* b, uint16_t v ) noexcept { header_of( b )->node_type = v; }
+    static void set_avl_height_of( void* b, std::uint8_t v ) noexcept { header_of( b )->avl_height = v; }
+    static void set_node_type_of( void* b, NodeType v ) noexcept { header_of( b )->node_type = v; }
 };
 /*
 ## pmm-freeblock
@@ -460,9 +574,9 @@ template <typename AT> class FreeBlock
     index_type    right_offset() const noexcept { return h_->right_offset; }
     index_type    parent_offset() const noexcept { return h_->parent_offset; }
     index_type    root_offset() const noexcept { return h_->root_offset; }
-    std::int16_t  avl_height() const noexcept { return h_->avl_height; }
-    uint16_t      node_type() const noexcept { return h_->node_type; }
-    bool          is_free() const noexcept { return h_->weight == 0 && h_->root_offset == 0; }
+    std::uint8_t  avl_height() const noexcept { return h_->avl_height; }
+    NodeType      node_type() const noexcept { return h_->node_type; }
+    bool          is_free() const noexcept { return pmm::is_free( h_->node_type ); }
 /*
 ### pmm-freeblock-cast_from_raw
 */
@@ -470,8 +584,7 @@ template <typename AT> class FreeBlock
     {
         assert( raw != nullptr );
         Header* h = detail::block_header_at<AT>( raw );
-        assert( ( h->weight == 0 && h->root_offset == 0 ) &&
-                "cast_from_raw<FreeBlock>: block is not in FreeBlock state" );
+        assert( pmm::is_free( h->node_type ) && "cast_from_raw<FreeBlock>: block is not in FreeBlock state" );
         return FreeBlock( *h );
     }
 /*
@@ -484,7 +597,7 @@ template <typename AT> class FreeBlock
         if ( reinterpret_cast<std::uintptr_t>( raw ) % alignof( Header ) != 0 )
             return false;
         const Header* h = reinterpret_cast<const Header*>( raw );
-        return h->weight == 0 && h->root_offset == 0;
+        return pmm::is_free( h->node_type );
     }
 /*
 ### pmm-freeblock-try_cast_from_raw
@@ -548,7 +661,8 @@ template <typename AT> class SplittingBlock
     {
         return SplittingBlock( *detail::block_header_at<AT>( raw ) );
     }
-    void initialize_new_block( void* new_blk_ptr, [[maybe_unused]] index_type new_idx, index_type own_idx ) noexcept
+    void initialize_new_block( void* new_blk_ptr, [[maybe_unused]] index_type new_idx, index_type own_idx,
+                               index_type new_block_total_granules ) noexcept
     {
         std::memset( new_blk_ptr, 0, sizeof( BlockHeader<AT> ) );
         Header* nh        = detail::block_header_at<AT>( new_blk_ptr );
@@ -558,8 +672,9 @@ template <typename AT> class SplittingBlock
         nh->right_offset  = AT::no_block;
         nh->parent_offset = AT::no_block;
         nh->avl_height    = 1;
-        nh->weight        = 0;
+        nh->weight        = new_block_total_granules;
         nh->root_offset   = 0;
+        nh->node_type     = NodeType::Free;
     }
     void link_new_block( void* old_next_blk, index_type new_idx ) noexcept
     {
@@ -586,6 +701,7 @@ template <typename AT> class AllocatedBlock
     const Header& header() const noexcept { return *h_; }
     index_type    weight() const noexcept { return h_->weight; }
     index_type    root_offset() const noexcept { return h_->root_offset; }
+    NodeType      node_type() const noexcept { return h_->node_type; }
 /*
 ### pmm-allocatedblock-cast_from_raw
 */
@@ -593,7 +709,7 @@ template <typename AT> class AllocatedBlock
     {
         assert( raw != nullptr );
         Header* h = detail::block_header_at<AT>( raw );
-        assert( h->weight != 0 && "cast_from_raw<AllocatedBlock>: block is not allocated (weight==0)" );
+        assert( pmm::is_allocated( h->node_type ) && "cast_from_raw<AllocatedBlock>: block is not allocated" );
         return AllocatedBlock( *h );
     }
 /*
@@ -606,7 +722,7 @@ template <typename AT> class AllocatedBlock
         if ( reinterpret_cast<std::uintptr_t>( raw ) % alignof( Header ) != 0 )
             return false;
         const Header* h = reinterpret_cast<const Header*>( raw );
-        return h->weight != 0;
+        return pmm::is_allocated( h->node_type );
     }
 /*
 ### pmm-allocatedblock-try_cast_from_raw
@@ -620,10 +736,13 @@ template <typename AT> class AllocatedBlock
 /*
 ### pmm-allocatedblock-verify_invariants
 */
-    bool verify_invariants( index_type own_idx ) const noexcept { return h_->weight > 0 && h_->root_offset == own_idx; }
+    bool verify_invariants( index_type own_idx ) const noexcept
+    {
+        return pmm::is_allocated( h_->node_type ) && h_->root_offset == own_idx;
+    }
     void*       user_ptr() noexcept { return reinterpret_cast<uint8_t*>( h_ ) + sizeof( Header ); }
     const void* user_ptr() const noexcept { return reinterpret_cast<const uint8_t*>( h_ ) + sizeof( Header ); }
-    FreeBlockNotInAVL<AT> mark_as_free() noexcept;
+    FreeBlockNotInAVL<AT> mark_as_free( index_type total_granules ) noexcept;
 
   private:
     Header* h_;
@@ -670,30 +789,36 @@ template <typename AT> class CoalescingBlock
     const Header&          header() const noexcept { return *h_; }
     index_type             next_offset() const noexcept { return h_->next_offset; }
     index_type             prev_offset() const noexcept { return h_->prev_offset; }
+    index_type             weight() const noexcept { return h_->weight; }
     static CoalescingBlock cast_from_raw( void* raw ) noexcept
     {
         return CoalescingBlock( *detail::block_header_at<AT>( raw ) );
     }
-    void coalesce_with_next( void* next_blk, void* next_next_blk, index_type own_idx ) noexcept
+    void coalesce_with_next( void* next_blk, void* next_next_blk, index_type own_idx,
+                             index_type next_block_granules ) noexcept
     {
         Header* nx      = detail::block_header_at<AT>( next_blk );
         h_->next_offset = nx->next_offset;
         if ( next_next_blk != nullptr )
             detail::block_header_at<AT>( next_next_blk )->prev_offset = own_idx;
         std::memset( next_blk, 0, sizeof( Header ) );
+        h_->weight = static_cast<index_type>( h_->weight + next_block_granules );
     }
-    CoalescingBlock coalesce_with_prev( void* prev_blk, void* next_blk, index_type prev_idx ) noexcept
+    CoalescingBlock coalesce_with_prev( void* prev_blk, void* next_blk, index_type prev_idx,
+                                        index_type self_block_granules ) noexcept
     {
         Header* prev      = detail::block_header_at<AT>( prev_blk );
         prev->next_offset = h_->next_offset;
         if ( next_blk != nullptr )
             detail::block_header_at<AT>( next_blk )->prev_offset = prev_idx;
         std::memset( h_, 0, sizeof( Header ) );
+        prev->weight = static_cast<index_type>( prev->weight + self_block_granules );
         return CoalescingBlock( *prev );
     }
     FreeBlock<AT> finalize_coalesce() noexcept
     {
         h_->avl_height = 1;
+        h_->node_type  = NodeType::Free;
         return FreeBlock<AT>( *h_ );
     }
 
@@ -713,6 +838,7 @@ AllocatedBlock<AT> FreeBlockRemovedAVL<AT>::mark_as_allocated( index_type data_g
     h_->right_offset  = AT::no_block;
     h_->parent_offset = AT::no_block;
     h_->avl_height    = 0;
+    h_->node_type     = NodeType::Generic;
     return AllocatedBlock<AT>( *h_ );
 }
 template <typename AT> SplittingBlock<AT> FreeBlockRemovedAVL<AT>::begin_splitting() noexcept
@@ -728,12 +854,14 @@ AllocatedBlock<AT> SplittingBlock<AT>::finalize_split( index_type data_granules,
     h_->right_offset  = AT::no_block;
     h_->parent_offset = AT::no_block;
     h_->avl_height    = 0;
+    h_->node_type     = NodeType::Generic;
     return AllocatedBlock<AT>( *h_ );
 }
-template <typename AT> FreeBlockNotInAVL<AT> AllocatedBlock<AT>::mark_as_free() noexcept
+template <typename AT> FreeBlockNotInAVL<AT> AllocatedBlock<AT>::mark_as_free( index_type total_granules ) noexcept
 {
-    h_->weight      = 0;
+    h_->weight      = total_granules;
     h_->root_offset = 0;
+    h_->node_type   = NodeType::Free;
     return FreeBlockNotInAVL<AT>( *h_ );
 }
 template <typename AT> CoalescingBlock<AT> FreeBlockNotInAVL<AT>::begin_coalescing() noexcept
@@ -836,14 +964,14 @@ inline void validate_block_header_full( const uint8_t* base, size_t total_size, 
         result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction, static_cast<uint64_t>( idx ),
                     static_cast<uint64_t>( AT::no_block ), static_cast<uint64_t>( prev ) );
     }
-    uint16_t nt = BlockState::get_node_type( blk_raw );
-    if ( nt != pmm::kNodeReadWrite && nt != pmm::kNodeReadOnly )
+    pmm::NodeType nt = BlockState::get_node_type( blk_raw );
+    if ( !pmm::is_known_node_type( static_cast<std::uint8_t>( nt ) ) )
     {
         result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction, static_cast<uint64_t>( idx ), 0,
-                    static_cast<uint64_t>( nt ) );
+                    static_cast<uint64_t>( static_cast<std::uint8_t>( nt ) ) );
     }
     index_type w = BlockState::get_weight( blk_raw );
-    if ( w > 0 )
+    if ( pmm::is_allocated( nt ) && w > 0 )
     {
         static constexpr size_t kBlkHdrBytes = sizeof( pmm::Block<AT> );
         size_t                  blk_byte_off = static_cast<size_t>( idx ) * AT::granule_size;
@@ -1107,8 +1235,8 @@ template <typename AT>
 inline constexpr typename AT::index_type kManagerHeaderGranules_t =
     static_cast<typename AT::index_type>( ( sizeof( ManagerHeader<AT> ) + AT::granule_size - 1 ) / AT::granule_size );
 template <typename AT>
-inline typename AT::index_type block_total_granules( const uint8_t* base, const ManagerHeader<AT>* hdr,
-                                                     const pmm::Block<AT>* blk )
+inline typename AT::index_type physical_block_total_granules( const uint8_t* base, const ManagerHeader<AT>* hdr,
+                                                              const pmm::Block<AT>* blk )
 {
     using BlockState                   = pmm::BlockStateBase<AT>;
     static constexpr size_t kGranSz    = AT::granule_size;
@@ -1121,6 +1249,20 @@ inline typename AT::index_type block_total_granules( const uint8_t* base, const 
     if ( next_off != kNoBlk )
         return static_cast<IndexT>( next_off - this_idx );
     return static_cast<IndexT>( total_gran - this_idx );
+}
+template <typename AT> inline typename AT::index_type cached_block_total_granules( const pmm::Block<AT>* blk )
+{
+    using BlockState = pmm::BlockStateBase<AT>;
+    return BlockState::get_weight( blk );
+}
+template <typename AT>
+inline typename AT::index_type block_total_granules( const uint8_t* base, const ManagerHeader<AT>* hdr,
+                                                     const pmm::Block<AT>* blk )
+{
+    using BlockState = pmm::BlockStateBase<AT>;
+    if ( pmm::is_free( BlockState::get_node_type( blk ) ) )
+        return cached_block_total_granules<AT>( blk );
+    return physical_block_total_granules<AT>( base, hdr, blk );
 }
 template <typename AT> inline void* resolve_granule_ptr( uint8_t* base, typename AT::index_type idx ) noexcept
 {
@@ -1228,11 +1370,11 @@ inline bool is_canonical_allocated_block_header( const uint8_t* base, size_t tot
     const IndexT cand_idx = static_cast<IndexT>( cand_off / AT::granule_size );
     if ( !validate_block_index<AT>( total_size, cand_idx ) )
         return false;
-    const IndexT weight = BlockState::get_weight( cand_addr );
-    if ( weight == 0 || BlockState::get_root_offset( cand_addr ) != cand_idx )
+    const IndexT        weight    = BlockState::get_weight( cand_addr );
+    const pmm::NodeType node_type = BlockState::get_node_type( cand_addr );
+    if ( !pmm::is_allocated( node_type ) || BlockState::get_root_offset( cand_addr ) != cand_idx )
         return false;
-    const uint16_t node_type = BlockState::get_node_type( cand_addr );
-    if ( node_type != pmm::kNodeReadWrite && node_type != pmm::kNodeReadOnly )
+    if ( weight == 0 )
         return false;
     if ( total_size < manager_header_offset_bytes_v<AT> + sizeof( ManagerHeader<AT> ) )
         return false;
@@ -1284,9 +1426,11 @@ template <typename AT> inline typename AT::index_type required_block_granules_t(
 }
 }
 
+#include <cassert>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 namespace pmm
 {
 namespace detail
@@ -1339,10 +1483,12 @@ template <typename PPtr> static void avl_update_height( PPtr p ) noexcept
 {
     if ( p.is_null() )
         return;
-    std::int16_t lh          = avl_height( pptr_get_left( p ) );
-    std::int16_t rh          = avl_height( pptr_get_right( p ) );
-    std::int16_t h           = static_cast<std::int16_t>( 1 + ( lh > rh ? lh : rh ) );
-    p.tree_node().avl_height = h;
+    std::int16_t lh = avl_height( pptr_get_left( p ) );
+    std::int16_t rh = avl_height( pptr_get_right( p ) );
+    std::int16_t h  = static_cast<std::int16_t>( 1 + ( lh > rh ? lh : rh ) );
+    assert( h >= 0 );
+    assert( h <= static_cast<std::int16_t>( ( std::numeric_limits<std::uint8_t>::max )() ) );
+    p.tree_node().avl_height = static_cast<std::uint8_t>( h );
 }
 template <typename PPtr> static std::int16_t avl_balance_factor( PPtr p ) noexcept
 {
@@ -1793,17 +1939,14 @@ template <typename AT = DefaultAddressTraits> struct AvlFreeTree
             hdr->free_tree_root = blk_idx;
             return;
         }
-        index_type total_gran = detail::byte_off_to_idx_t<AT>( hdr->total_size );
-        index_type blk_next   = BlockState::get_next_offset( blk );
-        index_type blk_gran   = ( blk_next != AT::no_block ) ? ( blk_next - blk_idx ) : ( total_gran - blk_idx );
+        index_type blk_gran = BlockState::get_weight( blk );
         index_type cur = hdr->free_tree_root, parent = AT::no_block;
         bool       go_left = false;
         while ( cur != AT::no_block )
         {
             parent              = cur;
             const void* n       = detail::block_at<AT>( base, cur );
-            index_type  n_next  = BlockState::get_next_offset( n );
-            index_type  n_gran  = ( n_next != AT::no_block ) ? ( n_next - cur ) : ( total_gran - cur );
+            index_type  n_gran  = BlockState::get_weight( n );
             bool        smaller = ( blk_gran < n_gran ) || ( blk_gran == n_gran && blk_idx < cur );
             go_left             = smaller;
             cur                 = smaller ? BlockState::get_left_offset( n ) : BlockState::get_right_offset( n );
@@ -1871,13 +2014,12 @@ template <typename AT = DefaultAddressTraits> struct AvlFreeTree
 */
     static index_type find_best_fit( uint8_t* base, detail::ManagerHeader<AT>* hdr, index_type needed_granules )
     {
-        index_type total_gran = detail::byte_off_to_idx_t<AT>( hdr->total_size );
+        (void)hdr;
         index_type cur = hdr->free_tree_root, result = AT::no_block;
         while ( cur != AT::no_block )
         {
-            const void* node      = detail::block_at<AT>( base, cur );
-            index_type  node_next = BlockState::get_next_offset( node );
-            index_type  cur_gran  = ( node_next != AT::no_block ) ? ( node_next - cur ) : ( total_gran - cur );
+            const void* node     = detail::block_at<AT>( base, cur );
+            index_type  cur_gran = BlockState::get_weight( node );
             if ( cur_gran >= needed_granules )
             {
                 result = cur;
@@ -2205,8 +2347,8 @@ class AllocatorPolicy
         FreeBlock<AT>               fb          = FreeBlock<AT>::cast_from_raw( detail::block_at<AT>( base, blk_idx ) );
         FreeBlockRemovedAVL<AT>     removed     = fb.remove_from_avl();
         static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AT>;
-        index_type blk_total_gran = detail::block_total_granules( base, hdr, detail::block_at<AT>( base, blk_idx ) );
-        index_type data_gran      = detail::bytes_to_granules_t<AT>( user_size );
+        index_type                  blk_total_gran = BlockState::get_weight( detail::block_at<AT>( base, blk_idx ) );
+        index_type                  data_gran      = detail::bytes_to_granules_t<AT>( user_size );
         if ( data_gran > std::numeric_limits<index_type>::max() - kBlkHdrGran )
             return nullptr;
         index_type needed_gran  = kBlkHdrGran + data_gran;
@@ -2220,8 +2362,9 @@ class AllocatorPolicy
             index_type         new_idx     = blk_idx + needed_gran;
             void*              new_blk_ptr = detail::block_at<AT>( base, new_idx );
             index_type         curr_next   = splitting.next_offset();
-            BlockT* old_next = ( curr_next != AT::no_block ) ? detail::block_at<AT>( base, curr_next ) : nullptr;
-            splitting.initialize_new_block( new_blk_ptr, new_idx, blk_idx );
+            BlockT*    old_next = ( curr_next != AT::no_block ) ? detail::block_at<AT>( base, curr_next ) : nullptr;
+            index_type new_blk_total_gran = static_cast<index_type>( blk_total_gran - needed_gran );
+            splitting.initialize_new_block( new_blk_ptr, new_idx, blk_idx, new_blk_total_gran );
             splitting.link_new_block( old_next, new_idx );
             if ( old_next == nullptr )
                 hdr->last_block_offset = new_idx;
@@ -2250,13 +2393,14 @@ class AllocatorPolicy
         if ( curr_next != AT::no_block )
         {
             void* nxt_raw = detail::block_at<AT>( base, curr_next );
-            if ( BlockState::get_weight( nxt_raw ) == 0 )
+            if ( pmm::is_free( BlockState::get_node_type( nxt_raw ) ) )
             {
                 index_type nxt_idx  = curr_next;
+                index_type nxt_gran = BlockState::get_weight( nxt_raw );
                 index_type nxt_next = BlockState::get_next_offset( nxt_raw );
                 BlockT* nxt_nxt_blk = ( nxt_next != AT::no_block ) ? detail::block_at<AT>( base, nxt_next ) : nullptr;
                 FT::remove( base, hdr, nxt_idx );
-                coalescing.coalesce_with_next( detail::block_at<AT>( base, nxt_idx ), nxt_nxt_blk, b_idx );
+                coalescing.coalesce_with_next( detail::block_at<AT>( base, nxt_idx ), nxt_nxt_blk, b_idx, nxt_gran );
                 if ( nxt_nxt_blk == nullptr )
                     hdr->last_block_offset = b_idx;
                 hdr->block_count--;
@@ -2269,13 +2413,15 @@ class AllocatorPolicy
         if ( curr_prev != AT::no_block )
         {
             void* prv_raw = detail::block_at<AT>( base, curr_prev );
-            if ( BlockState::get_weight( prv_raw ) == 0 )
+            if ( pmm::is_free( BlockState::get_node_type( prv_raw ) ) )
             {
-                index_type prv_idx  = curr_prev;
-                index_type blk_next = coalescing.next_offset();
-                BlockT*    next_blk = ( blk_next != AT::no_block ) ? detail::block_at<AT>( base, blk_next ) : nullptr;
+                index_type prv_idx   = curr_prev;
+                index_type self_gran = coalescing.weight();
+                index_type blk_next  = coalescing.next_offset();
+                BlockT*    next_blk  = ( blk_next != AT::no_block ) ? detail::block_at<AT>( base, blk_next ) : nullptr;
                 FT::remove( base, hdr, prv_idx );
-                CoalescingBlock<AT> result_coalescing = coalescing.coalesce_with_prev( prv_raw, next_blk, prv_idx );
+                CoalescingBlock<AT> result_coalescing =
+                    coalescing.coalesce_with_prev( prv_raw, next_blk, prv_idx, self_gran );
                 if ( next_blk == nullptr )
                     hdr->last_block_offset = prv_idx;
                 hdr->block_count--;
@@ -2299,8 +2445,10 @@ class AllocatorPolicy
         {
             void* blk_ptr = detail::block_at<AT>( base, idx );
             BlockState::recover_state( blk_ptr, idx );
-            if ( BlockState::get_weight( blk_ptr ) == 0 )
+            if ( pmm::is_free( BlockState::get_node_type( blk_ptr ) ) )
             {
+                index_type total_gran = compute_total_block_granules( base, hdr, idx, blk_ptr );
+                BlockState::set_weight_of( blk_ptr, total_gran );
                 BlockState::reset_avl_fields_of( blk_ptr );
                 FT::insert( base, hdr, idx );
             }
@@ -2338,11 +2486,10 @@ class AllocatorPolicy
             const void* blk_ptr = detail::block_at<AT>( base, idx );
             block_count++;
             used_gran += kBlkHdrGran;
-            index_type w = BlockState::get_weight( blk_ptr );
-            if ( w > 0 )
+            if ( pmm::is_allocated( BlockState::get_node_type( blk_ptr ) ) )
             {
                 alloc_count++;
-                used_gran += w;
+                used_gran += BlockState::get_weight( blk_ptr );
             }
             else
             {
@@ -2390,11 +2537,10 @@ class AllocatorPolicy
             const void* blk_ptr = detail::block_at<AT>( base, idx );
             block_count++;
             used_gran += kBlkHdrGran;
-            index_type w = BlockState::get_weight( blk_ptr );
-            if ( w > 0 )
+            if ( pmm::is_allocated( BlockState::get_node_type( blk_ptr ) ) )
             {
                 alloc_count++;
-                used_gran += w;
+                used_gran += BlockState::get_weight( blk_ptr );
             }
             else
             {
@@ -2419,6 +2565,18 @@ class AllocatorPolicy
                 break;
             const void* blk_ptr = detail::block_at<AT>( base, idx );
             BlockState::verify_state( blk_ptr, idx, result );
+            if ( pmm::is_free( BlockState::get_node_type( blk_ptr ) ) )
+            {
+                const auto* blk      = reinterpret_cast<const BlockT*>( blk_ptr );
+                index_type  cached   = BlockState::get_weight( blk_ptr );
+                index_type  physical = detail::physical_block_total_granules<AT>( base, hdr, blk );
+                if ( cached != physical )
+                {
+                    result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction,
+                                static_cast<uint64_t>( idx ), static_cast<uint64_t>( physical ),
+                                static_cast<uint64_t>( cached ) );
+                }
+            }
             idx = BlockState::get_next_offset( blk_ptr );
         }
     }
@@ -2432,7 +2590,7 @@ class AllocatorPolicy
             if ( static_cast<size_t>( idx ) * AT::granule_size + sizeof( BlockT ) > hdr->total_size )
                 break;
             const void* blk_ptr = detail::block_at<AT>( base, idx );
-            if ( BlockState::get_weight( blk_ptr ) == 0 )
+            if ( pmm::is_free( BlockState::get_node_type( blk_ptr ) ) )
                 ++expected_count;
             idx = BlockState::get_next_offset( blk_ptr );
         }
@@ -2459,7 +2617,8 @@ class AllocatorPolicy
             return;
         }
         const void* root = detail::block_at<AT>( base, hdr->free_tree_root );
-        if ( BlockState::get_weight( root ) != 0 || BlockState::get_parent_offset( root ) != AT::no_block )
+        if ( !pmm::is_free( BlockState::get_node_type( root ) ) ||
+             BlockState::get_parent_offset( root ) != AT::no_block )
         {
             result.add( ViolationType::FreeTreeStale, DiagnosticAction::NoAction,
                         static_cast<uint64_t>( hdr->free_tree_root ), 0,
@@ -2474,7 +2633,7 @@ class AllocatorPolicy
             if ( static_cast<size_t>( idx ) * AT::granule_size + sizeof( BlockT ) > hdr->total_size )
                 break;
             const void* blk_ptr = detail::block_at<AT>( base, idx );
-            if ( BlockState::get_weight( blk_ptr ) == 0 &&
+            if ( pmm::is_free( BlockState::get_node_type( blk_ptr ) ) &&
                  !free_tree_contains( base, hdr, hdr->free_tree_root, idx, expected_count ) )
             {
                 result.add( ViolationType::FreeTreeStale, DiagnosticAction::NoAction, static_cast<uint64_t>( idx ), 1,
@@ -2491,11 +2650,9 @@ class AllocatorPolicy
     static index_type free_tree_block_granules( const uint8_t* base, const detail::ManagerHeader<AT>* hdr,
                                                 index_type block_idx ) noexcept
     {
-        const void* n      = detail::block_at<AT>( base, block_idx );
-        index_type  n_next = BlockState::get_next_offset( n );
-        index_type  total  = detail::byte_off_to_idx_t<AT>( hdr->total_size );
-        return ( n_next != AT::no_block ) ? static_cast<index_type>( n_next - block_idx )
-                                          : static_cast<index_type>( total - block_idx );
+        (void)hdr;
+        const void* n = detail::block_at<AT>( base, block_idx );
+        return BlockState::get_weight( n );
     }
     static bool free_tree_less_key( const uint8_t* base, const detail::ManagerHeader<AT>* hdr, index_type a,
                                     index_type b ) noexcept
@@ -2512,7 +2669,7 @@ class AllocatorPolicy
             if ( !detail::validate_block_index<AT>( hdr->total_size, node_idx ) )
                 return false;
             const void* node = detail::block_at<AT>( base, node_idx );
-            if ( BlockState::get_weight( node ) != 0 )
+            if ( !pmm::is_free( BlockState::get_node_type( node ) ) )
                 return false;
             if ( node_idx == target )
                 return true;
@@ -2542,7 +2699,7 @@ class AllocatorPolicy
             return 0;
         }
         const void* node = detail::block_at<AT>( base, node_idx );
-        if ( BlockState::get_weight( node ) != 0 )
+        if ( !pmm::is_free( BlockState::get_node_type( node ) ) )
         {
             result.add( ViolationType::FreeTreeStale, DiagnosticAction::NoAction, static_cast<uint64_t>( node_idx ), 0,
                         static_cast<uint64_t>( BlockState::get_weight( node ) ) );
@@ -2571,7 +2728,7 @@ class AllocatorPolicy
         std::int16_t right_h    = verify_free_tree_node( base, hdr, right, node_idx, node_idx, true, upper, has_upper,
                                                          expected_count, visited_count, result );
         std::int16_t expected_h = static_cast<std::int16_t>( 1 + ( left_h > right_h ? left_h : right_h ) );
-        std::int16_t stored_h   = BlockState::get_avl_height( node );
+        std::int16_t stored_h   = static_cast<std::int16_t>( BlockState::get_avl_height( node ) );
         if ( stored_h != expected_h || left_h - right_h > 1 || right_h - left_h > 1 )
         {
             result.add( ViolationType::FreeTreeStale, DiagnosticAction::NoAction, static_cast<uint64_t>( node_idx ),
@@ -2586,12 +2743,13 @@ class AllocatorPolicy
         index_type                  remainder   = old_data_gran - new_data_gran;
         if ( remainder >= kBlkHdrGran + 1 )
         {
-            index_type new_free_idx = blk_idx + kBlkHdrGran + new_data_gran;
-            void*      new_free_blk = detail::block_at<AT>( base, new_free_idx );
-            index_type old_next     = BlockState::get_next_offset( blk_raw );
-            auto*      old_next_blk = ( old_next != AT::no_block ) ? detail::block_at<AT>( base, old_next ) : nullptr;
+            index_type new_free_idx  = blk_idx + kBlkHdrGran + new_data_gran;
+            void*      new_free_blk  = detail::block_at<AT>( base, new_free_idx );
+            index_type new_free_gran = remainder;
+            index_type old_next      = BlockState::get_next_offset( blk_raw );
+            auto*      old_next_blk  = ( old_next != AT::no_block ) ? detail::block_at<AT>( base, old_next ) : nullptr;
             std::memset( new_free_blk, 0, sizeof( BlockT ) );
-            BlockState::init_fields( new_free_blk, blk_idx, old_next, 1, 0, 0 );
+            BlockState::init_fields( new_free_blk, blk_idx, old_next, 1, new_free_gran, 0, NodeType::Free );
             BlockState::set_next_offset_of( blk_raw, new_free_idx );
             if ( old_next_blk != nullptr )
                 BlockState::set_prev_offset_of( old_next_blk, new_free_idx );
@@ -2618,9 +2776,9 @@ class AllocatorPolicy
         if ( next_idx == AT::no_block )
             return false;
         void* next_blk = detail::block_at<AT>( base, next_idx );
-        if ( BlockState::get_weight( next_blk ) != 0 )
+        if ( !pmm::is_free( BlockState::get_node_type( next_blk ) ) )
             return false;
-        index_type next_total = detail::block_total_granules( base, hdr, detail::block_at<AT>( base, next_idx ) );
+        index_type next_total = BlockState::get_weight( next_blk );
         index_type available  = old_data_gran + next_total;
         if ( available < new_data_gran )
             return false;
@@ -2643,7 +2801,7 @@ class AllocatorPolicy
             void*      rem_blk      = detail::block_at<AT>( base, rem_idx );
             index_type blk_new_next = BlockState::get_next_offset( blk_raw );
             std::memset( rem_blk, 0, sizeof( BlockT ) );
-            BlockState::init_fields( rem_blk, blk_idx, blk_new_next, 1, 0, 0 );
+            BlockState::init_fields( rem_blk, blk_idx, blk_new_next, 1, rem, 0, NodeType::Free );
             BlockState::set_next_offset_of( blk_raw, rem_idx );
             if ( blk_new_next != AT::no_block )
                 BlockState::set_prev_offset_of( detail::block_at<AT>( base, blk_new_next ), rem_idx );
@@ -2657,6 +2815,17 @@ class AllocatorPolicy
         BlockState::set_weight_of( blk_raw, new_data_gran );
         hdr->used_size += ( new_data_gran - old_data_gran );
         return true;
+    }
+
+  private:
+    static index_type compute_total_block_granules( const uint8_t* base, const detail::ManagerHeader<AT>* hdr,
+                                                    index_type idx, const void* blk ) noexcept
+    {
+        (void)base;
+        index_type next       = BlockState::get_next_offset( blk );
+        index_type total_gran = static_cast<index_type>( hdr->total_size / AT::granule_size );
+        return ( next != AT::no_block ) ? static_cast<index_type>( next - idx )
+                                        : static_cast<index_type>( total_gran - idx );
     }
 };
 using DefaultAllocatorPolicy = AllocatorPolicy<AvlFreeTree<DefaultAddressTraits>, DefaultAddressTraits>;
@@ -2768,7 +2937,7 @@ template <typename ManagerAccess> struct ManagerLayoutOps
         void* hdr_blk = base;
         std::memset( hdr_blk, 0, ManagerAccess::kBlockHdrByteSize );
         BlockState::init_fields( hdr_blk, address_traits::no_block, kFreeBlkIdx, 0, ManagerAccess::kMgrHdrGranules,
-                                 kHdrBlkIdx );
+                                 kHdrBlkIdx, NodeType::ManagerHeader );
         ManagerHeader<address_traits>* hdr = ManagerAccess::get_header( base );
         std::memset( hdr, 0, sizeof( ManagerHeader<address_traits> ) );
         hdr->magic              = ManagerAccess::kMagic;
@@ -2779,9 +2948,11 @@ template <typename ManagerAccess> struct ManagerLayoutOps
         hdr->image_version      = kCurrentImageVersion;
         hdr->granule_size       = static_cast<uint16_t>( kGranSz );
         hdr->root_offset        = address_traits::no_block;
-        void* blk               = base + static_cast<size_t>( kFreeBlkIdx ) * kGranSz;
+        void*      blk          = base + static_cast<size_t>( kFreeBlkIdx ) * kGranSz;
+        index_type total_gran   = static_cast<index_type>( size / kGranSz );
+        index_type free_gran    = static_cast<index_type>( total_gran - kFreeBlkIdx );
         std::memset( blk, 0, sizeof( Block<address_traits> ) );
-        BlockState::init_fields( blk, kHdrBlkIdx, address_traits::no_block, 1, 0, 0 );
+        BlockState::init_fields( blk, kHdrBlkIdx, address_traits::no_block, 1, free_gran, 0, NodeType::Free );
         hdr->last_block_offset = kFreeBlkIdx;
         hdr->free_tree_root    = kFreeBlkIdx;
         hdr->block_count       = 2;
@@ -2823,11 +2994,13 @@ template <typename ManagerAccess> struct ManagerLayoutOps
             ( hdr->last_block_offset != address_traits::no_block )
                 ? static_cast<void*>( new_base + static_cast<size_t>( hdr->last_block_offset ) * kGranSz )
                 : nullptr;
-        if ( last_blk_raw != nullptr && BlockState::get_weight( last_blk_raw ) == 0 )
+        if ( last_blk_raw != nullptr && pmm::is_free( BlockState::get_node_type( last_blk_raw ) ) )
         {
             Block<address_traits>* last_blk = reinterpret_cast<Block<address_traits>*>( last_blk_raw );
             index_type             loff     = block_idx_t<address_traits>( new_base, last_blk );
             free_block_tree::remove( new_base, hdr, loff );
+            index_type new_total_gran = byte_off_to_idx_t<address_traits>( new_size );
+            BlockState::set_weight_of( last_blk_raw, static_cast<index_type>( new_total_gran - loff ) );
             hdr->total_size = new_size;
             free_block_tree::insert( new_base, hdr, loff );
         }
@@ -2835,18 +3008,21 @@ template <typename ManagerAccess> struct ManagerLayoutOps
         {
             if ( extra_size < sizeof( Block<address_traits> ) + kGranSz )
                 return false;
-            void* nb_blk = new_base + static_cast<size_t>( extra_idx ) * kGranSz;
+            void*      nb_blk        = new_base + static_cast<size_t>( extra_idx ) * kGranSz;
+            index_type new_total_gran = byte_off_to_idx_t<address_traits>( new_size );
+            index_type new_blk_gran   = static_cast<index_type>( new_total_gran - extra_idx );
             std::memset( nb_blk, 0, sizeof( Block<address_traits> ) );
             if ( last_blk_raw != nullptr )
             {
                 Block<address_traits>* last_blk = reinterpret_cast<Block<address_traits>*>( last_blk_raw );
                 index_type             loff     = block_idx_t<address_traits>( new_base, last_blk );
-                BlockState::init_fields( nb_blk, loff, address_traits::no_block, 1, 0, 0 );
+                BlockState::init_fields( nb_blk, loff, address_traits::no_block, 1, new_blk_gran, 0, NodeType::Free );
                 BlockState::set_next_offset_of( last_blk_raw, static_cast<index_type>( extra_idx ) );
             }
             else
             {
-                BlockState::init_fields( nb_blk, address_traits::no_block, address_traits::no_block, 1, 0, 0 );
+                BlockState::init_fields( nb_blk, address_traits::no_block, address_traits::no_block, 1, new_blk_gran, 0,
+                                         NodeType::Free );
                 hdr->first_block_offset = extra_idx;
             }
             hdr->last_block_offset = extra_idx;
@@ -3088,6 +3264,10 @@ template <typename T, typename ManagerT> struct parray
         _capacity = new_cap;
         return true;
     }
+};
+template <typename T, typename ManagerT> struct node_type_for<parray<T, ManagerT>>
+{
+    static constexpr NodeType value = NodeType::PArray;
 };
 }
 
@@ -3342,6 +3522,10 @@ template <typename _K, typename _V, typename ManagerT> struct pmap
     }
     iterator end() const noexcept { return iterator( static_cast<index_type>( 0 ) ); }
 };
+template <typename _K, typename _V, typename ManagerT> struct node_type_for<pmap<_K, _V, ManagerT>>
+{
+    static constexpr NodeType value = NodeType::PMap;
+};
 }
 
 #include <concepts>
@@ -3569,6 +3753,10 @@ template <typename ManagerT> struct pstring
         return true;
     }
 };
+template <typename ManagerT> struct node_type_for<pstring<ManagerT>>
+{
+    static constexpr NodeType value = NodeType::PString;
+};
 }
 
 #include <cstddef>
@@ -3623,7 +3811,7 @@ template <typename ManagerT> struct pstringview
     uint32_t                    length;
     char                        str[1];
     explicit pstringview( const char* s ) noexcept : length( 0 ), str{ '\0' } { _interned = _intern( s ); }
-                operator psview_pptr() const noexcept { return _interned; }
+    operator psview_pptr() const noexcept { return _interned; }
     const char* c_str() const noexcept { return str; }
     size_t      size() const noexcept { return static_cast<size_t>( length ); }
     bool        empty() const noexcept { return length == 0; }
@@ -3673,6 +3861,10 @@ template <typename ManagerT> struct pstringview
         typename ManagerT::thread_policy::unique_lock_type lock( ManagerT::_mutex );
         return ManagerT::intern_symbol_unlocked( s );
     }
+};
+template <typename ManagerT> struct node_type_for<pstringview<ManagerT>>
+{
+    static constexpr NodeType value = NodeType::PStringView;
 };
 }
 
@@ -3748,16 +3940,42 @@ template <typename T, typename ManagerT> class typed_guard
 #include <limits>
 #include <new>
 #include <type_traits>
+namespace pmm
+{
+template <class T, class ManagerT> struct node_type_for<pptr<T, ManagerT>>
+{
+    static constexpr NodeType value = NodeType::PPtr;
+};
+}
 namespace pmm::detail
 {
 template <typename ManagerT> class PersistMemoryTypedApi
 {
   public:
+    template <typename T> static void assign_node_type_for( void* user_raw ) noexcept
+    {
+        if ( user_raw == nullptr )
+            return;
+        using address_traits = typename ManagerT::address_traits;
+        constexpr size_t kHdrBytes =
+            static_cast<size_t>( detail::kBlockHeaderGranules_t<address_traits> ) * address_traits::granule_size;
+        auto* base = ManagerT::backend().base_ptr();
+        if ( base == nullptr )
+            return;
+        const size_t user_off = static_cast<size_t>( static_cast<uint8_t*>( user_raw ) - base );
+        if ( user_off < kHdrBytes )
+            return;
+        void* blk_raw = base + user_off - kHdrBytes;
+        BlockStateBase<address_traits>::set_node_type_of( blk_raw, pmm::node_type_for_v<T> );
+    }
     template <typename T> static pmm::pptr<T, ManagerT> allocate_typed() noexcept
     {
-        void* raw = ManagerT::allocate( sizeof( T ) );
+        using thread_policy = typename ManagerT::thread_policy;
+        typename thread_policy::unique_lock_type lock( ManagerT::_mutex );
+        void*                                    raw = ManagerT::allocate_unlocked( sizeof( T ) );
         if ( raw == nullptr )
             return pmm::pptr<T, ManagerT>();
+        assign_node_type_for<T>( raw );
         return ManagerT::template make_pptr_from_raw<T>( raw );
     }
     template <typename T> static pmm::pptr<T, ManagerT> allocate_typed( size_t count ) noexcept
@@ -3766,9 +3984,12 @@ template <typename ManagerT> class PersistMemoryTypedApi
             return pmm::pptr<T, ManagerT>();
         if ( sizeof( T ) > 0 && count > ( std::numeric_limits<size_t>::max )() / sizeof( T ) )
             return pmm::pptr<T, ManagerT>();
-        void* raw = ManagerT::allocate( sizeof( T ) * count );
+        using thread_policy = typename ManagerT::thread_policy;
+        typename thread_policy::unique_lock_type lock( ManagerT::_mutex );
+        void*                                    raw = ManagerT::allocate_unlocked( sizeof( T ) * count );
         if ( raw == nullptr )
             return pmm::pptr<T, ManagerT>();
+        assign_node_type_for<T>( raw );
         return ManagerT::template make_pptr_from_raw<T>( raw );
     }
     template <typename T> static void deallocate_typed( pmm::pptr<T, ManagerT> p ) noexcept
@@ -3876,6 +4097,7 @@ template <typename ManagerT> class PersistMemoryTypedApi
             ManagerT::_last_error = PmmError::OutOfMemory;
             return pmm::pptr<T, ManagerT>();
         }
+        assign_node_type_for<T>( new_raw );
         pmm::pptr<T, ManagerT> new_p = ManagerT::template make_pptr_from_raw<T>( new_raw );
         if ( new_p.is_null() )
         {
@@ -3886,18 +4108,23 @@ template <typename ManagerT> class PersistMemoryTypedApi
         void*  old_src = resolve_unchecked<T>( p );
         size_t copy_sz = ( new_count < old_count ? new_count : old_count ) * sizeof( T );
         std::memmove( new_dst, old_src, copy_sz );
-        index_type old_blk_idx = ManagerT::template block_idx_from_pptr<T>( p );
-        void*      old_blk_raw = detail::block_at<address_traits>( base, old_blk_idx );
-        index_type freed_w     = BlockStateBase<address_traits>::get_weight( old_blk_raw );
-        if ( BlockStateBase<address_traits>::get_node_type( old_blk_raw ) != pmm::kNodeReadOnly )
+        index_type          old_blk_idx = ManagerT::template block_idx_from_pptr<T>( p );
+        void*               old_blk_raw = detail::block_at<address_traits>( base, old_blk_idx );
+        index_type          freed_w     = BlockStateBase<address_traits>::get_weight( old_blk_raw );
+        const pmm::NodeType nt_old      = BlockStateBase<address_traits>::get_node_type( old_blk_raw );
+        if ( pmm::is_allocated( nt_old ) && pmm::can_be_deleted_from_pap( nt_old ) )
         {
-            auto old_alloc = AllocatedBlock<address_traits>::cast_from_raw( old_blk_raw );
-            old_alloc.mark_as_free();
+            static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<address_traits>;
+            auto                        old_alloc   = AllocatedBlock<address_traits>::cast_from_raw( old_blk_raw );
+            index_type                  total_gran  = detail::physical_block_total_granules<address_traits>(
+                base, hdr, detail::block_at<address_traits>( base, old_blk_idx ) );
+            old_alloc.mark_as_free( total_gran );
             hdr->alloc_count--;
             hdr->free_count++;
             if ( hdr->used_size >= freed_w )
                 hdr->used_size -= freed_w;
             allocator::coalesce( base, hdr, old_blk_idx );
+            (void)kBlkHdrGran;
         }
         ManagerT::_last_error = PmmError::Ok;
         return new_p;
@@ -3905,11 +4132,18 @@ template <typename ManagerT> class PersistMemoryTypedApi
     template <typename T, typename... Args> static pmm::pptr<T, ManagerT> create_typed( Args&&... args ) noexcept
     {
         static_assert( std::is_nothrow_constructible_v<T, Args...>, "" );
-        void* raw = ManagerT::allocate( sizeof( T ) );
-        if ( raw == nullptr )
-            return pmm::pptr<T, ManagerT>();
-        pmm::pptr<T, ManagerT> p   = ManagerT::template make_pptr_from_raw<T>( raw );
-        T*                     obj = resolve_unchecked<T>( p );
+        pmm::pptr<T, ManagerT> p;
+        void*                  raw = nullptr;
+        {
+            using thread_policy = typename ManagerT::thread_policy;
+            typename thread_policy::unique_lock_type lock( ManagerT::_mutex );
+            raw = ManagerT::allocate_unlocked( sizeof( T ) );
+            if ( raw == nullptr )
+                return pmm::pptr<T, ManagerT>();
+            assign_node_type_for<T>( raw );
+            p = ManagerT::template make_pptr_from_raw<T>( raw );
+        }
+        T* obj = resolve_unchecked<T>( p );
         if ( obj == nullptr )
         {
             ManagerT::deallocate( raw );
@@ -3959,15 +4193,14 @@ template <typename ManagerT> class PersistMemoryTypedApi
             ManagerT::_last_error = PmmError::InvalidPointer;
             return nullptr;
         }
-        index_type blk_idx = ManagerT::template block_idx_from_pptr<T>( p );
-        if ( BlockStateBase<address_traits>::get_weight( blk_raw ) == 0 ||
-             BlockStateBase<address_traits>::get_root_offset( blk_raw ) != blk_idx )
+        index_type          blk_idx   = ManagerT::template block_idx_from_pptr<T>( p );
+        const pmm::NodeType node_type = BlockStateBase<address_traits>::get_node_type( blk_raw );
+        if ( !pmm::is_allocated( node_type ) || BlockStateBase<address_traits>::get_root_offset( blk_raw ) != blk_idx )
         {
             ManagerT::_last_error = PmmError::InvalidPointer;
             return nullptr;
         }
-        const uint16_t node_type = BlockStateBase<address_traits>::get_node_type( blk_raw );
-        if ( node_type != pmm::kNodeReadWrite && node_type != pmm::kNodeReadOnly )
+        if ( !pmm::is_known_node_type( static_cast<std::uint8_t>( node_type ) ) )
         {
             ManagerT::_last_error = PmmError::InvalidPointer;
             return nullptr;
@@ -4269,7 +4502,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         const pmm::Block<address_traits>* blk = find_block_from_user_ptr( ptr );
         if ( blk == nullptr )
             return false;
-        return BlockStateBase<address_traits>::get_node_type( blk ) == pmm::kNodeReadOnly;
+        return BlockStateBase<address_traits>::get_node_type( blk ) == pmm::NodeType::ReadOnlyLocked;
     }
     template <typename T> static void set_root( pptr<T> p ) noexcept
     {
@@ -4447,11 +4680,11 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     {
         set_tree_field( p, &BlockStateBase<address_traits>::set_weight_of, w );
     }
-    template <typename T> static std::int16_t get_tree_height( pptr<T> p ) noexcept
+    template <typename T> static std::uint8_t get_tree_height( pptr<T> p ) noexcept
     {
         return get_tree_field( p, &BlockStateBase<address_traits>::get_avl_height );
     }
-    template <typename T> static void set_tree_height( pptr<T> p, std::int16_t h ) noexcept
+    template <typename T> static void set_tree_height( pptr<T> p, std::uint8_t h ) noexcept
     {
         set_tree_field( p, &BlockStateBase<address_traits>::set_avl_height_of, h );
     }
@@ -4544,7 +4777,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             const Block<address_traits>* blk        = reinterpret_cast<const Block<address_traits>*>( blk_raw );
             index_type                   total_gran = detail::block_total_granules( base, hdr, blk );
             auto                         w          = BlockState::get_weight( blk_raw );
-            bool                         is_used    = ( w > 0 );
+            bool                         is_used    = pmm::is_allocated( BlockState::get_node_type( blk_raw ) );
             size_t                       hdr_bytes  = sizeof( Block<address_traits> );
             size_t                       data_bytes = is_used ? static_cast<size_t>( w ) * kGranSz : 0;
             BlockView                    view;
@@ -4641,16 +4874,19 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         pmm::Block<address_traits>* blk = find_block_from_user_ptr( ptr );
         if ( blk == nullptr )
             return;
+        const pmm::NodeType nt = BlockStateBase<address_traits>::get_node_type( blk );
+        if ( !pmm::is_allocated( nt ) || !pmm::can_be_deleted_from_pap( nt ) )
+            return;
         index_type freed = BlockStateBase<address_traits>::get_weight( blk );
         if ( freed == 0 )
             return;
-        if ( BlockStateBase<address_traits>::get_node_type( blk ) == pmm::kNodeReadOnly )
-            return;
-        uint8_t*                               base    = _backend.base_ptr();
-        detail::ManagerHeader<address_traits>* hdr     = get_header( base );
-        index_type                             blk_idx = detail::block_idx_t<address_traits>( base, blk );
-        AllocatedBlock<address_traits>         alloc   = AllocatedBlock<address_traits>::cast_from_raw( blk );
-        alloc.mark_as_free();
+        uint8_t*                               base       = _backend.base_ptr();
+        detail::ManagerHeader<address_traits>* hdr        = get_header( base );
+        index_type                             blk_idx    = detail::block_idx_t<address_traits>( base, blk );
+        index_type                             total_gran = detail::physical_block_total_granules<address_traits>(
+            base, hdr, detail::block_at<address_traits>( base, blk_idx ) );
+        AllocatedBlock<address_traits> alloc = AllocatedBlock<address_traits>::cast_from_raw( blk );
+        alloc.mark_as_free( total_gran );
         hdr->alloc_count--;
         hdr->free_count++;
         if ( hdr->used_size >= freed )
@@ -4664,10 +4900,10 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         pmm::Block<address_traits>* blk = find_block_from_user_ptr( ptr );
         if ( blk == nullptr )
             return false;
-        index_type w = BlockStateBase<address_traits>::get_weight( blk );
-        if ( w == 0 )
+        const pmm::NodeType nt = BlockStateBase<address_traits>::get_node_type( blk );
+        if ( !pmm::is_allocated( nt ) )
             return false;
-        BlockStateBase<address_traits>::set_node_type_of( blk, pmm::kNodeReadOnly );
+        BlockStateBase<address_traits>::set_node_type_of( blk, pmm::NodeType::ReadOnlyLocked );
         return true;
     }
     template <typename T, typename... Args> static pptr<T> create_typed_unlocked( Args&&... args ) noexcept
@@ -4676,6 +4912,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         void* raw = allocate_unlocked( sizeof( T ) );
         if ( raw == nullptr )
             return pptr<T>();
+        manager_type::template assign_node_type_for<T>( raw );
         pptr<T> p   = make_pptr_from_raw<T>( raw );
         T*      obj = manager_type::template resolve_unchecked<T>( p );
         if ( obj == nullptr )
@@ -5101,11 +5338,11 @@ template <typename T> static pptr<T> make_pptr_from_raw( void* raw ) noexcept
     if ( !detail::validate_block_index<address_traits>( _backend.total_size(), blk_idx ) )
         return pptr<T>();
     const void* blk = detail::block_at<address_traits>( base, blk_idx );
-    if ( BlockStateBase<address_traits>::get_weight( blk ) == 0 ||
+    const pmm::NodeType node_type = BlockStateBase<address_traits>::get_node_type( blk );
+    if ( !pmm::is_allocated( node_type ) ||
          BlockStateBase<address_traits>::get_root_offset( blk ) != blk_idx )
         return pptr<T>();
-    const uint16_t node_type = BlockStateBase<address_traits>::get_node_type( blk );
-    if ( node_type != pmm::kNodeReadWrite && node_type != pmm::kNodeReadOnly )
+    if ( !pmm::is_known_node_type( static_cast<std::uint8_t>( node_type ) ) )
         return pptr<T>();
     if ( blk_idx > std::numeric_limits<index_type>::max() - kBlockHdrGranules )
         return pptr<T>();

@@ -413,11 +413,11 @@ template <typename T> static pptr<T> make_pptr_from_raw( void* raw ) noexcept
     if ( !detail::validate_block_index<address_traits>( _backend.total_size(), blk_idx ) )
         return pptr<T>();
     const void* blk = detail::block_at<address_traits>( base, blk_idx );
-    if ( BlockStateBase<address_traits>::get_weight( blk ) == 0 ||
+    const pmm::NodeType node_type = BlockStateBase<address_traits>::get_node_type( blk );
+    if ( !pmm::is_allocated( node_type ) ||
          BlockStateBase<address_traits>::get_root_offset( blk ) != blk_idx )
         return pptr<T>();
-    const uint16_t node_type = BlockStateBase<address_traits>::get_node_type( blk );
-    if ( node_type != pmm::kNodeReadWrite && node_type != pmm::kNodeReadOnly )
+    if ( !pmm::is_known_node_type( static_cast<std::uint8_t>( node_type ) ) )
         return pptr<T>();
     if ( blk_idx > std::numeric_limits<index_type>::max() - kBlockHdrGranules )
         return pptr<T>();

@@ -53,7 +53,7 @@ template <typename ManagerT> struct pstringview
     uint32_t                    length;
     char                        str[1];
     explicit pstringview( const char* s ) noexcept : length( 0 ), str{ '\0' } { _interned = _intern( s ); }
-                operator psview_pptr() const noexcept { return _interned; }
+    operator psview_pptr() const noexcept { return _interned; }
     const char* c_str() const noexcept { return str; }
     size_t      size() const noexcept { return static_cast<size_t>( length ); }
     bool        empty() const noexcept { return length == 0; }
@@ -103,5 +103,9 @@ template <typename ManagerT> struct pstringview
         typename ManagerT::thread_policy::unique_lock_type lock( ManagerT::_mutex );
         return ManagerT::intern_symbol_unlocked( s );
     }
+};
+template <typename ManagerT> struct node_type_for<pstringview<ManagerT>>
+{
+    static constexpr NodeType value = NodeType::PStringView;
 };
 }

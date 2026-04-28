@@ -252,8 +252,8 @@ template <typename AT>
 inline constexpr typename AT::index_type kManagerHeaderGranules_t =
     static_cast<typename AT::index_type>( ( sizeof( ManagerHeader<AT> ) + AT::granule_size - 1 ) / AT::granule_size );
 template <typename AT>
-inline typename AT::index_type block_total_granules( const uint8_t* base, const ManagerHeader<AT>* hdr,
-                                                     const pmm::Block<AT>* blk )
+inline typename AT::index_type physical_block_total_granules( const uint8_t* base, const ManagerHeader<AT>* hdr,
+                                                              const pmm::Block<AT>* blk )
 {
     using BlockState                   = pmm::BlockStateBase<AT>;
     static constexpr size_t kGranSz    = AT::granule_size;
@@ -266,6 +266,20 @@ inline typename AT::index_type block_total_granules( const uint8_t* base, const 
     if ( next_off != kNoBlk )
         return static_cast<IndexT>( next_off - this_idx );
     return static_cast<IndexT>( total_gran - this_idx );
+}
+template <typename AT> inline typename AT::index_type cached_block_total_granules( const pmm::Block<AT>* blk )
+{
+    using BlockState = pmm::BlockStateBase<AT>;
+    return BlockState::get_weight( blk );
+}
+template <typename AT>
+inline typename AT::index_type block_total_granules( const uint8_t* base, const ManagerHeader<AT>* hdr,
+                                                     const pmm::Block<AT>* blk )
+{
+    using BlockState = pmm::BlockStateBase<AT>;
+    if ( pmm::is_free( BlockState::get_node_type( blk ) ) )
+        return cached_block_total_granules<AT>( blk );
+    return physical_block_total_granules<AT>( base, hdr, blk );
 }
 template <typename AT> inline void* resolve_granule_ptr( uint8_t* base, typename AT::index_type idx ) noexcept
 {
@@ -373,11 +387,11 @@ inline bool is_canonical_allocated_block_header( const uint8_t* base, size_t tot
     const IndexT cand_idx = static_cast<IndexT>( cand_off / AT::granule_size );
     if ( !validate_block_index<AT>( total_size, cand_idx ) )
         return false;
-    const IndexT weight = BlockState::get_weight( cand_addr );
-    if ( weight == 0 || BlockState::get_root_offset( cand_addr ) != cand_idx )
+    const IndexT        weight    = BlockState::get_weight( cand_addr );
+    const pmm::NodeType node_type = BlockState::get_node_type( cand_addr );
+    if ( !pmm::is_allocated( node_type ) || BlockState::get_root_offset( cand_addr ) != cand_idx )
         return false;
-    const uint16_t node_type = BlockState::get_node_type( cand_addr );
-    if ( node_type != pmm::kNodeReadWrite && node_type != pmm::kNodeReadOnly )
+    if ( weight == 0 )
         return false;
     if ( total_size < manager_header_offset_bytes_v<AT> + sizeof( ManagerHeader<AT> ) )
         return false;

@@ -1,1 +1,2 @@
+include/** text eol=lf
 single_include/pmm/*.h -diff
