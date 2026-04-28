@@ -29,8 +29,8 @@ class AllocatorPolicy
     AllocatorPolicy()                                    = delete;
     AllocatorPolicy( const AllocatorPolicy& )            = delete;
     AllocatorPolicy& operator=( const AllocatorPolicy& ) = delete;
-    static void* allocate_from_block( uint8_t* base, detail::ManagerHeader<AT>* hdr, index_type blk_idx,
-                                      index_type data_gran )
+    static void*     allocate_from_block( uint8_t* base, detail::ManagerHeader<AT>* hdr, index_type blk_idx,
+                                          index_type data_gran )
     {
         static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AT>;
         if ( data_gran == 0 )
