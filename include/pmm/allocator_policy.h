@@ -31,15 +31,15 @@ class AllocatorPolicy
     AllocatorPolicy()                                    = delete;
     AllocatorPolicy( const AllocatorPolicy& )            = delete;
     AllocatorPolicy& operator=( const AllocatorPolicy& ) = delete;
-    static void* allocate_from_block( Arena arena, index_type blk_idx, index_type data_gran )
+    static void*     allocate_from_block( Arena arena, index_type blk_idx, index_type data_gran )
     {
         static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AT>;
         if ( data_gran == 0 )
             data_gran = 1;
         if ( data_gran > std::numeric_limits<index_type>::max() - kBlkHdrGran )
             return nullptr;
-        std::uint8_t*                  base = arena.base();
-        detail::ManagerHeader<AT>*     hdr  = arena.header();
+        std::uint8_t*              base = arena.base();
+        detail::ManagerHeader<AT>* hdr  = arena.header();
         FT::remove( base, hdr, blk_idx );
         FreeBlock<AT>           fb             = FreeBlock<AT>::cast_from_raw( detail::block_at<AT>( base, blk_idx ) );
         FreeBlockRemovedAVL<AT> removed        = fb.remove_from_avl();
@@ -78,10 +78,10 @@ class AllocatorPolicy
     }
     static void coalesce( Arena arena, index_type blk_idx )
     {
-        std::uint8_t*               base    = arena.base();
-        detail::ManagerHeader<AT>*  hdr     = arena.header();
-        FreeBlockNotInAVL<AT>       not_avl = FreeBlockNotInAVL<AT>::cast_from_raw( detail::block_at<AT>( base, blk_idx ) );
-        CoalescingBlock<AT>         coalescing = not_avl.begin_coalescing();
+        std::uint8_t*              base = arena.base();
+        detail::ManagerHeader<AT>* hdr  = arena.header();
+        FreeBlockNotInAVL<AT> not_avl   = FreeBlockNotInAVL<AT>::cast_from_raw( detail::block_at<AT>( base, blk_idx ) );
+        CoalescingBlock<AT>   coalescing        = not_avl.begin_coalescing();
         static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AT>;
         index_type                  b_idx       = blk_idx;
         index_type                  curr_next   = coalescing.next_offset();
@@ -133,11 +133,11 @@ class AllocatorPolicy
     }
     static void rebuild_free_tree( Arena arena )
     {
-        std::uint8_t*              base   = arena.base();
-        detail::ManagerHeader<AT>* hdr    = arena.header();
-        hdr->free_tree_root               = AT::no_block;
-        hdr->last_block_offset            = AT::no_block;
-        index_type idx                    = hdr->first_block_offset;
+        std::uint8_t*              base = arena.base();
+        detail::ManagerHeader<AT>* hdr  = arena.header();
+        hdr->free_tree_root             = AT::no_block;
+        hdr->last_block_offset          = AT::no_block;
+        index_type idx                  = hdr->first_block_offset;
         while ( idx != AT::no_block )
         {
             void* blk_ptr = detail::block_at<AT>( base, idx );
@@ -157,10 +157,10 @@ class AllocatorPolicy
     }
     static void repair_linked_list( Arena arena )
     {
-        std::uint8_t*              base = arena.base();
-        detail::ManagerHeader<AT>* hdr  = arena.header();
-        index_type                 idx  = hdr->first_block_offset;
-        index_type                 prev = AT::no_block;
+        std::uint8_t*              base  = arena.base();
+        detail::ManagerHeader<AT>* hdr   = arena.header();
+        index_type                 idx   = hdr->first_block_offset;
+        index_type                 prev  = AT::no_block;
         const std::size_t          total = static_cast<std::size_t>( hdr->total_size );
         while ( idx != AT::no_block )
         {
@@ -178,23 +178,25 @@ class AllocatorPolicy
     {
         static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AT>;
         index_type                  block_count = 0, free_count = 0, alloc_count = 0;
-        index_type                  used_gran   = 0;
-        ConstArena cview{ arena.base(), arena.header() };
-        (void)detail::for_each_physical_block<AT>( cview, [&]( index_type, const void* blk_ptr ) noexcept
-            {
-                ++block_count;
-                used_gran = static_cast<index_type>( used_gran + kBlkHdrGran );
-                if ( pmm::is_allocated( BlockState::get_node_type( blk_ptr ) ) )
-                {
-                    ++alloc_count;
-                    used_gran = static_cast<index_type>( used_gran + BlockState::get_weight( blk_ptr ) );
-                }
-                else
-                {
-                    ++free_count;
-                }
-                return true;
-            } );
+        index_type                  used_gran = 0;
+        ConstArena                  cview{ arena.base(), arena.header() };
+        (void)detail::for_each_physical_block<AT>( cview,
+                                                   [&]( index_type, const void* blk_ptr ) noexcept
+                                                   {
+                                                       ++block_count;
+                                                       used_gran = static_cast<index_type>( used_gran + kBlkHdrGran );
+                                                       if ( pmm::is_allocated( BlockState::get_node_type( blk_ptr ) ) )
+                                                       {
+                                                           ++alloc_count;
+                                                           used_gran = static_cast<index_type>(
+                                                               used_gran + BlockState::get_weight( blk_ptr ) );
+                                                       }
+                                                       else
+                                                       {
+                                                           ++free_count;
+                                                       }
+                                                       return true;
+                                                   } );
         detail::ManagerHeader<AT>* hdr = arena.header();
         hdr->block_count               = block_count;
         hdr->free_count                = free_count;
@@ -204,15 +206,16 @@ class AllocatorPolicy
     static void verify_linked_list( ConstArena arena, VerifyResult& result ) noexcept
     {
         index_type expected_prev = AT::no_block;
-        const bool ok = detail::for_each_physical_block<AT>(
-            arena, [&]( index_type idx, const void* blk_ptr ) noexcept
+        const bool ok            = detail::for_each_physical_block<AT>(
+            arena,
+            [&]( index_type idx, const void* blk_ptr ) noexcept
             {
                 index_type stored_prev = BlockState::get_prev_offset( blk_ptr );
                 if ( stored_prev != expected_prev )
                 {
                     result.add( ViolationType::PrevOffsetMismatch, DiagnosticAction::NoAction,
-                                static_cast<uint64_t>( idx ), static_cast<uint64_t>( expected_prev ),
-                                static_cast<uint64_t>( stored_prev ) );
+                                           static_cast<uint64_t>( idx ), static_cast<uint64_t>( expected_prev ),
+                                           static_cast<uint64_t>( stored_prev ) );
                 }
                 expected_prev = idx;
                 return true;
@@ -226,8 +229,10 @@ class AllocatorPolicy
     {
         static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AT>;
         index_type                  block_count = 0, free_count = 0, alloc_count = 0;
-        index_type                  used_gran   = 0;
-        const bool ok = detail::for_each_physical_block<AT>( arena, [&]( index_type, const void* blk_ptr ) noexcept
+        index_type                  used_gran = 0;
+        const bool                  ok        = detail::for_each_physical_block<AT>(
+            arena,
+            [&]( index_type, const void* blk_ptr ) noexcept
             {
                 ++block_count;
                 used_gran = static_cast<index_type>( used_gran + kBlkHdrGran );
@@ -259,19 +264,21 @@ class AllocatorPolicy
     {
         const std::uint8_t*              base = arena.base();
         const detail::ManagerHeader<AT>* hdr  = arena.header();
-        const bool ok = detail::for_each_physical_block<AT>( arena, [&]( index_type idx, const void* blk_ptr ) noexcept
+        const bool                       ok   = detail::for_each_physical_block<AT>(
+            arena,
+            [&]( index_type idx, const void* blk_ptr ) noexcept
             {
                 BlockState::verify_state( blk_ptr, idx, result );
                 if ( pmm::is_free( BlockState::get_node_type( blk_ptr ) ) )
                 {
-                    const auto* blk      = reinterpret_cast<const BlockT*>( blk_ptr );
-                    index_type  cached   = BlockState::get_weight( blk_ptr );
+                    const auto* blk    = reinterpret_cast<const BlockT*>( blk_ptr );
+                    index_type  cached = BlockState::get_weight( blk_ptr );
                     index_type  physical = detail::physical_block_total_granules<AT>( base, hdr, blk );
                     if ( cached != physical )
                     {
                         result.add( ViolationType::BlockStateInconsistent, DiagnosticAction::NoAction,
-                                    static_cast<uint64_t>( idx ), static_cast<uint64_t>( physical ),
-                                    static_cast<uint64_t>( cached ) );
+                                                            static_cast<uint64_t>( idx ), static_cast<uint64_t>( physical ),
+                                                            static_cast<uint64_t>( cached ) );
                     }
                 }
                 return true;
@@ -286,12 +293,14 @@ class AllocatorPolicy
         const std::uint8_t*              base           = arena.base();
         const detail::ManagerHeader<AT>* hdr            = arena.header();
         std::size_t                      expected_count = 0;
-        const bool walk_ok = detail::for_each_physical_block<AT>( arena, [&]( index_type, const void* blk_ptr ) noexcept
-            {
-                if ( pmm::is_free( BlockState::get_node_type( blk_ptr ) ) )
-                    ++expected_count;
-                return true;
-            } );
+        const bool                       walk_ok =
+            detail::for_each_physical_block<AT>( arena,
+                                                 [&]( index_type, const void* blk_ptr ) noexcept
+                                                 {
+                                                     if ( pmm::is_free( BlockState::get_node_type( blk_ptr ) ) )
+                                                         ++expected_count;
+                                                     return true;
+                                                 } );
         if ( !walk_ok )
         {
             result.add( ViolationType::HeaderCorruption, DiagnosticAction::NoAction );
@@ -330,7 +339,9 @@ class AllocatorPolicy
         std::size_t visited_count = 0;
         verify_free_tree_node( base, hdr, hdr->free_tree_root, AT::no_block, {}, false, {}, false, expected_count,
                                visited_count, result );
-        (void)detail::for_each_physical_block<AT>( arena, [&]( index_type idx, const void* blk_ptr ) noexcept
+        (void)detail::for_each_physical_block<AT>(
+            arena,
+            [&]( index_type idx, const void* blk_ptr ) noexcept
             {
                 if ( pmm::is_free( BlockState::get_node_type( blk_ptr ) ) &&
                      !free_tree_contains( base, hdr, hdr->free_tree_root, idx, expected_count ) )

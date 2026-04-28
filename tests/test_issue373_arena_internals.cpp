@@ -186,12 +186,13 @@ TEST_CASE( "I373-I: for_each_physical_block walks all blocks of a healthy arena"
 {
     using Mgr = pmm::PersistMemoryManager<pmm::CacheManagerConfig, 3733>;
     REQUIRE( Mgr::create( 4096 ) );
-    auto*                                  base   = Mgr::backend().base_ptr();
-    const auto*                            hdr    = pmm::detail::manager_header_at<DefaultAT>( base );
+    auto*                                  base = Mgr::backend().base_ptr();
+    const auto*                            hdr  = pmm::detail::manager_header_at<DefaultAT>( base );
     pmm::detail::ConstArenaView<DefaultAT> view{ base, hdr };
     std::size_t                            visits = 0;
-    bool clean = pmm::detail::for_each_physical_block<DefaultAT>( view, [&]( DefaultAT::index_type, const void* ) noexcept
-                                                                  {
+    bool                                   clean  = pmm::detail::for_each_physical_block<DefaultAT>( view,
+                                                                                                     [&]( DefaultAT::index_type, const void* ) noexcept
+                                                                                                     {
                                                                       ++visits;
                                                                       return true;
                                                                   } );
@@ -222,8 +223,8 @@ TEST_CASE( "I373-I: for_each_physical_block honors WalkControl::StopOk and Fail"
     auto*                                  base = Mgr::backend().base_ptr();
     const auto*                            hdr  = pmm::detail::manager_header_at<DefaultAT>( base );
     pmm::detail::ConstArenaView<DefaultAT> view{ base, hdr };
-    bool stop_ok = pmm::detail::for_each_physical_block<DefaultAT>( view, []( DefaultAT::index_type, const void* ) noexcept
-                                                                    { return pmm::detail::WalkControl::StopOk; } );
+    bool                                   stop_ok = pmm::detail::for_each_physical_block<DefaultAT>(
+        view, []( DefaultAT::index_type, const void* ) noexcept { return pmm::detail::WalkControl::StopOk; } );
     REQUIRE( stop_ok );
     bool fail = pmm::detail::for_each_physical_block<DefaultAT>( view, []( DefaultAT::index_type, const void* ) noexcept
                                                                  { return pmm::detail::WalkControl::Fail; } );

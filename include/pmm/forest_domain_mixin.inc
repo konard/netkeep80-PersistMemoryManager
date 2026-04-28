@@ -418,10 +418,9 @@ template <typename T> static pptr<T> make_pptr_from_raw( void* raw ) noexcept
     index_type blk_idx = static_cast<index_type>( blk_idx_raw );
     if ( !detail::validate_block_index<address_traits>( _backend.total_size(), blk_idx ) )
         return pptr<T>();
-    const void* blk = detail::block_at<address_traits>( base, blk_idx );
+    const void*         blk       = detail::block_at<address_traits>( base, blk_idx );
     const pmm::NodeType node_type = BlockStateBase<address_traits>::get_node_type( blk );
-    if ( !pmm::is_allocated( node_type ) ||
-         BlockStateBase<address_traits>::get_root_offset( blk ) != blk_idx )
+    if ( !pmm::is_allocated( node_type ) || BlockStateBase<address_traits>::get_root_offset( blk ) != blk_idx )
         return pptr<T>();
     if ( !pmm::is_known_node_type( static_cast<std::uint8_t>( node_type ) ) )
         return pptr<T>();

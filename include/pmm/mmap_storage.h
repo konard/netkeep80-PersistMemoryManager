@@ -220,7 +220,9 @@ template <typename AT = DefaultAddressTraits> class MMapStorage
         _fd = ::open( path, O_RDWR | O_CREAT, 0600 );
         if ( _fd < 0 )
             return false;
-        struct stat st{};
+        struct stat st
+        {
+        };
         if ( ::fstat( _fd, &st ) != 0 )
         {
             ::close( _fd );

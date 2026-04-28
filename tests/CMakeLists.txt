@@ -316,6 +316,7 @@ pmm_add_test(test_issue369_review_fixes test_issue369_review_fixes.cpp)
 
 # ─── Issue 373: checked granule arithmetic, ArenaView, walker, growth, init ──
 pmm_add_test(test_issue373_arena_internals test_issue373_arena_internals.cpp)
+pmm_add_test(test_issue373_corruption test_issue373_corruption.cpp)
 
 # ─── Issue 314: build graph compaction contract ─────────────────
 add_test(

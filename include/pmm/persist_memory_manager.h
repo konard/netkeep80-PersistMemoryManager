@@ -222,8 +222,8 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         mark_entries( result, pre, DiagnosticAction::Rebuilt );
         if ( detail::image_version_requires_migration( hdr->image_version ) )
             hdr->image_version = detail::kCurrentImageVersion;
-        hdr->owns_memory                            = false;
-        hdr->prev_total_size                        = 0;
+        hdr->owns_memory     = false;
+        hdr->prev_total_size = 0;
         detail::ArenaView<address_traits> arena_mut{ base, hdr };
         allocator::repair_linked_list( arena_mut );
         allocator::recompute_counters( arena_mut );
@@ -577,7 +577,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             cview,
             [&]( index_type idx, const void* blk_raw ) noexcept
             {
-                const Block<address_traits>* blk = reinterpret_cast<const Block<address_traits>*>( blk_raw );
+                const Block<address_traits>* blk        = reinterpret_cast<const Block<address_traits>*>( blk_raw );
                 index_type                   total_gran = detail::block_total_granules( base, hdr, blk );
                 auto                         w          = BlockState::get_weight( blk_raw );
                 bool                         is_used    = pmm::is_allocated( BlockState::get_node_type( blk_raw ) );

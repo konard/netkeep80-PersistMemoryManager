@@ -50,8 +50,7 @@ constexpr std::optional<std::size_t> checked_granule_offset( typename AT::index_
 {
     return checked_mul( static_cast<std::size_t>( idx ), AT::granule_size );
 }
-template <typename AT>
-constexpr std::optional<GranuleCount<AT>> bytes_to_granules_checked( std::size_t bytes ) noexcept
+template <typename AT> constexpr std::optional<GranuleCount<AT>> bytes_to_granules_checked( std::size_t bytes ) noexcept
 {
     using IndexT             = typename AT::index_type;
     constexpr std::size_t kG = AT::granule_size;
@@ -71,8 +70,8 @@ constexpr std::optional<GranuleCount<AT>> bytes_to_granules_checked( std::size_t
 template <typename AT> class ArenaView
 {
   public:
-    using index_type                       = typename AT::index_type;
-    constexpr ArenaView() noexcept         = default;
+    using index_type               = typename AT::index_type;
+    constexpr ArenaView() noexcept = default;
     constexpr ArenaView( std::uint8_t* b, ManagerHeader<AT>* h ) noexcept : _base( b ), _hdr( h ) {}
     constexpr std::uint8_t*      base() const noexcept { return _base; }
     constexpr ManagerHeader<AT>* header() const noexcept { return _hdr; }
@@ -108,8 +107,8 @@ template <typename AT> class ArenaView
 template <typename AT> class ConstArenaView
 {
   public:
-    using index_type                            = typename AT::index_type;
-    constexpr ConstArenaView() noexcept         = default;
+    using index_type                    = typename AT::index_type;
+    constexpr ConstArenaView() noexcept = default;
     constexpr ConstArenaView( const std::uint8_t* b, const ManagerHeader<AT>* h ) noexcept : _base( b ), _hdr( h ) {}
     constexpr const std::uint8_t*      base() const noexcept { return _base; }
     constexpr const ManagerHeader<AT>* header() const noexcept { return _hdr; }
@@ -154,8 +153,7 @@ enum class WalkControl
 /*
 ### pmm-detail-blockwalker
 */
-template <typename AT, typename Fn>
-bool for_each_physical_block( ConstArenaView<AT> arena, Fn&& fn ) noexcept
+template <typename AT, typename Fn> bool for_each_physical_block( ConstArenaView<AT> arena, Fn&& fn ) noexcept
 {
     using BlockState = pmm::BlockStateBase<AT>;
     using IndexT     = typename AT::index_type;
@@ -199,8 +197,7 @@ bool for_each_physical_block( ConstArenaView<AT> arena, Fn&& fn ) noexcept
     }
     return true;
 }
-template <typename AT, typename Fn>
-bool for_each_physical_block( ArenaView<AT> arena, Fn&& fn ) noexcept
+template <typename AT, typename Fn> bool for_each_physical_block( ArenaView<AT> arena, Fn&& fn ) noexcept
 {
     return for_each_physical_block<AT>( ConstArenaView<AT>{ arena.base(), arena.header() }, std::forward<Fn>( fn ) );
 }

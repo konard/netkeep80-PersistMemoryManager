@@ -29,13 +29,14 @@ static void verify_image_unlocked( VerifyResult& result ) noexcept
         return;
     }
     detail::ConstArenaView<address_traits> cview{ base, hdr };
-    (void)detail::for_each_physical_block<address_traits>(
-        cview, [&]( index_type idx, const void* blk_ptr ) noexcept
-        {
-            (void)blk_ptr;
-            detail::validate_block_header_full<address_traits>( base, hdr->total_size, idx, result );
-            return true;
-        } );
+    (void)detail::for_each_physical_block<address_traits>( cview,
+                                                           [&]( index_type idx, const void* blk_ptr ) noexcept
+                                                           {
+                                                               (void)blk_ptr;
+                                                               detail::validate_block_header_full<address_traits>(
+                                                                   base, hdr->total_size, idx, result );
+                                                               return true;
+                                                           } );
     allocator::verify_block_states( cview, result );
     allocator::verify_linked_list( cview, result );
     allocator::verify_counters( cview, result );
