@@ -13,7 +13,7 @@ coexist through the `InstanceId` template parameter (multiton pattern).
 
 The canonical high-level model of PMM as a linear persistent address space plus an intrusive
 AVL-forest is documented in [pmm_avl_forest.md](pmm_avl_forest.md). The canonical semantics
-of [Block](../include/pmm/block.h#pmm-block) / [TreeNode](../include/pmm/tree_node.h#pmm-treenode) fields is documented in [block_and_treenode_semantics.md](block_and_treenode_semantics.md).
+of [BlockHeader](../include/pmm/block_header.h#pmm-blockheader) fields (the only physical block-header layout, which embeds the AVL slot as its prefix) is documented in [block_and_treenode_semantics.md](block_and_treenode_semantics.md).
 The frozen invariant set with traceability to code and tests is in [core_invariants.md](core_invariants.md).
 This document focuses on the low-level layout, invariants, and algorithms.
 
@@ -43,7 +43,7 @@ This document focuses on the low-level layout, invariants, and algorithms.
 │  (not a general forest-node lifecycle; pmap/pstringview do not use it)│
 ├───────────────────────────────────────────────────────────────────────┤
 │  Block<AddressTraitsT> raw memory layout                              │
-│  (LinkedListNode<A> + TreeNode<A>, granule indices)                   │
+│  (BlockHeader<A> direct fields, granule indices)                   │
 ├───────────────────────────────────────────────────────────────────────┤
 │  StorageBackend: HeapStorage / MMapStorage / StaticStorage            │
 │  LockPolicy: NoLock / SharedMutexLock                                 │
@@ -93,33 +93,49 @@ buffer start. Contains:
 | `crc32` | `uint32_t` | CRC32 checksum used by file save/load helpers |
 | `root_offset` | `uint32_t` | Forest registry root granule index |
 
-Version policy:
+Version policy (`detail::kCurrentImageVersion == 2`, no migration by design):
 
-- `image_version == 0`: legacy unversioned image; `load()` accepts it and migrates the header to version `1`.
-- `image_version == 1`: current layout; `load()` accepts it directly.
-- Any other value: unsupported format; `load()` returns `false` with `PmmError::UnsupportedImageVersion` and records `HeaderCorruption` / `Aborted`.
+- `image_version == 2`: current layout; `load()` / `verify()` accept it directly.
+- `image_version == 0` or `image_version == 1`: unsupported legacy image; `load()` /
+  `verify()` reject it with `PmmError::UnsupportedImageVersion` and record
+  `HeaderCorruption` / `Aborted`.
+- Any other value: unsupported format; same rejection behaviour.
+
+This is a deliberate, breaking change introduced by the issue #367 refactor. There is
+no migration path from previous image formats — old images must be recreated.
 
 ---
 
-## Block layout: `Block<AddressTraitsT>`
+## Block layout: `BlockHeader<AddressTraitsT>`
 
-Every block (header + data) is aligned to the granule size. The header `Block<A>` is
-32 bytes = 2 granules (for `DefaultAddressTraits`) and is placed immediately before the
-user data.
+`BlockHeader<AT>` is the **single physical block-header layout**. `Block<AT>` is a type
+alias for `BlockHeader<AT>`. Every block (header + data) is aligned to the granule size.
+The header is 32 bytes = 2 granules (for `DefaultAddressTraits`) and is placed immediately
+before the user data.
 
-`Block<A>` = `LinkedListNode<A>` + `TreeNode<A>`:
+`BlockHeader<AT>` is one physical record with two semantic groups:
+
+1. **AVL/state slot prefix** — `weight`, `left_offset`, `right_offset`, `parent_offset`,
+   `root_offset`, `avl_height`, `node_type`. Used by the free-tree and by other forest
+   domains that index allocated blocks (`pstringview`, `pmap`).
+2. **Linear PAP links** — `prev_offset`, `next_offset`. Define the block's physical
+   neighbours in the linear address space; used by split / coalesce / repair.
+
+Binary layout for `BlockHeader<DefaultAddressTraits>` (asserted via `BlockLayoutContract`
+and `static_assert` in `include/pmm/block_header.h`, verified in
+`tests/test_block_header.cpp`):
 
 | Field | Bytes | Type | Description |
 |-------|-------|------|-------------|
-| `prev_offset` | 0–3 | `uint32_t` | Previous block granule index (`kNoBlock` = none) |
-| `next_offset` | 4–7 | `uint32_t` | Next block granule index (`kNoBlock` = last) |
-| `weight` | 8–11 | `uint32_t` | User data size in granules (0 = free block) |
-| `left_offset` | 12–15 | `uint32_t` | Left child AVL node (granule index) |
-| `right_offset` | 16–19 | `uint32_t` | Right child AVL node (granule index) |
-| `parent_offset` | 20–23 | `uint32_t` | Parent AVL node (granule index) |
-| `root_offset` | 24–27 | `uint32_t` | 0 = free block; own index = allocated block |
-| `avl_height` | 28–29 | `int16_t` | AVL subtree height (0 = not in tree) |
-| `node_type` | 30–31 | `uint16_t` | 0=`kNodeReadWrite`, 1=`kNodeReadOnly` (permanently locked) |
+| `weight` | 0–3 | `uint32_t` | User data size in granules (0 = free block) |
+| `left_offset` | 4–7 | `uint32_t` | Left child AVL node (granule index) |
+| `right_offset` | 8–11 | `uint32_t` | Right child AVL node (granule index) |
+| `parent_offset` | 12–15 | `uint32_t` | Parent AVL node (granule index) |
+| `root_offset` | 16–19 | `uint32_t` | 0 = free block; own index = allocated block |
+| `avl_height` | 20–21 | `int16_t` | AVL subtree height (0 = not in tree) |
+| `node_type` | 22–23 | `uint16_t` | 0=`kNodeReadWrite`, 1=`kNodeReadOnly` (permanently locked) |
+| `prev_offset` | 24–27 | `uint32_t` | Previous block granule index (`kNoBlock` = none) |
+| `next_offset` | 28–31 | `uint32_t` | Next block granule index (`kNoBlock` = last) |
 
 Field sizes above are for `DefaultAddressTraits` (`uint32_t` index, 16-byte granule).
 For `SmallAddressTraits` (`uint16_t`) and `LargeAddressTraits` (`uint64_t`), the field
@@ -279,8 +295,10 @@ space limit.
 ### `pstringview<ManagerT>`
 
 An interned read-only persistent string. Multiple calls with the same content return the
-same [pptr](../include/pmm/pptr.h#pmm-pptr) (deduplication). Uses the built-in [TreeNode](../include/pmm/tree_node.h#pmm-treenode) fields of each allocated block
-as AVL tree links — no separate AVL node allocations. Blocks are permanently locked via
+same [pptr](../include/pmm/pptr.h#pmm-pptr) (deduplication). Uses the built-in AVL slot of the
+[BlockHeader](../include/pmm/block_header.h#pmm-blockheader) of each allocated block (fields
+`weight`, `left_offset`, `right_offset`, `parent_offset`, `avl_height`) as AVL tree links —
+no separate AVL node allocations. Blocks are permanently locked via
 `lock_block_permanent()`.
 
 ```
@@ -300,8 +318,10 @@ forest domain: system/symbols (persistent root in registry)
 A persistent AVL tree dictionary. The [pmap](../include/pmm/pmap.h#pmm-pmap) object is a typed facade over a
 type-scoped `container/pmap/<type>/<binding>` forest domain; the AVL root is stored in
 that domain binding while the object stores only the binding identity. Each node is an
-allocated block in PAP containing `pmap_node<_K, _V>`. The built-in [TreeNode](../include/pmm/tree_node.h#pmm-treenode) fields
-serve as AVL tree links. Nodes are **not** permanently locked (unlike [pstringview](../include/pmm/pstringview.h#pmm-pstringview)), so
+allocated block in PAP containing `pmap_node<_K, _V>`. The built-in AVL slot of the
+[BlockHeader](../include/pmm/block_header.h#pmm-blockheader) of each block (fields `weight`,
+`left_offset`, `right_offset`, `parent_offset`, `avl_height`) serves as AVL tree links.
+Nodes are **not** permanently locked (unlike [pstringview](../include/pmm/pstringview.h#pmm-pstringview)), so
 they can be freed.
 
 The `<type>` segment of the domain name is a stable fingerprint derived from `sizeof`,
@@ -367,8 +387,12 @@ pairs, making them behave like [pptr](../include/pmm/pptr.h#pmm-pptr) for the sh
 of maintaining ~120 lines of duplicate code.
 
 - `BlockPPtrManagerTag<AT>` — provides `address_traits` for template resolution
-- `BlockTreeNodeProxy<AT>` — proxy for [TreeNode](../include/pmm/tree_node.h#pmm-treenode)-like interface, delegating to [BlockStateBase](../include/pmm/block_state.h#pmm-blockstatebase)
 - `pptr_make(BlockPPtr, idx)` — specialization propagating `base_ptr`
+
+The shared AVL functions resolve a `BlockPPtr<AT>` to a `BlockHeader<AT>&` via
+`detail::block_header_at<AT>` and read/write its AVL-slot data members
+(`left_offset`, `right_offset`, `parent_offset`, `avl_height`, `weight`) directly — no
+separate `TreeNode` proxy.
 
 #### `AvlInorderIterator<NodePPtr>`
 
@@ -389,7 +413,7 @@ buffer_start (= Block<A>_0)
 │     prev_offset = kNoBlock
 │     next_offset ──────────────────────────┐
 │   [ManagerHeader inside (32 bytes offset)]│
-│     magic = "PMM_V083"                    │
+│     magic = "PMM_V098"                    │
 │     first_block_offset = 0 (self)         │
 │     free_tree_root ──────────────────┐    │
 │                                      │    │

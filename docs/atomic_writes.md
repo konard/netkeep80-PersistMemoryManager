@@ -24,32 +24,45 @@ process restarts.
 
 ### ManagerHeader (64 bytes, 4 granules for DefaultAddressTraits)
 
+Source of truth: `struct ManagerHeader<AT>` in `include/pmm/types.h`.
+
 ```
-Bytes 0–7:   magic           — manager magic number ("PMM_V083")
-Bytes 8–15:  total_size      — total managed region size in bytes
-Bytes 16–19: used_size       — used size in granules
-Bytes 20–23: block_count     — total block count
-Bytes 24–27: free_count      — free block count
-Bytes 28–31: alloc_count     — allocated block count
+Bytes 0–7:   magic              — manager magic number
+Bytes 8–15:  total_size         — total managed region size in bytes
+Bytes 16–19: used_size          — used size in granules
+Bytes 20–23: block_count        — total block count
+Bytes 24–27: free_count         — free block count
+Bytes 28–31: alloc_count        — allocated block count
 Bytes 32–35: first_block_offset — first block (granule index)
 Bytes 36–39: last_block_offset  — last block (granule index)
-Bytes 40–43: free_tree_root  — AVL free block tree root (granule index)
-Bytes 44:    owns_memory     — runtime-only (not persistent)
-Bytes 45:    _pad            — reserved
-Bytes 46–47: granule_size    — granule size at creation time; validated on load()
-Bytes 48–55: prev_total_size — runtime-only (not persistent)
-Bytes 56–63: _reserved[8]   — reserved
+Bytes 40–43: free_tree_root     — AVL free block tree root (granule index)
+Bytes 44:    owns_memory        — runtime-only (not persistent)
+Bytes 45:    image_version      — persistent image layout version (current = 2; legacy 0/1 are rejected)
+Bytes 46–47: granule_size       — granule size at creation time; validated on load()
+Bytes 48–55: prev_total_size    — runtime-only (not persistent)
+Bytes 56–59: crc32              — CRC32 used by file save/load helpers
+Bytes 60–63: root_offset        — forest registry root (granule index)
 ```
 
 The `granule_size` field is checked on `load()`: if it does not match the compile-time
 `address_traits::granule_size`, `load()` returns `false` (incompatible image).
+The `image_version` field must equal `detail::kCurrentImageVersion` (currently `2`);
+legacy values (`0`, `1`) are rejected with `PmmError::UnsupportedImageVersion` —
+there is no migration path by design (issue #367).
 
-### Block\<A\> (32 bytes = 2 granules for DefaultAddressTraits)
+### BlockHeader\<AT\> (32 bytes = 2 granules for DefaultAddressTraits)
 
-`Block<A>` = `LinkedListNode<A>` + `TreeNode<A>`:
+`BlockHeader<AT>` is the **single physical block-header layout**. `Block<AT>` is a type
+alias for `BlockHeader<AT>`. The header is one physical record with two semantic groups:
+
+1. AVL/state slot prefix — `weight`, `left_offset`, `right_offset`, `parent_offset`,
+   `root_offset`, `avl_height`, `node_type`.
+2. Linear PAP links — `prev_offset`, `next_offset`.
+
+Binary layout for `BlockHeader<DefaultAddressTraits>` (asserted in
+`include/pmm/block_header.h`):
 
 ```
-[TreeNode<A>]
   Bytes 0–3:   weight        — user data size in granules (0 = free block)
   Bytes 4–7:   left_offset   — left AVL child (granule index)
   Bytes 8–11:  right_offset  — right AVL child (granule index)
@@ -57,13 +70,12 @@ The `granule_size` field is checked on `load()`: if it does not match the compil
   Bytes 16–19: root_offset   — 0 = free block; own_idx = allocated block
   Bytes 20–21: avl_height    — AVL subtree height (0 = not in tree)
   Bytes 22–23: node_type     — 0 = kNodeReadWrite, 1 = kNodeReadOnly (permanently locked)
-[LinkedListNode<A>]
   Bytes 24–27: prev_offset   — previous block (granule index)
   Bytes 28–31: next_offset   — next block (granule index)
 ```
 
-**Note:** The [TreeNode](../include/pmm/tree_node.h#pmm-treenode) fields (`left_offset`, `right_offset`, `parent_offset`,
-`avl_height`) are shared between two separate tree uses:
+**Note:** The AVL-slot fields of the [BlockHeader](../include/pmm/block_header.h#pmm-blockheader)
+(`weight`, `left_offset`, `right_offset`, `parent_offset`, `avl_height`) are shared between two separate tree uses:
 1. **Free-block AVL tree** — used by the allocator when `weight == 0` (block is free).
 2. **User-data AVL trees** — used by [pstringview](../include/pmm/pstringview.h#pmm-pstringview) and [pmap](../include/pmm/pmap.h#pmm-pmap) when `weight > 0` (block
    is allocated and permanently locked or in a user-managed data structure).
@@ -252,7 +264,7 @@ after `load() + rebuild_free_tree()`.
 ### Phase 1: Validate ManagerHeader
 
 ```
-1. Check hdr->magic == kMagic ("PMM_V083")
+1. Check hdr->magic == kMagic ("PMM_V098")
 2. Check hdr->total_size == passed size argument
 3. Check hdr->granule_size == kGranuleSize
 4. If any check fails: return false (image invalid)
@@ -420,49 +432,63 @@ FreeBlock                    ← correct: weight=0, root_offset=0, in AVL
 
 ### State machine API
 
-The state machine is implemented via typed wrappers over `Block<A>` that allow only
-methods valid for the current state:
+The state machine is implemented via non-owning typed views over a `BlockHeader<A>&`
+that allow only methods valid for the current state. Views are returned by value;
+state transitions return new typed views over the same underlying header. Each view
+holds a `BlockHeader<A>*` and does **not** inherit from `BlockStateBase<A>`
+(`BlockStateBase<A>` is itself a static helper, not a base class):
 
 ```cpp
 // FreeBlock — correct state
-template <typename A> class FreeBlock : public BlockStateBase<A> {
+template <typename AT> class FreeBlock {
 public:
-    static FreeBlock* cast_from_raw(void* raw) noexcept;
+    static FreeBlock cast_from_raw(void* raw) noexcept;                     // unchecked, asserts
+    static bool      can_cast_from_raw(const void* raw) noexcept;            // checked
+    static std::optional<FreeBlock> try_cast_from_raw(void* raw) noexcept;   // checked
     bool verify_invariants() const noexcept;
-    FreeBlockRemovedAVL<A>* remove_from_avl() noexcept; // → transient
+    FreeBlockRemovedAVL<AT> remove_from_avl() noexcept;                      // → transient
 };
 
 // FreeBlockRemovedAVL — transient state
-template <typename A> class FreeBlockRemovedAVL : public BlockStateBase<A> {
+template <typename AT> class FreeBlockRemovedAVL {
 public:
-    AllocatedBlock<A>* mark_as_allocated(index_type data_granules, index_type own_idx);
-    SplittingBlock<A>* begin_splitting();
-    FreeBlock<A>* insert_to_avl(); // rollback
+    AllocatedBlock<AT> mark_as_allocated(index_type data_granules, index_type own_idx) noexcept;
+    SplittingBlock<AT> begin_splitting() noexcept;
+    FreeBlock<AT>      insert_to_avl() noexcept; // rollback
 };
 
 // AllocatedBlock — correct state
-template <typename A> class AllocatedBlock : public BlockStateBase<A> {
+template <typename AT> class AllocatedBlock {
 public:
+    static AllocatedBlock cast_from_raw(void* raw) noexcept;                      // unchecked, asserts
+    static bool           can_cast_from_raw(const void* raw) noexcept;             // checked
+    static std::optional<AllocatedBlock> try_cast_from_raw(void* raw) noexcept;    // checked
     bool verify_invariants(index_type own_idx) const noexcept;
     void* user_ptr() noexcept;
-    FreeBlockNotInAVL<A>* mark_as_free() noexcept; // → transient
+    FreeBlockNotInAVL<AT> mark_as_free() noexcept;                                 // → transient
 };
 
 // FreeBlockNotInAVL — transient state
-template <typename A> class FreeBlockNotInAVL : public BlockStateBase<A> {
+template <typename AT> class FreeBlockNotInAVL {
 public:
-    FreeBlock<A>* insert_to_avl() noexcept;        // → correct
-    CoalescingBlock<A>* begin_coalescing() noexcept;
+    FreeBlock<AT>       insert_to_avl() noexcept;     // → correct
+    CoalescingBlock<AT> begin_coalescing() noexcept;
 };
 
 // CoalescingBlock — transient state
-template <typename A> class CoalescingBlock : public BlockStateBase<A> {
+template <typename AT> class CoalescingBlock {
 public:
-    void coalesce_with_next(void* next, void* next_next, index_type own_idx);
-    CoalescingBlock* coalesce_with_prev(void* prev, void* next, index_type prev_idx);
-    FreeBlock<A>* finalize_coalesce() noexcept; // → correct
+    void            coalesce_with_next(void* next, void* next_next, index_type own_idx) noexcept;
+    CoalescingBlock coalesce_with_prev(void* prev, void* next, index_type prev_idx) noexcept;
+    FreeBlock<AT>   finalize_coalesce() noexcept;     // → correct
 };
 ```
+
+**Safety note:** `cast_from_raw` is an unchecked precondition-only primitive; in release
+builds with `NDEBUG` defined it does **not** validate `raw == nullptr`, alignment, or
+state consistency, and invalid input is undefined behavior. Use `can_cast_from_raw` /
+`try_cast_from_raw` at any boundary where the state has not already been proven by
+the caller.
 
 **Implementation:** `include/pmm/block_state.h`
 
@@ -505,8 +531,10 @@ point**, where partially completed allocation operations are treated as "not per
 
 ## User-data AVL trees ([pstringview](../include/pmm/pstringview.h#pmm-pstringview), [pmap](../include/pmm/pmap.h#pmm-pmap))
 
-[pstringview](../include/pmm/pstringview.h#pmm-pstringview) and [pmap](../include/pmm/pmap.h#pmm-pmap) use the same [TreeNode](../include/pmm/tree_node.h#pmm-treenode) fields inside allocated blocks to
-organize their own AVL trees. This is entirely separate from the free-block AVL tree.
+[pstringview](../include/pmm/pstringview.h#pmm-pstringview) and [pmap](../include/pmm/pmap.h#pmm-pmap) use the same AVL-slot fields of the
+[BlockHeader](../include/pmm/block_header.h#pmm-blockheader) (`weight`, `left_offset`, `right_offset`,
+`parent_offset`, `avl_height`) inside allocated blocks to organize their own AVL trees.
+This is entirely separate from the free-block AVL tree.
 
 ### Persistence of user-data trees
 

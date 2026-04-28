@@ -89,8 +89,10 @@ TEST_CASE( "I325: DefaultAddressTraits manager image round-trips with CRC", "[is
 
 TEST_CASE( "I325: SmallAddressTraits manager image round-trips with CRC", "[issue325]" )
 {
-    static_assert( sizeof( pmm::Block<pmm::SmallAddressTraits> ) % pmm::SmallAddressTraits::granule_size != 0,
-                   "SmallAddressTraits must exercise a non-granule-aligned Block header" );
+    // After issue #367 BlockHeader<AT> is granule-aligned for every public AddressTraits,
+    // including SmallAddressTraits. This test still exercises the SmallAddressTraits image round-trip end-to-end.
+    static_assert( sizeof( pmm::Block<pmm::SmallAddressTraits> ) % pmm::SmallAddressTraits::granule_size == 0,
+                   "SmallAddressTraits BlockHeader must be granule-aligned" );
 
     using Save = pmm::PersistMemoryManager<pmm::SmallEmbeddedStaticConfig<4096>, 32503>;
     using Load = pmm::PersistMemoryManager<pmm::SmallEmbeddedStaticConfig<4096>, 32504>;

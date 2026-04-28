@@ -49,8 +49,8 @@ TEST_CASE( "I168-A2: kBlockHeaderGranules_t<SmallAddressTraits> is correct", "[t
 {
     using AT = pmm::SmallAddressTraits;
 
-    // SmallAddressTraits: granule_size=16, Block<Small> has TreeNode<Small> + 2 uint16_t
-    // TreeNode<Small>: 5*uint16_t + 4 bytes = 14 bytes; Block<Small> = 14 + 4 = 18 bytes
+    // SmallAddressTraits: granule_size=16, Block<Small> has the AVL slot in BlockHeader<Small> + 2 uint16_t
+    // AVL slot inside BlockHeader<Small>: 5*uint16_t + 4 bytes = 14 bytes; Block<Small> = 14 + 4 = 18 bytes
     // ceil(18/16) = 2
     static_assert( pmm::detail::kBlockHeaderGranules_t<AT> == 2,
                    "kBlockHeaderGranules_t<SmallAddressTraits> must be 2 " );
@@ -61,9 +61,9 @@ TEST_CASE( "I168-A3: kBlockHeaderGranules_t<LargeAddressTraits> is >= 1", "[test
 {
     using AT = pmm::LargeAddressTraits;
 
-    // LargeAddressTraits: granule_size=64, Block<Large> has TreeNode<Large> + 2 uint64_t
-    // TreeNode<Large>: 5*uint64_t + 4 bytes = 44 bytes; Block<Large> = 44 + 16 = 60 bytes? No:
-    // Actually Block<Large> = sizeof(TreeNode<Large>) + 2*sizeof(uint64_t)
+    // LargeAddressTraits: granule_size=64, Block<Large> has the AVL slot in BlockHeader<Large> + 2 uint64_t
+    // the AVL slot in BlockHeader<Large>: 5*uint64_t + 4 bytes = 44 bytes; Block<Large> = 44 + 16 = 60 bytes? No:
+    // Actually Block<Large> == BlockHeader<Large> with the AVL slot embedded directly.
     // ceil(sizeof(Block<Large>) / 64) — at least 1
     static_assert( pmm::detail::kBlockHeaderGranules_t<AT> >= 1,
                    "kBlockHeaderGranules_t<LargeAddressTraits> must be >= 1 " );

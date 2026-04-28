@@ -428,13 +428,26 @@ They are intended for advanced use cases, such as implementing persistent data s
 
 ```cpp
 template <typename T>
-static TreeNode<address_traits>& tree_node(pptr<T> p) noexcept;
+static BlockHeader<address_traits>& tree_node(pptr<T> p) noexcept;
 ```
 
-Returns a direct reference to the [TreeNode](../include/pmm/tree_node.h#pmm-treenode) embedded in the block header for `p`.
-Provides unified access to all AVL fields via `get_left()`, `set_left()`, `get_right()`,
-`set_right()`, `get_parent()`, `set_parent()`, `get_height()`, `set_height()`,
-`get_weight()`, `set_weight()`.
+Returns a direct reference to the [BlockHeader](../include/pmm/block_header.h#pmm-blockheader) of the
+block backing `p`. The AVL slot is the prefix of `BlockHeader<AT>`, not a separate
+`TreeNode` object. AVL fields are accessed as direct data members of the returned reference:
+
+```cpp
+auto& h = MyMgr::tree_node(p);
+h.left_offset;     // index_type — left child granule index or no_block
+h.right_offset;    // index_type — right child granule index or no_block
+h.parent_offset;   // index_type — parent granule index or no_block
+h.weight;          // index_type — node weight (also data granules for allocated blocks)
+h.avl_height;      // std::int16_t — AVL subtree height
+h.left_offset   = idx;
+h.right_offset  = idx;
+h.parent_offset = idx;
+h.weight        = w;
+h.avl_height    = height;
+```
 
 > **Warning:** The returned reference is only valid while the manager is initialized and
 > the block has not been freed. Do not store the reference beyond the current operation.
@@ -521,24 +534,26 @@ Both operations call `ManagerT::resolve<T>(p)` internally.
 ### AVL tree node access
 
 ```cpp
-TreeNode<address_traits>& tree_node() const noexcept;  // direct reference to TreeNode
+BlockHeader<address_traits>& tree_node() const noexcept;  // direct reference to BlockHeader
 ```
 
-Returns a reference to the [TreeNode](../include/pmm/tree_node.h#pmm-treenode) embedded in the block header. All AVL fields
-are accessed through the returned [TreeNode](../include/pmm/tree_node.h#pmm-treenode) reference:
+Returns a reference to the [BlockHeader](../include/pmm/block_header.h#pmm-blockheader) of the block
+backing `p`. The AVL slot is the prefix of `BlockHeader<AT>` (fields `weight`,
+`left_offset`, `right_offset`, `parent_offset`, `avl_height`); there is no separate
+`TreeNode` object. AVL fields are accessed as direct data members:
 
 ```cpp
-auto& tn = p.tree_node();
-tn.get_left();              // index_type — left child granule index or no_block
-tn.get_right();             // index_type — right child granule index or no_block
-tn.get_parent();            // index_type — parent granule index or no_block
-tn.get_weight();            // index_type — node weight
-tn.get_height();            // std::int16_t — AVL subtree height
-tn.set_left(idx);
-tn.set_right(idx);
-tn.set_parent(idx);
-tn.set_weight(w);
-tn.set_height(h);
+auto& h = p.tree_node();
+h.left_offset;     // index_type — left child granule index or no_block
+h.right_offset;    // index_type — right child granule index or no_block
+h.parent_offset;   // index_type — parent granule index or no_block
+h.weight;          // index_type — node weight
+h.avl_height;      // std::int16_t — AVL subtree height
+h.left_offset   = idx;
+h.right_offset  = idx;
+h.parent_offset = idx;
+h.weight        = w;
+h.avl_height    = height;
 ```
 
 > **Note:** Absent links are stored as `address_traits::no_block` sentinel. Use
@@ -670,9 +685,10 @@ namespace pmm {
 ```
 
 A persistent associative container (dictionary) based on an AVL tree. Each node is an
-allocated block in PAP containing a key-value pair. The built-in [TreeNode](../include/pmm/tree_node.h#pmm-treenode) fields of
-each block serve as AVL tree links (no separate node allocations). Inserting a duplicate
-key updates the existing value.
+allocated block in PAP containing a key-value pair. The built-in AVL slot of the
+[BlockHeader](../include/pmm/block_header.h#pmm-blockheader) of each block (fields `weight`,
+`left_offset`, `right_offset`, `parent_offset`, `avl_height`) serves as the AVL tree links
+(no separate node allocations). Inserting a duplicate key updates the existing value.
 
 [pmap](../include/pmm/pmap.h#pmm-pmap) is a typed facade over the canonical forest-domain protocol. Its AVL root is stored
 in a manager domain binding under `container/pmap/<type>/<binding>`, not in the [pmap](../include/pmm/pmap.h#pmm-pmap)

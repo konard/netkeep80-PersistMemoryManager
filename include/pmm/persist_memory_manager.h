@@ -467,7 +467,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     {
         set_tree_field( p, &BlockStateBase<address_traits>::set_avl_height_of, h );
     }
-    template <typename T> static TreeNode<address_traits>& tree_node( pptr<T> p ) noexcept
+    template <typename T> static BlockHeader<address_traits>& tree_node( pptr<T> p ) noexcept
     {
         assert( !p.is_null() && "tree_node: pptr must not be null" );
         assert( _initialized && "tree_node: manager must be initialized before calling tree_node" );
@@ -475,11 +475,11 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         if ( blk == nullptr )
         {
             _last_error = PmmError::InvalidPointer;
-            static thread_local TreeNode<address_traits> sentinel{};
+            static thread_local BlockHeader<address_traits> sentinel{};
             sentinel = {};
             return sentinel;
         }
-        return *reinterpret_cast<TreeNode<address_traits>*>( blk );
+        return *detail::block_header_at<address_traits>( blk );
     }
 
   private:
@@ -661,8 +661,8 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         uint8_t*                               base    = _backend.base_ptr();
         detail::ManagerHeader<address_traits>* hdr     = get_header( base );
         index_type                             blk_idx = detail::block_idx_t<address_traits>( base, blk );
-        AllocatedBlock<address_traits>*        alloc   = AllocatedBlock<address_traits>::cast_from_raw( blk );
-        alloc->mark_as_free();
+        AllocatedBlock<address_traits>         alloc   = AllocatedBlock<address_traits>::cast_from_raw( blk );
+        alloc.mark_as_free();
         hdr->alloc_count--;
         hdr->free_count++;
         if ( hdr->used_size >= freed )

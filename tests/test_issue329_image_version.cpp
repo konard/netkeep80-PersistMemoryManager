@@ -26,8 +26,8 @@ TEST_CASE( "issue329: ManagerHeader exposes a persisted image version", "[issue3
 
     static_assert( std::is_same_v<decltype( Header::image_version ), std::uint8_t>,
                    "ManagerHeader::image_version must be a persisted version byte" );
-    static_assert( pmm::detail::kCurrentImageVersion == 1,
-                   "The current persisted image layout version must start at 1" );
+    static_assert( pmm::detail::kCurrentImageVersion >= 2,
+                   "Issue #367 bumps the persisted image version to 2 (or later) to break legacy compatibility" );
     static_assert( sizeof( Header ) == 64,
                    "Adding an explicit image version must preserve the default ManagerHeader size" );
 }
@@ -64,7 +64,7 @@ TEST_CASE( "issue329: load rejects an unsupported image version", "[issue329][lo
     REQUIRE( result.entries[0].actual == static_cast<std::uint8_t>( pmm::detail::kCurrentImageVersion + 1 ) );
 }
 
-TEST_CASE( "issue329: load migrates legacy unversioned images to the current version", "[issue329][load]" )
+TEST_CASE( "issue329/issue367: legacy unversioned images are rejected, not migrated", "[issue329][issue367][load]" )
 {
     VersionLegacyMgr::destroy();
     REQUIRE( VersionLegacyMgr::create( 64 * 1024 ) );
@@ -75,10 +75,10 @@ TEST_CASE( "issue329: load migrates legacy unversioned images to the current ver
 
     VersionLegacyMgr::clear_error();
     pmm::VerifyResult result;
-    REQUIRE( VersionLegacyMgr::load( result ) );
+    REQUIRE_FALSE( VersionLegacyMgr::load( result ) );
 
-    REQUIRE( VersionLegacyMgr::last_error() == pmm::PmmError::Ok );
-    REQUIRE( hdr->image_version == pmm::detail::kCurrentImageVersion );
+    REQUIRE( VersionLegacyMgr::last_error() == pmm::PmmError::UnsupportedImageVersion );
+    REQUIRE( hdr->image_version == pmm::detail::kLegacyUnversionedImageVersion );
 
     VersionLegacyMgr::destroy();
 }

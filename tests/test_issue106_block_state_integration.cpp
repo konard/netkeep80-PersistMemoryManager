@@ -120,8 +120,8 @@ TEST_CASE( "    AllocatedBlock state after alloc", "[test_issue106_block_state_i
     std::uint32_t  idx = blk_idx_of( pmm, blk );
 
     // Block is in AllocatedBlock state
-    auto* alloc = pmm::AllocatedBlock<A>::cast_from_raw( blk );
-    REQUIRE( alloc->verify_invariants( idx ) );
+    auto alloc = pmm::AllocatedBlock<A>::cast_from_raw( blk );
+    REQUIRE( alloc.verify_invariants( idx ) );
 
     // Counters updated correctly
     REQUIRE( pmm.alloc_block_count() >= alloc_before );

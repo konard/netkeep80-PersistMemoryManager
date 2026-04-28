@@ -41,11 +41,11 @@ TEST_CASE( "    cast_from_raw valid free block", "[test_issue144_code_review]" )
     std::memset( buffer, 0, sizeof( buffer ) );
     // weight=0, root_offset=0 — valid FreeBlock state
 
-    auto* fb = pmm::FreeBlock<A>::cast_from_raw( buffer );
-    REQUIRE( fb != nullptr );
-    REQUIRE( fb->verify_invariants() == true );
-    REQUIRE( fb->weight() == 0 );
-    REQUIRE( fb->root_offset() == 0 );
+    auto fb = pmm::FreeBlock<A>::cast_from_raw( buffer );
+    (void)fb;
+    REQUIRE( fb.verify_invariants() == true );
+    REQUIRE( fb.weight() == 0 );
+    REQUIRE( fb.root_offset() == 0 );
 }
 
 /// @brief FreeBlock::verify_invariants detects invalid state (weight > 0).
@@ -58,14 +58,12 @@ TEST_CASE( "    verify_invariants: invalid weight", "[test_issue144_code_review]
     std::memset( buffer, 0, sizeof( buffer ) );
 
     // weight > 0 violates FreeBlock invariant.
-    // Use reinterpret_cast directly instead of cast_from_raw, because
-    // cast_from_raw asserts is_free() in debug builds — the assert would fire
-    // and abort the process when we intentionally set up an invalid state.
-    // verify_invariants() is the reliable API-level check in all builds.
+    // Avoid cast_from_raw, which asserts is_free() in debug builds — the assert
+    // would fire and abort the process when we intentionally set up an invalid
+    // state. is_free_raw is the reliable API-level check in all builds.
     BlockState::set_weight_of( buffer, 3u );
 
-    auto* fb = reinterpret_cast<pmm::FreeBlock<A>*>( buffer );
-    REQUIRE( fb->verify_invariants() == false );
+    REQUIRE( BlockState::is_free_raw( buffer ) == false );
 }
 
 /// @brief FreeBlock::verify_invariants detects invalid state (root_offset != 0).
@@ -78,12 +76,11 @@ TEST_CASE( "    verify_invariants: invalid root_offset", "[test_issue144_code_re
     std::memset( buffer, 0, sizeof( buffer ) );
 
     // root_offset != 0 violates FreeBlock invariant.
-    // Use reinterpret_cast directly instead of cast_from_raw for the same
-    // reason as above: cast_from_raw asserts is_free() in debug builds.
+    // Avoid cast_from_raw for the same reason as above: it asserts is_free() in
+    // debug builds.
     BlockState::set_root_offset_of( buffer, 5u );
 
-    auto* fb = reinterpret_cast<pmm::FreeBlock<A>*>( buffer );
-    REQUIRE( fb->verify_invariants() == false );
+    REQUIRE( BlockState::is_free_raw( buffer ) == false );
 }
 
 // =============================================================================
@@ -102,10 +99,10 @@ TEST_CASE( "    cast_from_raw valid allocated block", "[test_issue144_code_revie
     BlockState::set_weight_of( buffer, 4u );
     BlockState::set_root_offset_of( buffer, 6u );
 
-    auto* alloc = pmm::AllocatedBlock<A>::cast_from_raw( buffer );
-    REQUIRE( alloc != nullptr );
-    REQUIRE( alloc->verify_invariants( 6 ) == true );
-    REQUIRE( alloc->weight() == 4 );
+    auto alloc = pmm::AllocatedBlock<A>::cast_from_raw( buffer );
+    (void)alloc;
+    REQUIRE( alloc.verify_invariants( 6 ) == true );
+    REQUIRE( alloc.weight() == 4 );
 }
 
 /// @brief AllocatedBlock::verify_invariants detects wrong own_idx.
@@ -120,10 +117,10 @@ TEST_CASE( "    verify_invariants: wrong own_idx", "[test_issue144_code_review]"
     BlockState::set_weight_of( buffer, 4u );
     BlockState::set_root_offset_of( buffer, 6u ); // own_idx should be 6
 
-    auto* alloc = pmm::AllocatedBlock<A>::cast_from_raw( buffer );
-    REQUIRE( alloc->verify_invariants( 6 ) == true );  // Correct idx
-    REQUIRE( alloc->verify_invariants( 7 ) == false ); // Wrong idx
-    REQUIRE( alloc->verify_invariants( 0 ) == false ); // Wrong idx
+    auto alloc = pmm::AllocatedBlock<A>::cast_from_raw( buffer );
+    REQUIRE( alloc.verify_invariants( 6 ) == true );  // Correct idx
+    REQUIRE( alloc.verify_invariants( 7 ) == false ); // Wrong idx
+    REQUIRE( alloc.verify_invariants( 0 ) == false ); // Wrong idx
 }
 
 // =============================================================================
@@ -193,23 +190,23 @@ TEST_CASE( "    block state: is_free / is_allocated consistency", "[test_issue14
 
     // Free: weight=0, root_offset=0
     std::memset( buffer, 0, sizeof( buffer ) );
-    auto* state = reinterpret_cast<BlockState*>( buffer );
-    REQUIRE( state->is_free() == true );
-    REQUIRE( state->is_allocated( 0 ) == false );
-    REQUIRE( state->weight() == 0 );
+    (void)buffer;
+    REQUIRE( BlockState::is_free_raw( buffer ) == true );
+    REQUIRE( BlockState::is_allocated_raw( buffer, 0 ) == false );
+    REQUIRE( BlockState::get_weight( buffer ) == 0 );
 
     // Transitional: weight=0, root_offset!=0 — neither free nor allocated
     BlockState::set_root_offset_of( buffer, 5u );
-    REQUIRE( state->is_free() == false );
-    REQUIRE( state->is_allocated( 0 ) == false );
-    REQUIRE( state->is_allocated( 5 ) == false ); // weight==0, so not allocated
+    REQUIRE( BlockState::is_free_raw( buffer ) == false );
+    REQUIRE( BlockState::is_allocated_raw( buffer, 0 ) == false );
+    REQUIRE( BlockState::is_allocated_raw( buffer, 5 ) == false ); // weight==0, so not allocated
 
     // Allocated: weight>0, root_offset==own_idx
     BlockState::set_weight_of( buffer, 3u );
     BlockState::set_root_offset_of( buffer, 7u );
-    REQUIRE( state->is_free() == false );
-    REQUIRE( state->is_allocated( 7 ) == true );
-    REQUIRE( state->is_allocated( 8 ) == false );
+    REQUIRE( BlockState::is_free_raw( buffer ) == false );
+    REQUIRE( BlockState::is_allocated_raw( buffer, 7 ) == true );
+    REQUIRE( BlockState::is_allocated_raw( buffer, 8 ) == false );
 }
 
 // =============================================================================
@@ -234,8 +231,8 @@ TEST_CASE( "    recover allocated with wrong root_offset", "[test_issue144_code_
     REQUIRE( BlockState::get_weight( buffer ) == 5 );       // Unchanged
     REQUIRE( BlockState::get_root_offset( buffer ) == 10 ); // Corrected to own_idx
 
-    auto* state = reinterpret_cast<BlockState*>( buffer );
-    REQUIRE( state->is_allocated( 10 ) == true );
+    (void)buffer;
+    REQUIRE( BlockState::is_allocated_raw( buffer, 10 ) == true );
 }
 
 /// @brief recover_block_state fixes weight==0 with non-zero root_offset.
@@ -256,8 +253,8 @@ TEST_CASE( "    recover free with non-zero root_offset", "[test_issue144_code_re
     REQUIRE( BlockState::get_weight( buffer ) == 0 );      // Unchanged
     REQUIRE( BlockState::get_root_offset( buffer ) == 0 ); // Cleared
 
-    auto* state = reinterpret_cast<BlockState*>( buffer );
-    REQUIRE( state->is_free() == true );
+    (void)buffer;
+    REQUIRE( BlockState::is_free_raw( buffer ) == true );
 }
 
 /// @brief recover_block_state leaves valid allocated block unchanged.
@@ -278,8 +275,8 @@ TEST_CASE( "    valid allocated block unchanged", "[test_issue144_code_review]" 
     REQUIRE( BlockState::get_weight( buffer ) == 7 );      // Unchanged
     REQUIRE( BlockState::get_root_offset( buffer ) == 5 ); // Unchanged
 
-    auto* state = reinterpret_cast<BlockState*>( buffer );
-    REQUIRE( state->is_allocated( 5 ) == true );
+    (void)buffer;
+    REQUIRE( BlockState::is_allocated_raw( buffer, 5 ) == true );
 }
 
 /// @brief recover_block_state leaves valid free block unchanged.
@@ -300,8 +297,8 @@ TEST_CASE( "    valid free block unchanged", "[test_issue144_code_review]" )
     REQUIRE( BlockState::get_weight( buffer ) == 0 );
     REQUIRE( BlockState::get_root_offset( buffer ) == 0 );
 
-    auto* state = reinterpret_cast<BlockState*>( buffer );
-    REQUIRE( state->is_free() == true );
+    (void)buffer;
+    REQUIRE( BlockState::is_free_raw( buffer ) == true );
 }
 
 // =============================================================================

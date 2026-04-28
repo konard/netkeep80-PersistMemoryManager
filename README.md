@@ -11,7 +11,7 @@ AVL-based allocator, проверкой структуры и восстанов
 [![CI](https://github.com/netkeep80/PersistMemoryManager/actions/workflows/ci.yml/badge.svg)](https://github.com/netkeep80/PersistMemoryManager/actions/workflows/ci.yml)
 [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](LICENSE)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-blue.svg)](https://isocpp.org/std/the-standard)
-[![Version](https://img.shields.io/badge/version-3.0.1-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-3.0.6-green.svg)](CHANGELOG.md)
 
 ## Что это
 
@@ -336,7 +336,7 @@ cmake --build build --target pmm_demo
 - [Validation Model](docs/validation_model.md) - уровни проверки указателей и блоков;
 - [Atomic Writes](docs/atomic_writes.md) - порядок мутаций и crash-consistency;
 - [Thread Safety](docs/thread_safety.md) - lock policies и concurrent usage;
-- [Block and TreeNode Semantics](docs/block_and_treenode_semantics.md) - семантика block header.
+- [Block Header Semantics](docs/block_and_treenode_semantics.md) - семантика block header.
 
 Исторические документы находятся в `docs/archive/` и не входят в основной
 маршрут чтения.

@@ -691,18 +691,18 @@ TEST_CASE( "validation: tree_node sentinel is stateless across invalid calls", "
     REQUIRE( Mgr::last_error() == pmm::PmmError::InvalidPointer );
 
     // Mutate the sentinel through the returned reference.
-    tn1.set_weight( 42 );
-    tn1.set_height( 7 );
-    tn1.set_left( 99 );
+    tn1.weight      = 42;
+    tn1.avl_height  = 7;
+    tn1.left_offset = 99;
 
     // Second bad call — sentinel must be clean again, not carry prior mutations.
     Mgr::clear_error();
     auto& tn2 = Mgr::tree_node( bad2 );
     REQUIRE( Mgr::last_error() == pmm::PmmError::InvalidPointer );
 
-    CHECK( tn2.get_weight() == 0 );
-    CHECK( tn2.get_height() == 0 );
-    CHECK( tn2.get_left() == 0 );
+    CHECK( tn2.weight == 0 );
+    CHECK( tn2.avl_height == 0 );
+    CHECK( tn2.left_offset == 0 );
 
     Mgr::destroy();
 }

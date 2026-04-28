@@ -2,7 +2,6 @@
 #include "pmm/address_traits.h"
 #include "pmm/block.h"
 #include "pmm/block_state.h"
-#include "pmm/tree_node.h"
 #include "pmm/validation.h"
 #include <algorithm>
 #include <cassert>
@@ -90,14 +89,14 @@ struct FreeBlockView
 namespace detail
 {
 inline constexpr uint8_t kLegacyUnversionedImageVersion = 0;
-inline constexpr uint8_t kCurrentImageVersion           = 1;
+inline constexpr uint8_t kCurrentImageVersion           = 2;
 inline constexpr bool    is_supported_image_version( uint8_t image_version ) noexcept
 {
-    return image_version == kLegacyUnversionedImageVersion || image_version == kCurrentImageVersion;
+    return image_version == kCurrentImageVersion;
 }
-inline constexpr bool image_version_requires_migration( uint8_t image_version ) noexcept
+inline constexpr bool image_version_requires_migration( [[maybe_unused]] uint8_t image_version ) noexcept
 {
-    return image_version == kLegacyUnversionedImageVersion;
+    return false;
 }
 inline uint32_t crc32_accumulate_byte( uint32_t crc, uint8_t byte ) noexcept
 {
@@ -115,10 +114,6 @@ inline uint32_t compute_crc32( const uint8_t* data, size_t length ) noexcept
 }
 static_assert( sizeof( pmm::Block<pmm::DefaultAddressTraits> ) == 32, "" );
 static_assert( sizeof( pmm::Block<pmm::DefaultAddressTraits> ) % kGranuleSize == 0, "" );
-static_assert( sizeof( pmm::Block<pmm::DefaultAddressTraits> ) ==
-                   sizeof( pmm::TreeNode<pmm::DefaultAddressTraits> ) + 2 * sizeof( uint32_t ),
-               "" );
-static_assert( sizeof( pmm::TreeNode<pmm::DefaultAddressTraits> ) == 5 * sizeof( uint32_t ) + 4, "" );
 inline constexpr uint32_t kNoBlock = 0xFFFFFFFFU;
 static_assert( kNoBlock == pmm::DefaultAddressTraits::no_block, "" );
 template <typename AT> inline constexpr typename AT::index_type kNoBlock_v = AT::no_block;
@@ -179,8 +174,8 @@ template <typename AT> inline uint32_t compute_image_crc32( const uint8_t* data,
 inline constexpr uint32_t kManagerHeaderGranules = sizeof( ManagerHeader<DefaultAddressTraits> ) / kGranuleSize;
 inline constexpr size_t   kMinBlockSize          = sizeof( pmm::Block<pmm::DefaultAddressTraits> ) + kGranuleSize;
 inline constexpr size_t   kMinMemorySize         = sizeof( pmm::Block<pmm::DefaultAddressTraits> ) +
-                                                   sizeof( ManagerHeader<pmm::DefaultAddressTraits> ) +
-                                                   sizeof( pmm::Block<pmm::DefaultAddressTraits> ) + kMinBlockSize;
+                                         sizeof( ManagerHeader<pmm::DefaultAddressTraits> ) +
+                                         sizeof( pmm::Block<pmm::DefaultAddressTraits> ) + kMinBlockSize;
 template <typename AT> inline typename AT::index_type bytes_to_granules_t( size_t bytes )
 {
     using IndexT                    = typename AT::index_type;

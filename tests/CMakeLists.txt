@@ -58,17 +58,8 @@ pmm_add_test(test_issue73_refactoring test_issue73_refactoring.cpp)
 # ─── Тесты оптимизации констант ──────────────────────────────────
 pmm_add_test(test_issue83_constants test_issue83_constants.cpp)
 
-# ─── Тесты code review и маяки абстракций ────────────────────────
-pmm_add_test(test_issue87_abstraction test_issue87_abstraction.cpp)
-
 # ─── Тесты Phase 1: AddressTraits ────────────────────────────────
 pmm_add_test(test_issue87_phase1 test_issue87_phase1.cpp)
-
-# ─── Тесты Phase 2: LinkedListNode + TreeNode ────────────────────
-pmm_add_test(test_issue87_phase2 test_issue87_phase2.cpp)
-
-# ─── Тесты Phase 3: Block<AddressTraits> ─────────────────────────
-pmm_add_test(test_issue87_phase3 test_issue87_phase3.cpp)
 
 # ─── Тесты Phase 4: FreeBlockTree policy ─────────────────────────
 pmm_add_test(test_issue87_phase4 test_issue87_phase4.cpp)
@@ -85,8 +76,8 @@ pmm_add_test(test_issue87_phase7 test_issue87_phase7.cpp)
 # ─── Тесты Phase 8: pmm_presets.h ────────────────────────────────
 pmm_add_test(test_issue87_phase8 test_issue87_phase8.cpp)
 
-# ─── Тесты Phase 9: BlockState machine ───────────────────────────
-pmm_add_test(test_block_state test_block_state.cpp)
+# ─── Issue 367: BlockHeader<AT> layout/contract/state tests ──────
+pmm_add_test(test_block_header test_block_header.cpp)
 
 # ─── Интеграционные тесты пресетов ───────────────────────────────
 add_executable(test_issue97_presets test_issue97_presets.cpp)

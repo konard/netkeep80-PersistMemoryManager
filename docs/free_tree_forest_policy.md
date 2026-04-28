@@ -24,9 +24,10 @@ The free-tree is the **primary system domain** of the AVL-forest.
 It indexes free blocks of the persistent address space (PAP) for best-fit allocation.
 
 Within the general forest model, the free-tree is a **specialized forest-policy**:
-it shares the same AVL tree substrate ([TreeNode](../include/pmm/tree_node.h#pmm-treenode) fields, shared rotations and rebalancing
-from `avl_tree_mixin.h`), but has its own domain-specific ordering rules
-and its own interpretation of block header fields.
+it shares the same AVL tree substrate (the AVL-slot prefix of [BlockHeader](../include/pmm/block_header.h#pmm-blockheader) — fields
+`weight`, `left_offset`, `right_offset`, `parent_offset`, `avl_height` — and shared
+rotations and rebalancing from `avl_tree_mixin.h`), but has its own domain-specific
+ordering rules and its own interpretation of block header fields.
 
 This specialization is architecturally intentional.
 The free-tree is not an exception to the forest model — it is a concrete instance

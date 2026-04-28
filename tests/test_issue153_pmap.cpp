@@ -30,7 +30,7 @@
  * @see include/pmm/pmap.h — pmap<_K,_V,ManagerT>
  * @see include/pmm/pstringview.h — pstringview (analogous AVL-tree type)
  * @see include/pmm/persist_memory_manager.h — PersistMemoryManager
- * @see include/pmm/tree_node.h — TreeNode<AT> built-in AVL fields
+ * @see include/pmm/block_header.h — BlockHeader<AT> built-in AVL fields
  * @version 0.1
  */
 

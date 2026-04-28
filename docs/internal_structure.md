@@ -9,11 +9,11 @@ Canonical map of internal modules, their responsibilities, and authoritative fil
 | File | Lines | Responsibility |
 |------|-------|----------------|
 | `address_traits.h` | 144 | `AddressTraits<IndexT, GranuleSz>` template; predefined Small/Default/Large aliases |
-| `block.h` | 80 | `Block<AT>` composite type (TreeNode + prev/next linked-list fields) |
-| `tree_node.h` | 170 | `TreeNode<AT>` intrusive AVL slot (weight, left/right/parent, root_offset, avl_height, node_type) |
+| `block.h` | 80 | `Block<AT>` is a typedef for `BlockHeader<AT>` — the single physical block-header layout |
+| `block_header.h` | 170 | `BlockHeader<AT>` (AVL slot) intrusive AVL slot (weight, left/right/parent, root_offset, avl_height, node_type) |
 | `types.h` | 464 | `ManagerHeader<AT>`, [PmmError](../include/pmm/types.h#pmm-pmmerror), [MemoryStats](../include/pmm/types.h#pmm-memorystats), [BlockView](../include/pmm/types.h#pmm-blockview), [FreeBlockView](../include/pmm/types.h#pmm-freeblockview); CRC32; byte↔granule conversion; `block_at()`, `user_ptr()`, `resolve_granule_ptr()`; `kNullIdx_v<AT>` null sentinel |
 
-**Authoritative path:** `address_traits.h``block.h` / `tree_node.h``types.h` (constants & helpers).
+**Authoritative path:** `address_traits.h``block.h` / `block_header.h``types.h` (constants & helpers).
 
 ### 2. Block State Machine
 
@@ -99,7 +99,7 @@ pmm::                           Public API surface
 ├── parray<T, ManagerT>         Dynamic array
 ├── pallocator<T, ManagerT>     STL allocator
 ├── Block<AT>                   Block layout
-├── TreeNode<AT>                AVL node
+├── BlockHeader<AT>             physical block header (AVL + linked-list)
 ├── BlockStateBase<AT>          State machine
 ├── AllocatorPolicy<>           Allocation logic
 ├── AvlFreeTree<AT>             Free tree policy

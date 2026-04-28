@@ -327,30 +327,30 @@ TEST_CASE( "pptr_tree_node_links", "[test_pptr]" )
     const auto no_block = pmm::DefaultAddressTraits::no_block;
 
     // Начальное состояние: нет связей (no_block в полях tree_node)
-    REQUIRE( node1.tree_node().get_left() == no_block );
-    REQUIRE( node1.tree_node().get_right() == no_block );
-    REQUIRE( node1.tree_node().get_parent() == no_block );
-    REQUIRE( node2.tree_node().get_left() == no_block );
-    REQUIRE( node2.tree_node().get_right() == no_block );
-    REQUIRE( node2.tree_node().get_parent() == no_block );
+    REQUIRE( node1.tree_node().left_offset == no_block );
+    REQUIRE( node1.tree_node().right_offset == no_block );
+    REQUIRE( node1.tree_node().parent_offset == no_block );
+    REQUIRE( node2.tree_node().left_offset == no_block );
+    REQUIRE( node2.tree_node().right_offset == no_block );
+    REQUIRE( node2.tree_node().parent_offset == no_block );
 
     // Построить дерево: node1 — корень, node2 — левый, node3 — правый
-    node1.tree_node().set_left( node2.offset() );
-    node1.tree_node().set_right( node3.offset() );
-    node2.tree_node().set_parent( node1.offset() );
-    node3.tree_node().set_parent( node1.offset() );
+    node1.tree_node().left_offset   = node2.offset();
+    node1.tree_node().right_offset  = node3.offset();
+    node2.tree_node().parent_offset = node1.offset();
+    node3.tree_node().parent_offset = node1.offset();
 
     // Проверить связи
-    REQUIRE( node1.tree_node().get_left() == node2.offset() );
-    REQUIRE( node1.tree_node().get_right() == node3.offset() );
-    REQUIRE( node2.tree_node().get_parent() == node1.offset() );
-    REQUIRE( node3.tree_node().get_parent() == node1.offset() );
+    REQUIRE( node1.tree_node().left_offset == node2.offset() );
+    REQUIRE( node1.tree_node().right_offset == node3.offset() );
+    REQUIRE( node2.tree_node().parent_offset == node1.offset() );
+    REQUIRE( node3.tree_node().parent_offset == node1.offset() );
 
     // Потомки node2 и node3 по-прежнему null (no_block)
-    REQUIRE( node2.tree_node().get_left() == no_block );
-    REQUIRE( node2.tree_node().get_right() == no_block );
-    REQUIRE( node3.tree_node().get_left() == no_block );
-    REQUIRE( node3.tree_node().get_right() == no_block );
+    REQUIRE( node2.tree_node().left_offset == no_block );
+    REQUIRE( node2.tree_node().right_offset == no_block );
+    REQUIRE( node3.tree_node().left_offset == no_block );
+    REQUIRE( node3.tree_node().right_offset == no_block );
 
     pmm.deallocate_typed( node1 );
     pmm.deallocate_typed( node2 );
@@ -375,15 +375,15 @@ TEST_CASE( "pptr_tree_node_height", "[test_pptr]" )
     REQUIRE( !node2.is_null() );
 
     // Начальная высота = 0 (узел не в дереве после выделения)
-    REQUIRE( node1.tree_node().get_height() == 0 );
-    REQUIRE( node2.tree_node().get_height() == 0 );
+    REQUIRE( node1.tree_node().avl_height == 0 );
+    REQUIRE( node2.tree_node().avl_height == 0 );
 
     // Установить высоту
-    node1.tree_node().set_height( 2 );
-    node2.tree_node().set_height( 1 );
+    node1.tree_node().avl_height = 2;
+    node2.tree_node().avl_height = 1;
 
-    REQUIRE( node1.tree_node().get_height() == 2 );
-    REQUIRE( node2.tree_node().get_height() == 1 );
+    REQUIRE( node1.tree_node().avl_height == 2 );
+    REQUIRE( node2.tree_node().avl_height == 1 );
 
     pmm.deallocate_typed( node1 );
     pmm.deallocate_typed( node2 );
@@ -404,7 +404,7 @@ TEST_CASE( "pptr_tree_node_weight", "[test_pptr]" )
     REQUIRE( !p.is_null() );
 
     // Для выделенного блока вес > 0 (размер данных в гранулах)
-    REQUIRE( p.tree_node().get_weight() > 0 );
+    REQUIRE( p.tree_node().weight > 0 );
 
     pmm.deallocate_typed( p );
     pmm.destroy();
@@ -452,46 +452,46 @@ TEST_CASE( "pptr_user_avl_tree", "[test_pptr]" )
     //   L    R
     // n4(10) n5(25)
 
-    n1.tree_node().set_left( n2.offset() );
-    n1.tree_node().set_right( n3.offset() );
-    n1.tree_node().set_parent( no_block );
-    n1.tree_node().set_height( 3 );
+    n1.tree_node().left_offset   = n2.offset();
+    n1.tree_node().right_offset  = n3.offset();
+    n1.tree_node().parent_offset = no_block;
+    n1.tree_node().avl_height    = 3;
 
-    n2.tree_node().set_left( n4.offset() );
-    n2.tree_node().set_right( n5.offset() );
-    n2.tree_node().set_parent( n1.offset() );
-    n2.tree_node().set_height( 2 );
+    n2.tree_node().left_offset   = n4.offset();
+    n2.tree_node().right_offset  = n5.offset();
+    n2.tree_node().parent_offset = n1.offset();
+    n2.tree_node().avl_height    = 2;
 
-    n3.tree_node().set_left( no_block );
-    n3.tree_node().set_right( no_block );
-    n3.tree_node().set_parent( n1.offset() );
-    n3.tree_node().set_height( 1 );
+    n3.tree_node().left_offset   = no_block;
+    n3.tree_node().right_offset  = no_block;
+    n3.tree_node().parent_offset = n1.offset();
+    n3.tree_node().avl_height    = 1;
 
-    n4.tree_node().set_left( no_block );
-    n4.tree_node().set_right( no_block );
-    n4.tree_node().set_parent( n2.offset() );
-    n4.tree_node().set_height( 1 );
+    n4.tree_node().left_offset   = no_block;
+    n4.tree_node().right_offset  = no_block;
+    n4.tree_node().parent_offset = n2.offset();
+    n4.tree_node().avl_height    = 1;
 
-    n5.tree_node().set_left( no_block );
-    n5.tree_node().set_right( no_block );
-    n5.tree_node().set_parent( n2.offset() );
-    n5.tree_node().set_height( 1 );
+    n5.tree_node().left_offset   = no_block;
+    n5.tree_node().right_offset  = no_block;
+    n5.tree_node().parent_offset = n2.offset();
+    n5.tree_node().avl_height    = 1;
 
     // Проверить структуру дерева
-    REQUIRE( n1.tree_node().get_left() == n2.offset() );
-    REQUIRE( n1.tree_node().get_right() == n3.offset() );
-    REQUIRE( n1.tree_node().get_parent() == no_block );
-    REQUIRE( n1.tree_node().get_height() == 3 );
+    REQUIRE( n1.tree_node().left_offset == n2.offset() );
+    REQUIRE( n1.tree_node().right_offset == n3.offset() );
+    REQUIRE( n1.tree_node().parent_offset == no_block );
+    REQUIRE( n1.tree_node().avl_height == 3 );
 
-    REQUIRE( n2.tree_node().get_left() == n4.offset() );
-    REQUIRE( n2.tree_node().get_right() == n5.offset() );
-    REQUIRE( n2.tree_node().get_parent() == n1.offset() );
-    REQUIRE( n2.tree_node().get_height() == 2 );
+    REQUIRE( n2.tree_node().left_offset == n4.offset() );
+    REQUIRE( n2.tree_node().right_offset == n5.offset() );
+    REQUIRE( n2.tree_node().parent_offset == n1.offset() );
+    REQUIRE( n2.tree_node().avl_height == 2 );
 
-    REQUIRE( n3.tree_node().get_left() == no_block );
-    REQUIRE( n3.tree_node().get_right() == no_block );
-    REQUIRE( n3.tree_node().get_parent() == n1.offset() );
-    REQUIRE( n3.tree_node().get_height() == 1 );
+    REQUIRE( n3.tree_node().left_offset == no_block );
+    REQUIRE( n3.tree_node().right_offset == no_block );
+    REQUIRE( n3.tree_node().parent_offset == n1.offset() );
+    REQUIRE( n3.tree_node().avl_height == 1 );
 
     // Проверить данные в узлах (не затронуты операциями дерева)
     REQUIRE( *n1 == 30 );
@@ -537,29 +537,29 @@ TEST_CASE( "pptr_tree_node_ref", "[test_pptr]" )
 
     // Начальное состояние: связи через tree_node() — no_block
     const auto no_block = pmm::DefaultAddressTraits::no_block;
-    REQUIRE( tn1.get_left() == no_block );
-    REQUIRE( tn1.get_right() == no_block );
-    REQUIRE( tn1.get_parent() == no_block );
-    REQUIRE( tn2.get_left() == no_block );
-    REQUIRE( tn2.get_right() == no_block );
+    REQUIRE( tn1.left_offset == no_block );
+    REQUIRE( tn1.right_offset == no_block );
+    REQUIRE( tn1.parent_offset == no_block );
+    REQUIRE( tn2.left_offset == no_block );
+    REQUIRE( tn2.right_offset == no_block );
 
     // Построить дерево через tree_node(): n1 — корень, n2 — левый, n3 — правый
-    tn1.set_left( n2.offset() );
-    tn1.set_right( n3.offset() );
-    tn2.set_parent( n1.offset() );
-    tn3.set_parent( n1.offset() );
-    tn1.set_height( 2 );
-    tn2.set_height( 1 );
-    tn3.set_height( 1 );
+    tn1.left_offset   = n2.offset();
+    tn1.right_offset  = n3.offset();
+    tn2.parent_offset = n1.offset();
+    tn3.parent_offset = n1.offset();
+    tn1.avl_height    = 2;
+    tn2.avl_height    = 1;
+    tn3.avl_height    = 1;
 
     // Проверить через tree_node()
-    REQUIRE( tn1.get_left() == n2.offset() );
-    REQUIRE( tn1.get_right() == n3.offset() );
-    REQUIRE( tn2.get_parent() == n1.offset() );
-    REQUIRE( tn3.get_parent() == n1.offset() );
-    REQUIRE( tn1.get_height() == 2 );
-    REQUIRE( tn2.get_height() == 1 );
-    REQUIRE( tn3.get_height() == 1 );
+    REQUIRE( tn1.left_offset == n2.offset() );
+    REQUIRE( tn1.right_offset == n3.offset() );
+    REQUIRE( tn2.parent_offset == n1.offset() );
+    REQUIRE( tn3.parent_offset == n1.offset() );
+    REQUIRE( tn1.avl_height == 2 );
+    REQUIRE( tn2.avl_height == 1 );
+    REQUIRE( tn3.avl_height == 1 );
 
     pmm.deallocate_typed( n1 );
     pmm.deallocate_typed( n2 );

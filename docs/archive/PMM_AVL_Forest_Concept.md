@@ -98,7 +98,7 @@
 
 Для `DefaultAddressTraits` layout таков:
 
-- [TreeNode](../../include/pmm/tree_node.h#pmm-treenode) = 24 байта;
+- AVL slot inside [BlockHeader](../../include/pmm/block_header.h#pmm-blockheader) = 24 байта;
 - [Block](../../include/pmm/block.h#pmm-block) = 32 байта;
 - блок идеально укладывается в 2 гранулы по 16 байт.
 
