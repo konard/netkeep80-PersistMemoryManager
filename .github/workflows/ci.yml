@@ -79,6 +79,32 @@ jobs:
             -I . -I utils \
             $(find . -name '*.cpp' ! -path './third_party/*')
 
+  # ─── Production LOC budget (issue #375) ───────────────────────────────────────
+  source-loc-budget:
+    name: Production LOC budget (issue #375)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install quom
+        run: pip install quom
+
+      - name: Regenerate single-header
+        run: bash scripts/generate-single-headers.sh --output-dir /tmp/loc-check
+
+      - name: Compare against baseline
+        run: |
+          baseline=$(cat scripts/source-loc-baseline.txt)
+          actual=$(wc -l < /tmp/loc-check/pmm.h)
+          echo "Baseline: $baseline, generated single-header: $actual"
+          if [ "$actual" -gt "$baseline" ]; then
+            echo "FAIL: generated pmm.h has $actual lines (baseline $baseline). Issue #375 budgets simplifying refactors."
+            exit 1
+          fi
+
+      - name: Forbidden-pattern scan
+        run: bash scripts/check-source-loc-budget.sh
+
   # ─── File size limits ─────────────────────────────────────────────────────────
   file-size:
     name: File size check (<= 1500 lines)

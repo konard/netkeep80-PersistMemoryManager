@@ -318,6 +318,13 @@ pmm_add_test(test_issue369_review_fixes test_issue369_review_fixes.cpp)
 pmm_add_test(test_issue373_arena_internals test_issue373_arena_internals.cpp)
 pmm_add_test(test_issue373_corruption test_issue373_corruption.cpp)
 
+# ─── Issue 375: canonical address layer, container reallocate_typed, tree_node ──
+pmm_add_test(test_issue375_address_layer test_issue375_address_layer.cpp)
+pmm_add_test(test_issue375_containers    test_issue375_containers.cpp)
+pmm_add_test(test_issue375_tree_node     test_issue375_tree_node.cpp)
+pmm_add_test(test_issue375_static_checks test_issue375_static_checks.cpp)
+target_compile_definitions(test_issue375_static_checks PRIVATE PMM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+
 # ─── Issue 314: build graph compaction contract ─────────────────
 add_test(
     NAME test_issue314_build_graph_contract

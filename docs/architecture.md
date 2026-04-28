@@ -265,7 +265,7 @@ duplicated `(base, hdr)` plumbing.
   `detail::checked_granule_offset<AT>(idx)`, `detail::fits_range(off, len, total)` are
   the overflow-safe building blocks used by the rest of the arena layer.
 
-### `ArenaView<AT>` and `ConstArenaView<AT>`
+### `ArenaView<AT>` / `ArenaAddress<AT>` (canonical address layer)
 
 [`detail::ArenaView<AT>`](../include/pmm/arena_internals.h#pmm-detail-arenaview) pairs the
 arena `base` pointer and `ManagerHeader<AT>*` so they cannot be mismatched between two
@@ -273,6 +273,37 @@ backends. Internal allocator / verifier / recovery / layout APIs accept `ArenaVi
 `ConstArenaView<AT>` for read-only paths) instead of a loose `(base, hdr)` pair. `valid_block`
 and `fits` use `checked_granule_offset`, so an out-of-range index never triggers undefined
 overflow before the bounds check runs.
+
+Issue #375 promoted `BasicArenaView` to the **canonical address layer** of PMM. The same
+type, exposed under the aliases `ArenaAddress<AT>` / `ConstArenaAddress<AT>`, owns every
+checked conversion between persistent indices, raw pointers, block headers, and user pointers:
+`granule_offset`, `valid_block`, `block`, `block_unchecked`, `try_user_ptr`,
+`try_user_idx_from_raw`, `try_block_idx_from_user_idx`, `try_user_idx_from_block_idx`. Manager
+helpers (`make_pptr_from_raw`, `block_raw_ptr_from_pptr`, `raw_user_ptr_from_pptr`, etc.)
+are thin wrappers that delegate to this layer. Null conventions are explicit and never
+silently conflated:
+
+- user index `0` (`detail::kNullIdx_v<AT>`) is the persistent null pointer / null user
+  pointer;
+- `AT::no_block` is the physical block-list null;
+- invalid conversions return `nullptr` / `std::nullopt` — never a sentinel object that the
+  caller could write through.
+
+Containers and tree access follow the same model: `parray<T>::ensure_capacity` and
+`pstring::ensure_capacity` grow exclusively via `ManagerT::reallocate_typed<T>`, which may
+take an in-place shrink/grow path or fall back to a fresh allocation that copies only live
+elements/bytes. AVL/tree access for user-facing `pptr<T>` is split into checked
+(`ManagerT::try_tree_node` returning `BlockHeader<AT>*` / `nullptr` and setting
+`PmmError::InvalidPointer`) and unchecked (`ManagerT::tree_node_unchecked` returning a
+`BlockHeader<AT>&` under a strict precondition); the previous ref-returning `tree_node(pptr)`
+that quietly returned a thread-local sentinel is gone.
+
+This refactor is **size-budgeted**: production source LOC (`single_include/pmm/pmm.h`) must
+not exceed the committed baseline in `scripts/source-loc-baseline.txt`. The
+`scripts/check-source-loc-budget.sh` CI gate fails the build on regressions and on the
+forbidden patterns the refactor removed (sentinel `BlockHeader`, manual
+`allocate -> memcpy -> deallocate` paths inside `parray`/`pstring`, ref-returning
+`tree_node(pptr)`).
 
 ### Walker `for_each_physical_block`
 

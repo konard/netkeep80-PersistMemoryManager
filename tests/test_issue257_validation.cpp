@@ -385,81 +385,85 @@ TEST_CASE( "validation: header_from_ptr uses validate_user_ptr for cheap rejecti
     }
 }
 
-// ─── E. block_at_checked tests ────────────────────────────────────────────────
+// ─── E. ArenaAddress::block (canonical address layer) tests ─────────────────
 
-TEST_CASE( "validation: block_at_checked returns nullptr for no_block", "[test_issue257]" )
+TEST_CASE( "validation: ArenaAddress::block returns nullptr for no_block", "[test_issue257]" )
 {
-    std::uint8_t dummy[256] = {};
-    auto*        blk        = pmm::detail::block_at_checked<AT>( dummy, 256, AT::no_block );
-    REQUIRE( blk == nullptr );
+    std::uint8_t                   dummy[256] = {};
+    pmm::detail::ArenaAddress<AT> addr{ dummy, std::size_t{ 256 } };
+    REQUIRE( addr.block( AT::no_block ) == nullptr );
 }
 
-TEST_CASE( "validation: block_at_checked returns nullptr for out-of-range index", "[test_issue257]" )
+TEST_CASE( "validation: ArenaAddress::block returns nullptr for out-of-range index", "[test_issue257]" )
 {
-    std::uint8_t dummy[256] = {};
-    // Index 20: 20*16+32 = 352 > 256 → out of range.
-    auto* blk = pmm::detail::block_at_checked<AT>( dummy, 256, 20 );
-    REQUIRE( blk == nullptr );
+    std::uint8_t                   dummy[256] = {};
+    pmm::detail::ArenaAddress<AT> addr{ dummy, std::size_t{ 256 } };
+    REQUIRE( addr.block( 20 ) == nullptr );
 }
 
-TEST_CASE( "validation: block_at_checked returns valid pointer for in-range index", "[test_issue257]" )
+TEST_CASE( "validation: ArenaAddress::block returns valid pointer for in-range index", "[test_issue257]" )
 {
-    std::uint8_t dummy[256] = {};
-    // Index 2: 2*16+32 = 64 <= 256 → valid.
-    auto* blk = pmm::detail::block_at_checked<AT>( dummy, 256, 2 );
+    std::uint8_t                   dummy[256] = {};
+    pmm::detail::ArenaAddress<AT> addr{ dummy, std::size_t{ 256 } };
+    auto*                          blk = addr.block( 2 );
     REQUIRE( blk != nullptr );
     REQUIRE( reinterpret_cast<std::uint8_t*>( blk ) == dummy + 2 * 16 );
 }
 
-// ─── F. resolve_granule_ptr_checked tests ─────────────────────────────────────
+// ─── F. ArenaAddress::try_user_ptr tests ────────────────────────────────────
 
-TEST_CASE( "validation: resolve_granule_ptr_checked returns nullptr for zero idx", "[test_issue257]" )
+TEST_CASE( "validation: ArenaAddress::try_user_ptr returns nullptr for zero idx", "[test_issue257]" )
 {
-    std::uint8_t dummy[256] = {};
-    REQUIRE( pmm::detail::resolve_granule_ptr_checked<AT>( dummy, 256, 0 ) == nullptr );
+    std::uint8_t                   dummy[256] = {};
+    pmm::detail::ArenaAddress<AT> addr{ dummy, std::size_t{ 256 } };
+    REQUIRE( addr.try_user_ptr( 0 ) == nullptr );
 }
 
-TEST_CASE( "validation: resolve_granule_ptr_checked returns nullptr for out-of-bounds idx", "[test_issue257]" )
+TEST_CASE( "validation: ArenaAddress::try_user_ptr returns nullptr for out-of-bounds idx", "[test_issue257]" )
 {
-    std::uint8_t dummy[256] = {};
-    // Index 20 → byte offset 320 > 256.
-    REQUIRE( pmm::detail::resolve_granule_ptr_checked<AT>( dummy, 256, 20 ) == nullptr );
+    std::uint8_t                   dummy[256] = {};
+    pmm::detail::ArenaAddress<AT> addr{ dummy, std::size_t{ 256 } };
+    REQUIRE( addr.try_user_ptr( 20 ) == nullptr );
 }
 
-TEST_CASE( "validation: resolve_granule_ptr_checked returns valid ptr for in-range idx", "[test_issue257]" )
+TEST_CASE( "validation: ArenaAddress::try_user_ptr returns valid ptr for in-range idx", "[test_issue257]" )
 {
-    std::uint8_t dummy[256] = {};
-    void*        result     = pmm::detail::resolve_granule_ptr_checked<AT>( dummy, 256, 3 );
-    REQUIRE( result == dummy + 48 );
+    std::uint8_t                   dummy[256] = {};
+    pmm::detail::ArenaAddress<AT> addr{ dummy, std::size_t{ 256 } };
+    REQUIRE( addr.try_user_ptr( 3 ) == dummy + 48 );
 }
 
-// ─── G. ptr_to_granule_idx_checked tests ──────────────────────────────────────
+// ─── G. ArenaAddress::try_user_idx_from_raw tests ───────────────────────────
 
-TEST_CASE( "validation: ptr_to_granule_idx_checked returns no_block for null", "[test_issue257]" )
+TEST_CASE( "validation: ArenaAddress::try_user_idx_from_raw nullopt for null", "[test_issue257]" )
 {
-    std::uint8_t dummy[256] = {};
-    REQUIRE( pmm::detail::ptr_to_granule_idx_checked<AT>( dummy, 256, nullptr ) == AT::no_block );
+    std::uint8_t                   dummy[256] = {};
+    pmm::detail::ArenaAddress<AT> addr{ dummy, std::size_t{ 256 } };
+    REQUIRE_FALSE( addr.try_user_idx_from_raw( nullptr ).has_value() );
 }
 
-TEST_CASE( "validation: ptr_to_granule_idx_checked returns no_block for out-of-bounds", "[test_issue257]" )
+TEST_CASE( "validation: ArenaAddress::try_user_idx_from_raw nullopt for out-of-bounds", "[test_issue257]" )
 {
-    std::uint8_t dummy[256] = {};
-    // Use a pointer that is clearly past the end of the managed area but avoids
-    // computing dummy+300 which is UB (out of bounds for uint8_t[256]).
+    std::uint8_t                   dummy[256] = {};
+    pmm::detail::ArenaAddress<AT> addr{ dummy, std::size_t{ 256 } };
     const void* oob_ptr = reinterpret_cast<const void*>( reinterpret_cast<std::uintptr_t>( dummy ) + 300 );
-    REQUIRE( pmm::detail::ptr_to_granule_idx_checked<AT>( dummy, 256, oob_ptr ) == AT::no_block );
+    REQUIRE_FALSE( addr.try_user_idx_from_raw( oob_ptr ).has_value() );
 }
 
-TEST_CASE( "validation: ptr_to_granule_idx_checked returns no_block for misaligned", "[test_issue257]" )
+TEST_CASE( "validation: ArenaAddress::try_user_idx_from_raw nullopt for misaligned", "[test_issue257]" )
 {
-    std::uint8_t dummy[256] = {};
-    REQUIRE( pmm::detail::ptr_to_granule_idx_checked<AT>( dummy, 256, dummy + 7 ) == AT::no_block );
+    std::uint8_t                   dummy[256] = {};
+    pmm::detail::ArenaAddress<AT> addr{ dummy, std::size_t{ 256 } };
+    REQUIRE_FALSE( addr.try_user_idx_from_raw( dummy + 7 ).has_value() );
 }
 
-TEST_CASE( "validation: ptr_to_granule_idx_checked returns correct index for valid ptr", "[test_issue257]" )
+TEST_CASE( "validation: ArenaAddress::try_user_idx_from_raw returns correct index", "[test_issue257]" )
 {
-    std::uint8_t dummy[256] = {};
-    REQUIRE( pmm::detail::ptr_to_granule_idx_checked<AT>( dummy, 256, dummy + 48 ) == 3 );
+    std::uint8_t                   dummy[256] = {};
+    pmm::detail::ArenaAddress<AT> addr{ dummy, std::size_t{ 256 } };
+    auto                           idx = addr.try_user_idx_from_raw( dummy + 48 );
+    REQUIRE( idx.has_value() );
+    REQUIRE( *idx == 3 );
 }
 
 // ─── H. validate_block_header_full tests ──────────────────────────────────────
@@ -663,47 +667,50 @@ TEST_CASE( "validation: set_tree_height is no-op and sets InvalidPointer for OOB
     Mgr::destroy();
 }
 
-TEST_CASE( "validation: tree_node returns sentinel and sets InvalidPointer for OOB pptr", "[test_issue257]" )
+TEST_CASE( "validation: try_tree_node returns nullptr and sets InvalidPointer for OOB pptr", "[test_issue257]" )
 {
     setup_clean_image();
 
     Mgr::pptr<int> bad( 0xFFFF );
 
     Mgr::clear_error();
-    auto& tn = Mgr::tree_node( bad );
+    auto* tn = Mgr::try_tree_node( bad );
+    CHECK( tn == nullptr );
     CHECK( Mgr::last_error() == pmm::PmmError::InvalidPointer );
-
-    // Sentinel should be zero-initialized — reads return safe defaults.
-    (void)tn;
 
     Mgr::destroy();
 }
 
-TEST_CASE( "validation: tree_node sentinel is stateless across invalid calls", "[test_issue257]" )
+TEST_CASE( "validation: try_tree_node returns nullptr for null pptr without error", "[test_issue257]" )
+{
+    setup_clean_image();
+
+    Mgr::pptr<int> null_p;
+    REQUIRE( null_p.is_null() );
+
+    Mgr::clear_error();
+    auto* tn = Mgr::try_tree_node( null_p );
+    CHECK( tn == nullptr );
+
+    Mgr::destroy();
+}
+
+TEST_CASE( "validation: try_tree_node never returns a writable sentinel for invalid pptr", "[test_issue257]" )
 {
     setup_clean_image();
 
     Mgr::pptr<int> bad1( 0xFFFF );
     Mgr::pptr<int> bad2( 0xFFFE );
 
-    // First bad call — get a mutable reference to the sentinel.
     Mgr::clear_error();
-    auto& tn1 = Mgr::tree_node( bad1 );
+    auto* tn1 = Mgr::try_tree_node( bad1 );
+    REQUIRE( tn1 == nullptr );
     REQUIRE( Mgr::last_error() == pmm::PmmError::InvalidPointer );
 
-    // Mutate the sentinel through the returned reference.
-    tn1.weight      = 42;
-    tn1.avl_height  = 7;
-    tn1.left_offset = 99;
-
-    // Second bad call — sentinel must be clean again, not carry prior mutations.
     Mgr::clear_error();
-    auto& tn2 = Mgr::tree_node( bad2 );
+    auto* tn2 = Mgr::try_tree_node( bad2 );
+    REQUIRE( tn2 == nullptr );
     REQUIRE( Mgr::last_error() == pmm::PmmError::InvalidPointer );
-
-    CHECK( tn2.weight == 0 );
-    CHECK( tn2.avl_height == 0 );
-    CHECK( tn2.left_offset == 0 );
 
     Mgr::destroy();
 }

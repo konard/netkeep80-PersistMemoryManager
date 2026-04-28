@@ -492,18 +492,24 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     {
         set_tree_field( p, &BlockStateBase<address_traits>::set_avl_height_of, h );
     }
-    template <typename T> static BlockHeader<address_traits>& tree_node( pptr<T> p ) noexcept
+    template <typename T> static BlockHeader<address_traits>* try_tree_node( pptr<T> p ) noexcept
     {
-        assert( !p.is_null() && "tree_node: pptr must not be null" );
-        assert( _initialized && "tree_node: manager must be initialized before calling tree_node" );
+        if ( p.is_null() || !_initialized )
+            return nullptr;
         void* blk = block_raw_mut_ptr_from_pptr( p );
         if ( blk == nullptr )
         {
             _last_error = PmmError::InvalidPointer;
-            static thread_local BlockHeader<address_traits> sentinel{};
-            sentinel = {};
-            return sentinel;
+            return nullptr;
         }
+        return detail::block_header_at<address_traits>( blk );
+    }
+    template <typename T> static BlockHeader<address_traits>& tree_node_unchecked( pptr<T> p ) noexcept
+    {
+        assert( !p.is_null() && "tree_node_unchecked: pptr must not be null" );
+        assert( _initialized && "tree_node_unchecked: manager must be initialized" );
+        void* blk = block_raw_mut_ptr_from_pptr( p );
+        assert( blk != nullptr && "tree_node_unchecked: pptr must resolve to a valid block" );
         return *detail::block_header_at<address_traits>( blk );
     }
 

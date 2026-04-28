@@ -1,4 +1,5 @@
 #pragma once
+#include "pmm/pptr.h"
 #include "pmm/types.h"
 #include <cstddef>
 #include <cstdint>
@@ -124,26 +125,20 @@ template <typename ManagerT> struct pstring
             new_cap = required;
         if ( new_cap < 16 )
             new_cap = 16;
-        size_t alloc_size = static_cast<size_t>( new_cap ) + 1;
-        void*  new_raw    = ManagerT::allocate( alloc_size );
-        if ( new_raw == nullptr )
+        const bool         had_data = _data_idx != detail::kNullIdx_v<typename ManagerT::address_traits>;
+        const std::size_t  old_count = had_data ? static_cast<std::size_t>( _length ) + 1 : 0;
+        const std::size_t  new_count = static_cast<std::size_t>( new_cap ) + 1;
+        pmm::pptr<char, ManagerT> old_p( _data_idx );
+        pmm::pptr<char, ManagerT> new_p =
+            ManagerT::template reallocate_typed<char>( old_p, old_count, new_count );
+        if ( new_p.is_null() )
             return false;
-        uint8_t*   base        = ManagerT::backend().base_ptr();
-        index_type new_dat_idx = detail::ptr_to_granule_idx<typename ManagerT::address_traits>( base, new_raw );
-        if ( _length > 0 && _data_idx != detail::kNullIdx_v<typename ManagerT::address_traits> )
-        {
-            char* old_data = resolve_data();
-            if ( old_data != nullptr )
-                std::memcpy( new_raw, old_data, static_cast<size_t>( _length ) + 1 );
-        }
-        else
-        {
-            static_cast<char*>( new_raw )[0] = '\0';
-        }
-        if ( _data_idx != detail::kNullIdx_v<typename ManagerT::address_traits> )
-            ManagerT::deallocate( detail::resolve_granule_ptr<typename ManagerT::address_traits>( base, _data_idx ) );
-        _data_idx = new_dat_idx;
+        _data_idx = new_p.offset();
         _capacity = new_cap;
+        char* data = resolve_data();
+        if ( data == nullptr )
+            return false;
+        data[_length] = '\0';
         return true;
     }
 };
