@@ -7,8 +7,43 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#if defined( _WIN32 )
+#include <malloc.h>
+#endif
 namespace pmm
 {
+namespace detail
+{
+/*
+### pmm-detail-alignedalloc
+*/
+inline void* aligned_alloc_for_arena( size_t alignment, size_t size ) noexcept
+{
+    if ( alignment == 0 || ( alignment & ( alignment - 1 ) ) != 0 )
+        return nullptr;
+    if ( size == 0 )
+        return nullptr;
+    size_t rounded = ( ( size + alignment - 1 ) / alignment ) * alignment;
+#if defined( _WIN32 )
+    return _aligned_malloc( rounded, alignment );
+#else
+    void* p = nullptr;
+    if ( posix_memalign( &p, alignment < sizeof( void* ) ? sizeof( void* ) : alignment, rounded ) != 0 )
+        return nullptr;
+    return p;
+#endif
+}
+inline void aligned_free_for_arena( void* p ) noexcept
+{
+    if ( p == nullptr )
+        return;
+#if defined( _WIN32 )
+    _aligned_free( p );
+#else
+    std::free( p );
+#endif
+}
+}
 /*
 ## pmm-heapstorage
 */
@@ -22,12 +57,13 @@ template <typename AT = DefaultAddressTraits> class HeapStorage
         if ( initial_size == 0 )
             return;
         size_t aligned = ( ( initial_size + AT::granule_size - 1 ) / AT::granule_size ) * AT::granule_size;
-        _buffer        = static_cast<uint8_t*>( std::malloc( aligned ) );
+        _buffer        = static_cast<uint8_t*>( detail::aligned_alloc_for_arena( AT::granule_size, aligned ) );
         if ( _buffer != nullptr )
         {
             _size        = aligned;
             _owns_memory = true;
         }
+        assert( reinterpret_cast<std::uintptr_t>( _buffer ) % AT::granule_size == 0 );
     }
     HeapStorage( const HeapStorage& )            = delete;
     HeapStorage& operator=( const HeapStorage& ) = delete;
@@ -43,7 +79,7 @@ template <typename AT = DefaultAddressTraits> class HeapStorage
         if ( this != &other )
         {
             if ( _owns_memory && _buffer != nullptr )
-                std::free( _buffer );
+                detail::aligned_free_for_arena( _buffer );
             _buffer            = other._buffer;
             _size              = other._size;
             _owns_memory       = other._owns_memory;
@@ -56,12 +92,12 @@ template <typename AT = DefaultAddressTraits> class HeapStorage
     ~HeapStorage()
     {
         if ( _owns_memory && _buffer != nullptr )
-            std::free( _buffer );
+            detail::aligned_free_for_arena( _buffer );
     }
     void attach( void* memory, size_t size ) noexcept
     {
         if ( _owns_memory && _buffer != nullptr )
-            std::free( _buffer );
+            detail::aligned_free_for_arena( _buffer );
         _buffer      = static_cast<uint8_t*>( memory );
         _size        = size;
         _owns_memory = false;
@@ -80,13 +116,14 @@ template <typename AT = DefaultAddressTraits> class HeapStorage
         new_size        = ( ( new_size + AT::granule_size - 1 ) / AT::granule_size ) * AT::granule_size;
         if ( new_size <= _size )
             return false;
-        void* new_buf = std::malloc( new_size );
+        void* new_buf = detail::aligned_alloc_for_arena( AT::granule_size, new_size );
         if ( new_buf == nullptr )
             return false;
+        assert( reinterpret_cast<std::uintptr_t>( new_buf ) % AT::granule_size == 0 );
         if ( _buffer != nullptr )
             std::memcpy( new_buf, _buffer, _size );
         if ( _owns_memory && _buffer != nullptr )
-            std::free( _buffer );
+            detail::aligned_free_for_arena( _buffer );
         _buffer      = static_cast<uint8_t*>( new_buf );
         _size        = new_size;
         _owns_memory = true;

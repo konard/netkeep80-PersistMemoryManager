@@ -7,6 +7,7 @@
 #error "pmm.h requires C++20 or later. Please compile with -std=c++20."
 #endif
 #include "pmm/allocator_policy.h"
+#include "pmm/arena_internals.h"
 #include "pmm/block.h"
 #include "pmm/block_state.h"
 #include "pmm/diagnostics.h"
@@ -41,6 +42,30 @@ template <typename C, typename = void> struct config_logging_policy
 template <typename C> struct config_logging_policy<C, std::void_t<typename C::logging_policy>>
 {
     using type = typename C::logging_policy;
+};
+template <typename, typename = void> struct config_grow_numerator
+{
+    static constexpr size_t value = config::kDefaultGrowNumerator;
+};
+template <typename C> struct config_grow_numerator<C, std::void_t<decltype( C::grow_numerator )>>
+{
+    static constexpr size_t value = C::grow_numerator;
+};
+template <typename, typename = void> struct config_grow_denominator
+{
+    static constexpr size_t value = config::kDefaultGrowDenominator;
+};
+template <typename C> struct config_grow_denominator<C, std::void_t<decltype( C::grow_denominator )>>
+{
+    static constexpr size_t value = C::grow_denominator;
+};
+template <typename, typename = void> struct config_max_memory_gb
+{
+    static constexpr size_t value = 64;
+};
+template <typename C> struct config_max_memory_gb<C, std::void_t<decltype( C::max_memory_gb )>>
+{
+    static constexpr size_t value = C::max_memory_gb;
 };
 }
 template <typename ConfigT = CacheManagerConfig, size_t InstanceId = 0>
@@ -102,17 +127,26 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             _last_error = PmmError::BackendError;
             return false;
         }
-        bool ok = init_layout( _backend.base_ptr(), _backend.total_size() );
-        if ( ok )
-            ok = bootstrap_forest_registry_unlocked();
-        if ( ok )
-            ok = validate_bootstrap_invariants_unlocked();
-        if ( ok )
+        detail::InitGuard guard( _initialized );
+        if ( !init_layout( _backend.base_ptr(), _backend.total_size() ) )
         {
-            _last_error = PmmError::Ok;
-            logging_policy::on_create( _backend.total_size() );
+            _last_error = PmmError::BackendError;
+            return false;
         }
-        return ok;
+        if ( !bootstrap_forest_registry_unlocked() )
+        {
+            _last_error = PmmError::BackendError;
+            return false;
+        }
+        if ( !validate_bootstrap_invariants_unlocked() )
+        {
+            _last_error = PmmError::BackendError;
+            return false;
+        }
+        _last_error = PmmError::Ok;
+        logging_policy::on_create( _backend.total_size() );
+        guard.commit();
+        return true;
     }
     static bool create() noexcept
     {
@@ -122,17 +156,26 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             _last_error = ( _backend.base_ptr() == nullptr ) ? PmmError::BackendError : PmmError::InvalidSize;
             return false;
         }
-        bool ok = init_layout( _backend.base_ptr(), _backend.total_size() );
-        if ( ok )
-            ok = bootstrap_forest_registry_unlocked();
-        if ( ok )
-            ok = validate_bootstrap_invariants_unlocked();
-        if ( ok )
+        detail::InitGuard guard( _initialized );
+        if ( !init_layout( _backend.base_ptr(), _backend.total_size() ) )
         {
-            _last_error = PmmError::Ok;
-            logging_policy::on_create( _backend.total_size() );
+            _last_error = PmmError::BackendError;
+            return false;
         }
-        return ok;
+        if ( !bootstrap_forest_registry_unlocked() )
+        {
+            _last_error = PmmError::BackendError;
+            return false;
+        }
+        if ( !validate_bootstrap_invariants_unlocked() )
+        {
+            _last_error = PmmError::BackendError;
+            return false;
+        }
+        _last_error = PmmError::Ok;
+        logging_policy::on_create( _backend.total_size() );
+        guard.commit();
+        return true;
     }
     static bool load( VerifyResult& result ) noexcept
     {
@@ -610,9 +653,14 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             logging_policy::on_allocation_failure( user_size, PmmError::InvalidSize );
             return nullptr;
         }
-        uint8_t*                               base      = _backend.base_ptr();
-        detail::ManagerHeader<address_traits>* hdr       = get_header( base );
-        index_type                             data_gran = detail::bytes_to_granules_t<address_traits>( user_size );
+        auto checked = detail::bytes_to_granules_checked<address_traits>( user_size );
+        if ( !checked.has_value() )
+        {
+            _last_error = PmmError::Overflow;
+            logging_policy::on_allocation_failure( user_size, PmmError::Overflow );
+            return nullptr;
+        }
+        index_type data_gran = checked->value;
         if ( data_gran == 0 )
             data_gran = 1;
         if ( data_gran > std::numeric_limits<index_type>::max() - kBlockHdrGranules )
@@ -621,12 +669,14 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
             logging_policy::on_allocation_failure( user_size, PmmError::Overflow );
             return nullptr;
         }
-        index_type needed = kBlockHdrGranules + data_gran;
-        index_type idx    = free_block_tree::find_best_fit( base, hdr, needed );
+        uint8_t*                               base   = _backend.base_ptr();
+        detail::ManagerHeader<address_traits>* hdr    = get_header( base );
+        index_type                             needed = kBlockHdrGranules + data_gran;
+        index_type                             idx    = free_block_tree::find_best_fit( base, hdr, needed );
         if ( idx != address_traits::no_block )
         {
             _last_error = PmmError::Ok;
-            return allocator::allocate_from_block( base, hdr, idx, user_size );
+            return allocator::allocate_from_block( base, hdr, idx, data_gran );
         }
         if ( !do_expand( user_size ) )
         {
@@ -640,7 +690,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         if ( idx != address_traits::no_block )
         {
             _last_error = PmmError::Ok;
-            return allocator::allocate_from_block( base, hdr, idx, user_size );
+            return allocator::allocate_from_block( base, hdr, idx, data_gran );
         }
         _last_error = PmmError::OutOfMemory;
         logging_policy::on_allocation_failure( user_size, PmmError::OutOfMemory );
@@ -729,6 +779,9 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         static constexpr index_type                   kBlockHdrGranules = manager_type::kBlockHdrGranules;
         static constexpr index_type                   kMgrHdrGranules   = manager_type::kMgrHdrGranules;
         static constexpr index_type                   kFreeBlkIdxLayout = manager_type::kFreeBlkIdxLayout;
+        static constexpr size_t                       kGrowNumerator    = detail::config_grow_numerator<ConfigT>::value;
+        static constexpr size_t  kGrowDenominator                       = detail::config_grow_denominator<ConfigT>::value;
+        static constexpr size_t  kMaxMemoryGB                           = detail::config_max_memory_gb<ConfigT>::value;
         static detail::ManagerHeader<address_traits>* get_header( uint8_t* base ) noexcept
         {
             return manager_type::get_header( base );

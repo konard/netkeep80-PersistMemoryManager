@@ -1,4 +1,5 @@
 #pragma once
+#include "pmm/arena_internals.h"
 #include "pmm/block_state.h"
 #include "pmm/diagnostics.h"
 #include "pmm/free_block_tree.h"
@@ -28,20 +29,21 @@ class AllocatorPolicy
     AllocatorPolicy()                                    = delete;
     AllocatorPolicy( const AllocatorPolicy& )            = delete;
     AllocatorPolicy& operator=( const AllocatorPolicy& ) = delete;
-    static void*     allocate_from_block( uint8_t* base, detail::ManagerHeader<AT>* hdr, index_type blk_idx,
-                                          size_t user_size )
+    static void* allocate_from_block( uint8_t* base, detail::ManagerHeader<AT>* hdr, index_type blk_idx,
+                                      index_type data_gran )
     {
-        FT::remove( base, hdr, blk_idx );
-        FreeBlock<AT>               fb          = FreeBlock<AT>::cast_from_raw( detail::block_at<AT>( base, blk_idx ) );
-        FreeBlockRemovedAVL<AT>     removed     = fb.remove_from_avl();
         static constexpr index_type kBlkHdrGran = detail::kBlockHeaderGranules_t<AT>;
-        index_type                  blk_total_gran = BlockState::get_weight( detail::block_at<AT>( base, blk_idx ) );
-        index_type                  data_gran      = detail::bytes_to_granules_t<AT>( user_size );
+        if ( data_gran == 0 )
+            data_gran = 1;
         if ( data_gran > std::numeric_limits<index_type>::max() - kBlkHdrGran )
             return nullptr;
-        index_type needed_gran  = kBlkHdrGran + data_gran;
-        index_type min_rem_gran = kBlkHdrGran + 1;
-        bool       can_split    = false;
+        FT::remove( base, hdr, blk_idx );
+        FreeBlock<AT>           fb             = FreeBlock<AT>::cast_from_raw( detail::block_at<AT>( base, blk_idx ) );
+        FreeBlockRemovedAVL<AT> removed        = fb.remove_from_avl();
+        index_type              blk_total_gran = BlockState::get_weight( detail::block_at<AT>( base, blk_idx ) );
+        index_type              needed_gran    = kBlkHdrGran + data_gran;
+        index_type              min_rem_gran   = kBlkHdrGran + 1;
+        bool                    can_split      = false;
         if ( needed_gran <= std::numeric_limits<index_type>::max() - min_rem_gran )
             can_split = ( blk_total_gran >= needed_gran + min_rem_gran );
         if ( can_split )

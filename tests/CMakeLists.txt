@@ -314,6 +314,9 @@ target_compile_definitions(test_issue358_release_workflow PRIVATE PMM_SOURCE_DIR
 # ─── Issue 369: review follow-up — NodeType / weight semantics tightening ──
 pmm_add_test(test_issue369_review_fixes test_issue369_review_fixes.cpp)
 
+# ─── Issue 373: checked granule arithmetic, ArenaView, walker, growth, init ──
+pmm_add_test(test_issue373_arena_internals test_issue373_arena_internals.cpp)
+
 # ─── Issue 314: build graph compaction contract ─────────────────
 add_test(
     NAME test_issue314_build_graph_contract

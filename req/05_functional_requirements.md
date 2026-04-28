@@ -23,3 +23,13 @@
 | FR-017 | Persistent string interning должен возвращать один и тот же `pstringview` для одинакового содержимого, где это поддерживается. | Could | Recovered | `docs/architecture.md` |
 | FR-018 | `pmap` должен хранить AVL root в type-scoped forest domain, а не в transient runtime state. | Could | Recovered | `docs/architecture.md` |
 | FR-019 | `make_guard` должен обеспечивать безопасную очистку typed objects с `free_data()` или `free_all()` перед `destroy_typed()`. | Could | Recovered | README API |
+| FR-020 | Конвертация байтов в гранулы должна быть проверяемой и не должна кодировать переполнение значением `0`. | Must | Issue #373 | `pmm/arena_internals.h` |
+| FR-021 | Публичный API `allocate(0)` должен отклоняться с `PmmError::InvalidSize`; `allocate(overflowing_size)` — с `PmmError::Overflow`. | Must | Issue #373 | `pmm/persist_memory_manager.h` |
+| FR-022 | Путь аллокации должен вычислять `data_gran` ровно один раз через `bytes_to_granules_checked` до выбора свободного блока. | Must | Issue #373 | `pmm/persist_memory_manager.h` |
+| FR-023 | Все проверки диапазонов арены должны быть overflow-safe (через `fits_range` / `checked_add` / `checked_mul`). | Must | Issue #373 | `pmm/arena_internals.h` |
+| FR-024 | Внутренние операции над физической ареной должны принимать `ArenaView<AT>` или эквивалентную сильно-парную пару `base+header`. | Must | Issue #373 | `pmm/arena_internals.h` |
+| FR-025 | Верификация и repair физической цепочки блоков должны завершаться даже на повреждённых образах (детектор циклов). | Must | Issue #373 | `pmm/arena_internals.h` |
+| FR-026 | Инициализация менеджера должна быть транзакционной: при сбое `create()` `_initialized` должен оставаться `false`. | Must | Issue #373 | `pmm/persist_memory_manager.h` |
+| FR-027 | Расширение хранилища должно использовать единую проверяемую growth-policy, учитывающую grow ratio и max-memory лимит. | Must | Issue #373 | `pmm/arena_internals.h`, `pmm/layout.h` |
+| FR-028 | Heap backend должен обеспечивать выравнивание базы по `AT::granule_size` (для `LargeAddressTraits` granule = 64). | Must | Issue #373 | `pmm/heap_storage.h` |
+| FR-029 | Typed allocation должна допускать только типы, выравнивание которых представимо granule_size. | Must | Issue #373 | `pmm/typed_manager_api.h` |

@@ -1,10 +1,12 @@
 #pragma once
+#include "pmm/arena_internals.h"
 #include "pmm/block.h"
 #include "pmm/block_state.h"
 #include "pmm/types.h"
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 namespace pmm::detail
 {
 template <typename ManagerAccess> struct ManagerLayoutOps
@@ -60,15 +62,19 @@ template <typename ManagerAccess> struct ManagerLayoutOps
         ManagerHeader<address_traits>* hdr            = ManagerAccess::get_header( base );
         size_t                         old_size       = hdr->total_size;
         static constexpr size_t        kGranSz        = address_traits::granule_size;
-        index_type                     data_gran_need = bytes_to_granules_t<address_traits>( user_size );
+        auto checked = bytes_to_granules_checked<address_traits>( user_size );
+        index_type data_gran_need = checked.has_value() ? checked->value : index_type{ 0 };
         if ( data_gran_need == 0 )
             data_gran_need = 1;
         size_t min_need = static_cast<size_t>( ManagerAccess::kBlockHdrGranules + data_gran_need +
                                                ManagerAccess::kBlockHdrGranules ) *
                           kGranSz;
-        size_t growth   = old_size / 4;
-        if ( growth < min_need )
-            growth = min_need;
+        std::optional<size_t> target_size = compute_growth( old_size, min_need, kGranSz, ManagerAccess::kGrowNumerator,
+                                                            ManagerAccess::kGrowDenominator,
+                                                            ManagerAccess::kMaxMemoryGB );
+        if ( !target_size.has_value() )
+            return false;
+        size_t growth = *target_size - old_size;
         if ( !backend.expand( growth ) )
             return false;
         uint8_t* new_base = backend.base_ptr();

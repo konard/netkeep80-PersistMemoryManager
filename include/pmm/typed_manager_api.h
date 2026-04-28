@@ -160,7 +160,7 @@ template <typename ManagerT> class PersistMemoryTypedApi
                 return pmm::pptr<T, ManagerT>();
             }
         }
-        void* new_raw = allocator::allocate_from_block( base, hdr, new_idx, new_user_size );
+        void* new_raw = allocator::allocate_from_block( base, hdr, new_idx, new_data_gran_alloc );
         if ( new_raw == nullptr )
         {
             ManagerT::_last_error = PmmError::OutOfMemory;
