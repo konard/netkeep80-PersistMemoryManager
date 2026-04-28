@@ -70,20 +70,4 @@ template <typename AT> inline const BlockHeader<AT>* block_header_at( const void
     return reinterpret_cast<const BlockHeader<AT>*>( raw );
 }
 }
-/*
-## pmm-blocktreeaccess
-*/
-template <typename AT> struct BlockTreeAccess
-{
-    using Header     = BlockHeader<AT>;
-    using index_type = typename AT::index_type;
-    static index_type   left( const Header& h ) noexcept { return h.left_offset; }
-    static index_type   right( const Header& h ) noexcept { return h.right_offset; }
-    static index_type   parent( const Header& h ) noexcept { return h.parent_offset; }
-    static std::int16_t height( const Header& h ) noexcept { return h.avl_height; }
-    static void         set_left( Header& h, index_type v ) noexcept { h.left_offset = v; }
-    static void         set_right( Header& h, index_type v ) noexcept { h.right_offset = v; }
-    static void         set_parent( Header& h, index_type v ) noexcept { h.parent_offset = v; }
-    static void         set_height( Header& h, std::int16_t v ) noexcept { h.avl_height = v; }
-};
 }

@@ -10,7 +10,7 @@ Single entry point for PMM documentation. The canonical set below must match
 | [PMM Target Model](pmm_target_model.md) | Normative top-level model: PMM as compact persistent storage kernel; boundary vs `pjson` / `pjson_db` / execution / product layers |
 | [PMM Transformation Rules](pmm_transformation_rules.md) | Normative operational rulebook: allowed issue types, atomic-issue / no-mixed-PR / extraction-first / surface-compression rules, PR review semantics |
 | [Comment Policy](comment_policy.md) | Canonical text discipline for comments, docs placement, and text-surface review |
-| [Block and TreeNode Semantics](block_and_treenode_semantics.md) | Field-level specification of [Block](../include/pmm/block.h#pmm-block) and [TreeNode](../include/pmm/block_header.h#pmm-blockheader) headers |
+| [BlockHeader Semantics](block_and_treenode_semantics.md) | Field-level specification of the single physical [BlockHeader](../include/pmm/block_header.h#pmm-blockheader) layout (`Block<AT>` is a type alias for `BlockHeader<AT>`) |
 | [Architecture](architecture.md) | Layer stack, memory layout, algorithms, storage backends, configuration |
 | [API Reference](api_reference.md) | Complete public API: lifecycle, allocation, containers, I/O, error codes |
 | [Validation Model](validation_model.md) | Low-level pointer and block validation: cheap vs full modes, conversion paths, error categories |
@@ -48,7 +48,7 @@ For newcomers, the recommended path is:
 
 1. **[PMM Target Model](pmm_target_model.md)** — understand the PMM boundary
 2. **[PMM Transformation Rules](pmm_transformation_rules.md)** — understand allowed changes
-3. **[Block and TreeNode Semantics](block_and_treenode_semantics.md)** — understand the data structures
+3. **[BlockHeader Semantics](block_and_treenode_semantics.md)** — understand the data structures
 4. **[Architecture](architecture.md)** — understand the implementation layers
 5. **[API Reference](api_reference.md)** — use the library
 6. **[Validation Model](validation_model.md)** / **[Atomic Writes](atomic_writes.md)** — understand safety checks

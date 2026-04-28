@@ -62,8 +62,8 @@ The `granule_size` field is checked on `load()`: if it does not match the compil
   Bytes 28–31: next_offset   — next block (granule index)
 ```
 
-**Note:** The [TreeNode](../include/pmm/block_header.h#pmm-blockheader) fields (`left_offset`, `right_offset`, `parent_offset`,
-`avl_height`) are shared between two separate tree uses:
+**Note:** The AVL-slot fields of the [BlockHeader](../include/pmm/block_header.h#pmm-blockheader)
+(`weight`, `left_offset`, `right_offset`, `parent_offset`, `avl_height`) are shared between two separate tree uses:
 1. **Free-block AVL tree** — used by the allocator when `weight == 0` (block is free).
 2. **User-data AVL trees** — used by [pstringview](../include/pmm/pstringview.h#pmm-pstringview) and [pmap](../include/pmm/pmap.h#pmm-pmap) when `weight > 0` (block
    is allocated and permanently locked or in a user-managed data structure).
@@ -420,49 +420,63 @@ FreeBlock                    ← correct: weight=0, root_offset=0, in AVL
 
 ### State machine API
 
-The state machine is implemented via typed wrappers over `Block<A>` that allow only
-methods valid for the current state:
+The state machine is implemented via non-owning typed views over a `BlockHeader<A>&`
+that allow only methods valid for the current state. Views are returned by value;
+state transitions return new typed views over the same underlying header. Each view
+holds a `BlockHeader<A>*` and does **not** inherit from `BlockStateBase<A>`
+(`BlockStateBase<A>` is itself a static helper, not a base class):
 
 ```cpp
 // FreeBlock — correct state
-template <typename A> class FreeBlock : public BlockStateBase<A> {
+template <typename AT> class FreeBlock {
 public:
-    static FreeBlock* cast_from_raw(void* raw) noexcept;
+    static FreeBlock cast_from_raw(void* raw) noexcept;                     // unchecked, asserts
+    static bool      can_cast_from_raw(const void* raw) noexcept;            // checked
+    static std::optional<FreeBlock> try_cast_from_raw(void* raw) noexcept;   // checked
     bool verify_invariants() const noexcept;
-    FreeBlockRemovedAVL<A>* remove_from_avl() noexcept; // → transient
+    FreeBlockRemovedAVL<AT> remove_from_avl() noexcept;                      // → transient
 };
 
 // FreeBlockRemovedAVL — transient state
-template <typename A> class FreeBlockRemovedAVL : public BlockStateBase<A> {
+template <typename AT> class FreeBlockRemovedAVL {
 public:
-    AllocatedBlock<A>* mark_as_allocated(index_type data_granules, index_type own_idx);
-    SplittingBlock<A>* begin_splitting();
-    FreeBlock<A>* insert_to_avl(); // rollback
+    AllocatedBlock<AT> mark_as_allocated(index_type data_granules, index_type own_idx) noexcept;
+    SplittingBlock<AT> begin_splitting() noexcept;
+    FreeBlock<AT>      insert_to_avl() noexcept; // rollback
 };
 
 // AllocatedBlock — correct state
-template <typename A> class AllocatedBlock : public BlockStateBase<A> {
+template <typename AT> class AllocatedBlock {
 public:
+    static AllocatedBlock cast_from_raw(void* raw) noexcept;                      // unchecked, asserts
+    static bool           can_cast_from_raw(const void* raw) noexcept;             // checked
+    static std::optional<AllocatedBlock> try_cast_from_raw(void* raw) noexcept;    // checked
     bool verify_invariants(index_type own_idx) const noexcept;
     void* user_ptr() noexcept;
-    FreeBlockNotInAVL<A>* mark_as_free() noexcept; // → transient
+    FreeBlockNotInAVL<AT> mark_as_free() noexcept;                                 // → transient
 };
 
 // FreeBlockNotInAVL — transient state
-template <typename A> class FreeBlockNotInAVL : public BlockStateBase<A> {
+template <typename AT> class FreeBlockNotInAVL {
 public:
-    FreeBlock<A>* insert_to_avl() noexcept;        // → correct
-    CoalescingBlock<A>* begin_coalescing() noexcept;
+    FreeBlock<AT>       insert_to_avl() noexcept;     // → correct
+    CoalescingBlock<AT> begin_coalescing() noexcept;
 };
 
 // CoalescingBlock — transient state
-template <typename A> class CoalescingBlock : public BlockStateBase<A> {
+template <typename AT> class CoalescingBlock {
 public:
-    void coalesce_with_next(void* next, void* next_next, index_type own_idx);
-    CoalescingBlock* coalesce_with_prev(void* prev, void* next, index_type prev_idx);
-    FreeBlock<A>* finalize_coalesce() noexcept; // → correct
+    void            coalesce_with_next(void* next, void* next_next, index_type own_idx) noexcept;
+    CoalescingBlock coalesce_with_prev(void* prev, void* next, index_type prev_idx) noexcept;
+    FreeBlock<AT>   finalize_coalesce() noexcept;     // → correct
 };
 ```
+
+**Safety note:** `cast_from_raw` is an unchecked precondition-only primitive; in release
+builds with `NDEBUG` defined it does **not** validate `raw == nullptr`, alignment, or
+state consistency, and invalid input is undefined behavior. Use `can_cast_from_raw` /
+`try_cast_from_raw` at any boundary where the state has not already been proven by
+the caller.
 
 **Implementation:** `include/pmm/block_state.h`
 
@@ -505,8 +519,10 @@ point**, where partially completed allocation operations are treated as "not per
 
 ## User-data AVL trees ([pstringview](../include/pmm/pstringview.h#pmm-pstringview), [pmap](../include/pmm/pmap.h#pmm-pmap))
 
-[pstringview](../include/pmm/pstringview.h#pmm-pstringview) and [pmap](../include/pmm/pmap.h#pmm-pmap) use the same [TreeNode](../include/pmm/block_header.h#pmm-blockheader) fields inside allocated blocks to
-organize their own AVL trees. This is entirely separate from the free-block AVL tree.
+[pstringview](../include/pmm/pstringview.h#pmm-pstringview) and [pmap](../include/pmm/pmap.h#pmm-pmap) use the same AVL-slot fields of the
+[BlockHeader](../include/pmm/block_header.h#pmm-blockheader) (`weight`, `left_offset`, `right_offset`,
+`parent_offset`, `avl_height`) inside allocated blocks to organize their own AVL trees.
+This is entirely separate from the free-block AVL tree.
 
 ### Persistence of user-data trees
 

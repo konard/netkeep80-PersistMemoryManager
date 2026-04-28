@@ -111,22 +111,21 @@ TEST_CASE( "BlockStateBase reads observe direct field writes", "[issue367][block
     REQUIRE( BlockState::get_next_offset( buffer ) == 29u );
 }
 
-// ─── BlockTreeAccess adapter ──────────────────────────────────────────────────
+// ─── Direct AVL-slot field reads/writes on BlockHeader<AT> ────────────────────
 
-TEST_CASE( "BlockTreeAccess<AT> reads and writes tree fields directly", "[issue367][block_header]" )
+TEST_CASE( "BlockHeader AVL slot fields are read and written directly", "[issue367][block_header]" )
 {
-    using A          = pmm::DefaultAddressTraits;
-    using H          = pmm::BlockHeader<A>;
-    using TreeAccess = pmm::BlockTreeAccess<A>;
+    using A = pmm::DefaultAddressTraits;
+    using H = pmm::BlockHeader<A>;
     H h{};
-    TreeAccess::set_left( h, 11 );
-    TreeAccess::set_right( h, 13 );
-    TreeAccess::set_parent( h, 17 );
-    TreeAccess::set_height( h, 4 );
-    REQUIRE( TreeAccess::left( h ) == 11u );
-    REQUIRE( TreeAccess::right( h ) == 13u );
-    REQUIRE( TreeAccess::parent( h ) == 17u );
-    REQUIRE( TreeAccess::height( h ) == 4 );
+    h.left_offset   = 11;
+    h.right_offset  = 13;
+    h.parent_offset = 17;
+    h.avl_height    = 4;
+    REQUIRE( h.left_offset == 11u );
+    REQUIRE( h.right_offset == 13u );
+    REQUIRE( h.parent_offset == 17u );
+    REQUIRE( h.avl_height == 4 );
 }
 
 // ─── State transitions over BlockHeader views ─────────────────────────────────
@@ -241,6 +240,70 @@ TEST_CASE( "detect_block_state and recover_block_state behave consistently", "[i
     BlockState::set_root_offset_of( buffer, 10u );
     pmm::recover_block_state<A>( buffer, 6 );
     REQUIRE( BlockState::get_root_offset( buffer ) == 6u );
+}
+
+// ─── Checked cast_from_raw boundaries ────────────────────────────────────────
+
+TEST_CASE( "FreeBlock::can_cast_from_raw / try_cast_from_raw reject invalid input",
+           "[issue367][block_header][safety]" )
+{
+    using A          = pmm::DefaultAddressTraits;
+    using H          = pmm::BlockHeader<A>;
+    using BlockState = pmm::BlockStateBase<A>;
+    alignas( H ) std::uint8_t buffer[sizeof( H )]{};
+
+    // nullptr is rejected without UB even in release builds.
+    REQUIRE_FALSE( pmm::FreeBlock<A>::can_cast_from_raw( nullptr ) );
+    REQUIRE_FALSE( pmm::FreeBlock<A>::try_cast_from_raw( nullptr ).has_value() );
+
+    // Misaligned raw pointer is rejected.
+    alignas( H ) std::uint8_t big_buffer[sizeof( H ) + alignof( H )]{};
+    void* misaligned = big_buffer + 1;
+    REQUIRE_FALSE( pmm::FreeBlock<A>::can_cast_from_raw( misaligned ) );
+    REQUIRE_FALSE( pmm::FreeBlock<A>::try_cast_from_raw( misaligned ).has_value() );
+
+    // Zero-initialized buffer is a free block.
+    REQUIRE( pmm::FreeBlock<A>::can_cast_from_raw( buffer ) );
+    auto opt = pmm::FreeBlock<A>::try_cast_from_raw( buffer );
+    REQUIRE( opt.has_value() );
+    REQUIRE( opt->is_free() );
+
+    // After becoming allocated, FreeBlock cast must be rejected.
+    BlockState::set_weight_of( buffer, 5u );
+    BlockState::set_root_offset_of( buffer, 6u );
+    REQUIRE_FALSE( pmm::FreeBlock<A>::can_cast_from_raw( buffer ) );
+    REQUIRE_FALSE( pmm::FreeBlock<A>::try_cast_from_raw( buffer ).has_value() );
+}
+
+TEST_CASE( "AllocatedBlock::can_cast_from_raw / try_cast_from_raw reject invalid input",
+           "[issue367][block_header][safety]" )
+{
+    using A          = pmm::DefaultAddressTraits;
+    using H          = pmm::BlockHeader<A>;
+    using BlockState = pmm::BlockStateBase<A>;
+    alignas( H ) std::uint8_t buffer[sizeof( H )]{};
+
+    // nullptr is rejected without UB even in release builds.
+    REQUIRE_FALSE( pmm::AllocatedBlock<A>::can_cast_from_raw( nullptr ) );
+    REQUIRE_FALSE( pmm::AllocatedBlock<A>::try_cast_from_raw( nullptr ).has_value() );
+
+    // Misaligned raw pointer is rejected.
+    alignas( H ) std::uint8_t big_buffer[sizeof( H ) + alignof( H )]{};
+    void* misaligned = big_buffer + 1;
+    REQUIRE_FALSE( pmm::AllocatedBlock<A>::can_cast_from_raw( misaligned ) );
+    REQUIRE_FALSE( pmm::AllocatedBlock<A>::try_cast_from_raw( misaligned ).has_value() );
+
+    // Zero-initialized buffer is a free block, not an allocated one.
+    REQUIRE_FALSE( pmm::AllocatedBlock<A>::can_cast_from_raw( buffer ) );
+    REQUIRE_FALSE( pmm::AllocatedBlock<A>::try_cast_from_raw( buffer ).has_value() );
+
+    // After being marked allocated, AllocatedBlock cast must succeed.
+    BlockState::set_weight_of( buffer, 5u );
+    BlockState::set_root_offset_of( buffer, 6u );
+    REQUIRE( pmm::AllocatedBlock<A>::can_cast_from_raw( buffer ) );
+    auto opt = pmm::AllocatedBlock<A>::try_cast_from_raw( buffer );
+    REQUIRE( opt.has_value() );
+    REQUIRE( opt->verify_invariants( 6 ) );
 }
 
 // ─── Image version contract ───────────────────────────────────────────────────

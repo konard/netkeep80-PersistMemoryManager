@@ -6,6 +6,7 @@
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #include <type_traits>
 namespace pmm
 {
@@ -145,6 +146,27 @@ template <typename AT> class FreeBlock
         return FreeBlock( *h );
     }
 /*
+### pmm-freeblock-can_cast_from_raw
+*/
+    static bool can_cast_from_raw( const void* raw ) noexcept
+    {
+        if ( raw == nullptr )
+            return false;
+        if ( reinterpret_cast<std::uintptr_t>( raw ) % alignof( Header ) != 0 )
+            return false;
+        const Header* h = reinterpret_cast<const Header*>( raw );
+        return h->weight == 0 && h->root_offset == 0;
+    }
+/*
+### pmm-freeblock-try_cast_from_raw
+*/
+    static std::optional<FreeBlock> try_cast_from_raw( void* raw ) noexcept
+    {
+        if ( !can_cast_from_raw( raw ) )
+            return std::nullopt;
+        return FreeBlock( *reinterpret_cast<Header*>( raw ) );
+    }
+/*
 ### pmm-freeblock-verify_invariants
 */
     bool                    verify_invariants() const noexcept { return is_free(); }
@@ -244,6 +266,27 @@ template <typename AT> class AllocatedBlock
         Header* h = detail::block_header_at<AT>( raw );
         assert( h->weight != 0 && "cast_from_raw<AllocatedBlock>: block is not allocated (weight==0)" );
         return AllocatedBlock( *h );
+    }
+/*
+### pmm-allocatedblock-can_cast_from_raw
+*/
+    static bool can_cast_from_raw( const void* raw ) noexcept
+    {
+        if ( raw == nullptr )
+            return false;
+        if ( reinterpret_cast<std::uintptr_t>( raw ) % alignof( Header ) != 0 )
+            return false;
+        const Header* h = reinterpret_cast<const Header*>( raw );
+        return h->weight != 0;
+    }
+/*
+### pmm-allocatedblock-try_cast_from_raw
+*/
+    static std::optional<AllocatedBlock> try_cast_from_raw( void* raw ) noexcept
+    {
+        if ( !can_cast_from_raw( raw ) )
+            return std::nullopt;
+        return AllocatedBlock( *reinterpret_cast<Header*>( raw ) );
     }
 /*
 ### pmm-allocatedblock-verify_invariants

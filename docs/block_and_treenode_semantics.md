@@ -1,9 +1,17 @@
-# Block and TreeNode Semantics
+# BlockHeader Semantics
+
+> **Историческая заметка.** До рефакторинга #367 этот документ описывал
+> отдельные `Block<AT>` и `TreeNode<AT>` объекты с парой `Block` / `TreeNode`.
+> После #367 единственный физический layout — `BlockHeader<AT>`, а `Block<AT>`
+> является type alias для `BlockHeader<AT>`. Термин «TreeNode» сохранён в
+> заголовке файла и упоминаниях ниже **только как исторический термин**;
+> канонически следует читать его как «AVL-slot префикс [BlockHeader](../include/pmm/block_header.h#pmm-blockheader)»
+> (`weight`, `left_offset`, `right_offset`, `parent_offset`, `avl_height`).
 
 ## Статус документа
 
-Этот документ фиксирует **каноническую семантику полей `Block<AddressTraitsT>` и
-`BlockHeader<AddressTraitsT> (AVL slot)`** для [PersistMemoryManager](../include/pmm/persist_memory_manager.h#pmm-persistmemorymanager).
+Этот документ фиксирует **каноническую семантику полей единственного физического
+layout `BlockHeader<AddressTraitsT>`** для [PersistMemoryManager](../include/pmm/persist_memory_manager.h#pmm-persistmemorymanager).
 
 Это документ уровня **storage kernel / AVL-forest substrate**. Он определяет,
 как следует понимать поля блока и встроенного intrusive tree-slot,

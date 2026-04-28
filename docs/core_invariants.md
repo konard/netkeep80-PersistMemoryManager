@@ -15,7 +15,7 @@ For each invariant the document provides:
 Related documents:
 
 - architectural model: [pmm_avl_forest.md](pmm_avl_forest.md)
-- field semantics: [block_and_treenode_semantics.md](block_and_treenode_semantics.md)
+- block-header field semantics: [block_and_treenode_semantics.md](block_and_treenode_semantics.md)
 - low-level layout: [architecture.md](architecture.md)
 - bootstrap sequence: [bootstrap.md](bootstrap.md)
 - free-tree policy: [free_tree_forest_policy.md](free_tree_forest_policy.md)
@@ -37,10 +37,16 @@ over it. PMM does not know `pjson` semantics or any upper-layer schema.
 
 ---
 
-## B. Block and TreeNode Semantics
+## B. Block Header Semantics
 
 Each block is an atom of the linear PAP **and** an atom of the intrusive forest.
-`Block<A>` carries the physical layer; `BlockHeader<A>` (AVL slot) carries the forest-slot.
+`BlockHeader<A>` is the only physical block-header layout; its prefix
+(fields `weight`, `left_offset`, `right_offset`, `parent_offset`, `avl_height`)
+is the universal intrusive AVL slot. `Block<A>` is a type alias for `BlockHeader<A>`.
+`BlockStateBase<A>` is **not** storage; it is a static typed access/helper layer
+over `BlockHeader<A>`. The state classes (`FreeBlock`, `AllocatedBlock`,
+`FreeBlockRemovedAVL`, `FreeBlockNotInAVL`, `SplittingBlock`, `CoalescingBlock`)
+are non-owning typed views over `BlockHeader<A>&`.
 
 ### B1. Linear neighbors
 
@@ -54,7 +60,7 @@ Each block is an atom of the linear PAP **and** an atom of the intrusive forest.
 | ID | Invariant | Code checkpoint | Test |
 |----|-----------|-----------------|------|
 | B2a | `left_offset`, `right_offset`, `parent_offset` are AVL structural links within the current tree-slot. They have no relation to physical block position. | `avl_tree_mixin.h` — all rotations and rebalancing operate exclusively through these fields. `avl_init_node()` sets them to `no_block`. | `test_avl_tree_view.cpp`, `test_issue243_free_tree_policy.cpp`. |
-| B2b | `avl_height` is the structural AVL subtree height. `avl_height == 0` means the slot is not participating in any tree. | `avl_update_height()` in `avl_tree_mixin.h`. `rebuild_free_tree()` resets all AVL fields before reinsertion. | `test_block_state.cpp` — "insert_to_avl" verifies `avl_height=1` after insertion. |
+| B2b | `avl_height` is the structural AVL subtree height. `avl_height == 0` means the slot is not participating in any tree. | `avl_update_height()` in `avl_tree_mixin.h`. `rebuild_free_tree()` resets all AVL fields before reinsertion. | `test_block_header.cpp` — "AllocatedBlock -> FreeBlockNotInAVL -> FreeBlock transitions" verifies `avl_height=1` after `insert_to_avl()`. |
 
 ### B3. Weight
 
@@ -67,8 +73,8 @@ Each block is an atom of the linear PAP **and** an atom of the intrusive forest.
 
 | ID | Invariant | Code checkpoint | Test |
 |----|-----------|-----------------|------|
-| B4a | `root_offset` is the owner-domain / owner-tree marker of the intrusive tree-slot. | [BlockStateBase::verify_state()](../include/pmm/block_state.h#pmm-blockstatebase-verify_state) in `block_state.h:183–197` checks consistency with `weight`. | `test_issue245_verify_repair.cpp` — "verify detects block state inconsistency". |
-| B4b | Free block: `root_offset == 0`. Allocated block: `root_offset == own_granule_index`. | [FreeBlock::verify_invariants()](../include/pmm/block_state.h#pmm-freeblock-verify_invariants) (`block_state.h:428`), [AllocatedBlock::verify_invariants()](../include/pmm/block_state.h#pmm-allocatedblock-verify_invariants) (`block_state.h:637`). `recover_state()` fixes violations (`block_state.h:162–171`). | `test_block_state.cpp` — "FreeBlock cast_from_raw and verify_invariants", "AllocatedBlock cast_from_raw and verify_invariants", "recover_block_state". |
+| B4a | `root_offset` is the owner-domain / owner-tree marker of the intrusive tree-slot. | [BlockStateBase::verify_state()](../include/pmm/block_state.h#pmm-blockstatebase-verify_state) checks consistency with `weight`. | `test_issue245_verify_repair.cpp` — "verify detects block state inconsistency". |
+| B4b | Free block: `root_offset == 0`. Allocated block: `root_offset == own_granule_index`. | [FreeBlock::verify_invariants()](../include/pmm/block_state.h#pmm-freeblock-verify_invariants), [AllocatedBlock::verify_invariants()](../include/pmm/block_state.h#pmm-allocatedblock-verify_invariants). [BlockStateBase::recover_state()](../include/pmm/block_state.h#pmm-blockstatebase-recover_state) fixes violations. | `test_block_header.cpp` — `FreeBlock -> FreeBlockRemovedAVL -> AllocatedBlock transitions`, `AllocatedBlock -> FreeBlockNotInAVL -> FreeBlock transitions`, `detect_block_state and recover_block_state behave consistently`. |
 
 ### B5. Node type
 
@@ -80,13 +86,13 @@ Each block is an atom of the linear PAP **and** an atom of the intrusive forest.
 
 | ID | Invariant | Code checkpoint | Test |
 |----|-----------|-----------------|------|
-| B6a | Each block has exactly one set of tree fields (`left_offset`, `right_offset`, `parent_offset`, `root_offset`, `avl_height`, `weight`, `node_type`). A block cannot simultaneously belong to two different AVL trees. | Enforced by `Block<A>` layout: `sizeof(Block<DefaultAddressTraits>) == 32` (`block.h:78`). | `test_block_state.cpp` — "BlockStateBase size" (32 bytes). |
+| B6a | Each block has exactly one set of tree fields (`left_offset`, `right_offset`, `parent_offset`, `root_offset`, `avl_height`, `weight`, `node_type`). A block cannot simultaneously belong to two different AVL trees. | Enforced by `BlockHeader<A>` layout: `sizeof(BlockHeader<DefaultAddressTraits>) == 32`. | `test_block_header.cpp` — "BlockHeader\<DefaultAddressTraits\> is standard-layout and trivially-copyable" asserts the 32-byte size. |
 
 ### B7. Block header size
 
 | ID | Invariant | Code checkpoint | Test |
 |----|-----------|-----------------|------|
-| B7a | `Block<DefaultAddressTraits>` = 32 bytes = 2 granules. This size must not increase. | `static_assert(sizeof(Block<DefaultAddressTraits>) == 32)` in `block.h:78`. `static_assert` in `types.h:152–158` and `block_state.h:369–372`. | `test_block_state.cpp` — "BlockStateBase size", "All states same size". |
+| B7a | `BlockHeader<DefaultAddressTraits>` = 32 bytes = 2 granules. This size must not increase. | `static_assert(sizeof(BlockHeader<DefaultAddressTraits>) == 32)` in `block_header.h`. `Block<AT>` is a type alias for `BlockHeader<AT>`. | `test_block_header.cpp` — "BlockHeader\<DefaultAddressTraits\> is standard-layout and trivially-copyable", "BlockHeader\<DefaultAddressTraits\> field offsets match the binary contract". |
 
 ---
 
@@ -147,7 +153,7 @@ Each block is an atom of the linear PAP **and** an atom of the intrusive forest.
 
 | ID | Invariant | Code checkpoint | Test |
 |----|-----------|-----------------|------|
-| E2a | In the free-tree domain, `weight` is a state discriminator (0 = free, >0 = allocated), not a sort key. | `is_free()` checks `weight == 0 && root_offset == 0`. Free-tree ordering uses derived block size, not `weight`. | `test_block_state.cpp` — "is_free / is_allocated". `test_issue243_free_tree_policy.cpp`. |
+| E2a | In the free-tree domain, `weight` is a state discriminator (0 = free, >0 = allocated), not a sort key. | `is_free()` checks `weight == 0 && root_offset == 0`. Free-tree ordering uses derived block size, not `weight`. | `test_block_header.cpp` — `detect_block_state and recover_block_state behave consistently`. `test_issue243_free_tree_policy.cpp`. |
 
 ### E3. Best-fit search
 
@@ -194,13 +200,13 @@ These are enforced by `static_assert` and are always checked at build time:
 
 | ID | Invariant | Code checkpoint |
 |----|-----------|-----------------|
-| S1 | `sizeof(Block<DefaultAddressTraits>) == 32` | `block.h:78`, `types.h:152–158`, `block_state.h:369–372` |
-| S2 | `sizeof(ManagerHeader<DefaultAddressTraits>) == 64`, granule-aligned | `types.h:214,216` |
-| S3 | `BlockHeader<DefaultAddressTraits>` (AVL slot) size == 5 × `sizeof(uint32_t)` + 4 | `types.h:163` |
-| S4 | `kGranuleSize` is power of 2, equals `DefaultAddressTraits::granule_size` | `types.h:62–63` |
-| S5 | `BlockStateBase<AT>` is binary-compatible with `Block<AT>` | `block_state.h:369–372` |
-| S6 | [ForestDomainRecord](../include/pmm/forest_registry.h#pmm-detail-forestdomainrecord) is trivially copyable; [ForestDomainRegistry](../include/pmm/forest_registry.h#pmm-detail-forestdomainregistry) is nothrow-default-constructible | `forest_registry.h:206–209` |
-| S7 | Address traits: `IndexT` unsigned, `GranuleSz >= 4`, `GranuleSz` power of 2 | `address_traits.h:63–65` |
+| S1 | `sizeof(BlockHeader<DefaultAddressTraits>) == 32` | `block_header.h` (`static_assert(sizeof(BlockHeader<DefaultAddressTraits>) == 32)`); `block.h` re-asserts the size on the `Block<AT>` alias |
+| S2 | `sizeof(ManagerHeader<DefaultAddressTraits>) == 64`, granule-aligned | `types.h` (`ManagerHeader` `static_assert`s) |
+| S3 | `BlockHeader<DefaultAddressTraits>` is the only physical block-header layout; it is standard-layout, trivially-copyable, and 32 bytes; the AVL slot is its prefix (`weight`, `left_offset`, `right_offset`, `parent_offset`, `avl_height`). | `block_header.h` (`BlockLayoutContract<AT>` and `static_assert`s on size/offsets) |
+| S4 | `kGranuleSize` is power of 2, equals `DefaultAddressTraits::granule_size` | `types.h` |
+| S5 | `BlockStateBase<AT>` is **not** storage; it is a static typed access/helper layer over `BlockHeader<AT>`. State classes (`FreeBlock`, `AllocatedBlock`, …) are non-owning typed views over `BlockHeader<AT>&`. | `block_state.h` (`BlockStateBase` only declares `static` members and a deleted constructor; `FreeBlock`/`AllocatedBlock`/… store a single `BlockHeader<AT>*`) |
+| S6 | [ForestDomainRecord](../include/pmm/forest_registry.h#pmm-detail-forestdomainrecord) is trivially copyable; [ForestDomainRegistry](../include/pmm/forest_registry.h#pmm-detail-forestdomainregistry) is nothrow-default-constructible | `forest_registry.h` |
+| S7 | Address traits: `IndexT` unsigned, `GranuleSz >= 4`, `GranuleSz` power of 2 | `address_traits.h` |
 
 ---
 
@@ -223,5 +229,5 @@ Forbidden states (must never appear in a persisted image):
 | > 0 | 0 | **Never valid** — `recover_state()` sets `root_offset = own_idx` |
 | > 0 | != own_idx | **Never valid** — `recover_state()` sets `root_offset = own_idx` |
 
-Code: [BlockStateBase::recover_state()](../include/pmm/block_state.h#pmm-blockstatebase-recover_state) (`block_state.h:162–171`).
-Test: `test_block_state.cpp` — "recover_block_state".
+Code: [BlockStateBase::recover_state()](../include/pmm/block_state.h#pmm-blockstatebase-recover_state).
+Test: `test_block_header.cpp` — `detect_block_state and recover_block_state behave consistently`.

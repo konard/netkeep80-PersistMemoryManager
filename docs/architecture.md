@@ -13,7 +13,7 @@ coexist through the `InstanceId` template parameter (multiton pattern).
 
 The canonical high-level model of PMM as a linear persistent address space plus an intrusive
 AVL-forest is documented in [pmm_avl_forest.md](pmm_avl_forest.md). The canonical semantics
-of [Block](../include/pmm/block.h#pmm-block) / [TreeNode](../include/pmm/block_header.h#pmm-blockheader) fields is documented in [block_and_treenode_semantics.md](block_and_treenode_semantics.md).
+of [BlockHeader](../include/pmm/block_header.h#pmm-blockheader) fields (the only physical block-header layout, which embeds the AVL slot as its prefix) is documented in [block_and_treenode_semantics.md](block_and_treenode_semantics.md).
 The frozen invariant set with traceability to code and tests is in [core_invariants.md](core_invariants.md).
 This document focuses on the low-level layout, invariants, and algorithms.
 
@@ -279,8 +279,10 @@ space limit.
 ### `pstringview<ManagerT>`
 
 An interned read-only persistent string. Multiple calls with the same content return the
-same [pptr](../include/pmm/pptr.h#pmm-pptr) (deduplication). Uses the built-in [TreeNode](../include/pmm/block_header.h#pmm-blockheader) fields of each allocated block
-as AVL tree links — no separate AVL node allocations. Blocks are permanently locked via
+same [pptr](../include/pmm/pptr.h#pmm-pptr) (deduplication). Uses the built-in AVL slot of the
+[BlockHeader](../include/pmm/block_header.h#pmm-blockheader) of each allocated block (fields
+`weight`, `left_offset`, `right_offset`, `parent_offset`, `avl_height`) as AVL tree links —
+no separate AVL node allocations. Blocks are permanently locked via
 `lock_block_permanent()`.
 
 ```
@@ -300,8 +302,10 @@ forest domain: system/symbols (persistent root in registry)
 A persistent AVL tree dictionary. The [pmap](../include/pmm/pmap.h#pmm-pmap) object is a typed facade over a
 type-scoped `container/pmap/<type>/<binding>` forest domain; the AVL root is stored in
 that domain binding while the object stores only the binding identity. Each node is an
-allocated block in PAP containing `pmap_node<_K, _V>`. The built-in [TreeNode](../include/pmm/block_header.h#pmm-blockheader) fields
-serve as AVL tree links. Nodes are **not** permanently locked (unlike [pstringview](../include/pmm/pstringview.h#pmm-pstringview)), so
+allocated block in PAP containing `pmap_node<_K, _V>`. The built-in AVL slot of the
+[BlockHeader](../include/pmm/block_header.h#pmm-blockheader) of each block (fields `weight`,
+`left_offset`, `right_offset`, `parent_offset`, `avl_height`) serves as AVL tree links.
+Nodes are **not** permanently locked (unlike [pstringview](../include/pmm/pstringview.h#pmm-pstringview)), so
 they can be freed.
 
 The `<type>` segment of the domain name is a stable fingerprint derived from `sizeof`,
@@ -367,8 +371,12 @@ pairs, making them behave like [pptr](../include/pmm/pptr.h#pmm-pptr) for the sh
 of maintaining ~120 lines of duplicate code.
 
 - `BlockPPtrManagerTag<AT>` — provides `address_traits` for template resolution
-- `BlockTreeNodeProxy<AT>` — proxy for [TreeNode](../include/pmm/block_header.h#pmm-blockheader)-like interface, delegating to [BlockStateBase](../include/pmm/block_state.h#pmm-blockstatebase)
 - `pptr_make(BlockPPtr, idx)` — specialization propagating `base_ptr`
+
+The shared AVL functions resolve a `BlockPPtr<AT>` to a `BlockHeader<AT>&` via
+`detail::block_header_at<AT>` and read/write its AVL-slot data members
+(`left_offset`, `right_offset`, `parent_offset`, `avl_height`, `weight`) directly — no
+separate `TreeNode` proxy.
 
 #### `AvlInorderIterator<NodePPtr>`
 
