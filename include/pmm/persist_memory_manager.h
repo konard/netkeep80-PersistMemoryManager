@@ -47,6 +47,7 @@ template <typename C> struct config_logging_policy<C, std::void_t<typename C::lo
 template <typename ConfigT = CacheManagerConfig, size_t InstanceId = 0>
 /*
 ## pmm-persistmemorymanager
+req: feat-001, if-008, con-004, con-005, if-009
 */
 class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryManager<ConfigT, InstanceId>>
 {
@@ -78,6 +79,10 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     static PmmError last_error() noexcept { return _last_error; }
     static void     clear_error() noexcept { _last_error = PmmError::Ok; }
     static void     set_last_error( PmmError err ) noexcept { _last_error = err; }
+/*
+### pmm-persistmemorymanager-create
+req: fr-001, fr-026, ur-001, feat-001
+*/
     static bool     create( size_t initial_size ) noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
@@ -157,6 +162,10 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         guard.commit();
         return true;
     }
+/*
+### pmm-persistmemorymanager-load
+req: fr-002, fr-014, ur-005, feat-001, feat-004, qa-rec-001, qa-compat-001
+*/
     static bool load( VerifyResult& result ) noexcept
     {
         result.mode = RecoveryMode::Repair;
@@ -261,6 +270,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     }
 /*
 ### pmm-persistmemorymanager-destroy
+req: fr-003, ur-001
 */
     static void destroy() noexcept
     {
@@ -282,6 +292,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     static bool is_initialized() noexcept { return _initialized.load( std::memory_order_acquire ); }
 /*
 ### pmm-persistmemorymanager-allocate
+req: fr-004, fr-021, fr-022, ur-002, feat-002
 */
     static void* allocate( size_t user_size ) noexcept
     {

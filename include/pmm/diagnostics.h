@@ -10,6 +10,7 @@ using std::uint64_t;
 using std::uint8_t;
 /*
 ## pmm-recoverymode
+req: feat-004, fr-014, fr-024, qa-rec-001
 */
 enum class RecoveryMode : uint8_t
 {
@@ -18,6 +19,7 @@ enum class RecoveryMode : uint8_t
 };
 /*
 ## pmm-violationtype
+req: feat-004, fr-014, fr-024, qa-rec-001
 */
 enum class ViolationType : uint8_t
 {
@@ -33,6 +35,7 @@ enum class ViolationType : uint8_t
 };
 /*
 ## pmm-diagnosticaction
+req: feat-004, fr-014, fr-024, qa-rec-001
 */
 enum class DiagnosticAction : uint8_t
 {
@@ -43,6 +46,7 @@ enum class DiagnosticAction : uint8_t
 };
 /*
 ## pmm-diagnosticentry
+req: feat-004, fr-014, fr-024, qa-rec-001
 */
 struct DiagnosticEntry
 {
@@ -55,6 +59,7 @@ struct DiagnosticEntry
 inline constexpr size_t kMaxDiagnosticEntries = 64;
 /*
 ## pmm-verifyresult
+req: feat-004, fr-014, fr-024, qa-rec-001
 */
 struct VerifyResult
 {

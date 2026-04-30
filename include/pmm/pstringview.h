@@ -9,6 +9,7 @@ namespace pmm
 template <typename ManagerT> struct pstringview;
 /*
 ## pmm-pstringview
+req: feat-003, fr-007, fr-008, fr-029, ur-003, dr-007
 */
 template <typename ManagerT> struct pstringview
 {

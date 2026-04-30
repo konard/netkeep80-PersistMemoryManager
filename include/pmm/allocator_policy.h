@@ -15,6 +15,7 @@ namespace pmm
 template <typename FT = AvlFreeTree<DefaultAddressTraits>, typename AT = DefaultAddressTraits>
 /*
 ## pmm-allocatorpolicy
+req: feat-002, fr-004, fr-013, dr-005, dr-013, dr-020, qa-perf-001
 */
 class AllocatorPolicy
 {

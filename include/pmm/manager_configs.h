@@ -22,6 +22,7 @@ template <typename AT = DefaultAddressTraits, typename LockPolicyT = config::NoL
           size_t MaxMemoryGB = 64, typename LoggingPolicyT = logging::NoLogging>
 /*
 ## pmm-basicconfig
+req: feat-001, fr-001, ur-001, ur-006, if-008, con-005
 */
 struct BasicConfig
 {
@@ -39,6 +40,7 @@ struct BasicConfig
 template <typename AT, size_t BufferSize, size_t GrowNum = 3, size_t GrowDen = 2>
 /*
 ## pmm-staticconfig
+req: feat-001, fr-001, ur-001, ur-006, con-005
 */
 struct StaticConfig
 {

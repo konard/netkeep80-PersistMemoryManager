@@ -24,6 +24,7 @@ namespace pmm
 {
 /*
 ## pmm-mmapstorage
+req: feat-001, feat-008, fr-001, fr-014, ur-005, ur-007, qa-rec-001, qa-port-001
 */
 template <typename AT = DefaultAddressTraits> class MMapStorage
 {
