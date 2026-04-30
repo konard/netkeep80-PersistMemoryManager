@@ -17,6 +17,11 @@
 
 using Mgr = pmm::presets::SingleThreadedHeap;
 
+/*
+### test-allocate
+req: feat-002, fr-004, fr-022, fr-026, ur-001
+*/
+
 TEST_CASE( "create_basic", "[test_allocate]" )
 {
     REQUIRE( Mgr::create( 64 * 1024 ) );

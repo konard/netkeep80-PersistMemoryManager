@@ -13,6 +13,11 @@
 
 using Mgr = pmm::presets::SingleThreadedHeap;
 
+/*
+### test-coalesce
+req: feat-002, fr-005, fr-013, dr-005, dr-013
+*/
+
 TEST_CASE( "coalesce_with_next", "[test_coalesce]" )
 {
     REQUIRE( Mgr::create( 64 * 1024 ) );

@@ -14,6 +14,11 @@
 
 using Mgr = pmm::presets::SingleThreadedHeap;
 
+/*
+### test-deallocate
+req: feat-002, fr-005, fr-013, dr-005, dr-018
+*/
+
 TEST_CASE( "deallocate_null", "[test_deallocate]" )
 {
     REQUIRE( Mgr::create( 64 * 1024 ) );

@@ -31,6 +31,7 @@ template <typename Mgr> auto* arena_header()
 
 /*
 ### test-issue373-corruption-cycle
+req: feat-004, fr-014, fr-024, qa-rec-001
 */
 TEST_CASE( "I373-Corruption: walker terminates on self-cycle next_offset", "[issue373][corruption]" )
 {
@@ -92,6 +93,7 @@ TEST_CASE( "I373-Corruption: walker terminates on backward next_offset", "[issue
 
 /*
 ### test-issue373-corruption-verify
+req: feat-004, fr-014, fr-024, dr-020, qa-rec-001
 */
 TEST_CASE( "I373-Corruption: verify reports corruption on cyclic chain without hanging", "[issue373][corruption]" )
 {
@@ -117,6 +119,7 @@ TEST_CASE( "I373-Corruption: verify reports corruption on cyclic chain without h
 
 /*
 ### test-issue373-overflow-reallocate
+req: feat-002, feat-004, fr-014, fr-022, fr-024
 */
 TEST_CASE( "I373-Overflow: reallocate_typed rejects size_t overflow with PmmError::Overflow", "[issue373][overflow]" )
 {
@@ -136,6 +139,7 @@ TEST_CASE( "I373-Overflow: reallocate_typed rejects size_t overflow with PmmErro
 
 /*
 ### test-issue373-real-growth-cap
+req: fr-026, qa-mem-001
 */
 TEST_CASE( "I373-Growth: real allocation respects max_memory_gb cap from config", "[issue373][growth]" )
 {
@@ -145,6 +149,7 @@ TEST_CASE( "I373-Growth: real allocation respects max_memory_gb cap from config"
 
 /*
 ### test-issue373-real-growth-uses-policy
+req: fr-026, qa-mem-001
 */
 TEST_CASE( "I373-Growth: do_expand uses compute_growth for backend resize", "[issue373][growth]" )
 {
@@ -160,6 +165,7 @@ TEST_CASE( "I373-Growth: do_expand uses compute_growth for backend resize", "[is
 
 /*
 ### test-issue373-arenaview-huge-idx
+req: feat-004, fr-014, dr-020
 */
 TEST_CASE( "I373-ArenaView: valid_block rejects index whose granule offset overflows size_t",
            "[issue373][arena][overflow]" )
@@ -176,6 +182,7 @@ TEST_CASE( "I373-ArenaView: valid_block rejects index whose granule offset overf
 
 /*
 ### test-issue373-allocate-from-block-zero
+req: feat-002, fr-004, fr-022
 */
 TEST_CASE( "I373-Allocator: allocate_from_block(data_gran=0) returns nullptr instead of clamping to 1",
            "[issue373][allocator][contract]" )
@@ -195,6 +202,7 @@ TEST_CASE( "I373-Allocator: allocate_from_block(data_gran=0) returns nullptr ins
 
 /*
 ### test-issue373-recovery-cyclic-terminates
+req: feat-004, fr-014, fr-024, qa-rec-001
 */
 TEST_CASE( "I373-Recovery: repair_linked_list / rebuild_free_tree terminate on cyclic chain", "[issue373][recovery]" )
 {
@@ -224,6 +232,7 @@ TEST_CASE( "I373-Recovery: repair_linked_list / rebuild_free_tree terminate on c
 
 /*
 ### test-issue373-validation-overflow
+req: feat-004, fr-014, dr-020
 */
 TEST_CASE( "I373-Validation: validate_block_index handles overflow-prone indexes safely", "[issue373][validation]" )
 {
@@ -236,6 +245,7 @@ TEST_CASE( "I373-Validation: validate_block_index handles overflow-prone indexes
 
 /*
 ### test-issue373-growth-traits-cap
+req: fr-026, qa-mem-001, dr-007
 */
 TEST_CASE( "I373-Growth: compute_growth_for_traits caps target by max_arena_size for AT", "[issue373][growth][traits]" )
 {
@@ -247,6 +257,7 @@ TEST_CASE( "I373-Growth: compute_growth_for_traits caps target by max_arena_size
 
 /*
 ### test-issue373-growth-traits-no-block
+req: fr-026, qa-mem-001, dr-007
 */
 TEST_CASE( "I373-Growth: compute_growth_for_traits rejects no_block-sized arena target", "[issue373][growth][traits]" )
 {
@@ -258,6 +269,7 @@ TEST_CASE( "I373-Growth: compute_growth_for_traits rejects no_block-sized arena 
 
 /*
 ### test-issue373-byte-off-checked
+req: feat-004, fr-014, dr-007
 */
 TEST_CASE( "I373-Conv: byte_off_to_idx_checked rejects misalignment and overflow", "[issue373][conv]" )
 {
