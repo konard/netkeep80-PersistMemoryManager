@@ -13,6 +13,7 @@ namespace pmm
 {
 /*
 ## pmm-pmmerror
+req: feat-004, fr-014, fr-024, qa-rec-001, qa-compat-001
 */
 enum class PmmError : uint8_t
 {
@@ -37,6 +38,7 @@ static_assert( kGranuleSize == pmm::DefaultAddressTraits::granule_size, "" );
 inline constexpr uint64_t kMagic = 0x504D4D5F56303938ULL;
 /*
 ## pmm-memorystats
+req: feat-005, fr-019, fr-031, ur-004
 */
 struct MemoryStats
 {
@@ -61,6 +63,7 @@ struct ManagerInfo
 };
 /*
 ## pmm-blockview
+req: feat-005, fr-019, fr-031, ur-004
 */
 struct BlockView
 {
@@ -74,6 +77,7 @@ struct BlockView
 };
 /*
 ## pmm-freeblockview
+req: feat-005, fr-019, fr-031, ur-004
 */
 struct FreeBlockView
 {

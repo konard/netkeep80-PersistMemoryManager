@@ -15,6 +15,11 @@
 
 using Mgr = pmm::presets::SingleThreadedHeap;
 
+/*
+### test-avl-allocator
+req: feat-002, fr-004, fr-005, fr-013, dr-005, dr-013, dr-017, qa-perf-001
+*/
+
 /// After fresh create(), there should be exactly 1 free block and 1 alloc block
 TEST_CASE( "free_block_has_zero_size", "[test_avl_allocator]" )
 {

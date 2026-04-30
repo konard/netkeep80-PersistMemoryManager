@@ -52,6 +52,7 @@ using std::uint64_t;
 using std::uint8_t;
 /*
 ## pmm-addresstraits
+req: dr-007, qa-mem-001, asm-002
 */
 template <typename IndexT, size_t GranuleSz> struct AddressTraits
 {
@@ -132,6 +133,7 @@ namespace pmm
 {
 /*
 ## pmm-nodetype
+req: dr-001, dr-006, fr-007
 */
 enum class NodeType : std::uint8_t
 {
@@ -286,6 +288,7 @@ template <typename AT> using BlockHeaderStorage = BlockHeaderStorageImpl<AT, blo
 }
 /*
 ## pmm-blockheader
+req: dr-001, dr-002, dr-003, dr-004, dr-006, qa-mem-001
 */
 template <typename AT> struct BlockHeader : detail::BlockHeaderStorage<AT>
 {
@@ -294,6 +297,7 @@ template <typename AT> struct BlockHeader : detail::BlockHeaderStorage<AT>
 };
 /*
 ## pmm-blocklayoutcontract
+req: dr-001, dr-004, qa-mem-001, asm-002, con-006
 */
 template <typename AT> struct BlockLayoutContract
 {
@@ -348,6 +352,7 @@ namespace pmm
 {
 /*
 ## pmm-block
+req: dr-001, dr-004
 */
 template <typename AT> using Block = BlockHeader<AT>;
 static_assert( sizeof( pmm::Block<pmm::DefaultAddressTraits> ) == 32, "" );
@@ -364,6 +369,7 @@ using std::uint64_t;
 using std::uint8_t;
 /*
 ## pmm-recoverymode
+req: feat-004, fr-014, fr-024, qa-rec-001
 */
 enum class RecoveryMode : uint8_t
 {
@@ -372,6 +378,7 @@ enum class RecoveryMode : uint8_t
 };
 /*
 ## pmm-violationtype
+req: feat-004, fr-014, fr-024, qa-rec-001
 */
 enum class ViolationType : uint8_t
 {
@@ -387,6 +394,7 @@ enum class ViolationType : uint8_t
 };
 /*
 ## pmm-diagnosticaction
+req: feat-004, fr-014, fr-024, qa-rec-001
 */
 enum class DiagnosticAction : uint8_t
 {
@@ -397,6 +405,7 @@ enum class DiagnosticAction : uint8_t
 };
 /*
 ## pmm-diagnosticentry
+req: feat-004, fr-014, fr-024, qa-rec-001
 */
 struct DiagnosticEntry
 {
@@ -409,6 +418,7 @@ struct DiagnosticEntry
 inline constexpr size_t kMaxDiagnosticEntries = 64;
 /*
 ## pmm-verifyresult
+req: feat-004, fr-014, fr-024, qa-rec-001
 */
 struct VerifyResult
 {
@@ -450,6 +460,7 @@ template <typename AT> class SplittingBlock;
 template <typename AT> class CoalescingBlock;
 /*
 ## pmm-blockstatebase
+req: feat-007, fr-009, fr-010, fr-018, dr-006, rule-002
 */
 template <typename AT> class BlockStateBase
 {
@@ -542,6 +553,7 @@ template <typename AT> class BlockStateBase
 };
 /*
 ## pmm-freeblock
+req: feat-002, fr-005, fr-013, dr-005, rule-002
 */
 template <typename AT> class FreeBlock
 {
@@ -605,6 +617,7 @@ template <typename AT> class FreeBlock
 };
 /*
 ## pmm-freeblockremovedavl
+req: feat-002, fr-004, fr-013, dr-005, rule-002
 */
 template <typename AT> class FreeBlockRemovedAVL
 {
@@ -632,6 +645,7 @@ template <typename AT> class FreeBlockRemovedAVL
 };
 /*
 ## pmm-splittingblock
+req: feat-002, fr-004, fr-021, dr-005, rule-002
 */
 template <typename AT> class SplittingBlock
 {
@@ -675,6 +689,7 @@ template <typename AT> class SplittingBlock
 };
 /*
 ## pmm-allocatedblock
+req: feat-002, fr-004, fr-005, fr-022, dr-005, rule-002
 */
 template <typename AT> class AllocatedBlock
 {
@@ -735,6 +750,7 @@ template <typename AT> class AllocatedBlock
 };
 /*
 ## pmm-freeblocknotinavl
+req: feat-002, fr-005, fr-013, dr-005, rule-002
 */
 template <typename AT> class FreeBlockNotInAVL
 {
@@ -763,6 +779,7 @@ template <typename AT> class FreeBlockNotInAVL
 };
 /*
 ## pmm-coalescingblock
+req: feat-002, fr-005, fr-022, dr-005, rule-002
 */
 template <typename AT> class CoalescingBlock
 {
@@ -989,6 +1006,7 @@ namespace pmm
 {
 /*
 ## pmm-pmmerror
+req: feat-004, fr-014, fr-024, qa-rec-001, qa-compat-001
 */
 enum class PmmError : uint8_t
 {
@@ -1013,6 +1031,7 @@ static_assert( kGranuleSize == pmm::DefaultAddressTraits::granule_size, "" );
 inline constexpr uint64_t kMagic = 0x504D4D5F56303938ULL;
 /*
 ## pmm-memorystats
+req: feat-005, fr-019, fr-031, ur-004
 */
 struct MemoryStats
 {
@@ -1037,6 +1056,7 @@ struct ManagerInfo
 };
 /*
 ## pmm-blockview
+req: feat-005, fr-019, fr-031, ur-004
 */
 struct BlockView
 {
@@ -1050,6 +1070,7 @@ struct BlockView
 };
 /*
 ## pmm-freeblockview
+req: feat-005, fr-019, fr-031, ur-004
 */
 struct FreeBlockView
 {
@@ -1849,6 +1870,7 @@ concept FreeBlockTreePolicyForTraitsConcept =
     };
 /*
 ## pmm-avlfreetree
+req: feat-002, fr-004, fr-013, dr-005, dr-013, qa-perf-001
 */
 template <typename AT = DefaultAddressTraits> struct AvlFreeTree
 {
@@ -2363,6 +2385,7 @@ inline void aligned_free_for_arena( void* p ) noexcept
 }
 /*
 ## pmm-heapstorage
+req: feat-001, fr-001, fr-026, ur-001, if-008, qa-mem-001
 */
 template <typename AT = DefaultAddressTraits> class HeapStorage
 {
@@ -2506,6 +2529,7 @@ namespace pmm
 {
 /*
 ## pmm-staticstorage
+req: feat-001, fr-001, ur-006, con-005
 */
 template <size_t Size, typename AT = DefaultAddressTraits> class StaticStorage
 {
@@ -2550,6 +2574,7 @@ template <typename AT = DefaultAddressTraits, typename LockPolicyT = config::NoL
           size_t MaxMemoryGB = 64, typename LoggingPolicyT = logging::NoLogging>
 /*
 ## pmm-basicconfig
+req: feat-001, fr-001, ur-001, ur-006, if-008, con-005
 */
 struct BasicConfig
 {
@@ -2567,6 +2592,7 @@ struct BasicConfig
 template <typename AT, size_t BufferSize, size_t GrowNum = 3, size_t GrowDen = 2>
 /*
 ## pmm-staticconfig
+req: feat-001, fr-001, ur-001, ur-006, con-005
 */
 struct StaticConfig
 {
@@ -2610,6 +2636,7 @@ namespace pmm
 template <typename FT = AvlFreeTree<DefaultAddressTraits>, typename AT = DefaultAddressTraits>
 /*
 ## pmm-allocatorpolicy
+req: feat-002, fr-004, fr-013, dr-005, dr-013, dr-020, qa-perf-001
 */
 class AllocatorPolicy
 {
@@ -3344,6 +3371,7 @@ namespace pmm
 {
 /*
 ## pmm-pallocator
+req: feat-006, fr-027, ur-003, if-001
 */
 template <typename T, typename ManagerT> struct pallocator
 {
@@ -3398,6 +3426,7 @@ template <class T, class ManagerT>
     requires( !std::is_void_v<ManagerT> )
 /*
 ## pmm-pptr
+req: feat-003, fr-007, fr-008, fr-030, fr-033, dr-007, qa-port-001, con-007, rule-001
 */
 class pptr
 {
@@ -3424,6 +3453,7 @@ class pptr
     constexpr index_type offset() const noexcept { return _idx; }
 /*
 ### pmm-pptr-byte_offset
+req: dr-007, qa-port-001
 */
     constexpr size_t byte_offset() const noexcept
     {
@@ -3464,6 +3494,7 @@ namespace pmm
 {
 /*
 ## pmm-parray
+req: feat-003, fr-007, fr-008, fr-029, ur-003, dr-007
 */
 template <typename T, typename ManagerT> struct parray
 {
@@ -3718,6 +3749,7 @@ inline bool pmap_write_name( char ( &out )[kForestDomainNameCapacity], uint32_t 
 }
 /*
 ## pmm-pmap
+req: feat-003, fr-007, fr-008, fr-029, ur-003, dr-007
 */
 template <typename _K, typename _V, typename ManagerT> struct pmap
 {
@@ -3903,6 +3935,7 @@ namespace pmm
 {
 /*
 ## pmm-pstring
+req: feat-003, fr-007, fr-008, fr-029, ur-003, dr-007
 */
 template <typename ManagerT> struct pstring
 {
@@ -4044,6 +4077,7 @@ namespace pmm
 template <typename ManagerT> struct pstringview;
 /*
 ## pmm-pstringview
+req: feat-003, fr-007, fr-008, fr-029, ur-003, dr-007
 */
 template <typename ManagerT> struct pstringview
 {
@@ -4551,6 +4585,7 @@ template <typename C> struct config_logging_policy<C, std::void_t<typename C::lo
 template <typename ConfigT = CacheManagerConfig, size_t InstanceId = 0>
 /*
 ## pmm-persistmemorymanager
+req: feat-001, if-008, con-004, con-005, if-009
 */
 class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryManager<ConfigT, InstanceId>>
 {
@@ -4582,6 +4617,10 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     static PmmError last_error() noexcept { return _last_error; }
     static void     clear_error() noexcept { _last_error = PmmError::Ok; }
     static void     set_last_error( PmmError err ) noexcept { _last_error = err; }
+/*
+### pmm-persistmemorymanager-create
+req: fr-001, fr-026, ur-001, feat-001
+*/
     static bool     create( size_t initial_size ) noexcept
     {
         typename thread_policy::unique_lock_type lock( _mutex );
@@ -4661,6 +4700,10 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
         guard.commit();
         return true;
     }
+/*
+### pmm-persistmemorymanager-load
+req: fr-002, fr-014, ur-005, feat-001, feat-004, qa-rec-001, qa-compat-001
+*/
     static bool load( VerifyResult& result ) noexcept
     {
         result.mode = RecoveryMode::Repair;
@@ -4765,6 +4808,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     }
 /*
 ### pmm-persistmemorymanager-destroy
+req: fr-003, ur-001
 */
     static void destroy() noexcept
     {
@@ -4786,6 +4830,7 @@ class PersistMemoryManager : public detail::PersistMemoryTypedApi<PersistMemoryM
     static bool is_initialized() noexcept { return _initialized.load( std::memory_order_acquire ); }
 /*
 ### pmm-persistmemorymanager-allocate
+req: fr-004, fr-021, fr-022, ur-002, feat-002
 */
     static void* allocate( size_t user_size ) noexcept
     {
@@ -6014,6 +6059,7 @@ namespace pmm
 {
 /*
 ## pmm-mmapstorage
+req: feat-001, feat-008, fr-001, fr-014, ur-005, ur-007, qa-rec-001, qa-port-001
 */
 template <typename AT = DefaultAddressTraits> class MMapStorage
 {

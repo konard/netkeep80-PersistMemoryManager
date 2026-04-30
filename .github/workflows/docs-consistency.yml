@@ -16,9 +16,13 @@ on:
       - "**/*.md"
       - "CMakeLists.txt"
       - "repo-policy.json"
+      - "req/**"
+      - "include/pmm/**"
+      - "tests/**"
       - "scripts/check-docs-consistency.sh"
       - "scripts/check-version-consistency.sh"
       - "scripts/check-repo-guard-rollout.sh"
+      - "scripts/check-requirements-traceability.py"
       - ".github/workflows/docs-consistency.yml"
       - ".github/workflows/repo-guard.yml"
       - ".github/PULL_REQUEST_TEMPLATE.md"
@@ -33,9 +37,13 @@ on:
       - "**/*.md"
       - "CMakeLists.txt"
       - "repo-policy.json"
+      - "req/**"
+      - "include/pmm/**"
+      - "tests/**"
       - "scripts/check-docs-consistency.sh"
       - "scripts/check-version-consistency.sh"
       - "scripts/check-repo-guard-rollout.sh"
+      - "scripts/check-requirements-traceability.py"
       - ".github/workflows/docs-consistency.yml"
       - ".github/workflows/repo-guard.yml"
       - ".github/PULL_REQUEST_TEMPLATE.md"
@@ -53,6 +61,14 @@ jobs:
 
       - name: Check repo-guard rollout wiring
         run: bash scripts/check-repo-guard-rollout.sh
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check requirements traceability
+        run: python3 scripts/check-requirements-traceability.py
 
   version-consistency:
     name: Version consistency check (release-owned)

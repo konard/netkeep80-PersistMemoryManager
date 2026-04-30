@@ -8,6 +8,7 @@ namespace pmm
 {
 /*
 ## pmm-nodetype
+req: dr-001, dr-006, fr-007
 */
 enum class NodeType : std::uint8_t
 {
@@ -162,6 +163,7 @@ template <typename AT> using BlockHeaderStorage = BlockHeaderStorageImpl<AT, blo
 }
 /*
 ## pmm-blockheader
+req: dr-001, dr-002, dr-003, dr-004, dr-006, qa-mem-001
 */
 template <typename AT> struct BlockHeader : detail::BlockHeaderStorage<AT>
 {
@@ -170,6 +172,7 @@ template <typename AT> struct BlockHeader : detail::BlockHeaderStorage<AT>
 };
 /*
 ## pmm-blocklayoutcontract
+req: dr-001, dr-004, qa-mem-001, asm-002, con-006
 */
 template <typename AT> struct BlockLayoutContract
 {

@@ -11,6 +11,7 @@ namespace pmm
 {
 /*
 ## pmm-parray
+req: feat-003, fr-007, fr-008, fr-029, ur-003, dr-007
 */
 template <typename T, typename ManagerT> struct parray
 {

@@ -18,6 +18,7 @@ template <typename AT> class SplittingBlock;
 template <typename AT> class CoalescingBlock;
 /*
 ## pmm-blockstatebase
+req: feat-007, fr-009, fr-010, fr-018, dr-006, rule-002
 */
 template <typename AT> class BlockStateBase
 {
@@ -110,6 +111,7 @@ template <typename AT> class BlockStateBase
 };
 /*
 ## pmm-freeblock
+req: feat-002, fr-005, fr-013, dr-005, rule-002
 */
 template <typename AT> class FreeBlock
 {
@@ -173,6 +175,7 @@ template <typename AT> class FreeBlock
 };
 /*
 ## pmm-freeblockremovedavl
+req: feat-002, fr-004, fr-013, dr-005, rule-002
 */
 template <typename AT> class FreeBlockRemovedAVL
 {
@@ -200,6 +203,7 @@ template <typename AT> class FreeBlockRemovedAVL
 };
 /*
 ## pmm-splittingblock
+req: feat-002, fr-004, fr-021, dr-005, rule-002
 */
 template <typename AT> class SplittingBlock
 {
@@ -243,6 +247,7 @@ template <typename AT> class SplittingBlock
 };
 /*
 ## pmm-allocatedblock
+req: feat-002, fr-004, fr-005, fr-022, dr-005, rule-002
 */
 template <typename AT> class AllocatedBlock
 {
@@ -303,6 +308,7 @@ template <typename AT> class AllocatedBlock
 };
 /*
 ## pmm-freeblocknotinavl
+req: feat-002, fr-005, fr-013, dr-005, rule-002
 */
 template <typename AT> class FreeBlockNotInAVL
 {
@@ -331,6 +337,7 @@ template <typename AT> class FreeBlockNotInAVL
 };
 /*
 ## pmm-coalescingblock
+req: feat-002, fr-005, fr-022, dr-005, rule-002
 */
 template <typename AT> class CoalescingBlock
 {

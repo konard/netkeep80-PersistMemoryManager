@@ -28,6 +28,11 @@
 #include <cstring>
 #include <type_traits>
 
+/*
+### test-block-header
+req: dr-001, dr-002, dr-003, dr-004, dr-005, dr-006, dr-014, dr-015, dr-016, qa-mem-001
+*/
+
 // ─── Compile-time layout contract ─────────────────────────────────────────────
 
 TEST_CASE( "BlockHeader<DefaultAddressTraits> is standard-layout and trivially-copyable", "[issue369][block_header]" )

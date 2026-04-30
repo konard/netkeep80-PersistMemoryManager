@@ -13,6 +13,7 @@ using std::uint64_t;
 using std::uint8_t;
 /*
 ## pmm-addresstraits
+req: dr-007, qa-mem-001, asm-002
 */
 template <typename IndexT, size_t GranuleSz> struct AddressTraits
 {
