@@ -52,13 +52,13 @@ bool is_anchor_name( std::string_view anchor )
 
 std::string validate_anchor_comment_format( std::string_view comment )
 {
-    static const std::regex comment_pattern( R"re(^/\*\n(#+) ([^\n]+)\n\*/$)re" );
+    static const std::regex comment_pattern( R"re(^/\*\n(#+) ([^\n]+)\n(req: [^\n]+\n)?\*/$)re" );
 
     std::smatch match;
     const auto  comment_text = std::string( comment );
     if ( !std::regex_match( comment_text, match, comment_pattern ) )
     {
-        static const std::regex indented_anchor_pattern( R"re(^/\*\n\s+#+ [^\n]+\n\s*\*/$)re" );
+        static const std::regex indented_anchor_pattern( R"re(^/\*\n\s+#+ [^\n]+\n(\s*req: [^\n]+\n)?\s*\*/$)re" );
         if ( std::regex_match( comment_text, indented_anchor_pattern ) )
             return "anchor heading marker must start at the beginning of the line";
         return "block comment is not a PMM anchor";
@@ -236,7 +236,7 @@ std::vector<std::string> validate_comments_are_anchors( const std::filesystem::p
 std::vector<std::string> anchors_in( const std::string& text )
 {
     static const std::regex anchor_pattern(
-        R"re((?:^|\n)/\*\n(#+) ([a-z_~][a-z0-9_~]*(?:-[a-z_~][a-z0-9_~]*)*)\n\*/)re" );
+        R"re((?:^|\n)/\*\n(#+) ([a-z_~][a-z0-9_~]*(?:-[a-z_~][a-z0-9_~]*)*)\n(?:req: [^\n]+\n)?\*/)re" );
     std::vector<std::string> anchors;
     for ( std::sregex_iterator it( text.begin(), text.end(), anchor_pattern ), end; it != end; ++it )
     {
