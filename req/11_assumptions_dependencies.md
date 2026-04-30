@@ -2,23 +2,85 @@
 
 Предположения и зависимости фиксируют внешние условия, которые влияют на реализацию и эксплуатацию требований.
 
-## Предположения
+Каждое предположение/зависимость оформлены как заголовок уровня `##` с идентификатором в формате `asm-xxx` или `dep-xxx`.
 
-| ID | Предположение | Статус | Основание |
-|---|---|---|---|
-| ASM-001 | Клиентский код не хранит raw pointers как persistent references. | Recovered | README, `docs/architecture.md` |
-| ASM-002 | Клиентский код выбирает address traits, достаточные для максимального размера PAP. | Recovered | README, `docs/architecture.md` |
-| ASM-003 | Клиентский код выбирает lock policy согласно модели конкурентного доступа. | Recovered | README, `docs/thread_safety.md` |
-| ASM-004 | Пользовательские типы, создаваемые через `create_typed`, совместимы с nothrow lifecycle constraints. | Recovered | README |
-| ASM-005 | Для абсолютного контроля persistent type identity в `pmap` пользователь может специализировать `pmap_type_identity<T>` фиксированным ASCII-tag. | Recovered | `docs/architecture.md` |
-| ASM-006 | Верхние слои отвечают за schema migration собственных объектов, PMM отвечает только за свой image/layout/kernel metadata. | Recovered | `docs/pmm_target_model.md`, `docs/validation_model.md` |
+### Предположения
 
-## Зависимости
+## asm-001
 
-| ID | Зависимость | Статус | Основание |
-|---|---|---|---|
-| DEP-001 | Для build/test workflow нужны CMake, поддерживаемый C++20 compiler и CTest. | Recovered | README |
-| DEP-002 | Для optional demo нужны GLFW, Dear ImGui и OpenGL. | Recovered | README |
-| DEP-003 | Для benchmark workflow нужен Google Benchmark target, включаемый отдельной CMake option. | Recovered | README |
-| DEP-004 | Для file-backed persistence на платформах с mmap требуется поддержка соответствующих OS primitives. | Recovered | `docs/architecture.md` |
-| DEP-005 | Для многопоточного режима требуется доступный `std::shared_mutex`. | Recovered | `docs/thread_safety.md` |
+- **Предположение:** Клиентский код не хранит raw pointers как persistent references.
+- **Статус:** Recovered
+- **Основание:** README, `docs/architecture.md`
+- **Связано с:** [rule-001](02_business_rules.md#rule-001), [feat-003](04_features.md#feat-003)
+
+## asm-002
+
+- **Предположение:** Клиентский код выбирает address traits, достаточные для максимального размера PAP.
+- **Статус:** Recovered
+- **Основание:** README, `docs/architecture.md`
+- **Связано с:** [dr-007](06_data_requirements.md#dr-007), [qa-mem-001](08_quality_attributes.md#qa-mem-001)
+
+## asm-003
+
+- **Предположение:** Клиентский код выбирает lock policy согласно модели конкурентного доступа.
+- **Статус:** Recovered
+- **Основание:** README, `docs/thread_safety.md`
+- **Связано с:** [rule-009](02_business_rules.md#rule-009), [feat-007](04_features.md#feat-007)
+
+## asm-004
+
+- **Предположение:** Пользовательские типы, создаваемые через `create_typed`, совместимы с nothrow lifecycle constraints.
+- **Статус:** Recovered
+- **Основание:** README
+- **Связано с:** [rule-007](02_business_rules.md#rule-007), [fr-006](05_functional_requirements.md#fr-006)
+
+## asm-005
+
+- **Предположение:** Для абсолютного контроля persistent type identity в `pmap` пользователь может специализировать `pmap_type_identity<T>` фиксированным ASCII-tag.
+- **Статус:** Recovered
+- **Основание:** `docs/architecture.md`
+- **Связано с:** [dr-010](06_data_requirements.md#dr-010), [dr-011](06_data_requirements.md#dr-011)
+
+## asm-006
+
+- **Предположение:** Верхние слои отвечают за schema migration собственных объектов, PMM отвечает только за свой image/layout/kernel metadata.
+- **Статус:** Recovered
+- **Основание:** `docs/pmm_target_model.md`, `docs/validation_model.md`
+- **Связано с:** [rule-002](02_business_rules.md#rule-002), [sys-002](10_system_requirements.md#sys-002)
+
+### Зависимости
+
+## dep-001
+
+- **Зависимость:** Для build/test workflow нужны CMake, поддерживаемый C++20 compiler и CTest.
+- **Статус:** Recovered
+- **Основание:** README
+- **Связано с:** [con-001](09_constraints.md#con-001), [con-002](09_constraints.md#con-002), [if-004](07_external_interfaces.md#if-004), [ur-009](03_user_requirements.md#ur-009)
+
+## dep-002
+
+- **Зависимость:** Для optional demo нужны GLFW, Dear ImGui и OpenGL.
+- **Статус:** Recovered
+- **Основание:** README
+- **Связано с:** [if-011](07_external_interfaces.md#if-011)
+
+## dep-003
+
+- **Зависимость:** Для benchmark workflow нужен Google Benchmark target, включаемый отдельной CMake option.
+- **Статус:** Recovered
+- **Основание:** README
+- **Связано с:** `benchmarks/`
+
+## dep-004
+
+- **Зависимость:** Для file-backed persistence на платформах с mmap требуется поддержка соответствующих OS primitives.
+- **Статус:** Recovered
+- **Основание:** `docs/architecture.md`
+- **Связано с:** [if-005](07_external_interfaces.md#if-005), [ur-011](03_user_requirements.md#ur-011)
+
+## dep-005
+
+- **Зависимость:** Для многопоточного режима требуется доступный `std::shared_mutex`.
+- **Статус:** Recovered
+- **Основание:** `docs/thread_safety.md`
+- **Связано с:** [qa-thread-001](08_quality_attributes.md#qa-thread-001)
