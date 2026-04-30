@@ -6,10 +6,15 @@ import pathlib
 import re
 import sys
 
-ANCHOR_RE = re.compile(r"^/\*\n(#+) ([^\n]+)\n\*/$")
+ANCHOR_RE = re.compile(r"^/\*\n(#+) ([^\n]+)\n((?:req:[^\n]+\n)*)\*/$")
 INDENTED_ANCHOR_RE = re.compile(r"^/\*\n\s+#+ [^\n]+\n\s*\*/$")
 INDENTED_CLOSE_RE = re.compile(r"^/\*\n#+ [^\n]+\n\s+\*/$")
 ANCHOR_NAME_RE = re.compile(r"^[a-z_~][a-z0-9_~]*(?:-[a-z_~][a-z0-9_~]*)*$")
+# Optional req-trace lines inside an anchor comment. Format:
+#   req: <id>[, <id>...]
+# where <id> is a lowercase requirement anchor like fr-021, qa-rel-001, ac-003.
+REQ_LINE_RE = re.compile(r"^req:\s*([a-z][a-z0-9-]*(?:\s*,\s*[a-z][a-z0-9-]*)*)\s*$")
+REQ_ID_RE = re.compile(r"^[a-z]+(?:-[a-z0-9]+)+$")
 
 
 def line_number_at(text, pos):
@@ -35,6 +40,16 @@ def validate_anchor_comment(comment):
         return "anchor name must contain only lowercase ASCII hyphen-separated segments"
     if heading_depth != anchor_segment_count(anchor):
         return "anchor heading depth must match the number of hyphen-separated name segments"
+
+    req_block = match.group(3)
+    if req_block:
+        for line in req_block.rstrip("\n").split("\n"):
+            req_match = REQ_LINE_RE.fullmatch(line)
+            if not req_match:
+                return f"invalid req-trace line in anchor: {line!r}"
+            for req_id in (s.strip() for s in req_match.group(1).split(",")):
+                if not REQ_ID_RE.fullmatch(req_id):
+                    return f"invalid requirement id in anchor: {req_id!r}"
     return ""
 
 
