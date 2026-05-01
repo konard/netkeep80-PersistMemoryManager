@@ -105,6 +105,12 @@
   - per-type required fields из `req/templates/<type>.md` —
     проверяются для требований, использующих развернутый формат
     (поле `Формулировка` присутствует в требовании).
+  - проверка целостности ссылок в supporting-файлах каталога:
+    [req/templates/](templates/), [req/README.md](README.md) и
+    [req/13_traceability_matrix.md](13_traceability_matrix.md).
+    Ссылки внутри fenced code blocks и inline code spans пропускаются
+    (это шаблонные snippet'ы, чьи относительные пути ведут отсчёт от
+    `req/*.md`, а не от самого шаблона).
 
 Оба скрипта запускаются при изменениях в `req/`, [include/](../include/),
 [tests/](../tests/) и связанных файлов CI.

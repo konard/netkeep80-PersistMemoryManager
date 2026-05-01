@@ -47,6 +47,13 @@ contract documented in ``req/templates/`` and ``req/README.md``:
      contains at least one ``req:`` line that lists the originating
      requirement (or a parent / acceptance criterion of it).
 
+6. Supporting catalog files
+   - ``req/templates/*.md``, ``req/README.md`` and
+     ``req/13_traceability_matrix.md`` are scanned for broken Markdown
+     links. Links inside fenced code blocks or inline code spans are
+     skipped because templates contain sample snippets whose paths are
+     relative to ``req/*.md``, not to the template file itself.
+
 The script exits with status 1 if any violation is found, prints a summary
 line otherwise. Allowlist entries can be added to
 ``req/.catalog-allowlist.json``::
@@ -319,18 +326,107 @@ def collect_md_anchor_index() -> dict[str, set[str]]:
 
 
 def collect_docs_anchor_index() -> dict[str, set[str]]:
-    """All heading slugs in ``docs/**/*.md``."""
+    """All heading slugs in ``docs/**/*.md`` and ``req/**/*.md``."""
     docs_anchors: dict[str, set[str]] = {}
-    if not DOCS_DIR.exists():
-        return docs_anchors
-    for md in sorted(DOCS_DIR.rglob("*.md")):
-        text = md.read_text(encoding="utf-8")
-        anchors: set[str] = set()
-        for m in HEADING_RE.finditer(text):
-            anchors.add(github_slug(m.group(2)))
-        rel = md.relative_to(ROOT).as_posix()
-        docs_anchors[rel] = anchors
+    for base in (DOCS_DIR, REQ_DIR):
+        if not base.exists():
+            continue
+        for md in sorted(base.rglob("*.md")):
+            text = md.read_text(encoding="utf-8")
+            anchors: set[str] = set()
+            for m in HEADING_RE.finditer(text):
+                anchors.add(github_slug(m.group(2)))
+            rel = md.relative_to(ROOT).as_posix()
+            docs_anchors[rel] = anchors
     return docs_anchors
+
+
+INLINE_CODE_RE = re.compile(r"``[^`]*``|`[^`]*`")
+
+
+def strip_fenced_code(text: str) -> str:
+    """Replace fenced code blocks and inline code spans with blank
+    placeholders so link/regex scans do not treat sample snippets as
+    real links. Lines are preserved so line numbers stay accurate for
+    diagnostics."""
+    out: list[str] = []
+    in_fence = False
+    for line in text.splitlines():
+        stripped = line.lstrip()
+        if stripped.startswith("```"):
+            in_fence = not in_fence
+            out.append("")
+            continue
+        if in_fence:
+            out.append("")
+            continue
+        # Strip inline code: replace ``...`` and `...` with spaces of the
+        # same length so column positions of preceding text are preserved.
+        out.append(INLINE_CODE_RE.sub(lambda m: " " * len(m.group(0)), line))
+    return "\n".join(out)
+
+
+def validate_md_links(md_path: pathlib.Path,
+                      md_anchors: dict[str, set[str]],
+                      docs_anchors: dict[str, set[str]],
+                      src_anchors: dict[str, set[str]],
+                      errors: list[str]) -> None:
+    """Validate every Markdown link in ``md_path`` resolves to a real target.
+
+    Used for ``req/templates/*.md``, ``req/README.md`` and
+    ``req/13_traceability_matrix.md`` — these are part of the requirements
+    contract but not requirement entries themselves, so they are not parsed
+    as ``## <id>`` blocks but their links must still resolve.
+
+    Links inside fenced code blocks are skipped: templates contain sample
+    snippets whose paths are relative to ``req/*.md``, not to the template
+    file itself.
+    """
+    raw_text = md_path.read_text(encoding="utf-8")
+    text = strip_fenced_code(raw_text)
+    rel_md = md_path.relative_to(ROOT).as_posix()
+    for line_no, line in enumerate(text.splitlines(), start=1):
+        for m in LINK_RE.finditer(line):
+            target = m.group(2)
+            if target.startswith("http") or target.startswith("#"):
+                continue
+            file_part, _, anchor_part = target.partition("#")
+            if not file_part:
+                continue
+            abs_path = (md_path.parent / file_part).resolve()
+            try:
+                rel_to_root = abs_path.relative_to(ROOT).as_posix()
+            except ValueError:
+                continue
+            # Existence check
+            if not abs_path.exists():
+                errors.append(
+                    f"{rel_md}:{line_no}: link to non-existent path "
+                    f"'{target}'"
+                )
+                continue
+            if not anchor_part:
+                continue
+            # Anchor resolution
+            if rel_to_root.startswith("include/pmm/"):
+                if anchor_part not in src_anchors.get(rel_to_root, set()):
+                    errors.append(
+                        f"{rel_md}:{line_no}: link to missing source anchor "
+                        f"'{rel_to_root}#{anchor_part}'"
+                    )
+            elif rel_to_root.endswith(".md"):
+                # Try req/*.md ## <id> anchors first (file-name scoped),
+                # then fall back to GitHub-style heading slugs.
+                base = pathlib.Path(rel_to_root).name
+                if (base in md_anchors
+                        and anchor_part in md_anchors[base]):
+                    continue
+                if anchor_part in docs_anchors.get(rel_to_root, set()):
+                    continue
+                errors.append(
+                    f"{rel_md}:{line_no}: link to missing markdown anchor "
+                    f"'{rel_to_root}#{anchor_part}'"
+                )
 
 
 def main() -> int:
@@ -657,6 +753,19 @@ def main() -> int:
                 f"have a 'req:' line that lists '{rid}' or one of its "
                 f"related ids"
             )
+
+    # 6. Validate links in supporting catalog files (templates, README,
+    #    traceability matrix). These files are part of the requirements
+    #    contract but are not parsed as ``## <id>`` requirement blocks,
+    #    so we only check that their Markdown links resolve.
+    extra_md = list((REQ_DIR / "templates").rglob("*.md")) if (
+        REQ_DIR / "templates").exists() else []
+    for name in NON_REQ_FILES:
+        candidate = REQ_DIR / name
+        if candidate.exists():
+            extra_md.append(candidate)
+    for md in sorted(extra_md):
+        validate_md_links(md, md_anchors, docs_anchors, src_anchors, errors)
 
     if warnings:
         for w in warnings:
