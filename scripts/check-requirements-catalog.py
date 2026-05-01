@@ -14,19 +14,23 @@ contract documented in ``req/templates/`` and ``req/README.md``:
      ``Ограничение`` / ``Критерий``) is present;
    - ``Приоритет`` belongs to the enum ``{Must, Should, Could, Won't}``;
    - ``Статус`` belongs to the enum
-     ``{Draft, Active, Recovered, Deprecated, Superseded}``
-     (legacy ``Issue #...`` values are accepted as an explicit "in-flight"
-     marker but warned about);
+     ``{Draft, Active, Recovered, Deprecated, Superseded}`` — the legacy
+     ``Issue #NNN`` form is rejected and must be migrated to the canonical
+     enum plus a separate ``Tracking issue`` field;
    - the body is non-trivial (at least one sentence beyond the headers);
-   - the ``— анкер`` text-format anchor reference is forbidden.
+   - the ``— анкер`` text-format anchor reference is forbidden;
+   - if the requirement opts in to the verbose template (``Формулировка`` is
+     present), every type-specific mandatory field from
+     ``req/templates/<type>.md`` must be filled.
 
 3. Outgoing links
    - every Markdown link ``[..](path#anchor)`` resolves to an existing file
      and, when the target is an ``include/pmm/**`` source file, the listed
      anchor exists as a PMM block-comment heading in that file;
-   - for ``req/*.md`` targets the anchor must match a ``## <id>`` heading.
+   - for ``req/*.md`` and ``docs/*.md`` targets the anchor must match a
+     ``## <id>`` heading or its GitHub-style slug.
 
-4. Bidirectional traceability
+4. Bidirectional traceability (errors)
    - if a requirement lists ``[name](../include/pmm/<file>#anchor)`` under a
      traceability field, the corresponding source anchor must contain a
      ``req: <id>`` annotation pointing back to the requirement; helper
@@ -36,7 +40,12 @@ contract documented in ``req/templates/`` and ``req/README.md``:
      to an existing requirement;
    - every requirement is reachable from at least one peer:
      either it is a top-level type (``br``) or another requirement (or an
-     ``ac``) references it.
+     ``ac``, or a source anchor's ``req:`` line) references it.
+
+5. Test traceability
+   - every test file referenced from ``Проверяется в:`` / ``Тесты:``
+     contains at least one ``req:`` line that lists the originating
+     requirement (or a parent / acceptance criterion of it).
 
 The script exits with status 1 if any violation is found, prints a summary
 line otherwise. Allowlist entries can be added to
@@ -49,7 +58,13 @@ line otherwise. Allowlist entries can be added to
       "requirements_without_incoming": [
         "br-001"
       ],
-      "requirements_without_outgoing": []
+      "requirements_without_outgoing": [],
+      "test_traceability_exceptions": [
+        "fr-019:tests/test_typed_guard.cpp"
+      ],
+      "verbose_template_exceptions": [
+        "fr-001"
+      ]
     }
 """
 
@@ -65,7 +80,9 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 REQ_DIR = ROOT / "req"
 INC_DIR = ROOT / "include" / "pmm"
 TESTS_DIR = ROOT / "tests"
+DOCS_DIR = ROOT / "docs"
 ALLOWLIST = REQ_DIR / ".catalog-allowlist.json"
+TEMPLATES_DIR = REQ_DIR / "templates"
 
 NON_REQ_FILES = {"README.md", "13_traceability_matrix.md"}
 
@@ -106,11 +123,82 @@ PRIMARY_FIELDS = {
     "ac": ("Критерий", "Формулировка"),
 }
 
+# Type-specific mandatory fields from ``req/templates/<type>.md``. Enforced
+# only when the requirement opts in to the verbose template format by
+# providing ``Формулировка`` (i.e., it stops using the legacy short form).
+# Common required fields (``Тип``, ``Название``, ``Приоритет``, ``Статус``,
+# ``Источник``, ``Формулировка``, ``Контекст и обоснование``) are listed
+# explicitly below per type to keep the schema declarative.
+COMMON_VERBOSE_FIELDS = (
+    "Тип", "Название", "Приоритет", "Статус", "Источник",
+    "Формулировка", "Контекст и обоснование",
+)
+REQUIRED_FIELDS_BY_TYPE = {
+    "br": COMMON_VERBOSE_FIELDS + (
+        "Бизнес-цель", "Ожидаемая ценность", "Границы",
+        "Реализуется в", "Проверяется в",
+    ),
+    "rule": COMMON_VERBOSE_FIELDS + (
+        "Правило", "Область применения", "Запрещённые состояния",
+        "Последствия нарушения", "Связанные требования",
+    ),
+    "ur": COMMON_VERBOSE_FIELDS + (
+        "Роль пользователя", "Пользовательская цель", "Сценарий",
+        "Ожидаемый результат", "Реализуется в", "Проверяется в",
+    ),
+    "feat": COMMON_VERBOSE_FIELDS + (
+        "Описание возможности", "Пользовательский или системный эффект",
+        "Включённое поведение", "Исключённое поведение",
+        "Реализует", "Реализуется в", "Проверяется в",
+    ),
+    "fr": COMMON_VERBOSE_FIELDS + (
+        "Триггер/условие", "Поведение системы", "Результат", "Ошибки/отказы",
+        "Реализует", "Реализуется в", "Проверяется в",
+    ),
+    "dr": COMMON_VERBOSE_FIELDS + (
+        "Структура данных", "Инварианты", "Lifetime/persistence",
+        "Допустимые значения",
+        "Реализует", "Реализуется в", "Проверяется в",
+    ),
+    "if": COMMON_VERBOSE_FIELDS + (
+        "Внешний API/интерфейс", "Сигнатуры или contract-level описание",
+        "Preconditions", "Postconditions", "Ошибки", "Compatibility notes",
+        "Реализует", "Реализуется в", "Проверяется в",
+    ),
+    "qa": COMMON_VERBOSE_FIELDS + (
+        "Категория", "Атрибут качества", "Измеримая характеристика",
+        "Сценарий проверки", "Допустимый порог",
+        "Связанное функциональное поведение",
+        "Реализуется в", "Проверяется в",
+    ),
+    "con": COMMON_VERBOSE_FIELDS + (
+        "Ограничение", "Причина ограничения", "Область действия",
+        "Последствия для реализации", "Связанные требования",
+    ),
+    "sys": COMMON_VERBOSE_FIELDS + (
+        "Системный аспект", "Runtime/build-time условия",
+        "Зависимости от платформы/компилятора", "Связь с CI/test matrix",
+    ),
+    "asm": COMMON_VERBOSE_FIELDS + (
+        "Предположение", "Где используется", "Риск при нарушении",
+        "Fallback/mitigation", "Связано с",
+    ),
+    "dep": COMMON_VERBOSE_FIELDS + (
+        "Зависимость", "Тип зависимости", "Версия/условие",
+        "Влияние на build/runtime", "Fallback/mitigation", "Связано с",
+    ),
+    "ac": COMMON_VERBOSE_FIELDS + (
+        "Проверяемое поведение", "Шаги или сценарий проверки",
+        "Expected result", "Проверяет",
+    ),
+}
+
 PRIORITY_ENUM = {"Must", "Should", "Could", "Won't"}
 STATUS_ENUM = {"Draft", "Active", "Recovered", "Deprecated", "Superseded"}
 
 # Heading and link regexes
 H2_RE = re.compile(r"^## ([^\n]+)$", re.MULTILINE)
+HEADING_RE = re.compile(r"^(#{1,6}) +([^\n]+?)\s*$", re.MULTILINE)
 LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 FIELD_RE = re.compile(r"^- \*\*([^:*]+):\*\*\s*(.*)$", re.MULTILINE)
 REQ_ID_RE = re.compile(r"^[a-z]+(?:-[a-z0-9]+)+$")
@@ -123,6 +211,16 @@ REQ_LINE_RE = re.compile(
     r"^req:\s*([a-z][a-z0-9-]*(?:\s*,\s*[a-z][a-z0-9-]*)*)\s*$"
 )
 BANNED_ANCHOR_TEXT_RE = re.compile(r"`[^`]*\.(?:h|inc)`\s*—\s*анкер")
+TRACKING_ISSUE_RE = re.compile(r"^#\d+(?:\s*,\s*#\d+)*\s*$")
+
+
+def github_slug(heading: str) -> str:
+    """Approximate GitHub-style anchor slug for a heading."""
+    s = heading.strip().lower()
+    # Drop punctuation that GitHub strips, keep word chars, hyphens, spaces
+    s = re.sub(r"[^\w\s-]", "", s, flags=re.UNICODE)
+    s = re.sub(r"\s+", "-", s)
+    return s
 
 
 def load_allowlist() -> dict:
@@ -190,7 +288,28 @@ def collect_anchor_index() -> tuple[dict[str, set[str]], dict[str, dict[str, set
     return file_anchors, req_back_refs
 
 
+def collect_test_req_index() -> dict[str, set[str]]:
+    """``test_file_relpath -> {req-id, ...}`` from ``req:`` annotations."""
+    test_refs: dict[str, set[str]] = defaultdict(set)
+    if not TESTS_DIR.exists():
+        return test_refs
+    for path in sorted(TESTS_DIR.rglob("*.cpp")):
+        rel = path.relative_to(ROOT).as_posix()
+        text = path.read_text(encoding="utf-8")
+        for m in ANCHOR_HEADING_RE.finditer(text):
+            req_block = m.group(3)
+            for line in req_block.strip().splitlines():
+                rm = REQ_LINE_RE.match(line.strip())
+                if not rm:
+                    continue
+                for rid in [x.strip() for x in rm.group(1).split(",")
+                            if x.strip()]:
+                    test_refs[rel].add(rid)
+    return test_refs
+
+
 def collect_md_anchor_index() -> dict[str, set[str]]:
+    """All H2 anchors in ``req/*.md`` and slug-style anchors in ``docs/*.md``."""
     md_anchors: dict[str, set[str]] = {}
     for md in sorted(REQ_DIR.glob("*.md")):
         text = md.read_text(encoding="utf-8")
@@ -199,10 +318,27 @@ def collect_md_anchor_index() -> dict[str, set[str]]:
     return md_anchors
 
 
+def collect_docs_anchor_index() -> dict[str, set[str]]:
+    """All heading slugs in ``docs/**/*.md``."""
+    docs_anchors: dict[str, set[str]] = {}
+    if not DOCS_DIR.exists():
+        return docs_anchors
+    for md in sorted(DOCS_DIR.rglob("*.md")):
+        text = md.read_text(encoding="utf-8")
+        anchors: set[str] = set()
+        for m in HEADING_RE.finditer(text):
+            anchors.add(github_slug(m.group(2)))
+        rel = md.relative_to(ROOT).as_posix()
+        docs_anchors[rel] = anchors
+    return docs_anchors
+
+
 def main() -> int:
     allowlist = load_allowlist()
     md_anchors = collect_md_anchor_index()
+    docs_anchors = collect_docs_anchor_index()
     src_anchors, req_back_refs = collect_anchor_index()
+    test_req_refs = collect_test_req_index()
 
     known_req_ids: set[str] = set()
     for md_name, ids in md_anchors.items():
@@ -218,6 +354,7 @@ def main() -> int:
     # traceability check.
     outgoing_req: dict[str, set[str]] = defaultdict(set)
     outgoing_src: dict[str, set[str]] = defaultdict(set)
+    outgoing_tests: dict[str, set[str]] = defaultdict(set)
 
     for md_path in sorted(REQ_DIR.glob("*.md")):
         if md_path.name in NON_REQ_FILES:
@@ -286,19 +423,30 @@ def main() -> int:
                     f"'Статус'"
                 )
             elif status not in STATUS_ENUM:
-                # Legacy 'Issue #NNN' values are an in-flight marker and
-                # are treated as a warning rather than an error.
+                # Legacy ``Issue #NNN`` form is no longer accepted: it
+                # conflated tracking with status. Use a real enum value
+                # plus an explicit ``Tracking issue`` field.
                 if status.startswith("Issue #"):
-                    warnings.append(
-                        f"{md_path.name}:{line_no}: '{heading}' uses "
-                        f"non-canonical status '{status}'; migrate to one of "
-                        f"{sorted(STATUS_ENUM)}"
+                    errors.append(
+                        f"{md_path.name}:{line_no}: '{heading}' uses legacy "
+                        f"status '{status}'; replace with one of "
+                        f"{sorted(STATUS_ENUM)} and add a separate "
+                        f"'**Tracking issue:** #NNN' field"
                     )
                 else:
                     errors.append(
                         f"{md_path.name}:{line_no}: '{heading}' has invalid "
                         f"'Статус: {status}' (allowed: {sorted(STATUS_ENUM)})"
                     )
+
+            tracking_issue = fields.get("Tracking issue")
+            if tracking_issue is not None and not TRACKING_ISSUE_RE.match(
+                    tracking_issue):
+                errors.append(
+                    f"{md_path.name}:{line_no}: '{heading}' has invalid "
+                    f"'Tracking issue: {tracking_issue}' (expected '#NNN' "
+                    f"or comma-separated list)"
+                )
 
             # Body must contain something beyond a single header line.
             non_blank = [ln for ln in body.strip().splitlines() if ln.strip()]
@@ -308,6 +456,21 @@ def main() -> int:
                     f"short ({len(non_blank)} lines); requirements must be "
                     f"described in detail"
                 )
+
+            # Type-specific verbose-template enforcement: triggered when the
+            # requirement opts in to the canonical name 'Формулировка'.
+            verbose_exceptions = set(
+                allowlist.get("verbose_template_exceptions", []))
+            if ("Формулировка" in fields
+                    and heading not in verbose_exceptions):
+                required = REQUIRED_FIELDS_BY_TYPE.get(prefix, ())
+                missing = [f for f in required if f not in fields]
+                if missing:
+                    errors.append(
+                        f"{md_path.name}:{line_no}: '{heading}' uses verbose "
+                        f"template (Формулировка) but is missing required "
+                        f"fields: {', '.join(missing)}"
+                    )
 
             # 3. Outgoing links
             for link_text, target in LINK_RE.findall(body):
@@ -366,21 +529,40 @@ def main() -> int:
                             else:
                                 outgoing_src[heading].add(
                                     f"{rel_to_root}#{anchor_part}")
+                        elif rel_to_root.endswith(".md"):
+                            # Markdown heading anchor in docs/ or other md.
+                            anchors_in_target = docs_anchors.get(
+                                rel_to_root, set())
+                            if rel_to_root not in docs_anchors:
+                                # e.g. ../README.md — best effort: skip
+                                # unknown files; existence already verified.
+                                pass
+                            elif anchor_part not in anchors_in_target:
+                                errors.append(
+                                    f"{md_path.name}:{line_no}: '{heading}' "
+                                    f"links to missing markdown anchor "
+                                    f"'{rel_to_root}#{anchor_part}'"
+                                )
+
+                    # Track test references for test-traceability check.
+                    if rel_to_root.startswith("tests/"):
+                        outgoing_tests[heading].add(rel_to_root)
 
     # 4. Bidirectional traceability
     # 4a. Source anchors referenced from requirements should trace back via
-    #     ``req:``. The catalog grew before bidirectional discipline was
-    #     enforced, so missing back-refs are reported as warnings — they are
-    #     candidates for follow-up annotation, not blockers.
+    #     ``req:``. With the catalog now back-filled this is enforced as an
+    #     error; ``anchors_without_req_trace`` allowlist still applies for
+    #     anchors that intentionally do not trace.
     for rid, refs in outgoing_src.items():
         for ref in refs:
             if ref in allowlist.get("anchors_without_req_trace", []):
                 continue
             back = req_back_refs.get(rid, set())
             if ref not in back:
-                warnings.append(
-                    f"bidirectional: '{rid}' references source anchor '{ref}' "
-                    f"but the anchor's req: line does not list '{rid}'"
+                errors.append(
+                    f"bidirectional: '{rid}' references source anchor "
+                    f"'{ref}' but the anchor's req: line does not list "
+                    f"'{rid}'"
                 )
 
     # 4b. req: annotations in src/tests must reference known requirement IDs.
@@ -419,8 +601,11 @@ def main() -> int:
     for src_id, targets in outgoing_req.items():
         for t in targets:
             incoming[t].add(src_id)
-    # AC -> requirement covers via `Проверяет:` already counted as outgoing
-    # from the AC; treat it as incoming for the requirement.
+    # Source anchors that ``req:``-list a requirement count as incoming
+    # references — they tie the catalog back to implementation code.
+    for rid, refs in req_back_refs.items():
+        for ref in refs:
+            incoming[rid].add(f"src:{ref}")
 
     allow_no_incoming = set(allowlist.get("requirements_without_incoming", []))
     allow_no_outgoing = set(allowlist.get("requirements_without_outgoing", []))
@@ -430,10 +615,8 @@ def main() -> int:
             continue
         if rid in allow_no_incoming:
             continue
-        # AC requirements are normally referenced from `Проверяется в:` of
-        # other requirements; treat that as incoming.
         if not incoming.get(rid):
-            warnings.append(
+            errors.append(
                 f"orphan: requirement '{rid}' has no incoming references "
                 f"(add a parent ref or allow-list it in "
                 f"req/.catalog-allowlist.json)"
@@ -446,9 +629,34 @@ def main() -> int:
         # ac requirements may have no further outgoing refs beyond Проверяет;
         # those land in outgoing_req via links from inside the AC body.
         if (prefix != "ac" and not outgoing_req.get(rid)
-                and not outgoing_src.get(rid)):
-            warnings.append(
+                and not outgoing_src.get(rid)
+                and not outgoing_tests.get(rid)):
+            errors.append(
                 f"orphan: requirement '{rid}' has no outgoing references")
+
+    # 5. Test traceability: every test linked from a requirement must have a
+    #    ``req:`` annotation that mentions either the requirement itself,
+    #    one of the AC's it gates, or any of its parents.
+    test_exceptions = set(allowlist.get("test_traceability_exceptions", []))
+    for rid, tests in outgoing_tests.items():
+        for tpath in tests:
+            key = f"{rid}:{tpath}"
+            if key in test_exceptions:
+                continue
+            mentioned = test_req_refs.get(tpath, set())
+            if rid in mentioned:
+                continue
+            # Allow indirect coverage: if the requirement's outgoing
+            # parent refs (or its outgoing ac refs) appear in the test.
+            related = outgoing_req.get(rid, set())
+            if mentioned & related:
+                continue
+            errors.append(
+                f"test-traceability: '{rid}' lists '{tpath}' under "
+                f"Проверяется в:/Тесты:, but the test file does not "
+                f"have a 'req:' line that lists '{rid}' or one of its "
+                f"related ids"
+            )
 
     if warnings:
         for w in warnings:

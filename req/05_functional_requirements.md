@@ -211,7 +211,8 @@
 
 - **Требование:** Конвертация байтов в гранулы должна быть проверяемой и не должна кодировать переполнение значением `0`.
 - **Приоритет:** Must
-- **Статус:** Issue #373
+- **Статус:** Active
+- **Tracking issue:** #373
 - **Основание:** `pmm/arena_internals.h`
 - **Реализуется в:**
   - [pmm-detail-arenaview](../include/pmm/arena_internals.h#pmm-detail-arenaview)
@@ -220,7 +221,8 @@
 
 - **Требование:** Публичный API `allocate(0)` должен отклоняться с `PmmError::InvalidSize`; `allocate(overflowing_size)` — с `PmmError::Overflow`.
 - **Приоритет:** Must
-- **Статус:** Issue #373
+- **Статус:** Active
+- **Tracking issue:** #373
 - **Основание:** `pmm/persist_memory_manager.h`
 - **Реализуется в:**
   - [pmm-persistmemorymanager](../include/pmm/persist_memory_manager.h#pmm-persistmemorymanager)
@@ -229,7 +231,8 @@
 
 - **Требование:** Путь аллокации должен вычислять `data_gran` ровно один раз через `bytes_to_granules_checked` до выбора свободного блока.
 - **Приоритет:** Must
-- **Статус:** Issue #373
+- **Статус:** Active
+- **Tracking issue:** #373
 - **Основание:** `pmm/persist_memory_manager.h`
 - **Реализуется в:**
   - [pmm-persistmemorymanager](../include/pmm/persist_memory_manager.h#pmm-persistmemorymanager)
@@ -238,7 +241,8 @@
 
 - **Требование:** Все проверки диапазонов арены должны быть overflow-safe (через `fits_range` / `checked_add` / `checked_mul`).
 - **Приоритет:** Must
-- **Статус:** Issue #373
+- **Статус:** Active
+- **Tracking issue:** #373
 - **Основание:** `pmm/arena_internals.h`
 - **Реализуется в:**
   - [pmm-detail-arenaview](../include/pmm/arena_internals.h#pmm-detail-arenaview)
@@ -247,7 +251,8 @@
 
 - **Требование:** Внутренние операции над физической ареной должны принимать `ArenaView<AT>` или эквивалентную сильно-парную пару `base+header`.
 - **Приоритет:** Must
-- **Статус:** Issue #373
+- **Статус:** Active
+- **Tracking issue:** #373
 - **Основание:** `pmm/arena_internals.h`
 - **Реализуется в:**
   - [pmm-detail-arenaview](../include/pmm/arena_internals.h#pmm-detail-arenaview)
@@ -256,7 +261,8 @@
 
 - **Требование:** Верификация и repair физической цепочки блоков должны завершаться даже на повреждённых образах (детектор циклов).
 - **Приоритет:** Must
-- **Статус:** Issue #373
+- **Статус:** Active
+- **Tracking issue:** #373
 - **Основание:** `pmm/arena_internals.h`
 - **Реализует:** [feat-004](04_features.md#feat-004)
 - **Реализуется в:**
@@ -266,7 +272,8 @@
 
 - **Требование:** Инициализация менеджера должна быть транзакционной: при сбое `create()` `_initialized` должен оставаться `false`.
 - **Приоритет:** Must
-- **Статус:** Issue #373
+- **Статус:** Active
+- **Tracking issue:** #373
 - **Основание:** `pmm/persist_memory_manager.h`
 - **Реализуется в:**
   - [pmm-persistmemorymanager-create](../include/pmm/persist_memory_manager.h#pmm-persistmemorymanager-create)
@@ -275,7 +282,8 @@
 
 - **Требование:** Расширение хранилища должно использовать единую проверяемую growth-policy, учитывающую grow ratio и max-memory лимит.
 - **Приоритет:** Must
-- **Статус:** Issue #373
+- **Статус:** Active
+- **Tracking issue:** #373
 - **Основание:** `pmm/arena_internals.h`, `pmm/layout.h`
 - **Реализуется в:**
   - [pmm-detail-arenaview](../include/pmm/arena_internals.h#pmm-detail-arenaview)
@@ -285,7 +293,8 @@
 
 - **Требование:** Heap backend должен обеспечивать выравнивание базы по `AT::granule_size` (для `LargeAddressTraits` granule = 64).
 - **Приоритет:** Must
-- **Статус:** Issue #373
+- **Статус:** Active
+- **Tracking issue:** #373
 - **Основание:** `pmm/heap_storage.h`
 - **Реализуется в:**
   - [pmm-heapstorage](../include/pmm/heap_storage.h#pmm-heapstorage)
@@ -294,7 +303,8 @@
 
 - **Требование:** Typed allocation должна допускать только типы, выравнивание которых представимо granule_size.
 - **Приоритет:** Must
-- **Статус:** Issue #373
+- **Статус:** Active
+- **Tracking issue:** #373
 - **Основание:** `pmm/typed_manager_api.h`
 - **Реализуется в:**
   - [pmm-detail-persistmemorytypedapi-reallocate_typed](../include/pmm/typed_manager_api.h#pmm-detail-persistmemorytypedapi-reallocate_typed)
@@ -303,7 +313,8 @@
 
 - **Требование:** Все pptr/raw pointer/block index конверсии должны проходить через канонический address layer (`detail::ArenaAddress<AT>`/`ConstArenaAddress<AT>`); невалидные конверсии возвращают `nullptr`/`std::nullopt`, никогда — sentinel-объект.
 - **Приоритет:** Must
-- **Статус:** Issue #375
+- **Статус:** Active
+- **Tracking issue:** #375
 - **Основание:** `pmm/arena_internals.h`
 - **Реализует:** [rule-001](02_business_rules.md#rule-001)
 - **Реализуется в:**
@@ -313,7 +324,8 @@
 
 - **Требование:** `parray::ensure_capacity` и `pstring::ensure_capacity` должны расти через `reallocate_typed`; ручной путь `allocate -> memcpy -> deallocate` запрещён.
 - **Приоритет:** Must
-- **Статус:** Issue #375
+- **Статус:** Active
+- **Tracking issue:** #375
 - **Основание:** `pmm/parray.h`, `pmm/pstring.h`
 - **Реализует:** [feat-008](04_features.md#feat-008)
 - **Реализуется в:**
@@ -324,7 +336,8 @@
 
 - **Требование:** Доступ к AVL/tree header через `pptr<T>` должен явно различать checked (`ManagerT::try_tree_node` → `BlockHeader*`/`nullptr` + `_last_error`) и unchecked (`ManagerT::tree_node_unchecked` → `BlockHeader&`, precondition); ref-returning `tree_node(pptr)` с sentinel-объектом удалён.
 - **Приоритет:** Must
-- **Статус:** Issue #375
+- **Статус:** Active
+- **Tracking issue:** #375
 - **Основание:** `pmm/persist_memory_manager.h`, `pmm/pptr.h`
 - **Реализуется в:**
   - [pmm-persistmemorymanager](../include/pmm/persist_memory_manager.h#pmm-persistmemorymanager)
@@ -334,7 +347,8 @@
 
 - **Требование:** Null-конвенции явные: user-index `0` = persistent null; `AT::no_block` = physical block-list null; helpers не должны их молча конфлатить.
 - **Приоритет:** Must
-- **Статус:** Issue #375
+- **Статус:** Active
+- **Tracking issue:** #375
 - **Основание:** `pmm/arena_internals.h`
 - **Реализуется в:**
   - [pmm-detail-arenaview](../include/pmm/arena_internals.h#pmm-detail-arenaview)
@@ -343,7 +357,8 @@
 
 - **Требование:** Production source LOC ([single_include/pmm/pmm.h](../single_include/pmm/pmm.h)) не должен расти выше зафиксированного baseline; CI скрипт [scripts/check-source-loc-budget.sh](../scripts/check-source-loc-budget.sh) валит PR при превышении.
 - **Приоритет:** Must
-- **Статус:** Issue #375
+- **Статус:** Active
+- **Tracking issue:** #375
 - **Основание:** [scripts/source-loc-baseline.txt](../scripts/source-loc-baseline.txt)
 - **Реализует:** [rule-005](02_business_rules.md#rule-005), [con-010](09_constraints.md#con-010)
 - **Реализуется в:**
