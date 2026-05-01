@@ -1,0 +1,40 @@
+{
+  "_comment": "Allow-list for the requirements catalog validator. Entries here suppress specific warnings produced by scripts/check-requirements-catalog.py. Each list documents an intentional gap that the team has decided to live with rather than back-fill, and serves as a TODO surface — when an entry can be removed, please remove it.",
+  "anchors_without_req_trace": [],
+  "requirements_without_incoming": [
+    "asm-001",
+    "asm-002",
+    "dep-003",
+    "dr-001",
+    "dr-004",
+    "dr-013",
+    "dr-014",
+    "dr-015",
+    "dr-016",
+    "dr-017",
+    "dr-018",
+    "dr-019",
+    "dr-020",
+    "fr-009",
+    "fr-010",
+    "fr-019",
+    "fr-020",
+    "fr-021",
+    "fr-022",
+    "fr-023",
+    "fr-024",
+    "fr-026",
+    "fr-027",
+    "fr-028",
+    "fr-029",
+    "fr-032",
+    "fr-033",
+    "qa-maint-002",
+    "qa-perf-002",
+    "sys-006"
+  ],
+  "requirements_without_outgoing": [
+    "dep-003",
+    "fr-019"
+  ]
+}
