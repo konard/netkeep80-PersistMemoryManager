@@ -69,7 +69,7 @@ Header выполняет роль entry point для recovery и совмест
 
 **Реализуется в:**
 
-- [pmm-managerheader](../../include/pmm/manager_header.h#pmm-managerheader)
+- [pmm-detail-managerheader](../../include/pmm/types.h#pmm-detail-managerheader)
 
 **Проверяется в:**
 

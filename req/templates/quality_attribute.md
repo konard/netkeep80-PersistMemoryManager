@@ -67,7 +67,7 @@ recovery API.
 
 **Реализуется в:**
 
-- [pmm-persistmemorymanager-verify](../../include/pmm/persist_memory_manager.h#pmm-persistmemorymanager-verify)
+- [pmm-verifyresult](../../include/pmm/diagnostics.h#pmm-verifyresult)
 
 **Проверяется в:**
 
