@@ -342,6 +342,11 @@ def collect_docs_anchor_index() -> dict[str, set[str]]:
 
 
 INLINE_CODE_RE = re.compile(r"``[^`]*``|`[^`]*`")
+# A real code fence is a line that begins with ``` followed only by an
+# optional info string (language identifier). Lines like
+# ```` ``` `code-span` ```` are inline-code escapes, not fences, and must
+# not be treated as opening/closing a fence.
+FENCE_LINE_RE = re.compile(r"^\s*```[A-Za-z0-9_-]*\s*$")
 
 
 def strip_fenced_code(text: str) -> str:
@@ -352,8 +357,7 @@ def strip_fenced_code(text: str) -> str:
     out: list[str] = []
     in_fence = False
     for line in text.splitlines():
-        stripped = line.lstrip()
-        if stripped.startswith("```"):
+        if FENCE_LINE_RE.match(line):
             in_fence = not in_fence
             out.append("")
             continue
